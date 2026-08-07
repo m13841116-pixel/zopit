@@ -1,0 +1,6 @@
+{
+  "name": "B2B Marketplace Platform",
+  "description": "A full-stack B2B marketplace application connecting suppliers with store managers, featuring product catalog management, order processing, and financial settlements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
