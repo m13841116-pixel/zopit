@@ -4,18 +4,24 @@ import AdmZip from 'adm-zip';
 
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err);
-  try { fs.appendFileSync('server.log', new Date().toISOString() + ' - UNCAUGHT EXCEPTION: ' + (err.stack || err) + '\n'); } catch (e) {}
+  try {
+    const logPath = process.env.VERCEL ? path.join('/tmp', 'server.log') : 'server.log';
+    fs.appendFileSync(logPath, new Date().toISOString() + ' - UNCAUGHT EXCEPTION: ' + (err.stack || err) + '\n');
+  } catch (e) {}
 });
 process.on('unhandledRejection', (reason, promise) => {
   console.error('UNHANDLED REJECTION at:', promise, 'reason:', reason);
-  try { fs.appendFileSync('server.log', new Date().toISOString() + ' - UNHANDLED REJECTION: ' + ((reason as any)?.stack || reason) + '\n'); } catch (e) {}
+  try {
+    const logPath = process.env.VERCEL ? path.join('/tmp', 'server.log') : 'server.log';
+    fs.appendFileSync(logPath, new Date().toISOString() + ' - UNHANDLED REJECTION: ' + ((reason as any)?.stack || reason) + '\n');
+  } catch (e) {}
 });
 
 const originalConsoleError = console.error;
 console.error = function (...args) {
   originalConsoleError.apply(console, args);
   try {
-    const errorLogPath = path.join(process.cwd(), 'error.log');
+    const errorLogPath = process.env.VERCEL ? path.join('/tmp', 'error.log') : path.join(process.cwd(), 'error.log');
     const logLine = `[${new Date().toISOString()}] ERROR: ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ')}\n`;
     fs.appendFileSync(errorLogPath, logLine);
   } catch (e) {}
@@ -861,7 +867,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || 'dummy_cli
 
 
 // Ensure uploads/labels directory exists for fast base64 to file storage
-const labelsUploadDir = path.join(process.cwd(), 'uploads', 'labels');
+const labelsUploadDir = process.env.VERCEL ? path.join('/tmp', 'uploads', 'labels') : path.join(process.cwd(), 'uploads', 'labels');
 if (!fs.existsSync(labelsUploadDir)) {
   try { fs.mkdirSync(labelsUploadDir, { recursive: true }); } catch (e) {}
 }
@@ -951,7 +957,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve uploads folder statically for product images, receipts, and attachments
-const rootUploadsDir = path.join(process.cwd(), 'uploads');
+const rootUploadsDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(rootUploadsDir)) {
   try { fs.mkdirSync(rootUploadsDir, { recursive: true }); } catch (e) {}
 }
@@ -6787,7 +6793,7 @@ app.post('/api/upload', authenticateToken, multerFn({ dest: rootUploadsDir }).si
   }
 });
 
-const devUploadDir = path.join(process.cwd(), 'uploads');
+const devUploadDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(devUploadDir)) {
   try { fs.mkdirSync(devUploadDir, { recursive: true }); } catch (e) {}
 }

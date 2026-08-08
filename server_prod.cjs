@@ -2548,14 +2548,16 @@ async function syncSingleOrder(storeId, orderId) {
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);
   try {
-    import_fs3.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNCAUGHT EXCEPTION: " + (err.stack || err) + "\n");
+    const logPath = process.env.VERCEL ? import_path3.default.join("/tmp", "server.log") : "server.log";
+    import_fs3.default.appendFileSync(logPath, (/* @__PURE__ */ new Date()).toISOString() + " - UNCAUGHT EXCEPTION: " + (err.stack || err) + "\n");
   } catch (e) {
   }
 });
 process.on("unhandledRejection", (reason, promise) => {
   console.error("UNHANDLED REJECTION at:", promise, "reason:", reason);
   try {
-    import_fs3.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNHANDLED REJECTION: " + (reason?.stack || reason) + "\n");
+    const logPath = process.env.VERCEL ? import_path3.default.join("/tmp", "server.log") : "server.log";
+    import_fs3.default.appendFileSync(logPath, (/* @__PURE__ */ new Date()).toISOString() + " - UNHANDLED REJECTION: " + (reason?.stack || reason) + "\n");
   } catch (e) {
   }
 });
@@ -2563,7 +2565,7 @@ var originalConsoleError = console.error;
 console.error = function(...args) {
   originalConsoleError.apply(console, args);
   try {
-    const errorLogPath = import_path3.default.join(process.cwd(), "error.log");
+    const errorLogPath = process.env.VERCEL ? import_path3.default.join("/tmp", "error.log") : import_path3.default.join(process.cwd(), "error.log");
     const logLine = `[${(/* @__PURE__ */ new Date()).toISOString()}] ERROR: ${args.map((a) => typeof a === "object" ? JSON.stringify(a) : a).join(" ")}
 `;
     import_fs3.default.appendFileSync(errorLogPath, logLine);
@@ -3278,7 +3280,7 @@ var prisma14 = new Proxy({}, {
 });
 var app = (0, import_express.default)();
 var googleClient = new import_google_auth_library.OAuth2Client(process.env.GOOGLE_CLIENT_ID || "dummy_client_id_for_build");
-var labelsUploadDir = import_path3.default.join(process.cwd(), "uploads", "labels");
+var labelsUploadDir = process.env.VERCEL ? import_path3.default.join("/tmp", "uploads", "labels") : import_path3.default.join(process.cwd(), "uploads", "labels");
 if (!import_fs3.default.existsSync(labelsUploadDir)) {
   try {
     import_fs3.default.mkdirSync(labelsUploadDir, { recursive: true });
@@ -3352,7 +3354,7 @@ app.get("/api/orders/:id/postal-label/file", async (req, res) => {
 app.use((0, import_cors.default)({ origin: true, credentials: true }));
 app.use(import_express.default.json({ limit: "50mb" }));
 app.use(import_express.default.urlencoded({ limit: "50mb", extended: true }));
-var rootUploadsDir = import_path3.default.join(process.cwd(), "uploads");
+var rootUploadsDir = process.env.VERCEL ? import_path3.default.join("/tmp", "uploads") : import_path3.default.join(process.cwd(), "uploads");
 if (!import_fs3.default.existsSync(rootUploadsDir)) {
   try {
     import_fs3.default.mkdirSync(rootUploadsDir, { recursive: true });
@@ -8355,7 +8357,7 @@ app.post("/api/upload", authenticateToken, multerFn({ dest: rootUploadsDir }).si
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u0622\u067E\u0644\u0648\u062F \u0641\u0627\u06CC\u0644" });
   }
 });
-var devUploadDir = import_path3.default.join(process.cwd(), "uploads");
+var devUploadDir = process.env.VERCEL ? import_path3.default.join("/tmp", "uploads") : import_path3.default.join(process.cwd(), "uploads");
 if (!import_fs3.default.existsSync(devUploadDir)) {
   try {
     import_fs3.default.mkdirSync(devUploadDir, { recursive: true });
