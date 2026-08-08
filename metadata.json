@@ -1,6 +1,6 @@
 {
-  "name": "B2B Marketplace Platform",
-  "description": "A full-stack B2B marketplace application connecting suppliers with store managers, featuring product catalog management, order processing, and financial settlements.",
-  "requestFramePermissions": [],
+  "name": "Kasp.ir",
+  "description": "Innovative AI Micro-Startups & Custom App Development platform featuring AI Agents showcase, Custom App request with AI Idea Analyzer, and full Admin Dashboard with Freelancer CRM.",
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

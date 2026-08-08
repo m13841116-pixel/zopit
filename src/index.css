@@ -1,347 +1,105 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
-
-@theme {
-  --color-background: var(--background);
-  --color-surface: var(--surface);
-  --color-card: var(--card);
-  --color-elevated: var(--elevated);
-
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-muted: var(--text-muted);
-  --color-text-inverse: var(--text-inverse);
-  --color-inverse: var(--text-inverse);
-
-  --color-border-default: var(--border);
-  --color-border-subtle: var(--border-subtle);
-
-  --color-primary: var(--primary);
-  --color-primary-default: var(--primary);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-light: var(--primary-light);
-  --color-secondary: var(--secondary);
-  --color-accent: var(--accent);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-
-  --font-sans: "Vazirmatn", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-}
 
 @layer base {
   :root {
-    --background: #F8F8FC;
-    --surface: #F3F2FF;
-    --card: #FFFFFF;
-    --elevated: #FFFFFF;
-
-    --text-primary: #111827;
-    --text-secondary: #374151;
-    --text-muted: #6B7280;
-    --text-inverse: #FFFFFF;
-
-    --border: #CBD5E1;
-    --border-subtle: #E2E8F0;
-
-    --primary: #6D28D9;
-    --primary-hover: #5B21B6;
-    --primary-light: #8B5CF6;
-    --secondary: #7C3AED;
-    --accent: #A855F7;
-    
-    --success: #22C55E;
-    --warning: #F59E0B;
-    --danger: #EF4444;
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #e2e8f0;
+    --accent-blue: #2563eb;
+    --accent-purple: #7c3aed;
   }
 
   .dark {
-    --background: #0F172A;
-    --surface: #1E1B4B;
-    --card: #2E1065;
-    --elevated: #2E1065;
-
-    --text-primary: #F8FAFC;
-    --text-secondary: #E2E8F0;
-    --text-muted: #94A3B8;
-    --text-inverse: #FFFFFF;
-
-    --border: #4338CA;
-    --border-subtle: #3730A3;
-
-    --primary: #8B5CF6;
-    --primary-hover: #A855F7;
-    --primary-light: #C084FC;
-    --secondary: #9333EA;
-    --accent: #D8B4FE;
-    
-    --success: #22C55E;
-    --warning: #F59E0B;
-    --danger: #EF4444;
+    --bg-primary: #080c18;
+    --bg-card: #0f172a;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #1e293b;
+    --accent-blue: #3b82f6;
+    --accent-purple: #a855f7;
   }
 
-  body {
-    font-family: var(--font-sans);
-    background-color: var(--background);
+  html, body {
+    background-color: var(--bg-primary);
     color: var(--text-primary);
-  }
-
-  /* Smooth transitions */
-  *, *::before, *::after {
-    transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
-                color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
-                border-color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
-                box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  /* Modern input fields styling */
-  input[type="text"],
-  input[type="number"],
-  input[type="email"],
-  input[type="password"],
-  input[type="tel"],
-  input[type="url"],
-  select,
-  textarea {
-    @apply bg-surface border border-border-default rounded-xl px-4 py-2.5 text-sm outline-none text-text-primary;
-    border: 1px solid var(--border);
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
-  }
-
-  .dark input[type="text"],
-  .dark input[type="number"],
-  .dark input[type="email"],
-  .dark input[type="password"],
-  .dark input[type="tel"],
-  .dark input[type="url"],
-  .dark select,
-  .dark textarea {
-    background-color: var(--background);
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3);
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: var(--text-muted);
-    opacity: 1;
-  }
-
-  input:focus, select:focus, textarea:focus {
-    @apply bg-card border-primary-default ring-4 ring-primary-default/20 scale-[1.01] shadow-lg shadow-primary-default/10;
-    transform: translateY(-1px) scale(1.01);
-  }
-
-  .dark input:focus, .dark select:focus, .dark textarea:focus {
-    @apply bg-surface border-primary-default;
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25), 0 4px 12px rgba(0, 0, 0, 0.5);
-  }
-
-  input:disabled, select:disabled, textarea:disabled {
-    @apply bg-surface text-text-muted border-border-subtle opacity-70 cursor-not-allowed;
-  }
-
-  /* Beautiful modern buttons global guidelines */
-  button {
-    font-family: var(--font-sans);
-  }
-
-  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-    @apply outline-none ring-2 ring-primary-default ring-offset-2 ring-offset-background;
+    font-family: 'Yekan Bakh', 'YekanBakh', 'IRANYekanX', 'IRANYekan', 'Yekan', 'Vazirmatn', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden;
   }
 }
 
-/* Card and Surface styles for dark mode */
-.dark .bg-card, .dark .bg-surface {
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+.glass-panel {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
 }
 
-html:not(.dark) .bg-card, html:not(.dark) .bg-surface {
-  border: 1px solid var(--border-subtle);
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(30, 41, 59, 0.8);
 }
 
-/* Custom Floating Animations */
-@keyframes float {
-  0% { transform: translateY(0px) scale(1) rotate(0deg); }
-  50% { transform: translateY(-30px) scale(1.05) rotate(4deg); }
-  100% { transform: translateY(0px) scale(1) rotate(0deg); }
-}
-@keyframes float-delayed {
-  0% { transform: translateY(0px) scale(1) rotate(0deg); }
-  50% { transform: translateY(25px) scale(1.08) rotate(-5deg); }
-  100% { transform: translateY(0px) scale(1) rotate(0deg); }
-}
-.animate-float {
-  animation: float 14s ease-in-out infinite;
-}
-.animate-float-delayed {
-  animation: float-delayed 18s ease-in-out infinite;
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
 }
 
-@layer base {
-  /* Tables */
-  table {
-    @apply w-full text-right border-collapse;
-  }
-  
-  th {
-    @apply bg-surface text-text-muted font-bold text-xs py-4 px-4 border-b border-border-subtle sticky top-0 z-10;
-  }
-
-  td {
-    @apply py-4 px-4 border-b border-border-subtle text-sm text-text-primary;
-  }
-
-  tr:hover td {
-    @apply bg-surface/50 transition-colors;
-  }
-  
-  /* Make zebra stripes very subtle */
-  tbody tr:nth-child(even) td {
-    background-color: color-mix(in srgb, var(--surface) 30%, transparent);
-  }
-
-  /* Consistent border radius and subtle shadows for cards */
-  .bg-card {
-    @apply rounded-[1.25rem] shadow-sm;
-  }
-
-  .dark .bg-card {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
-  }
-
-  /* Typography improvements */
-  h1, h2, h3, h4, h5, h6 {
-    @apply text-text-primary tracking-tight;
-  }
-
-  label {
-    @apply text-text-secondary font-medium;
-  }
+.dark .glass-card {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(30, 41, 59, 0.8);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.2);
 }
 
-/* Print Media Styles for Invoices & Reports */
-@media print {
-  /* Hide interactive, non-essential elements */
-  nav, sidebar, header, footer, button, .no-print, [role="button"],
-  .fixed, .absolute, .shadow-lg, .shadow-sm, .shadow-xl, .shadow-2xl, .shadow-md,
-  .backdrop-blur-sm, .bg-background\/60, .modal-backdrop {
-    display: none !important;
-  }
-
-  /* Reset main container and layout constraints */
-  body, html, main, #root, .flex-1, .grid {
-    background: #ffffff !important;
-    color: #000000 !important;
-    width: 100% !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    position: static !important;
-    overflow: visible !important;
-  }
-
-  /* Ensure modal or specific printing content fills the screen */
-  .fixed.inset-0, .modal {
-    position: static !important;
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  .bg-card, .bg-surface, .bg-gradient-to-br, .bg-gradient-to-r {
-    background: #ffffff !important;
-    color: #000000 !important;
-    border: 1px solid #e2e8f0 !important;
-    box-shadow: none !important;
-  }
-
-  /* Text color corrections for high contrast printing */
-  h1, h2, h3, h4, h5, h6, p, span, td, th, div, label {
-    color: #000000 !important;
-    text-shadow: none !important;
-  }
-
-  /* Format tables professionally for print */
-  table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    page-break-inside: auto !important;
-  }
-
-  tr {
-    page-break-inside: avoid !important;
-    page-break-after: auto !important;
-  }
-
-  th, td {
-    border: 1px solid #cbd5e1 !important;
-    padding: 8px 12px !important;
-    background: transparent !important;
-  }
-
-  /* Page break rules */
-  .page-break-before {
-    page-break-before: always !important;
-  }
-  .page-break-after {
-    page-break-after: always !important;
-  }
+.gradient-text {
+  background: linear-gradient(135deg, #4f46e5 0%, #9333ea 50%, #ec4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-/* High-contrast and darker shade updates as requested by the user */
-#view-role .group.bg-card.border-2.border-subtle.p-5 h3,
-#view-role .group.bg-card.border-2.border-subtle.p-5 .text-primary,
-#view-role .group.bg-card.border-2.border-subtle.p-5 .text-lg.font-black,
-#view-role .text-xs.text-primary.mt-1.leading-relaxed.font-medium,
-#view-customer h2,
-#view-customer p.text-primary,
-#view-customer .text-primary,
-#view-supplier-form h2,
-#view-supplier-form .text-primary,
-#view-store-form h2,
-#view-store-form .text-primary {
-  color: #1e293b !important;
+.dark .gradient-text {
+  background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-/* Maintain readability in dark mode */
-.dark #view-role .group.bg-card.border-2.border-subtle.p-5 h3,
-.dark #view-role .group.bg-card.border-2.border-subtle.p-5 .text-primary,
-.dark #view-role .group.bg-card.border-2.border-subtle.p-5 .text-lg.font-black,
-.dark #view-role .text-xs.text-primary.mt-1.leading-relaxed.font-medium,
-.dark #view-customer h2,
-.dark #view-customer p.text-primary,
-.dark #view-customer .text-primary,
-.dark #view-supplier-form h2,
-.dark #view-supplier-form .text-primary,
-.dark #view-store-form h2,
-.dark #view-store-form .text-primary {
-  color: #f8fafc !important;
+.glow-purple {
+  box-shadow: 0 0 35px -5px rgba(124, 58, 237, 0.25);
 }
 
+.glow-indigo {
+  box-shadow: 0 0 35px -5px rgba(79, 70, 229, 0.25);
+}
 
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
-/* Remove number input spinners */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-input[type=number] {
-  -moz-appearance: textfield;
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
 }
-input[type="number"] {
-  -moz-appearance: textfield;
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
+
