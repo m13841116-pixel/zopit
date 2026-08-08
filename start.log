@@ -1,0 +1,9 @@
+◇ injected env (2) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+[Server Startup] No real remote DB URL found, but defaulting to postgresql for Vercel/Neon deployment.
+[Notification Service] Initialized and listening to events.
+[Background Job] Started FinancialJobs
+[Express Static] Serving static files from distPath: /app/applet/prod_output
+🚀 Backend Express server running on port 3000
+[Server Startup] Skipping DB seeding because a dummy URL is configured.
+[Server Startup] Skipping wallet sync because a dummy URL is configured.

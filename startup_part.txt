@@ -1,0 +1,300 @@
+import './src/env-loader.js';
+import multer from 'multer';
+import AdmZip from 'adm-zip';
+
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+  try { fs.appendFileSync('server.log', new Date().toISOString() + ' - UNCAUGHT EXCEPTION: ' + (err.stack || err) + '\n'); } catch (e) {}
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION at:', promise, 'reason:', reason);
+  try { fs.appendFileSync('server.log', new Date().toISOString() + ' - UNHANDLED REJECTION: ' + ((reason as any)?.stack || reason) + '\n'); } catch (e) {}
+});
+
+const originalConsoleError = console.error;
+console.error = function (...args) {
+  originalConsoleError.apply(console, args);
+  try {
+    const errorLogPath = path.join(process.cwd(), 'error.log');
+    const logLine = `[${new Date().toISOString()}] ERROR: ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ')}\n`;
+    fs.appendFileSync(errorLogPath, logLine);
+  } catch (e) {}
+};
+
+import { registerAdminShippingRoutes } from './src/services/adminShippingRoutes.js';
+import { registerStoreShippingRoutes } from './src/services/storeShippingRoutes.js';
+import { sendSmsViaMelliPayamak, notifySupplierNewOrder } from './src/services/sms/SmsService.js';
+import { OAuth2Client } from 'google-auth-library';
+import express from 'express';
+
+function toEngDigits(str: any): any {
+  if (typeof str !== 'string') return str;
+  return str.replace(/[۰-۹]/g, (d: string) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d).toString());
+}
+
+function safeParseFloat(val: any, fallback = 0): number {
+  if (val === undefined || val === null || val === '') return fallback;
+  const engStr = toEngDigits(val.toString());
+  const parsed = parseFloat(engStr);
+  return isNaN(parsed) ? fallback : parsed;
+}
+
+function safeParseInt(val: any, fallback = 0): number {
+  if (val === undefined || val === null || val === '') return fallback;
+  const engStr = toEngDigits(val.toString());
+  const parsed = parseInt(engStr, 10);
+  return isNaN(parsed) ? fallback : parsed;
+}
+
+import rateLimit from 'express-rate-limit';
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
+
+import dotenv from 'dotenv';
+import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import { execSync } from 'child_process';
+
+let PrismaClient: any;
+try {
+  PrismaClient = require('@prisma/client').PrismaClient;
+} catch (err: any) {
+  console.warn('PrismaClient loading failed initially, will attempt lazy loading:', err.message);
+}
+import { NotificationService } from './src/services/NotificationService.js';
+import registerConfig from './src/services/configRoute.js';
+import registerNewFeatures from './src/services/newFeaturesRoute.js';
+import registerAnnouncements from './src/services/announcementsRoute.js';
+import registerOrderLabel from './src/services/orderLabelRoute.js';
+import registerPenaltyRoutes from './src/services/penaltyRoute.js';
+import registerAIStudioRoute from './src/services/aiStudioRoute.js';
+
+import { z } from 'zod';
+
+import { FinancialJobs } from './src/services/financial/Jobs.js';
+import { PaymentLifecycleService } from './src/services/financial/PaymentLifecycleService.js';
+import { PaymentServiceFactory } from './src/services/payment/PaymentServiceFactory.js';
+import { initiatePaymentSchema, refundPaymentSchema, reportQuerySchema } from './src/validators/financial.js';
+
+
+function findTrueRootDir(): string {
+  const current = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
+  if (fs.existsSync(path.join(current, 'package.json'))) {
+    return current;
+  }
+  const parent = path.join(current, '..');
+  if (fs.existsSync(path.join(parent, 'package.json'))) {
+    return parent;
+  }
+  return current;
+}
+
+const isAIStudioEnv = !!process.env.APPLET_ID;
+const isCloudRunEnv = !!process.env.K_SERVICE || (!!process.env.PORT && process.env.NODE_ENV === 'production');
+const rootDir = (isAIStudioEnv || isCloudRunEnv) ? process.cwd() : findTrueRootDir();
+
+// Load environment variables from correct root path
+dotenv.config({ path: path.join(rootDir, '.env') });
+
+// Dynamically locate and set the Prisma query engine library for cPanel/shared hosting
+try {
+  if (!isAIStudioEnv) {
+    const distDir = path.join(rootDir, 'prod_output');
+    let enginePath: string | null = null;
+    
+    // 1. Search in prod_output/
+    if (fs.existsSync(distDir)) {
+      const files = fs.readdirSync(distDir);
+      let engineFile = files.find(f => {
+        const isEngine = (f.includes('query-engine') || f.includes('query_engine')) && f.endsWith('.node');
+        return isEngine && f.includes('rhel');
+      });
+      if (!engineFile) {
+        engineFile = files.find(f => (f.includes('query-engine') || f.includes('query_engine')) && f.endsWith('.node'));
+      }
+      if (engineFile) {
+        enginePath = path.join(distDir, engineFile);
+      }
+    }
+    // 2. Search in root/
+    if (!enginePath && fs.existsSync(rootDir)) {
+      const files = fs.readdirSync(rootDir);
+      let engineFile = files.find(f => {
+        const isEngine = (f.includes('query-engine') || f.includes('query_engine')) && f.endsWith('.node');
+        return isEngine && f.includes('rhel');
+      });
+      if (!engineFile) {
+        engineFile = files.find(f => (f.includes('query-engine') || f.includes('query_engine')) && f.endsWith('.node'));
+      }
+      if (engineFile) {
+        enginePath = path.join(rootDir, engineFile);
+      }
+    }
+    
+    if (enginePath && !isCloudRunEnv) {
+      process.env.PRISMA_QUERY_ENGINE_LIBRARY = enginePath;
+      console.log('[Prisma Config] Set query engine library to:', enginePath);
+    }
+  }
+} catch (err: any) {
+  console.warn('[Prisma Config] Failed to detect query engine library:', err.message);
+}
+
+// Security: Rate Limiters
+const webhookLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 webhook requests per windowMs
+  message: { error: 'Too many webhook requests from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const payoutRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // Limit each IP to 5 payout requests per hour
+  message: { error: 'Too many payout requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
+// Check if we are running inside Google AI Studio container or Cloud Run container with local mysql URL
+const isAIStudio = !!process.env.APPLET_ID;
+let dbUrl = process.env.DATABASE_URL || '';
+
+// Sanitize database URL if password contains unencoded @ symbols or duplicate variable names
+function sanitizeDbUrl(rawUrl: string): string {
+  if (!rawUrl) return rawUrl;
+  let url = rawUrl.trim();
+  
+  while (url.startsWith('DATABASE_URL=')) {
+    url = url.substring('DATABASE_URL='.length).trim();
+  }
+  
+  while ((url.startsWith('"') && url.endsWith('"')) || (url.startsWith("'") && url.endsWith("'"))) {
+    url = url.slice(1, -1).trim();
+  }
+  
+  const match = url.match(/^([a-zA-Z0-9+-]+:\/\/)(.*)$/);
+  if (!match) return url;
+  const scheme = match[1];
+  const rest = match[2];
+  const lastAtIndex = rest.lastIndexOf('@');
+  if (lastAtIndex === -1) return url;
+  const credentials = rest.substring(0, lastAtIndex);
+  const hostAndDb = rest.substring(lastAtIndex + 1);
+  const firstColon = credentials.indexOf(':');
+  if (firstColon === -1) return url;
+  const username = credentials.substring(0, firstColon);
+  let password = credentials.substring(firstColon + 1);
+  password = password.replace(/@/g, '%40');
+  return `${scheme}${username}:${password}@${hostAndDb}`;
+}
+
+dbUrl = sanitizeDbUrl(dbUrl);
+process.env.DATABASE_URL = dbUrl;
+
+const isCloudRun = !!process.env.K_SERVICE || (!!process.env.PORT && dbUrl.includes('localhost'));
+
+let provider = 'mysql'; // Default for production/cPanel
+
+const isRealRemoteDb = dbUrl && (
+  dbUrl.startsWith('mysql://') || 
+  dbUrl.startsWith('mysqls://') || 
+  dbUrl.startsWith('postgresql://') || 
+  dbUrl.startsWith('postgres://')
+) && !dbUrl.includes('localhost') && !dbUrl.includes('127.0.0.1') && !dbUrl.includes('dummy_db');
+
+if (!isRealRemoteDb) {
+  provider = 'postgresql';
+  dbUrl = 'postgresql://dummy:dummy@dummy_db/dummy';
+  process.env.DATABASE_URL = dbUrl;
+  console.log('[Server Startup] No real remote DB URL found, but defaulting to postgresql for Vercel/Neon deployment.');
+} else {
+  // Outside AI Studio (on user's cPanel host), keep existing database provider and config untouched.
+  if (dbUrl.startsWith('mysql://') || dbUrl.startsWith('mysqls://')) {
+    provider = 'mysql';
+  } else if (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) {
+    provider = 'postgresql';
+  } else if (dbUrl.startsWith('file:') || dbUrl.includes('.db')) {
+    provider = 'sqlite';
+  }
+
+  // Automate DB schema synchronization and client generation on cPanel/shared hosting in a non-blocking background process
+  if (dbUrl) {
+    setTimeout(async () => {
+      console.log('[cPanel Auto DB] Running setup-db.js in background...');
+      try {
+        execSync('node setup-db.js', { stdio: 'inherit', env: { ...process.env, DATABASE_URL: dbUrl } });
+        console.log('[cPanel Auto DB] Database synchronized successfully.');
+      } catch (err: any) {
+        console.error('[cPanel Auto DB] Background setup-db.js warning:', err?.message || err);
+      }
+    }, 1000);
+  }
+}
+
+let realPrisma: any = null;
+let isPrismaMock = false;
+
+const noOpMock: any = new Proxy({
+  $transaction: async (cb: any) => {
+    if (typeof cb === 'function') {
+      return cb(new Proxy({}, { get: () => noOpMock }));
+    }
+    return [];
+  },
+  $connect: async () => {},
+  $disconnect: async () => {},
+}, {
+  get: function(target, prop) {
+    if (prop in target) return target[prop];
+    return new Proxy({}, {
+      get: function(subTarget, subProp) {
+        return async (...args: any[]) => {
+          if (subProp === 'findMany') return [];
+          if (subProp === 'findFirst' || subProp === 'findUnique') return null;
+          if (subProp === 'create' || subProp === 'update') return args[0]?.data ?? {};
+          if (subProp === 'delete' || subProp === 'deleteMany') return { count: 0 };
+          if (subProp === 'count') return 0;
+          return null;
+        };
+      }
+    });
+  }
+});
+/* 
+  findMany: async () => [], 
+  findFirst: async () => null,
+  findUnique: async () => null, 
+  create: async (d: any) => d?.data ?? {},
+  update: async (d: any) => d?.data ?? {}, 
+  delete: async () => ({}), 
+  upsert: async (d: any) => d?.create ?? {},
+  count: async () => 0,
+  aggregate: async () => ({ _sum: { totalAmount: 0 } }),
+  groupBy: async () => [],
+  updateMany: async () => ({ count: 0 }),
+  deleteMany: async () => ({ count: 0 }),
+  $connect: async () => {},
+  $disconnect: async () => {}
+};
+*/
+
+function getActivePrisma() {
+  if (!realPrisma || isPrismaMock) {
+    try {
+      if (PrismaClient) {
+        const url = process.env.DATABASE_URL || dbUrl;
+        realPrisma = new PrismaClient({
+          datasources: {
