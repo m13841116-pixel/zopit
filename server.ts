@@ -141,7 +141,7 @@ try {
       }
     }
     
-    if (enginePath && !isCloudRunEnv) {
+    if (enginePath && !isCloudRunEnv && !process.env.VERCEL) {
       process.env.PRISMA_QUERY_ENGINE_LIBRARY = enginePath;
       console.log('[Prisma Config] Set query engine library to:', enginePath);
     }
@@ -230,15 +230,15 @@ if (!isRealRemoteDb) {
     provider = 'sqlite';
   }
 
-  // Automate DB schema synchronization and client generation on cPanel/shared hosting in a non-blocking background process
+  // Automate DB schema synchronization and client generation on remote database deployment in a non-blocking background process
   if (dbUrl) {
     setTimeout(async () => {
-      console.log('[cPanel Auto DB] Running setup-db.js in background...');
+      console.log('[Auto DB] Running setup-db.js in background...');
       try {
         execSync('node setup-db.js', { stdio: 'inherit', env: { ...process.env, DATABASE_URL: dbUrl } });
-        console.log('[cPanel Auto DB] Database synchronized successfully.');
+        console.log('[Auto DB] Database synchronized successfully.');
       } catch (err: any) {
-        console.error('[cPanel Auto DB] Background setup-db.js warning:', err?.message || err);
+        console.error('[Auto DB] Background setup-db.js warning:', err?.message || err);
       }
     }, 1000);
   }
@@ -763,6 +763,13 @@ const memoryStore = new MemoryDatabase();
 function getActivePrisma() {
   if (!realPrisma || isPrismaMock) {
     try {
+      if (!PrismaClient) {
+        try {
+          PrismaClient = require('@prisma/client').PrismaClient;
+        } catch (e: any) {
+          console.warn('[Server Prisma] Failed to require @prisma/client dynamically:', e.message);
+        }
+      }
       if (PrismaClient && isRealRemoteDb) {
         const url = process.env.DATABASE_URL || dbUrl;
         realPrisma = new PrismaClient({
@@ -785,7 +792,18 @@ function getActivePrisma() {
 }
 
 let prisma: any = new Proxy({}, {
-  get(target, prop: string) {
+  get(target, prop) {
+    if (typeof prop !== 'string') {
+      return Reflect.get(target, prop);
+    }
+    // Prevent promise-like behavior or inspection infinite loops
+    if (prop === 'then' || prop === 'catch' || prop === 'finally') {
+      return undefined;
+    }
+    if (prop === 'inspect' || prop === 'toJSON' || prop === 'toString' || prop.startsWith('_')) {
+      return undefined;
+    }
+
     if (prop === '$transaction') {
       return async (cbOrList: any) => {
         if (typeof cbOrList === 'function') {
@@ -805,7 +823,17 @@ let prisma: any = new Proxy({}, {
     }
 
     return new Proxy({}, {
-      get(subTarget, subProp: string) {
+      get(subTarget, subProp) {
+        if (typeof subProp !== 'string') {
+          return Reflect.get(subTarget, subProp);
+        }
+        if (subProp === 'then' || subProp === 'catch' || subProp === 'finally') {
+          return undefined;
+        }
+        if (subProp === 'inspect' || subProp === 'toJSON' || subProp === 'toString' || subProp.startsWith('_')) {
+          return undefined;
+        }
+
         return async (...args: any[]) => {
           const active = getActivePrisma();
           if (isRealRemoteDb && active && !isPrismaMock && typeof active[prop]?.[subProp] === 'function') {

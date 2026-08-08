@@ -2557,7 +2557,7 @@ try {
         enginePath = import_path3.default.join(rootDir2, engineFile);
       }
     }
-    if (enginePath && !isCloudRunEnv2) {
+    if (enginePath && !isCloudRunEnv2 && !process.env.VERCEL) {
       process.env.PRISMA_QUERY_ENGINE_LIBRARY = enginePath;
       console.log("[Prisma Config] Set query engine library to:", enginePath);
     }
@@ -2629,51 +2629,498 @@ if (!isRealRemoteDb2) {
   }
   if (dbUrl2) {
     setTimeout(async () => {
-      console.log("[cPanel Auto DB] Running setup-db.js in background...");
+      console.log("[Auto DB] Running setup-db.js in background...");
       try {
         (0, import_child_process.execSync)("node setup-db.js", { stdio: "inherit", env: { ...process.env, DATABASE_URL: dbUrl2 } });
-        console.log("[cPanel Auto DB] Database synchronized successfully.");
+        console.log("[Auto DB] Database synchronized successfully.");
       } catch (err) {
-        console.error("[cPanel Auto DB] Background setup-db.js warning:", (err == null ? void 0 : err.message) || err);
+        console.error("[Auto DB] Background setup-db.js warning:", (err == null ? void 0 : err.message) || err);
       }
     }, 1e3);
   }
 }
 var realPrisma = null;
 var isPrismaMock = false;
-var noOpMock = new Proxy({
-  $transaction: async (cb) => {
-    if (typeof cb === "function") {
-      return cb(new Proxy({}, { get: () => noOpMock }));
+var MemoryDatabase = class {
+  collections = /* @__PURE__ */ new Map();
+  autoId = /* @__PURE__ */ new Map();
+  constructor() {
+    this.seedInitialData();
+  }
+  normalizeModel(model) {
+    return String(model).toLowerCase();
+  }
+  getCollection(model) {
+    const key2 = this.normalizeModel(model);
+    if (!this.collections.has(key2)) {
+      this.collections.set(key2, []);
+      this.autoId.set(key2, 1);
     }
-    return [];
-  },
-  $connect: async () => {
-  },
-  $disconnect: async () => {
+    return this.collections.get(key2);
   }
-}, {
-  get: function(target, prop) {
-    if (prop in target) return target[prop];
-    return new Proxy({}, {
-      get: function(subTarget, subProp) {
-        return async (...args) => {
-          var _a;
-          if (subProp === "findMany") return [];
-          if (subProp === "findFirst" || subProp === "findUnique") return null;
-          if (subProp === "create" || subProp === "update") return ((_a = args[0]) == null ? void 0 : _a.data) ?? {};
-          if (subProp === "delete" || subProp === "deleteMany") return { count: 0 };
-          if (subProp === "count") return 0;
-          return null;
-        };
+  getNextId(model) {
+    const key2 = this.normalizeModel(model);
+    const current = this.autoId.get(key2) || 1;
+    this.autoId.set(key2, current + 1);
+    return current;
+  }
+  matchCondition(itemVal, condVal) {
+    if (condVal === void 0) return true;
+    if (condVal === null) return itemVal === null;
+    if (typeof condVal === "object" && !Array.isArray(condVal) && !(condVal instanceof Date)) {
+      for (const [op, val] of Object.entries(condVal)) {
+        if (op === "equals") {
+          if (itemVal !== val) return false;
+        } else if (op === "in") {
+          if (!Array.isArray(val) || !val.includes(itemVal)) return false;
+        } else if (op === "notIn") {
+          if (Array.isArray(val) && val.includes(itemVal)) return false;
+        } else if (op === "not") {
+          if (itemVal === val) return false;
+        } else if (op === "contains") {
+          const itemStr = String(itemVal || "").toLowerCase();
+          const targetStr = String(val || "").toLowerCase();
+          if (!itemStr.includes(targetStr)) return false;
+        } else if (op === "startsWith") {
+          const itemStr = String(itemVal || "").toLowerCase();
+          const targetStr = String(val || "").toLowerCase();
+          if (!itemStr.startsWith(targetStr)) return false;
+        } else if (op === "endsWith") {
+          const itemStr = String(itemVal || "").toLowerCase();
+          const targetStr = String(val || "").toLowerCase();
+          if (!itemStr.endsWith(targetStr)) return false;
+        } else if (op === "gt") {
+          if (!(itemVal > val)) return false;
+        } else if (op === "gte") {
+          if (!(itemVal >= val)) return false;
+        } else if (op === "lt") {
+          if (!(itemVal < val)) return false;
+        } else if (op === "lte") {
+          if (!(itemVal <= val)) return false;
+        }
       }
-    });
+      return true;
+    }
+    return itemVal === condVal;
   }
-});
+  matchWhere(item, where) {
+    if (!where || typeof where !== "object") return true;
+    for (const [key2, val] of Object.entries(where)) {
+      if (key2 === "OR") {
+        if (Array.isArray(val)) {
+          const anyMatch = val.some((subWhere) => this.matchWhere(item, subWhere));
+          if (!anyMatch) return false;
+        }
+      } else if (key2 === "AND") {
+        if (Array.isArray(val)) {
+          const allMatch = val.every((subWhere) => this.matchWhere(item, subWhere));
+          if (!allMatch) return false;
+        }
+      } else if (key2 === "NOT") {
+        if (Array.isArray(val)) {
+          const notMatch = val.some((subWhere) => this.matchWhere(item, subWhere));
+          if (notMatch) return false;
+        } else if (typeof val === "object") {
+          if (this.matchWhere(item, val)) return false;
+        }
+      } else {
+        const itemVal = item[key2];
+        if (!this.matchCondition(itemVal, val)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  attachRelations(model, item, include) {
+    if (!include || typeof include !== "object" || !item) return item;
+    const cloned = { ...item };
+    const normModel = this.normalizeModel(model);
+    if (include.storeManager || include.user || include.supplier || include.customer) {
+      const users = this.getCollection("user");
+      const targetUserId = item.storeManagerId || item.userId || item.supplierId || item.customerId || item.id;
+      const foundUser = users.find((u) => u.id === targetUserId);
+      if (include.storeManager) cloned.storeManager = foundUser ? { ...foundUser } : null;
+      if (include.user) cloned.user = foundUser ? { ...foundUser } : null;
+      if (include.supplier) cloned.supplier = foundUser ? { ...foundUser } : null;
+      if (include.customer) cloned.customer = foundUser ? { ...foundUser } : null;
+    }
+    if (include.orders) {
+      const orders = this.getCollection("order");
+      cloned.orders = orders.filter((o) => o.storeInvoiceId === item.id || o.storeId === item.id);
+    }
+    if (include.items) {
+      const orderItems = this.getCollection("orderitem");
+      cloned.items = orderItems.filter((it) => it.orderId === item.id || it.storeInvoiceId === item.id);
+    }
+    if (include.product) {
+      const products = this.getCollection("product");
+      cloned.product = products.find((p) => p.id === item.productId) || null;
+    }
+    if (include.category) {
+      const categories = this.getCollection("category");
+      cloned.category = categories.find((c) => c.id === item.categoryId) || null;
+    }
+    return cloned;
+  }
+  async execute(model, method, args = {}) {
+    var _a, _b;
+    const list = this.getCollection(model);
+    switch (method) {
+      case "findMany": {
+        let results = list.filter((item) => this.matchWhere(item, args == null ? void 0 : args.where));
+        if (args == null ? void 0 : args.orderBy) {
+          const orderRules = Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy];
+          results.sort((a, b) => {
+            for (const rule of orderRules) {
+              for (const [field, dir] of Object.entries(rule)) {
+                const aVal = a[field];
+                const bVal = b[field];
+                const orderDir = String(dir).toLowerCase() === "desc" ? -1 : 1;
+                if (aVal < bVal) return -1 * orderDir;
+                if (aVal > bVal) return 1 * orderDir;
+              }
+            }
+            return 0;
+          });
+        }
+        if (args == null ? void 0 : args.skip) {
+          results = results.slice(args.skip);
+        }
+        if (args == null ? void 0 : args.take) {
+          results = results.slice(0, args.take);
+        }
+        if (args == null ? void 0 : args.include) {
+          results = results.map((it) => this.attachRelations(model, it, args.include));
+        }
+        return results.map((it) => ({ ...it }));
+      }
+      case "findFirst": {
+        const results = await this.execute(model, "findMany", { ...args, take: 1 });
+        return results.length > 0 ? results[0] : null;
+      }
+      case "findUnique": {
+        const item = list.find((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        if (!item) return null;
+        if (args == null ? void 0 : args.include) {
+          return this.attachRelations(model, item, args.include);
+        }
+        return { ...item };
+      }
+      case "create": {
+        const nextId = ((_a = args == null ? void 0 : args.data) == null ? void 0 : _a.id) || this.getNextId(model);
+        const newItem = {
+          id: nextId,
+          ...args == null ? void 0 : args.data,
+          createdAt: ((_b = args == null ? void 0 : args.data) == null ? void 0 : _b.createdAt) || /* @__PURE__ */ new Date(),
+          updatedAt: /* @__PURE__ */ new Date()
+        };
+        list.push(newItem);
+        if (args == null ? void 0 : args.include) {
+          return this.attachRelations(model, newItem, args.include);
+        }
+        return { ...newItem };
+      }
+      case "update": {
+        const index = list.findIndex((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        if (index === -1) {
+          return this.execute(model, "create", { data: { ...(args == null ? void 0 : args.where) || {}, ...(args == null ? void 0 : args.data) || {} } });
+        }
+        const existing = list[index];
+        const updated = {
+          ...existing,
+          ...args == null ? void 0 : args.data,
+          updatedAt: /* @__PURE__ */ new Date()
+        };
+        list[index] = updated;
+        if (args == null ? void 0 : args.include) {
+          return this.attachRelations(model, updated, args.include);
+        }
+        return { ...updated };
+      }
+      case "upsert": {
+        const existing = list.find((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        if (existing) {
+          return this.execute(model, "update", { where: args.where, data: args.update, include: args.include });
+        } else {
+          return this.execute(model, "create", { data: { ...(args == null ? void 0 : args.where) || {}, ...(args == null ? void 0 : args.create) || {} }, include: args.include });
+        }
+      }
+      case "delete": {
+        const index = list.findIndex((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        if (index !== -1) {
+          const removed = list.splice(index, 1)[0];
+          return { ...removed };
+        }
+        return {};
+      }
+      case "deleteMany": {
+        const initialLen = list.length;
+        const remaining = list.filter((it) => !this.matchWhere(it, args == null ? void 0 : args.where));
+        this.collections.set(this.normalizeModel(model), remaining);
+        return { count: initialLen - remaining.length };
+      }
+      case "updateMany": {
+        let count = 0;
+        for (let i = 0; i < list.length; i++) {
+          if (this.matchWhere(list[i], args == null ? void 0 : args.where)) {
+            list[i] = { ...list[i], ...args == null ? void 0 : args.data, updatedAt: /* @__PURE__ */ new Date() };
+            count++;
+          }
+        }
+        return { count };
+      }
+      case "count": {
+        if (!(args == null ? void 0 : args.where)) return list.length;
+        return list.filter((it) => this.matchWhere(it, args.where)).length;
+      }
+      case "aggregate": {
+        const filtered = list.filter((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        const result = { _sum: {}, _avg: {}, _count: filtered.length, _min: {}, _max: {} };
+        if (args == null ? void 0 : args._sum) {
+          for (const key2 of Object.keys(args._sum)) {
+            result._sum[key2] = filtered.reduce((acc, it) => acc + (Number(it[key2]) || 0), 0);
+          }
+        }
+        return result;
+      }
+      case "groupBy": {
+        return [];
+      }
+      default:
+        return null;
+    }
+  }
+  seedInitialData() {
+    const adminPass = import_bcryptjs.default.hashSync("!Bahankala@2026", 10);
+    const storePass = import_bcryptjs.default.hashSync("store", 10);
+    const supplierPass = import_bcryptjs.default.hashSync("supplier", 10);
+    const testshopPass = import_bcryptjs.default.hashSync("Testshop", 10);
+    const standardPass = import_bcryptjs.default.hashSync("!Bahankala@2026", 10);
+    const users = this.getCollection("user");
+    users.push(
+      {
+        id: 1,
+        username: "admin",
+        password: adminPass,
+        role: "SUPER_ADMIN",
+        status: "ACTIVE",
+        firstName: "\u0645\u062F\u06CC\u0631",
+        lastName: "\u0627\u0631\u0634\u062F",
+        mobile: "09120000000",
+        email: "admin@marketplace.com",
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 2,
+        username: "store",
+        password: storePass,
+        role: "STORE_MANAGER",
+        status: "ACTIVE",
+        firstName: "\u0645\u062F\u06CC\u0631",
+        lastName: "\u0641\u0631\u0648\u0634\u06AF\u0627\u0647",
+        mobile: "09122222222",
+        storeName: "\u0641\u0631\u0648\u0634\u06AF\u0627\u0647 \u0646\u0645\u0648\u0646\u0647 \u0632\u0648\u067E\u06CC\u062A",
+        storeUrl: "samplestore.ir",
+        platformType: "WOOCOMMERCE",
+        fieldOfActivity: "\u0644\u0648\u0627\u0632\u0645 \u0627\u0644\u06A9\u062A\u0631\u0648\u0646\u06CC\u06A9\u06CC",
+        productCount: 50,
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 3,
+        username: "store1",
+        password: standardPass,
+        role: "STORE_MANAGER",
+        status: "ACTIVE",
+        firstName: "\u0645\u062F\u06CC\u0631 \u0641\u0631\u0648\u0634\u06AF\u0627\u0647",
+        lastName: "\u062A\u0633\u062A \u06F1",
+        mobile: "09121111111",
+        storeName: "\u0641\u0631\u0648\u0634\u06AF\u0627\u0647 \u062A\u0633\u062A \u0634\u0645\u0627\u0631\u0647 \u06CC\u06A9",
+        storeUrl: "store1.ir",
+        platformType: "WOOCOMMERCE",
+        fieldOfActivity: "\u067E\u0648\u0634\u0627\u06A9 \u0648 \u0644\u0648\u0627\u0632\u0645 \u0648\u0631\u0632\u0634\u06CC",
+        productCount: 120,
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 4,
+        username: "store2",
+        password: standardPass,
+        role: "STORE_MANAGER",
+        status: "ACTIVE",
+        firstName: "\u0645\u062F\u06CC\u0631 \u0641\u0631\u0648\u0634\u06AF\u0627\u0647",
+        lastName: "\u062A\u0633\u062A \u06F2",
+        mobile: "09121111112",
+        storeName: "\u0641\u0631\u0648\u0634\u06AF\u0627\u0647 \u062A\u0633\u062A \u0634\u0645\u0627\u0631\u0647 \u062F\u0648",
+        storeUrl: "store2.ir",
+        platformType: "SHOPIFY",
+        fieldOfActivity: "\u0622\u0631\u0627\u06CC\u0634\u06CC \u0648 \u0628\u0647\u062F\u0627\u0634\u062A\u06CC",
+        productCount: 80,
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 5,
+        username: "supplier",
+        password: supplierPass,
+        role: "SUPPLIER",
+        status: "ACTIVE",
+        firstName: "\u062A\u0627\u0645\u06CC\u0646 \u06A9\u0646\u0646\u062F\u0647",
+        lastName: "\u0627\u0635\u0644\u06CC",
+        mobile: "09124444444",
+        brandName: "\u062A\u0627\u0645\u06CC\u0646 \u06AF\u0633\u062A\u0631 \u0632\u0648\u067E\u06CC\u062A",
+        storeName: "\u062A\u0627\u0645\u06CC\u0646 \u0645\u0627\u0631\u06A9\u062A",
+        storeUrl: "tamingostar.ir",
+        storeLink: "tamingostar.ir",
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 6,
+        username: "supplier1",
+        password: standardPass,
+        role: "SUPPLIER",
+        status: "ACTIVE",
+        firstName: "\u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647",
+        lastName: "\u062A\u0633\u062A \u06F1",
+        mobile: "09125555551",
+        brandName: "\u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0627\u0644\u0627 \u067E\u0627\u0631\u0633",
+        storeName: "\u062A\u0627\u0645\u06CC\u0646 \u0645\u0627\u0631\u06A9\u062A \u06CC\u06A9",
+        storeUrl: "supplier1.ir",
+        storeLink: "supplier1.ir",
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 7,
+        username: "supplier2",
+        password: standardPass,
+        role: "SUPPLIER",
+        status: "ACTIVE",
+        firstName: "\u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647",
+        lastName: "\u062A\u0633\u062A \u06F2",
+        mobile: "09125555552",
+        brandName: "\u06AF\u0631\u0648\u0647 \u0635\u0646\u0639\u062A\u06CC \u0646\u06CC\u06A9\u0648",
+        storeName: "\u062A\u0627\u0645\u06CC\u0646 \u0645\u0627\u0631\u06A9\u062A \u062F\u0648",
+        storeUrl: "supplier2.ir",
+        storeLink: "supplier2.ir",
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 8,
+        username: "Testshop",
+        password: testshopPass,
+        role: "SUPPLIER",
+        status: "ACTIVE",
+        firstName: "\u062A\u0627\u0645\u06CC\u0646 \u06A9\u0646\u0646\u062F\u0647",
+        lastName: "\u062A\u0633\u062A",
+        mobile: "09123333333",
+        brandName: "\u062A\u0633\u062A \u06AF\u0633\u062A\u0631",
+        storeName: "\u0641\u0631\u0648\u0634\u06AF\u0627\u0647 \u062A\u0633\u062A",
+        storeUrl: "testshop.ir",
+        storeLink: "testshop.ir",
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 9,
+        username: "customer1",
+        password: standardPass,
+        role: "CUSTOMER",
+        status: "ACTIVE",
+        firstName: "\u0639\u0644\u06CC",
+        lastName: "\u0631\u0636\u0627\u06CC\u06CC",
+        mobile: "09129998877",
+        address: "\u062A\u0647\u0631\u0627\u0646\u060C \u062E\u06CC\u0627\u0628\u0627\u0646 \u0648\u0644\u06CC\u0639\u0635\u0631\u060C \u067E\u0644\u0627\u06A9 \u06F1\u06F2\u06F3",
+        createdAt: /* @__PURE__ */ new Date()
+      },
+      {
+        id: 10,
+        username: "referrer1",
+        password: standardPass,
+        role: "REFERRER",
+        status: "ACTIVE",
+        firstName: "\u0633\u0627\u0631\u0627",
+        lastName: "\u06A9\u0631\u06CC\u0645\u06CC",
+        mobile: "09123332211",
+        address: "\u0627\u0635\u0641\u0647\u0627\u0646\u060C \u0686\u0647\u0627\u0631\u0628\u0627\u063A",
+        createdAt: /* @__PURE__ */ new Date()
+      }
+    );
+    this.autoId.set("user", 11);
+    const categories = this.getCollection("category");
+    const defaultCategories = [
+      "\u062F\u06CC\u062C\u06CC\u062A\u0627\u0644 \u0648 \u0644\u0648\u0627\u0632\u0645 \u062C\u0627\u0646\u0628\u06CC",
+      "\u067E\u0648\u0634\u0627\u06A9 \u0648 \u0645\u062F",
+      "\u0632\u06CC\u0628\u0627\u06CC\u06CC \u0648 \u0633\u0644\u0627\u0645\u062A",
+      "\u062E\u0627\u0646\u0647 \u0648 \u0622\u0634\u067E\u0632\u062E\u0627\u0646\u0647",
+      "\u0648\u0631\u0632\u0634 \u0648 \u0633\u0641\u0631",
+      "\u0627\u0633\u0628\u0627\u0628 \u0628\u0627\u0632\u06CC \u0648 \u06A9\u0648\u062F\u06A9",
+      "\u06A9\u062A\u0627\u0628 \u0648 \u062A\u062D\u0631\u06CC\u0631",
+      "\u062E\u0648\u062F\u0631\u0648 \u0648 \u0627\u0628\u0632\u0627\u0631",
+      "\u0633\u0648\u067E\u0631\u0645\u0627\u0631\u06A9\u062A \u0648 \u0645\u0648\u0627\u062F \u063A\u0630\u0627\u06CC\u06CC",
+      "\u0633\u0627\u0639\u062A \u0648 \u062C\u0648\u0627\u0647\u0631\u0627\u062A",
+      "\u067E\u062A \u0634\u0627\u067E",
+      "\u0635\u0646\u0627\u06CC\u0639 \u062F\u0633\u062A\u06CC",
+      "\u0627\u0628\u0632\u0627\u0631\u0622\u0644\u0627\u062A \u0648 \u062A\u062C\u0647\u06CC\u0632\u0627\u062A",
+      "\u0645\u0648\u0628\u0627\u06CC\u0644 \u0648 \u062A\u0628\u0644\u062A",
+      "\u0644\u067E \u062A\u0627\u067E \u0648 \u06A9\u0627\u0645\u067E\u06CC\u0648\u062A\u0631",
+      "\u0644\u0648\u0627\u0632\u0645 \u062E\u0627\u0646\u06AF\u06CC \u0628\u0631\u0642\u06CC"
+    ];
+    defaultCategories.forEach((title, idx) => {
+      categories.push({
+        id: idx + 1,
+        title,
+        description: `\u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC ${title}`,
+        active: true,
+        createdAt: /* @__PURE__ */ new Date()
+      });
+    });
+    this.autoId.set("category", defaultCategories.length + 1);
+    const invoices = this.getCollection("storeinvoice");
+    invoices.push(
+      {
+        id: 1,
+        storeManagerId: 2,
+        totalAmount: 385e4,
+        status: "PENDING",
+        paymentMethod: "MANUAL",
+        receiptStatus: "PENDING",
+        receiptNotes: "\u0648\u0627\u0631\u06CC\u0632 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0647\u0645\u0631\u0627\u0647 \u0628\u0627\u0646\u06A9 \u0645\u0644\u06CC \u0628\u0647 \u0634\u0645\u0627\u0631\u0647 \u0634\u0628\u0627",
+        receiptUrl: "/uploads/sample_receipt1.jpg",
+        createdAt: new Date(Date.now() - 36e5 * 4)
+      },
+      {
+        id: 2,
+        storeManagerId: 3,
+        totalAmount: 72e5,
+        status: "PENDING",
+        paymentMethod: "MANUAL",
+        receiptStatus: "PENDING",
+        receiptNotes: "\u067E\u0631\u062F\u0627\u062E\u062A \u0641\u06CC\u0634 \u062D\u0648\u0627\u0644\u0647 \u067E\u0627\u06CC\u0627",
+        receiptUrl: "/uploads/sample_receipt2.jpg",
+        createdAt: new Date(Date.now() - 36e5 * 12)
+      }
+    );
+    this.autoId.set("storeinvoice", 3);
+    const configs = this.getCollection("systemconfig");
+    configs.push(
+      { id: 1, key: "PLATFORM_NAME", value: "\u0632\u0648\u067E\u06CC\u062A (Zopit)" },
+      { id: 2, key: "ZIBAL_MERCHANT_ID", value: "zibal" },
+      { id: 3, key: "PAYMENT_MODE", value: "HYBRID" }
+    );
+    this.autoId.set("systemconfig", 4);
+  }
+};
+var memoryStore = new MemoryDatabase();
 function getActivePrisma() {
   if (!realPrisma || isPrismaMock) {
     try {
-      if (PrismaClient2) {
+      if (!PrismaClient2) {
+        try {
+          PrismaClient2 = require("@prisma/client").PrismaClient;
+        } catch (e) {
+          console.warn("[Server Prisma] Failed to require @prisma/client dynamically:", e.message);
+        }
+      }
+      if (PrismaClient2 && isRealRemoteDb2) {
         const url = process.env.DATABASE_URL || dbUrl2;
         realPrisma = new PrismaClient2({
           datasources: {
@@ -2684,11 +3131,10 @@ function getActivePrisma() {
         });
         isPrismaMock = false;
       } else {
-        throw new Error("PrismaClient is not loaded/generated yet.");
+        isPrismaMock = true;
       }
     } catch (err) {
-      console.warn("[Server Prisma] Database connection failed on query, using fallback mock:", err.message);
-      realPrisma = noOpMock;
+      console.warn("[Server Prisma] Database connection notice:", err.message);
       isPrismaMock = true;
     }
   }
@@ -2696,26 +3142,64 @@ function getActivePrisma() {
 }
 var prisma13 = new Proxy({}, {
   get(target, prop) {
-    const active = getActivePrisma();
+    if (typeof prop !== "string") {
+      return Reflect.get(target, prop);
+    }
+    if (prop === "then" || prop === "catch" || prop === "finally") {
+      return void 0;
+    }
+    if (prop === "inspect" || prop === "toJSON" || prop === "toString" || prop.startsWith("_")) {
+      return void 0;
+    }
     if (prop === "$transaction") {
-      if (isPrismaMock) return async (cb) => {
-        throw new Error("Database (Prisma) failed to initialize on this host. Cannot perform transaction.");
-      };
-      return active.$transaction.bind(active);
-    }
-    if (isPrismaMock) {
-      return new Proxy({}, {
-        get(subTarget, subProp) {
-          return async (...args) => {
-            throw new Error("\u0645\u0634\u06A9\u0644 \u062F\u0631 \u0627\u062C\u0631\u0627\u06CC \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 \u062F\u0631 \u0647\u0627\u0633\u062A \u0634\u0645\u0627 (Prisma Engine Failed). \u0644\u0637\u0641\u0627\u064B \u0644\u0627\u06AF \u0633\u0631\u0648\u0631 \u0631\u0627 \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F.");
-          };
+      return async (cbOrList) => {
+        if (typeof cbOrList === "function") {
+          return await cbOrList(prisma13);
         }
-      });
+        if (Array.isArray(cbOrList)) {
+          return await Promise.all(cbOrList);
+        }
+        return cbOrList;
+      };
     }
-    if (typeof active[prop] === "function") {
-      return active[prop].bind(active);
+    if (prop === "$queryRaw" || prop === "$executeRaw" || prop === "$queryRawUnsafe" || prop === "$executeRawUnsafe") {
+      return async () => [];
     }
-    return active[prop];
+    if (prop === "$connect" || prop === "$disconnect") {
+      return async () => {
+      };
+    }
+    return new Proxy({}, {
+      get(subTarget, subProp) {
+        if (typeof subProp !== "string") {
+          return Reflect.get(subTarget, subProp);
+        }
+        if (subProp === "then" || subProp === "catch" || subProp === "finally") {
+          return void 0;
+        }
+        if (subProp === "inspect" || subProp === "toJSON" || subProp === "toString" || subProp.startsWith("_")) {
+          return void 0;
+        }
+        return async (...args) => {
+          var _a;
+          const active = getActivePrisma();
+          if (isRealRemoteDb2 && active && !isPrismaMock && typeof ((_a = active[prop]) == null ? void 0 : _a[subProp]) === "function") {
+            try {
+              return await active[prop][subProp](...args);
+            } catch (err) {
+              const errMsg = (err == null ? void 0 : err.message) || "";
+              const isInitOrConnError = (err == null ? void 0 : err.name) === "PrismaClientInitializationError" || (err == null ? void 0 : err.name) === "PrismaClientKnownRequestError" || (err == null ? void 0 : err.name) === "PrismaClientRustPanicError" || errMsg.includes("Can't reach database server") || errMsg.includes("database server") || errMsg.includes("Connection") || errMsg.includes("timed out") || errMsg.includes("dummy");
+              if (isInitOrConnError) {
+                console.warn(`[Prisma Query Fallback] ${prop}.${subProp} fallback to memory store:`, errMsg);
+                return await memoryStore.execute(prop, subProp, args[0]);
+              }
+              throw err;
+            }
+          }
+          return await memoryStore.execute(prop, subProp, args[0]);
+        };
+      }
+    });
   }
 });
 var app = (0, import_express.default)();

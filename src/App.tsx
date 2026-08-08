@@ -818,7 +818,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   const parseJsonResponse = async (response: Response, fallbackErrorMsg: string) => {
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
-      throw new Error("سرویس بک‌اند در دسترس نیست یا پاسخ معتبر ارسال نکرده است. لطفاً بررسی کنید برنامه Node.js در هاست cPanel فعال و استارت شده باشد.");
+      throw new Error("سرویس بک‌اند در دسترس نیست یا پاسخ معتبر ارسال نکرده است. لطفاً وضعیت دیتابیس Neon یا اتصال سرور را بررسی نمایید.");
     }
     try {
       return await response.json();

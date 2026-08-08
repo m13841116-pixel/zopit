@@ -39,7 +39,6 @@ import ManualInvoices from "./ManualInvoices";
 import AdminAnnouncements from "./AdminAnnouncements";
 import SuperAdminNewFeatures from "./SuperAdminNewFeatures";
 import SuperAdminProAccounts from "./SuperAdminProAccounts";
-import SuperAdminAIStudio from "./SuperAdminAIStudio";
 import { Crown, Sparkles } from "lucide-react";
 import SupplierPenaltyManagement from "./SupplierPenaltyManagement";
 import AdminBanners from "./AdminBanners";
@@ -101,7 +100,6 @@ export default function SuperAdminDashboard({
     { id: "logs", label: "لاگ سیستم", icon: Activity },
     { id: "health", label: "سلامت سیستم", icon: ShieldCheck },
     { id: "dev-tools", label: "توسعه‌دهنده (کد)", icon: Activity },
-    { id: "ai-studio", label: "گوگل AI استودیو", icon: Sparkles },
   ];
 
   const handleNavigateTab = (tab: string, roleFilter?: string) => {
@@ -217,7 +215,6 @@ export default function SuperAdminDashboard({
           {activeTab === "overview" && (
             <Overview onNavigateTab={handleNavigateTab} />
           )}
-          {activeTab === "ai-studio" && <SuperAdminAIStudio />}
           {activeTab === "pro-accounts" && (
             <SuperAdminProAccounts showNotification={showNotification} />
           )}
