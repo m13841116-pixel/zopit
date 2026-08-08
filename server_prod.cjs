@@ -42,13 +42,24 @@ function getPrisma() {
       if (dbUrl3.includes("dummy_db") || !process.env.DATABASE_URL) {
         prismaInstance = createMemoryPrismaProxy();
       } else {
-        prismaInstance = new import_client.PrismaClient({
-          datasources: {
-            db: {
-              url: dbUrl3
+        let ClientClass = null;
+        try {
+          const prismaModule = require("@prisma/client");
+          ClientClass = prismaModule.PrismaClient;
+        } catch (e) {
+          console.warn("[Prisma] Could not load @prisma/client package dynamically:", e.message);
+        }
+        if (ClientClass) {
+          prismaInstance = new ClientClass({
+            datasources: {
+              db: {
+                url: dbUrl3
+              }
             }
-          }
-        });
+          });
+        } else {
+          prismaInstance = createMemoryPrismaProxy();
+        }
       }
     } catch (err) {
       console.warn("[Prisma] Initialization failed, falling back to mock proxy:", err.message);
@@ -84,10 +95,9 @@ function createMemoryPrismaProxy() {
     }
   });
 }
-var import_client, prismaInstance, prisma;
+var prismaInstance, prisma;
 var init_prisma = __esm({
   "src/prisma.ts"() {
-    import_client = require("@prisma/client");
     prismaInstance = null;
     prisma = getPrisma();
   }
@@ -2575,9 +2585,9 @@ function safeParseInt(val, fallback = 0) {
   const parsed = parseInt(engStr, 10);
   return isNaN(parsed) ? fallback : parsed;
 }
-var PrismaClient2;
+var PrismaClient;
 try {
-  PrismaClient2 = require("@prisma/client").PrismaClient;
+  PrismaClient = require("@prisma/client").PrismaClient;
 } catch (err) {
   console.warn("PrismaClient loading failed initially, will attempt lazy loading:", err.message);
 }
@@ -3186,16 +3196,16 @@ var memoryStore = new MemoryDatabase();
 function getActivePrisma() {
   if (!realPrisma || isPrismaMock) {
     try {
-      if (!PrismaClient2) {
+      if (!PrismaClient) {
         try {
-          PrismaClient2 = require("@prisma/client").PrismaClient;
+          PrismaClient = require("@prisma/client").PrismaClient;
         } catch (e) {
           console.warn("[Server Prisma] Failed to require @prisma/client dynamically:", e.message);
         }
       }
-      if (PrismaClient2 && isRealRemoteDb2) {
+      if (PrismaClient && isRealRemoteDb2) {
         const url = process.env.DATABASE_URL || dbUrl2;
-        realPrisma = new PrismaClient2({
+        realPrisma = new PrismaClient({
           datasources: {
             db: {
               url
@@ -3373,15 +3383,20 @@ if (!process.env.JWT_SECRET) {
   console.warn("\u26A0\uFE0F WARNING: JWT_SECRET environment variable is missing. Using fallback for development.");
   process.env.JWT_SECRET = "dev_secret_key_123!@#";
 }
-if (false) {
-  console.error("\u274C FATAL ERROR: JWT_SECRET environment variable is required but not set.");
+if (process.env.VERCEL && (!process.env.JWT_SECRET || process.env.JWT_SECRET === "dev_secret_key_123!@#" || process.env.JWT_SECRET === "dev_secret_key_8358128411163!@#")) {
+  console.error("\u274C FATAL ERROR: JWT_SECRET is missing or using an insecure default value in production.");
   process.exit(1);
 }
 if (!process.env.ENCRYPTION_KEY) {
   console.warn("\u26A0\uFE0F WARNING: ENCRYPTION_KEY environment variable is missing. Using fallback for development.");
   process.env.ENCRYPTION_KEY = "12345678901234567890123456789012";
 }
-if (false) {
+if (process.env.VERCEL && (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY === "12345678901234567890123456789012")) {
+  console.error("\u274C FATAL ERROR: ENCRYPTION_KEY environment variable is missing or using an insecure default value in production.");
+  process.exit(1);
+}
+if (process.env.VERCEL && (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("dummy_db"))) {
+  console.error("\u274C FATAL ERROR: DATABASE_URL is missing or using a dummy value in production.");
   process.exit(1);
 }
 var JWT_SECRET = process.env.JWT_SECRET;
@@ -4250,43 +4265,27 @@ app.post("/api/auth/login", async (req, res) => {
     const cleanUsername = String(username).trim();
     const isSuperAdminCandidate = cleanUsername === "admin" || cleanUsername === "superadmin" || cleanUsername === "09120000000";
     let user = null;
-    try {
-      user = await prisma14.user.findUnique({ where: { username: cleanUsername } });
-      if (!user && isSuperAdminCandidate) {
-        user = await prisma14.user.findFirst({ where: { role: "SUPER_ADMIN" } });
-      }
-    } catch (dbErr) {
-      console.warn("[Login] DB query notice:", dbErr.message);
-    }
+    user = await prisma14.user.findUnique({ where: { username: cleanUsername } });
     if (!user && isSuperAdminCandidate) {
-      const allowedAdminPasswords = ["!Bahankala@2026", "admin", process.env.SUPER_ADMIN_PASSWORD].filter(Boolean);
-      if (allowedAdminPasswords.includes(password)) {
-        try {
-          const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-          user = await prisma14.user.create({
-            data: {
-              username: "admin",
-              email: "admin@marketplace.com",
-              password: hashedPassword,
-              role: "SUPER_ADMIN",
-              status: "ACTIVE",
-              firstName: "\u0645\u062F\u06CC\u0631",
-              lastName: "\u0627\u0631\u0634\u062F",
-              mobile: "09120000000"
-            }
-          });
-        } catch {
-          user = {
-            id: 1,
+      user = await prisma14.user.findFirst({ where: { role: "SUPER_ADMIN" } });
+    }
+    if (process.env.NODE_ENV !== "production" && !user && isSuperAdminCandidate && process.env.SUPER_ADMIN_PASSWORD && password === process.env.SUPER_ADMIN_PASSWORD) {
+      try {
+        const hashedPassword = await import_bcryptjs.default.hash(password, 10);
+        user = await prisma14.user.create({
+          data: {
             username: "admin",
             email: "admin@marketplace.com",
+            password: hashedPassword,
             role: "SUPER_ADMIN",
             status: "ACTIVE",
             firstName: "\u0645\u062F\u06CC\u0631",
             lastName: "\u0627\u0631\u0634\u062F",
             mobile: "09120000000"
-          };
-        }
+          }
+        });
+      } catch (createErr) {
+        console.warn("[Login] Super admin auto-create notice:", createErr.message);
       }
     }
     if (!user) {
@@ -4295,9 +4294,6 @@ app.post("/api/auth/login", async (req, res) => {
     let isValid = false;
     if (user.password) {
       isValid = await import_bcryptjs.default.compare(password, user.password);
-    }
-    if (!isValid && (user.role === "SUPER_ADMIN" || isSuperAdminCandidate) && (password === "admin" || password === "!Bahankala@2026" || password === process.env.SUPER_ADMIN_PASSWORD)) {
-      isValid = true;
     }
     if (!isValid) {
       return res.status(401).json({ error: "\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u06CC\u0627 \u06A9\u0644\u0645\u0647 \u0639\u0628\u0648\u0631 \u0646\u0627\u062F\u0631\u0633\u062A \u0627\u0633\u062A." });
@@ -9471,8 +9467,8 @@ async function startServer() {
     try {
       res.write("<p>\u23F3 \u06AF\u0627\u0645 \u06F3: \u062F\u0631 \u062D\u0627\u0644 \u0627\u062A\u0635\u0627\u0644 \u0645\u062C\u062F\u062F \u0628\u0631\u0646\u0627\u0645\u0647 \u0628\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633...</p>");
       const prismaModule = require("@prisma/client");
-      PrismaClient2 = prismaModule.PrismaClient;
-      prisma14 = new PrismaClient2({
+      PrismaClient = prismaModule.PrismaClient;
+      prisma14 = new PrismaClient({
         datasources: {
           db: {
             url: dbUrl3

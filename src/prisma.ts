@@ -1,5 +1,3 @@
-import { PrismaClient } from '@prisma/client';
-
 let prismaInstance: any = null;
 
 export function getPrisma(): any {
@@ -9,13 +7,25 @@ export function getPrisma(): any {
       if (dbUrl.includes('dummy_db') || !process.env.DATABASE_URL) {
         prismaInstance = createMemoryPrismaProxy();
       } else {
-        prismaInstance = new PrismaClient({
-          datasources: {
-            db: {
-              url: dbUrl,
+        let ClientClass: any = null;
+        try {
+          const prismaModule = require('@prisma/client');
+          ClientClass = prismaModule.PrismaClient;
+        } catch (e: any) {
+          console.warn('[Prisma] Could not load @prisma/client package dynamically:', e.message);
+        }
+
+        if (ClientClass) {
+          prismaInstance = new ClientClass({
+            datasources: {
+              db: {
+                url: dbUrl,
+              },
             },
-          },
-        });
+          });
+        } else {
+          prismaInstance = createMemoryPrismaProxy();
+        }
       }
     } catch (err: any) {
       console.warn('[Prisma] Initialization failed, falling back to mock proxy:', err.message);

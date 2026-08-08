@@ -986,8 +986,8 @@ if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'dev_secret_key_123!@#';
 }
 
-if (false) {
-  console.error('❌ FATAL ERROR: JWT_SECRET environment variable is required but not set.');
+if (process.env.VERCEL && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev_secret_key_123!@#' || process.env.JWT_SECRET === 'dev_secret_key_8358128411163!@#')) {
+  console.error('❌ FATAL ERROR: JWT_SECRET is missing or using an insecure default value in production.');
   process.exit(1);
 }
 if (!process.env.ENCRYPTION_KEY) {
@@ -995,8 +995,13 @@ if (!process.env.ENCRYPTION_KEY) {
   process.env.ENCRYPTION_KEY = '12345678901234567890123456789012';
 }
 
-if (false) {
-  // console.error('❌ FATAL ERROR: ENCRYPTION_KEY environment variable is required but not set.');
+if (process.env.VERCEL && (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY === '12345678901234567890123456789012')) {
+  console.error('❌ FATAL ERROR: ENCRYPTION_KEY environment variable is missing or using an insecure default value in production.');
+  process.exit(1);
+}
+
+if (process.env.VERCEL && (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dummy_db'))) {
+  console.error('❌ FATAL ERROR: DATABASE_URL is missing or using a dummy value in production.');
   process.exit(1);
 }
 
@@ -2026,45 +2031,29 @@ app.post('/api/auth/login', async (req, res) => {
     const isSuperAdminCandidate = cleanUsername === 'admin' || cleanUsername === 'superadmin' || cleanUsername === '09120000000';
 
     let user: any = null;
-    try {
-      user = await prisma.user.findUnique({ where: { username: cleanUsername } });
-      if (!user && isSuperAdminCandidate) {
-        user = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
-      }
-    } catch (dbErr: any) {
-      console.warn('[Login] DB query notice:', dbErr.message);
+    user = await prisma.user.findUnique({ where: { username: cleanUsername } });
+    if (!user && isSuperAdminCandidate) {
+      user = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
     }
 
-    // Special auto-recovery for Super Admin login if database user is missing or unseeded
-    if (!user && isSuperAdminCandidate) {
-      const allowedAdminPasswords = ['!Bahankala@2026', 'admin', process.env.SUPER_ADMIN_PASSWORD].filter(Boolean);
-      if (allowedAdminPasswords.includes(password)) {
-        try {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          user = await prisma.user.create({
-            data: {
-              username: 'admin',
-              email: 'admin@marketplace.com',
-              password: hashedPassword,
-              role: 'SUPER_ADMIN',
-              status: 'ACTIVE',
-              firstName: 'مدیر',
-              lastName: 'ارشد',
-              mobile: '09120000000'
-            }
-          });
-        } catch {
-          user = {
-            id: 1,
+    // Special auto-recovery for Super Admin login only in development environment
+    if (process.env.NODE_ENV !== 'production' && !user && isSuperAdminCandidate && process.env.SUPER_ADMIN_PASSWORD && password === process.env.SUPER_ADMIN_PASSWORD) {
+      try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        user = await prisma.user.create({
+          data: {
             username: 'admin',
             email: 'admin@marketplace.com',
+            password: hashedPassword,
             role: 'SUPER_ADMIN',
             status: 'ACTIVE',
             firstName: 'مدیر',
             lastName: 'ارشد',
             mobile: '09120000000'
-          };
-        }
+          }
+        });
+      } catch (createErr: any) {
+        console.warn('[Login] Super admin auto-create notice:', createErr.message);
       }
     }
 
@@ -2076,9 +2065,6 @@ app.post('/api/auth/login', async (req, res) => {
     let isValid = false;
     if (user.password) {
       isValid = await bcrypt.compare(password, user.password);
-    }
-    if (!isValid && (user.role === 'SUPER_ADMIN' || isSuperAdminCandidate) && (password === 'admin' || password === '!Bahankala@2026' || password === process.env.SUPER_ADMIN_PASSWORD)) {
-      isValid = true;
     }
 
     if (!isValid) {
