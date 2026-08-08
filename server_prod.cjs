@@ -1042,6 +1042,7 @@ async function notifySupplierNewOrder(supplierMobile, orderId, supplierName) {
 // server.ts
 var import_google_auth_library = require("google-auth-library");
 var import_express = __toESM(require("express"));
+var import_client = require("@prisma/client");
 var import_express_rate_limit = __toESM(require("express-rate-limit"));
 var import_dotenv2 = __toESM(require("dotenv"));
 var import_cors = __toESM(require("cors"));
@@ -2585,12 +2586,7 @@ function safeParseInt(val, fallback = 0) {
   const parsed = parseInt(engStr, 10);
   return isNaN(parsed) ? fallback : parsed;
 }
-var PrismaClient;
-try {
-  PrismaClient = require("@prisma/client").PrismaClient;
-} catch (err) {
-  console.warn("PrismaClient loading failed initially, will attempt lazy loading:", err.message);
-}
+var PrismaClient = import_client.PrismaClient;
 function findTrueRootDir2() {
   const current = typeof __dirname !== "undefined" ? __dirname : process.cwd();
   if (import_fs3.default.existsSync(import_path3.default.join(current, "package.json"))) {
@@ -3197,11 +3193,7 @@ function getActivePrisma() {
   if (!realPrisma || isPrismaMock) {
     try {
       if (!PrismaClient) {
-        try {
-          PrismaClient = require("@prisma/client").PrismaClient;
-        } catch (e) {
-          console.warn("[Server Prisma] Failed to require @prisma/client dynamically:", e.message);
-        }
+        PrismaClient = import_client.PrismaClient;
       }
       if (PrismaClient && isRealRemoteDb2) {
         const url = process.env.DATABASE_URL || dbUrl2;
@@ -4314,7 +4306,7 @@ app.post("/api/auth/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Error in login:", error);
-    return res.status(500).json({ error: "\u062E\u0637\u0627\u06CC\u06CC \u062F\u0631 \u0648\u0631\u0648\u062F \u0631\u062E \u062F\u0627\u062F. \u0644\u0637\u0641\u0627\u064B \u0645\u062C\u062F\u062F\u0627\u064B \u062A\u0644\u0627\u0634 \u06A9\u0646\u06CC\u062F." });
+    return res.status(500).json({ error: "\u062E\u0637\u0627\u06CC\u06CC \u062F\u0631 \u0648\u0631\u0648\u062F \u0631\u062E \u062F\u0627\u062F. \u0644\u0637\u0641\u0627\u064B \u0645\u062C\u062F\u062F\u0627\u064B \u062A\u0644\u0627\u0634 \u06A9\u0646\u06CC\u062F.", details: error?.message || String(error) });
   }
 });
 function authenticateToken(req, res, next) {
@@ -9466,8 +9458,7 @@ async function startServer() {
     }
     try {
       res.write("<p>\u23F3 \u06AF\u0627\u0645 \u06F3: \u062F\u0631 \u062D\u0627\u0644 \u0627\u062A\u0635\u0627\u0644 \u0645\u062C\u062F\u062F \u0628\u0631\u0646\u0627\u0645\u0647 \u0628\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633...</p>");
-      const prismaModule = require("@prisma/client");
-      PrismaClient = prismaModule.PrismaClient;
+      PrismaClient = import_client.PrismaClient;
       prisma14 = new PrismaClient({
         datasources: {
           db: {
@@ -9507,7 +9498,7 @@ async function startServer() {
       }, {});
       res.json(configMap);
     } catch (err) {
-      res.json({});
+      res.status(500).json({ error: "Failed to fetch config", details: err?.message || String(err) });
     }
   });
   app.put("/api/config", async (req, res) => {
@@ -9686,6 +9677,14 @@ async function startServer() {
   }
   if (process.env.VERCEL) {
     console.log("Running on Vercel, skipping app.listen()");
+    setImmediate(async () => {
+      try {
+        await seedDatabase();
+        await syncAllPaidOrdersSupplierWallets();
+      } catch (err) {
+        console.warn("[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:", err?.message || err);
+      }
+    });
     return;
   }
   const portStr = String(PORT);

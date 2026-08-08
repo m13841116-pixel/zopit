@@ -12,6 +12,22 @@ try {
   const viteCmd = hasViteBin ? `node "${viteBin}"` : 'npx vite';
   execSync(`${viteCmd} build`, { stdio: 'inherit' });
 
+  // 1.5 Database Setup for Vercel
+  if (process.env.VERCEL && process.env.DATABASE_URL) {
+    const isRealDb = process.env.DATABASE_URL.startsWith('postgres') || process.env.DATABASE_URL.startsWith('mysql');
+    if (isRealDb) {
+      console.log('[Build] Vercel environment detected with remote database. Pushing schema...');
+      try {
+        execSync('npx prisma db push --accept-data-loss', { stdio: 'inherit' });
+        console.log('[Build] Schema push successful.');
+        console.log('[Build] Running seed script...');
+        execSync('npx tsx src/seed-vercel.ts', { stdio: 'inherit' });
+      } catch (dbErr) {
+        console.error('[Build] Failed to push schema to the database:', dbErr.message);
+      }
+    }
+  }
+
   // 2. Compile backend using esbuild
   console.log('[Build] Compiling Express backend server using esbuild...');
   const distDir = path.join(__dirname, 'dist');

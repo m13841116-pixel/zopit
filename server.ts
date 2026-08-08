@@ -26,6 +26,7 @@ import { registerStoreShippingRoutes } from './src/services/storeShippingRoutes.
 import { sendSmsViaMelliPayamak, notifySupplierNewOrder } from './src/services/sms/SmsService.js';
 import { OAuth2Client } from 'google-auth-library';
 import express from 'express';
+import { PrismaClient as StaticPrismaClient } from '@prisma/client';
 
 function toEngDigits(str: any): any {
   if (typeof str !== 'string') return str;
@@ -65,12 +66,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { execSync } from 'child_process';
 
-let PrismaClient: any;
-try {
-  PrismaClient = require('@prisma/client').PrismaClient;
-} catch (err: any) {
-  console.warn('PrismaClient loading failed initially, will attempt lazy loading:', err.message);
-}
+let PrismaClient: any = StaticPrismaClient;
 import { NotificationService } from './src/services/NotificationService.js';
 import registerConfig from './src/services/configRoute.js';
 import registerNewFeatures from './src/services/newFeaturesRoute.js';
@@ -763,11 +759,7 @@ function getActivePrisma() {
   if (!realPrisma || isPrismaMock) {
     try {
       if (!PrismaClient) {
-        try {
-          PrismaClient = require('@prisma/client').PrismaClient;
-        } catch (e: any) {
-          console.warn('[Server Prisma] Failed to require @prisma/client dynamically:', e.message);
-        }
+        PrismaClient = StaticPrismaClient;
       }
       if (PrismaClient && isRealRemoteDb) {
         const url = process.env.DATABASE_URL || dbUrl;
@@ -2092,7 +2084,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   } catch (error: any) {
     console.error('Error in login:', error);
-    return res.status(500).json({ error: 'خطایی در ورود رخ داد. لطفاً مجدداً تلاش کنید.' });
+    return res.status(500).json({ error: 'خطایی در ورود رخ داد. لطفاً مجدداً تلاش کنید.', details: error?.message || String(error) });
   }
 });
 
@@ -8035,8 +8027,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     // 3. Re-instantiate Prisma Client dynamically
     try {
       res.write('<p>⏳ گام ۳: در حال اتصال مجدد برنامه به دیتابیس...</p>');
-      const prismaModule = require('@prisma/client');
-      PrismaClient = prismaModule.PrismaClient;
+      PrismaClient = StaticPrismaClient;
       prisma = new PrismaClient({
         datasources: {
           db: {
@@ -8081,7 +8072,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       }, {});
       res.json(configMap);
     } catch (err) {
-      res.json({});
+      res.status(500).json({ error: 'Failed to fetch config', details: err?.message || String(err) });
     }
   });
 
@@ -8275,8 +8266,16 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     });
   }
 
-  if (process.env.VERCEL) {
+    if (process.env.VERCEL) {
     console.log("Running on Vercel, skipping app.listen()");
+    setImmediate(async () => {
+      try {
+        await seedDatabase();
+        await syncAllPaidOrdersSupplierWallets();
+      } catch (err: any) {
+        console.warn('[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:', err?.message || err);
+      }
+    });
     return;
   }
 
