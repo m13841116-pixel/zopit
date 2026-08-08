@@ -1,10 +1,10 @@
 try {
   let appModule;
   try {
-    appModule = require('../dist/server.cjs');
-  } catch (e1) {
-    console.warn('[Vercel API] Could not load ../dist/server.cjs, trying ../server_prod.cjs...', e1.message);
     appModule = require('../server_prod.cjs');
+  } catch (e1) {
+    console.warn('[Vercel API] Could not load ../server_prod.cjs, trying ../dist/server.cjs...', e1.message);
+    appModule = require('../dist/server.cjs');
   }
   const app = appModule.default || appModule;
   module.exports = app;
@@ -31,7 +31,7 @@ try {
   const app = express();
   app.use((req, res) => {
     res.status(500).json({
-      error: "Critical backend load failure on Vercel",
+      error: `Critical backend load failure on Vercel: ${err.message}`,
       details: err.message,
       stack: err.stack
     });

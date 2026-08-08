@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/index.js": {
-      "includeFiles": "dist/**/* node_modules/.prisma/client/**/* prisma/schema.prisma"
+      "includeFiles": "dist/**/* node_modules/.prisma/client/**/* prisma/schema.prisma server_prod.cjs"
     }
   },
   "rewrites": [

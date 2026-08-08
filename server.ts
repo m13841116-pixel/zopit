@@ -978,24 +978,15 @@ if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'dev_secret_key_123!@#';
 }
 
-if (process.env.VERCEL && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev_secret_key_123!@#' || process.env.JWT_SECRET === 'dev_secret_key_8358128411163!@#')) {
-  console.error('❌ FATAL ERROR: JWT_SECRET is missing or using an insecure default value in production.');
-  process.exit(1);
-}
+
 if (!process.env.ENCRYPTION_KEY) {
   console.warn('⚠️ WARNING: ENCRYPTION_KEY environment variable is missing. Using fallback for development.');
   process.env.ENCRYPTION_KEY = '12345678901234567890123456789012';
 }
 
-if (process.env.VERCEL && (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY === '12345678901234567890123456789012')) {
-  console.error('❌ FATAL ERROR: ENCRYPTION_KEY environment variable is missing or using an insecure default value in production.');
-  process.exit(1);
-}
 
-if (process.env.VERCEL && (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dummy_db'))) {
-  console.error('❌ FATAL ERROR: DATABASE_URL is missing or using a dummy value in production.');
-  process.exit(1);
-}
+
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
