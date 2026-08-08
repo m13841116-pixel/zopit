@@ -3,9 +3,13 @@ import path from 'path';
 
 export default function registerOrderLabels(app: any, prisma: any) {
   // Ensure uploads/labels directory exists for fast base64 to file storage
-  const uploadDir = path.join(process.cwd(), 'uploads', 'labels');
+  const uploadDir = process.env.VERCEL
+    ? path.join('/tmp', 'uploads', 'labels')
+    : path.join(process.cwd(), 'uploads', 'labels');
   if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
+    try {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    } catch (e) {}
   }
 
   app.post('/api/orders/:id/label', async (req: any, res: any) => {

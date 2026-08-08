@@ -1450,9 +1450,12 @@ function registerAnnouncements(app2) {
 var import_fs2 = __toESM(require("fs"));
 var import_path2 = __toESM(require("path"));
 function registerOrderLabels(app2, prisma15) {
-  const uploadDir = import_path2.default.join(process.cwd(), "uploads", "labels");
+  const uploadDir = process.env.VERCEL ? import_path2.default.join("/tmp", "uploads", "labels") : import_path2.default.join(process.cwd(), "uploads", "labels");
   if (!import_fs2.default.existsSync(uploadDir)) {
-    import_fs2.default.mkdirSync(uploadDir, { recursive: true });
+    try {
+      import_fs2.default.mkdirSync(uploadDir, { recursive: true });
+    } catch (e) {
+    }
   }
   app2.post("/api/orders/:id/label", async (req, res) => {
     try {
