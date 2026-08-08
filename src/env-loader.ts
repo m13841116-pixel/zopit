@@ -111,12 +111,17 @@ const isProduction = process.env.NODE_ENV === 'production' || !!process.env.K_SE
 
 if (resolvedProvider !== currentSchemaProvider || !clientExists || isProduction) {
   console.log(`[Env Loader] Database setup needed (resolved="${resolvedProvider}", schema="${currentSchemaProvider}", exists=${clientExists}, prod=${isProduction})`);
-  try {
-    console.log('[Env Loader] Running setup-db.js synchronously...');
-    execSync('node setup-db.js', { stdio: 'inherit', env: { ...process.env, DATABASE_URL: resolvedUrl } });
-    console.log('[Env Loader] Database setup completed successfully.');
-  } catch (err: any) {
-    console.error('[Env Loader] Failed to execute setup-db.js synchronously on startup:', err.message);
+  const setupScriptPath = path.join(process.cwd(), 'setup-db.js');
+  if (fs.existsSync(setupScriptPath)) {
+    try {
+      console.log('[Env Loader] Running setup-db.js synchronously...');
+      execSync('node setup-db.js', { stdio: 'inherit', env: { ...process.env, DATABASE_URL: resolvedUrl } });
+      console.log('[Env Loader] Database setup completed successfully.');
+    } catch (err: any) {
+      console.error('[Env Loader] Failed to execute setup-db.js synchronously on startup:', err.message);
+    }
+  } else {
+    console.log('[Env Loader] setup-db.js not found, skipping setup script execution.');
   }
 } else {
   console.log('[Env Loader] Database setup skipped: Client is up-to-date and provider matches.');

@@ -35,107 +35,61 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/prisma.ts
-function createDummyPrismaProxy() {
-  const dummyHandler = {
-    get(_target, prop) {
-      if (prop === "$transaction") {
-        return async (arg) => {
-          if (typeof arg === "function") {
-            return arg(createDummyPrismaProxy());
-          }
-          if (Array.isArray(arg)) {
-            return Promise.all(arg);
-          }
-          return [];
-        };
-      }
-      if (prop === "$connect" || prop === "$disconnect") {
-        return async () => {
-        };
-      }
-      if (typeof prop === "string" && prop.startsWith("$")) {
-        return async () => null;
-      }
-      return new Proxy({}, {
-        get(_modelTarget, method) {
-          if (method === "findMany") return async () => [];
-          if (method === "findFirst" || method === "findUnique") return async () => null;
-          if (method === "count") return async () => 0;
-          if (method === "create" || method === "update" || method === "upsert") {
-            return async (args) => (args == null ? void 0 : args.data) ?? {};
-          }
-          if (method === "delete" || method === "deleteMany" || method === "updateMany") {
-            return async () => ({ count: 0 });
-          }
-          return async () => null;
-        }
-      });
-    }
-  };
-  return new Proxy({}, dummyHandler);
-}
-function getActivePrismaInstance() {
-  if (prismaInstance) return prismaInstance;
-  try {
-    const dbUrl3 = process.env.DATABASE_URL;
-    let schemaProvider = "sqlite";
+function getPrisma() {
+  if (!prismaInstance) {
     try {
-      const schemaPath = import_path2.default.join(process.cwd(), "prisma", "schema.prisma");
-      if (import_fs2.default.existsSync(schemaPath)) {
-        const content = import_fs2.default.readFileSync(schemaPath, "utf8");
-        const match = content.match(/provider\s*=\s*"([^"]+)"/);
-        if (match) {
-          schemaProvider = match[1];
-        }
-      }
-    } catch (e) {
-    }
-    const isSqliteUrl = dbUrl3 && (dbUrl3.startsWith("file:") || dbUrl3.startsWith("sqlite:") || dbUrl3.includes(".db"));
-    const isPostgresUrl = dbUrl3 && (dbUrl3.startsWith("postgresql://") || dbUrl3.startsWith("postgres://"));
-    const isMysqlUrl = dbUrl3 && (dbUrl3.startsWith("mysql://") || dbUrl3.startsWith("mysqls://"));
-    const isMismatch = schemaProvider === "sqlite" && (isPostgresUrl || isMysqlUrl) || schemaProvider === "postgresql" && (isSqliteUrl || isMysqlUrl) || schemaProvider === "mysql" && (isSqliteUrl || isPostgresUrl);
-    if (isMismatch) {
-      console.warn(`[Prisma Mismatch] Schema provider is "${schemaProvider}" but DATABASE_URL is incompatible. Returning safe fallback proxy.`);
-      return createDummyPrismaProxy();
-    }
-    if (dbUrl3) {
-      prismaInstance = new import_client.PrismaClient({
-        datasources: {
-          db: {
-            url: dbUrl3
+      const dbUrl3 = process.env.DATABASE_URL || "postgresql://dummy:dummy@dummy_db/dummy";
+      if (dbUrl3.includes("dummy_db") || !process.env.DATABASE_URL) {
+        prismaInstance = createMemoryPrismaProxy();
+      } else {
+        prismaInstance = new import_client.PrismaClient({
+          datasources: {
+            db: {
+              url: dbUrl3
+            }
           }
-        }
-      });
-    } else {
-      prismaInstance = new import_client.PrismaClient();
+        });
+      }
+    } catch (err) {
+      console.warn("[Prisma] Initialization failed, falling back to mock proxy:", err.message);
+      prismaInstance = createMemoryPrismaProxy();
     }
-  } catch (err) {
-    console.warn("[Prisma Singleton] Dynamic creation failed, returning fallback proxy:", err.message);
-    return createDummyPrismaProxy();
   }
   return prismaInstance;
 }
-function getPrisma() {
+function createMemoryPrismaProxy() {
   return new Proxy({}, {
-    get(_target, prop) {
-      if (prop === "then" || prop === "catch" || prop === "finally") {
-        return void 0;
+    get(target, prop) {
+      if (typeof prop !== "string") return Reflect.get(target, prop);
+      if (prop === "then" || prop === "catch" || prop === "finally") return void 0;
+      if (prop.startsWith("$")) {
+        if (prop === "$connect" || prop === "$disconnect") return async () => {
+        };
+        if (prop === "$transaction") return async (cb) => typeof cb === "function" ? cb(prismaInstance) : cb;
+        return async () => [];
       }
-      const active = getActivePrismaInstance();
-      if (typeof active[prop] === "function") {
-        return active[prop].bind(active);
-      }
-      return active[prop];
+      return {
+        findMany: async () => [],
+        findUnique: async () => null,
+        findFirst: async () => null,
+        create: async (args) => ({ id: 1, ...args?.data || {} }),
+        update: async (args) => ({ id: 1, ...args?.data || {} }),
+        upsert: async (args) => ({ id: 1, ...args?.create || {} }),
+        delete: async () => ({}),
+        deleteMany: async () => ({ count: 0 }),
+        count: async () => 0,
+        aggregate: async () => ({}),
+        groupBy: async () => []
+      };
     }
   });
 }
-var import_client, import_fs2, import_path2, prismaInstance;
+var import_client, prismaInstance, prisma;
 var init_prisma = __esm({
   "src/prisma.ts"() {
     import_client = require("@prisma/client");
-    import_fs2 = __toESM(require("fs"));
-    import_path2 = __toESM(require("path"));
     prismaInstance = null;
+    prisma = getPrisma();
   }
 });
 
@@ -230,7 +184,6 @@ var init_ZibalService = __esm({
        * Verify an existing payment with Zibal
        */
       async verifyPayment(authority, amount) {
-        var _a, _b;
         try {
           if (authority.startsWith("ZIBAL_") || authority.startsWith("SIM_") || this.zibalMerchant === "zibal") {
             return {
@@ -253,7 +206,7 @@ var init_ZibalService = __esm({
             return {
               success: true,
               trackId: authority,
-              refId: ((_a = data.refNumber) == null ? void 0 : _a.toString()) || ((_b = data.refId) == null ? void 0 : _b.toString()) || authority
+              refId: data.refNumber?.toString() || data.refId?.toString() || authority
             };
           } else {
             if (authority.startsWith("ZIBAL_") || this.zibalMerchant === "zibal") {
@@ -281,7 +234,6 @@ var init_ZibalService = __esm({
        * Request a payout/settlement to a Shaba account
        */
       async requestPayout(amount, shaba, description) {
-        var _a, _b;
         try {
           const response = await fetch(`${ZIBAL_API_URL}/checkout`, {
             method: "POST",
@@ -302,7 +254,7 @@ var init_ZibalService = __esm({
           if (data.result === 1 || data.result === 100 || data.success) {
             return {
               success: true,
-              trackId: ((_a = data.trackId) == null ? void 0 : _a.toString()) || ((_b = data.id) == null ? void 0 : _b.toString()) || `ZIBAL_PAYOUT_${Date.now()}`
+              trackId: data.trackId?.toString() || data.id?.toString() || `ZIBAL_PAYOUT_${Date.now()}`
             };
           } else {
             throw new Error(`Zibal Payout Request Failed: ${data.message || data.result}`);
@@ -402,17 +354,17 @@ var init_MockZibalService = __esm({
 });
 
 // src/services/payment/PaymentServiceFactory.ts
-var prisma, PaymentServiceFactory;
+var prisma2, PaymentServiceFactory;
 var init_PaymentServiceFactory = __esm({
   "src/services/payment/PaymentServiceFactory.ts"() {
     init_prisma();
     init_ZibalService();
     init_MockZibalService();
-    prisma = getPrisma();
+    prisma2 = getPrisma();
     PaymentServiceFactory = class {
       static async getService() {
         try {
-          const configRecord = await prisma.systemConfig.findUnique({ where: { key: "payment_gateway_settings" } });
+          const configRecord = await prisma2.systemConfig.findUnique({ where: { key: "payment_gateway_settings" } });
           let config = {};
           if (configRecord && configRecord.value) {
             config = JSON.parse(configRecord.value);
@@ -467,7 +419,7 @@ __export(WalletService_exports, {
   PayoutStatus: () => PayoutStatus,
   WalletService: () => WalletService
 });
-var import_library, LedgerType, LedgerStatus, PayoutStatus, prisma10, WalletService;
+var import_library, LedgerType, LedgerStatus, PayoutStatus, prisma11, WalletService;
 var init_WalletService = __esm({
   "src/services/WalletService.ts"() {
     init_prisma();
@@ -492,7 +444,7 @@ var init_WalletService = __esm({
       SUCCESS: "SUCCESS",
       FAILED: "FAILED"
     };
-    prisma10 = getPrisma();
+    prisma11 = getPrisma();
     WalletService = class {
       /**
        * Get the wallet balance for a specific wallet ID
@@ -500,7 +452,7 @@ var init_WalletService = __esm({
        * @returns The current balance as a Decimal
        */
       async getBalance(walletId) {
-        const wallet = await prisma10.wallet.findUnique({
+        const wallet = await prisma11.wallet.findUnique({
           where: { id: walletId }
         });
         if (!wallet) {
@@ -524,7 +476,7 @@ var init_WalletService = __esm({
         if (transactionAmount.lte(0)) {
           throw new Error("Credit amount must be greater than zero.");
         }
-        return await prisma10.$transaction(async (tx) => {
+        return await prisma11.$transaction(async (tx) => {
           const wallet = await tx.wallet.findUnique({
             where: { id: walletId }
           });
@@ -574,7 +526,7 @@ var init_WalletService = __esm({
         if (transactionAmount.lte(0)) {
           throw new Error("Debit amount must be greater than zero.");
         }
-        return await prisma10.$transaction(async (tx) => {
+        return await prisma11.$transaction(async (tx) => {
           const wallet = await tx.wallet.findUnique({
             where: { id: walletId }
           });
@@ -623,7 +575,7 @@ var init_WalletService = __esm({
         if (payoutAmount.lte(0)) {
           throw new Error("Payout amount must be greater than zero.");
         }
-        const activePayouts = await prisma10.payoutRequest.findFirst({
+        const activePayouts = await prisma11.payoutRequest.findFirst({
           where: {
             walletId,
             status: { in: [PayoutStatus.PENDING, PayoutStatus.PROCESSING] }
@@ -632,7 +584,7 @@ var init_WalletService = __esm({
         if (activePayouts) {
           throw new Error("An active payout request already exists. Please wait for it to complete.");
         }
-        const payoutRequest = await prisma10.$transaction(async (tx) => {
+        const payoutRequest = await prisma11.$transaction(async (tx) => {
           const wallet = await tx.wallet.findUnique({
             where: { id: walletId }
           });
@@ -680,7 +632,7 @@ var init_WalletService = __esm({
             shaba,
             `Payout for wallet ${walletId}`
           );
-          return await prisma10.payoutRequest.update({
+          return await prisma11.payoutRequest.update({
             where: { id: payoutRequest.id },
             data: {
               trackId: gatewayResponse.trackId
@@ -689,7 +641,7 @@ var init_WalletService = __esm({
           });
         } catch (error) {
           console.error(`Gateway payout request failed: ${error.message}`);
-          await prisma10.$transaction(async (tx) => {
+          await prisma11.$transaction(async (tx) => {
             await tx.payoutRequest.update({
               where: { id: payoutRequest.id },
               data: { status: PayoutStatus.FAILED }
@@ -715,7 +667,7 @@ var init_WalletService = __esm({
        * @param trackId The tracking ID from the gateway
        */
       async syncPayoutStatus(trackId) {
-        const payoutRequest = await prisma10.payoutRequest.findFirst({
+        const payoutRequest = await prisma11.payoutRequest.findFirst({
           where: { trackId }
         });
         if (!payoutRequest || payoutRequest.status === PayoutStatus.SUCCESS || payoutRequest.status === PayoutStatus.FAILED) {
@@ -724,7 +676,7 @@ var init_WalletService = __esm({
         const paymentService2 = await PaymentServiceFactory.getService();
         const gatewayStatus = await paymentService2.getPayoutStatus(trackId);
         if (gatewayStatus.status === "SUCCESS" || gatewayStatus.status === "FAILED") {
-          await prisma10.$transaction(async (tx) => {
+          await prisma11.$transaction(async (tx) => {
             const newStatus = gatewayStatus.status === "SUCCESS" ? PayoutStatus.SUCCESS : PayoutStatus.FAILED;
             await tx.payoutRequest.update({
               where: { id: payoutRequest.id },
@@ -775,6 +727,7 @@ module.exports = __toCommonJS(server_exports);
 var import_dotenv = __toESM(require("dotenv"));
 var import_fs = __toESM(require("fs"));
 var import_path = __toESM(require("path"));
+var import_child_process = require("child_process");
 function findTrueRootDir() {
   const current = typeof __dirname !== "undefined" ? __dirname : process.cwd();
   if (import_fs.default.existsSync(import_path.default.join(current, "package.json"))) {
@@ -843,16 +796,55 @@ if (!isRealRemoteDb || isAIStudioEnv && !process.env.FORCE_PRODUCTION_DB) {
   dbUrl = `file:///${dbPath.replace(/^\//, "")}`;
   process.env.DATABASE_URL = dbUrl;
 }
+var resolvedProvider = "sqlite";
+var resolvedUrl = process.env.DATABASE_URL || "";
+if (resolvedUrl.startsWith("mysql://") || resolvedUrl.startsWith("mysqls://")) {
+  resolvedProvider = "mysql";
+} else if (resolvedUrl.startsWith("postgresql://") || resolvedUrl.startsWith("postgres://")) {
+  resolvedProvider = "postgresql";
+}
+var currentSchemaProvider = "";
+try {
+  const schemaPath = import_path.default.join(process.cwd(), "prisma", "schema.prisma");
+  if (import_fs.default.existsSync(schemaPath)) {
+    const content = import_fs.default.readFileSync(schemaPath, "utf8");
+    const match = content.match(/provider\s*=\s*"([^"]+)"/);
+    if (match) {
+      currentSchemaProvider = match[1];
+    }
+  }
+} catch (e) {
+}
+var prismaClientDir = import_path.default.join(process.cwd(), "node_modules", "@prisma", "client");
+var clientExists = import_fs.default.existsSync(prismaClientDir);
+var isProduction = process.env.NODE_ENV === "production" || !!process.env.K_SERVICE;
+if (resolvedProvider !== currentSchemaProvider || !clientExists || isProduction) {
+  console.log(`[Env Loader] Database setup needed (resolved="${resolvedProvider}", schema="${currentSchemaProvider}", exists=${clientExists}, prod=${isProduction})`);
+  const setupScriptPath = import_path.default.join(process.cwd(), "setup-db.js");
+  if (import_fs.default.existsSync(setupScriptPath)) {
+    try {
+      console.log("[Env Loader] Running setup-db.js synchronously...");
+      (0, import_child_process.execSync)("node setup-db.js", { stdio: "inherit", env: { ...process.env, DATABASE_URL: resolvedUrl } });
+      console.log("[Env Loader] Database setup completed successfully.");
+    } catch (err) {
+      console.error("[Env Loader] Failed to execute setup-db.js synchronously on startup:", err.message);
+    }
+  } else {
+    console.log("[Env Loader] setup-db.js not found, skipping setup script execution.");
+  }
+} else {
+  console.log("[Env Loader] Database setup skipped: Client is up-to-date and provider matches.");
+}
 
 // server.ts
 var import_multer = __toESM(require("multer"));
 var import_adm_zip = __toESM(require("adm-zip"));
 
 // src/services/adminShippingRoutes.ts
-function registerAdminShippingRoutes(app2, prisma14, authenticateToken2, requireSuperAdmin2) {
+function registerAdminShippingRoutes(app2, prisma15, authenticateToken2, requireSuperAdmin2) {
   app2.get("/api/admin/shipping", authenticateToken2, requireSuperAdmin2, async (req, res) => {
     try {
-      const orders = await prisma14.order.findMany({
+      const orders = await prisma15.order.findMany({
         where: {
           status: {
             in: [
@@ -889,7 +881,7 @@ function registerAdminShippingRoutes(app2, prisma14, authenticateToken2, require
       if (!cost || cost <= 0) {
         return res.status(400).json({ error: "\u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A." });
       }
-      const order = await prisma14.order.findUnique({
+      const order = await prisma15.order.findUnique({
         where: { id: parseInt(orderId) }
       });
       if (!order) {
@@ -898,7 +890,7 @@ function registerAdminShippingRoutes(app2, prisma14, authenticateToken2, require
       if (order.status !== "WAITING_SHIPPING_COST") {
         return res.status(400).json({ error: "\u0648\u0636\u0639\u06CC\u062A \u0633\u0641\u0627\u0631\u0634 \u0628\u0631\u0627\u06CC \u062B\u0628\u062A \u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A." });
       }
-      const invoice = await prisma14.shippingInvoice.create({
+      const invoice = await prisma15.shippingInvoice.create({
         data: {
           orderId: order.id,
           shippingCost: Number(cost),
@@ -906,7 +898,7 @@ function registerAdminShippingRoutes(app2, prisma14, authenticateToken2, require
           description: description || ""
         }
       });
-      await prisma14.order.update({
+      await prisma15.order.update({
         where: { id: order.id },
         data: {
           status: "WAITING_SHIPPING_PAYMENT",
@@ -931,11 +923,11 @@ function registerAdminShippingRoutes(app2, prisma14, authenticateToken2, require
 
 // src/services/storeShippingRoutes.ts
 init_PaymentServiceFactory();
-function registerStoreShippingRoutes(app2, prisma14, authenticateToken2, requireStoreManager2) {
+function registerStoreShippingRoutes(app2, prisma15, authenticateToken2, requireStoreManager2) {
   app2.post("/api/store-manager/shipping/:orderId/pay", authenticateToken2, requireStoreManager2, async (req, res) => {
     try {
       const { orderId } = req.params;
-      const order = await prisma14.order.findUnique({
+      const order = await prisma15.order.findUnique({
         where: { id: parseInt(orderId), storeId: req.user.userId },
         include: { shippingInvoice: true }
       });
@@ -958,7 +950,7 @@ function registerStoreShippingRoutes(app2, prisma14, authenticateToken2, require
           `\u067E\u0631\u062F\u0627\u062E\u062A \u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644 \u0633\u0641\u0627\u0631\u0634 #${order.id}`,
           callbackUrl
         );
-        await prisma14.shippingInvoice.update({
+        await prisma15.shippingInvoice.update({
           where: { id: order.shippingInvoice.id },
           data: { payLink: zibalResult.payLink }
         });
@@ -1028,8 +1020,8 @@ async function sendSmsViaMelliPayamak(mobile, message, orderId) {
       return { success: false, message: data.StrRetStatus || data.StrStatus || "\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0645\u0644\u06CC \u067E\u06CC\u0627\u0645\u06A9", rawResponse: data };
     }
   } catch (err) {
-    console.error("[SMS Service] Error invoking MelliPayamak API:", (err == null ? void 0 : err.message) || err);
-    return { success: false, message: (err == null ? void 0 : err.message) || "\u062E\u0637\u0627\u06CC \u0634\u0628\u06A9\u0647 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9" };
+    console.error("[SMS Service] Error invoking MelliPayamak API:", err?.message || err);
+    return { success: false, message: err?.message || "\u062E\u0637\u0627\u06CC \u0634\u0628\u06A9\u0647 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9" };
   }
 }
 async function notifySupplierNewOrder(supplierMobile, orderId, supplierName) {
@@ -1045,18 +1037,18 @@ var import_dotenv2 = __toESM(require("dotenv"));
 var import_cors = __toESM(require("cors"));
 var import_bcryptjs = __toESM(require("bcryptjs"));
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"));
-var import_path4 = __toESM(require("path"));
-var import_fs4 = __toESM(require("fs"));
-var import_child_process = require("child_process");
+var import_path3 = __toESM(require("path"));
+var import_fs3 = __toESM(require("fs"));
+var import_child_process2 = require("child_process");
 init_NotificationService();
 
 // src/services/configRoute.ts
 init_prisma();
-var prisma2 = getPrisma();
+var prisma3 = getPrisma();
 function registerConfig(app2) {
   app2.get("/api/config", async (req, res) => {
     try {
-      const configs = await prisma2.systemConfig.findMany();
+      const configs = await prisma3.systemConfig.findMany();
       const configMap = configs.reduce((acc, c) => {
         if (c.value === "true") acc[c.key] = true;
         else if (c.value === "false") acc[c.key] = false;
@@ -1071,7 +1063,7 @@ function registerConfig(app2) {
   app2.put("/api/config", async (req, res) => {
     try {
       const { key: key2, value } = req.body;
-      const config = await prisma2.systemConfig.upsert({
+      const config = await prisma3.systemConfig.upsert({
         where: { key: key2 },
         update: { value: String(value) },
         create: { key: key2, value: String(value) }
@@ -1084,10 +1076,10 @@ function registerConfig(app2) {
 }
 
 // src/services/newFeaturesRoute.ts
-function registerNewFeatures(app2, prisma14) {
+function registerNewFeatures(app2, prisma15) {
   app2.get("/api/admin/info-pages", async (req, res) => {
     try {
-      const pages = await prisma14.infoPage.findMany({
+      const pages = await prisma15.infoPage.findMany({
         orderBy: { createdAt: "desc" }
       });
       res.json(pages);
@@ -1098,7 +1090,7 @@ function registerNewFeatures(app2, prisma14) {
   app2.post("/api/admin/info-pages", async (req, res) => {
     try {
       const { title, slug, category, summary, content, images, attachments, videos, tags, isPublished, isPinned } = req.body;
-      const page = await prisma14.infoPage.create({
+      const page = await prisma15.infoPage.create({
         data: {
           title,
           slug,
@@ -1124,7 +1116,7 @@ function registerNewFeatures(app2, prisma14) {
       const pageId = parseInt(id, 10);
       const updateData = { ...req.body };
       delete updateData.id;
-      const page = await prisma14.infoPage.update({
+      const page = await prisma15.infoPage.update({
         where: { id: isNaN(pageId) ? void 0 : pageId },
         data: updateData
       });
@@ -1137,7 +1129,7 @@ function registerNewFeatures(app2, prisma14) {
     try {
       const { id } = req.params;
       const pageId = parseInt(id, 10);
-      await prisma14.infoPage.delete({
+      await prisma15.infoPage.delete({
         where: { id: isNaN(pageId) ? void 0 : pageId }
       });
       res.json({ success: true });
@@ -1147,7 +1139,7 @@ function registerNewFeatures(app2, prisma14) {
   });
   app2.get("/api/admin/public-messages", async (req, res) => {
     try {
-      const messages = await prisma14.publicMessage.findMany({
+      const messages = await prisma15.publicMessage.findMany({
         orderBy: { createdAt: "desc" }
       });
       res.json(messages);
@@ -1158,7 +1150,7 @@ function registerNewFeatures(app2, prisma14) {
   app2.post("/api/admin/public-messages", async (req, res) => {
     try {
       const { content, icon, color, expiryDate, isActive } = req.body;
-      const msg = await prisma14.publicMessage.create({
+      const msg = await prisma15.publicMessage.create({
         data: {
           content,
           icon: icon || "info",
@@ -1181,7 +1173,7 @@ function registerNewFeatures(app2, prisma14) {
       if (updateData.expiryDate) {
         updateData.expiryDate = new Date(updateData.expiryDate);
       }
-      const msg = await prisma14.publicMessage.update({
+      const msg = await prisma15.publicMessage.update({
         where: { id: isNaN(msgId) ? void 0 : msgId },
         data: updateData
       });
@@ -1194,7 +1186,7 @@ function registerNewFeatures(app2, prisma14) {
     try {
       const { id } = req.params;
       const msgId = parseInt(id, 10);
-      await prisma14.publicMessage.delete({
+      await prisma15.publicMessage.delete({
         where: { id: isNaN(msgId) ? void 0 : msgId }
       });
       res.json({ success: true });
@@ -1204,7 +1196,7 @@ function registerNewFeatures(app2, prisma14) {
   });
   app2.get("/api/admin/dashboard-messages", async (req, res) => {
     try {
-      const messages = await prisma14.dashboardMessage.findMany({
+      const messages = await prisma15.dashboardMessage.findMany({
         orderBy: { createdAt: "desc" }
       });
       res.json(messages);
@@ -1215,7 +1207,7 @@ function registerNewFeatures(app2, prisma14) {
   app2.post("/api/admin/dashboard-messages", async (req, res) => {
     try {
       const { title, content, targetRole, priority, expiryDate, publishDate, attachments } = req.body;
-      const msg = await prisma14.dashboardMessage.create({
+      const msg = await prisma15.dashboardMessage.create({
         data: {
           title,
           content,
@@ -1239,7 +1231,7 @@ function registerNewFeatures(app2, prisma14) {
       delete updateData.id;
       if (updateData.expiryDate) updateData.expiryDate = new Date(updateData.expiryDate);
       if (updateData.publishDate) updateData.publishDate = new Date(updateData.publishDate);
-      const msg = await prisma14.dashboardMessage.update({
+      const msg = await prisma15.dashboardMessage.update({
         where: { id: isNaN(msgId) ? void 0 : msgId },
         data: updateData
       });
@@ -1252,7 +1244,7 @@ function registerNewFeatures(app2, prisma14) {
     try {
       const { id } = req.params;
       const msgId = parseInt(id, 10);
-      await prisma14.dashboardMessage.delete({
+      await prisma15.dashboardMessage.delete({
         where: { id: isNaN(msgId) ? void 0 : msgId }
       });
       res.json({ success: true });
@@ -1263,7 +1255,7 @@ function registerNewFeatures(app2, prisma14) {
   app2.get("/api/menus/:selectedRole", async (req, res) => {
     try {
       const { selectedRole } = req.params;
-      const menu = await prisma14.dynamicMenu.findUnique({
+      const menu = await prisma15.dynamicMenu.findUnique({
         where: { role: selectedRole }
       });
       res.json(menu ? JSON.parse(menu.items) : null);
@@ -1275,7 +1267,7 @@ function registerNewFeatures(app2, prisma14) {
     try {
       const { selectedRole } = req.params;
       const { items } = req.body;
-      const menu = await prisma14.dynamicMenu.upsert({
+      const menu = await prisma15.dynamicMenu.upsert({
         where: { role: selectedRole },
         update: { items: typeof items === "string" ? items : JSON.stringify(items) },
         create: {
@@ -1290,7 +1282,7 @@ function registerNewFeatures(app2, prisma14) {
   });
   app2.get("/api/info-pages", async (req, res) => {
     try {
-      const pages = await prisma14.infoPage.findMany({
+      const pages = await prisma15.infoPage.findMany({
         where: { isPublished: true },
         orderBy: [
           { isPinned: "desc" },
@@ -1304,7 +1296,7 @@ function registerNewFeatures(app2, prisma14) {
   });
   app2.get("/api/dashboard-messages", async (req, res) => {
     try {
-      const messages = await prisma14.dashboardMessage.findMany({
+      const messages = await prisma15.dashboardMessage.findMany({
         where: {
           OR: [
             { expiryDate: null },
@@ -1320,7 +1312,7 @@ function registerNewFeatures(app2, prisma14) {
   });
   app2.get("/api/public-messages", async (req, res) => {
     try {
-      const messages = await prisma14.publicMessage.findMany({
+      const messages = await prisma15.publicMessage.findMany({
         where: {
           isActive: true,
           OR: [
@@ -1339,7 +1331,7 @@ function registerNewFeatures(app2, prisma14) {
 
 // src/services/announcementsRoute.ts
 init_prisma();
-var prisma3 = getPrisma();
+var prisma4 = getPrisma();
 function registerAnnouncements(app2) {
   app2.get("/api/announcements", async (req, res) => {
     try {
@@ -1352,7 +1344,7 @@ function registerAnnouncements(app2) {
           { expiryDate: { gte: /* @__PURE__ */ new Date() } }
         ];
       }
-      const announcements = await prisma3.announcement.findMany({
+      const announcements = await prisma4.announcement.findMany({
         where: whereClause,
         orderBy: [
           { isSticky: "desc" },
@@ -1369,7 +1361,7 @@ function registerAnnouncements(app2) {
       const { title, content, target, priority, isSticky, isLoginPopup, expiryDate, attachmentUrl, imageUrl } = req.body;
       let announcement;
       try {
-        announcement = await prisma3.announcement.create({
+        announcement = await prisma4.announcement.create({
           data: {
             title,
             content,
@@ -1384,7 +1376,7 @@ function registerAnnouncements(app2) {
           }
         });
       } catch (err) {
-        announcement = await prisma3.announcement.create({
+        announcement = await prisma4.announcement.create({
           data: {
             title,
             content: attachmentUrl ? `${content}
@@ -1421,7 +1413,7 @@ function registerAnnouncements(app2) {
       if (expiryDate !== void 0) {
         updateData.expiryDate = expiryDate ? new Date(expiryDate) : null;
       }
-      const announcement = await prisma3.announcement.update({
+      const announcement = await prisma4.announcement.update({
         where: { id },
         data: updateData
       });
@@ -1433,7 +1425,7 @@ function registerAnnouncements(app2) {
   app2.delete("/api/announcements/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      await prisma3.announcement.delete({
+      await prisma4.announcement.delete({
         where: { id }
       });
       res.json({ success: true });
@@ -1444,12 +1436,12 @@ function registerAnnouncements(app2) {
 }
 
 // src/services/orderLabelRoute.ts
-var import_fs3 = __toESM(require("fs"));
-var import_path3 = __toESM(require("path"));
-function registerOrderLabels(app2, prisma14) {
-  const uploadDir = import_path3.default.join(process.cwd(), "uploads", "labels");
-  if (!import_fs3.default.existsSync(uploadDir)) {
-    import_fs3.default.mkdirSync(uploadDir, { recursive: true });
+var import_fs2 = __toESM(require("fs"));
+var import_path2 = __toESM(require("path"));
+function registerOrderLabels(app2, prisma15) {
+  const uploadDir = import_path2.default.join(process.cwd(), "uploads", "labels");
+  if (!import_fs2.default.existsSync(uploadDir)) {
+    import_fs2.default.mkdirSync(uploadDir, { recursive: true });
   }
   app2.post("/api/orders/:id/label", async (req, res) => {
     try {
@@ -1475,16 +1467,16 @@ function registerOrderLabels(app2, prisma14) {
             else if (contentType.includes("png")) ext = "png";
             else if (contentType.includes("jpeg") || contentType.includes("jpg")) ext = "jpg";
             const filename = `label_${orderId}_${Date.now()}.${ext}`;
-            const filePath = import_path3.default.join(uploadDir, filename);
-            import_fs3.default.writeFileSync(filePath, buffer);
-            import_fs3.default.writeFileSync(filePath + ".meta", contentType);
+            const filePath = import_path2.default.join(uploadDir, filename);
+            import_fs2.default.writeFileSync(filePath, buffer);
+            import_fs2.default.writeFileSync(filePath + ".meta", contentType);
             savedLabelPath = `/api/orders/${orderId}/postal-label/file`;
           }
         } catch (err) {
           console.error("Error saving base64 label file:", err);
         }
       }
-      const updatedOrder = await prisma14.order.update({
+      const updatedOrder = await prisma15.order.update({
         where: { id: orderId },
         data: {
           postalLabel: savedLabelPath,
@@ -1500,17 +1492,17 @@ function registerOrderLabels(app2, prisma14) {
 }
 
 // src/services/penaltyRoute.ts
-function registerPenaltyRoutes(app2, prisma14) {
+function registerPenaltyRoutes(app2, prisma15) {
   app2.get("/api/admin/penalty-stats", async (req, res) => {
     try {
-      const totalPenalties = await prisma14.supplierPenalty.count();
-      const topViolators = await prisma14.user.findMany({
+      const totalPenalties = await prisma15.supplierPenalty.count();
+      const topViolators = await prisma15.user.findMany({
         where: { role: "SUPPLIER", penaltyPoints: { gt: 0 } },
         orderBy: { penaltyPoints: "desc" },
         take: 5,
         select: { id: true, username: true, penaltyPoints: true, warningLevel: true }
       });
-      const recentPenalties = await prisma14.supplierPenalty.findMany({
+      const recentPenalties = await prisma15.supplierPenalty.findMany({
         orderBy: { createdAt: "desc" },
         take: 10,
         include: {
@@ -1530,7 +1522,7 @@ function registerPenaltyRoutes(app2, prisma14) {
   });
   app2.get("/api/admin/penalty-rules", async (req, res) => {
     try {
-      const rules = await prisma14.penaltyRule.findMany({
+      const rules = await prisma15.penaltyRule.findMany({
         orderBy: { createdAt: "desc" }
       });
       res.json(rules);
@@ -1541,7 +1533,7 @@ function registerPenaltyRoutes(app2, prisma14) {
   app2.post("/api/admin/penalty-rules", async (req, res) => {
     try {
       const { title, description, negativePoints, autoNotification, isActive } = req.body;
-      const rule = await prisma14.penaltyRule.create({
+      const rule = await prisma15.penaltyRule.create({
         data: {
           title,
           description,
@@ -1564,7 +1556,7 @@ function registerPenaltyRoutes(app2, prisma14) {
       if (updateData.negativePoints !== void 0) {
         updateData.negativePoints = parseInt(updateData.negativePoints, 10) || 0;
       }
-      const rule = await prisma14.penaltyRule.update({
+      const rule = await prisma15.penaltyRule.update({
         where: { id: ruleId },
         data: updateData
       });
@@ -1577,7 +1569,7 @@ function registerPenaltyRoutes(app2, prisma14) {
     try {
       const { id } = req.params;
       const ruleId = parseInt(id, 10);
-      await prisma14.penaltyRule.delete({
+      await prisma15.penaltyRule.delete({
         where: { id: ruleId }
       });
       res.json({ success: true });
@@ -1587,9 +1579,9 @@ function registerPenaltyRoutes(app2, prisma14) {
   });
   app2.get("/api/admin/penalty-config", async (req, res) => {
     try {
-      let config = await prisma14.penaltyConfig.findFirst();
+      let config = await prisma15.penaltyConfig.findFirst();
       if (!config) {
-        config = await prisma14.penaltyConfig.create({
+        config = await prisma15.penaltyConfig.create({
           data: {
             id: 1,
             underReviewThreshold: 20,
@@ -1607,7 +1599,7 @@ function registerPenaltyRoutes(app2, prisma14) {
   app2.put("/api/admin/penalty-config", async (req, res) => {
     try {
       const { underReviewThreshold, temporarySuspensionThreshold, blockedThreshold, autoSuspensionEnabled } = req.body;
-      const config = await prisma14.penaltyConfig.upsert({
+      const config = await prisma15.penaltyConfig.upsert({
         where: { id: 1 },
         update: {
           underReviewThreshold: parseInt(underReviewThreshold, 10),
@@ -1630,7 +1622,7 @@ function registerPenaltyRoutes(app2, prisma14) {
   });
   app2.get("/api/admin/suppliers", async (req, res) => {
     try {
-      const suppliers = await prisma14.user.findMany({
+      const suppliers = await prisma15.user.findMany({
         where: { role: "SUPPLIER" },
         select: {
           id: true,
@@ -1657,7 +1649,7 @@ function registerPenaltyRoutes(app2, prisma14) {
       if (isNaN(supplierId)) {
         return res.status(400).json({ error: "Invalid supplier ID" });
       }
-      const supplier = await prisma14.user.findUnique({
+      const supplier = await prisma15.user.findUnique({
         where: { id: supplierId },
         select: {
           id: true,
@@ -1672,7 +1664,7 @@ function registerPenaltyRoutes(app2, prisma14) {
       if (!supplier) {
         return res.status(404).json({ error: "Supplier not found" });
       }
-      const penalties = await prisma14.supplierPenalty.findMany({
+      const penalties = await prisma15.supplierPenalty.findMany({
         where: { supplierId },
         orderBy: { createdAt: "desc" }
       });
@@ -1689,7 +1681,7 @@ function registerPenaltyRoutes(app2, prisma14) {
       if (isNaN(supplierId)) {
         return res.status(400).json({ error: "Invalid supplier ID" });
       }
-      const supplier = await prisma14.user.findUnique({
+      const supplier = await prisma15.user.findUnique({
         where: { id: supplierId }
       });
       if (!supplier) {
@@ -1698,7 +1690,7 @@ function registerPenaltyRoutes(app2, prisma14) {
       const penaltyPts = parseInt(points, 10) || 0;
       const newPenaltyPoints = (supplier.penaltyPoints || 0) + penaltyPts;
       const newPerformanceScore = Math.max(0, 100 - newPenaltyPoints);
-      const config = await prisma14.penaltyConfig.findFirst() || {
+      const config = await prisma15.penaltyConfig.findFirst() || {
         underReviewThreshold: 20,
         temporarySuspensionThreshold: 40,
         blockedThreshold: 60,
@@ -1716,8 +1708,8 @@ function registerPenaltyRoutes(app2, prisma14) {
         warningLevel = "LOW";
         if (config.autoSuspensionEnabled) status = "WARNING";
       }
-      const [penaltyRecord, updatedUser] = await prisma14.$transaction([
-        prisma14.supplierPenalty.create({
+      const [penaltyRecord, updatedUser] = await prisma15.$transaction([
+        prisma15.supplierPenalty.create({
           data: {
             supplierId,
             reason,
@@ -1727,7 +1719,7 @@ function registerPenaltyRoutes(app2, prisma14) {
             adminName: "\u0645\u062F\u06CC\u0631\u06CC\u062A \u0633\u06CC\u0633\u062A\u0645"
           }
         }),
-        prisma14.user.update({
+        prisma15.user.update({
           where: { id: supplierId },
           data: {
             penaltyPoints: newPenaltyPoints,
@@ -1743,19 +1735,18 @@ function registerPenaltyRoutes(app2, prisma14) {
     }
   });
   app2.get("/api/supplier/performance", async (req, res) => {
-    var _a;
     try {
-      const userId = (_a = req.user) == null ? void 0 : _a.userId;
+      const userId = req.user?.userId;
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const supplier = await prisma14.user.findUnique({
+      const supplier = await prisma15.user.findUnique({
         where: { id: userId }
       });
       if (!supplier) {
         return res.status(404).json({ error: "Supplier not found" });
       }
-      const penalties = await prisma14.supplierPenalty.findMany({
+      const penalties = await prisma15.supplierPenalty.findMany({
         where: { supplierId: userId },
         orderBy: { createdAt: "desc" }
       });
@@ -1820,7 +1811,17 @@ ${currentCss || "/* \u0647\u0646\u0648\u0632 \u06A9\u062F\u06CC \u062B\u0628\u06
 
 \u062F\u0631\u062E\u0648\u0627\u0633\u062A \u06A9\u0627\u0631\u0628\u0631:
 ${prompt}`;
-      const selectedModel = model === "gemini-1.5-pro" || model === "gemini-3.1-pro-preview" ? "gemini-3.1-pro-preview" : "gemini-3.6-flash";
+      const initialModel = model === "gemini-1.5-pro" || model === "gemini-3.1-pro-preview" ? "gemini-3.1-pro-preview" : "gemini-3.6-flash";
+      const modelFallbacks = [
+        initialModel,
+        "gemini-1.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash"
+      ];
+      const modelsToTry = Array.from(new Set(modelFallbacks));
+      let response = null;
+      let usedModel = initialModel;
+      let lastError = null;
       let contents;
       if (imageFile && imageFile.data && imageFile.mimeType) {
         contents = {
@@ -1845,11 +1846,27 @@ ${userMessage}
           { role: "user", parts: [{ text: baseSystemPrompt }, { text: userMessage }] }
         ];
       }
-      const response = await ai.models.generateContent({
-        model: selectedModel,
-        contents
-      });
-      const responseText = response.text || "";
+      for (const candidateModel of modelsToTry) {
+        try {
+          usedModel = candidateModel;
+          console.log(`[AI Studio] Attempting generation with model: ${candidateModel}`);
+          response = await ai.models.generateContent({
+            model: candidateModel,
+            contents
+          });
+          if (response && (response.text || response.candidates)) {
+            break;
+          }
+        } catch (err) {
+          lastError = err;
+          const errMsg = err?.message || String(err);
+          console.warn(`[AI Studio] Model ${candidateModel} failed or exceeded quota: ${errMsg}. Trying fallback...`);
+        }
+      }
+      if (!response || !response.text && !response.candidates) {
+        throw lastError || new Error("All Gemini model fallbacks exhausted or returned empty responses.");
+      }
+      const responseText = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "";
       let parsedData = null;
       const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
       if (jsonMatch && jsonMatch[1]) {
@@ -1870,14 +1887,14 @@ ${userMessage}
       }
       return res.json({
         success: true,
-        model: selectedModel,
+        model: usedModel,
         responseText,
         aiResult: parsedData
       });
     } catch (err) {
       console.error("AI Studio Generation Error:", err);
       return res.status(500).json({
-        error: err.message || "\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u06CC\u0633 \u06AF\u0648\u06AF\u0644 AI \u0627\u0633\u062A\u0648\u062F\u06CC\u0648"
+        error: err.message || "\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u06CC\u0633 \u06AF\u0648\u06AF\u0644 AI \u0627\u0633\u062A\u0648\u062F\u06CC\u0648 (\u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0633\u0647\u0645\u06CC\u0647 \u06CC\u0627 \u062E\u0637\u0627\u06CC \u0634\u0628\u06A9\u0647)"
       });
     }
   });
@@ -1900,14 +1917,14 @@ var PaymentStatus = {
 // src/services/financial/PaymentLifecycleService.ts
 init_prisma();
 init_PaymentServiceFactory();
-var prisma4 = getPrisma();
+var prisma5 = getPrisma();
 var PaymentLifecycleService = class {
   /**
    * Initialize a new payment
    */
   async initiatePayment(userId, amount, callbackUrl) {
     const idempotencyKey = `PAY_${userId}_${Date.now()}`;
-    const payment = await prisma4.payment.create({
+    const payment = await prisma5.payment.create({
       data: {
         userId,
         amount,
@@ -1918,7 +1935,7 @@ var PaymentLifecycleService = class {
     try {
       const paymentGateway = await PaymentServiceFactory.getService();
       const gatewayResponse = await paymentGateway.createPayment(amount, "Payment for order", callbackUrl);
-      const updatedPayment = await prisma4.$transaction(async (tx) => {
+      const updatedPayment = await prisma5.$transaction(async (tx) => {
         const p = await tx.payment.update({
           where: { id: payment.id },
           data: { gatewayReference: gatewayResponse.authority }
@@ -1946,7 +1963,7 @@ var PaymentLifecycleService = class {
         payLink: gatewayResponse.payLink
       };
     } catch (err) {
-      await prisma4.payment.update({
+      await prisma5.payment.update({
         where: { id: payment.id },
         data: { status: PaymentStatus.FAILED }
       });
@@ -1957,7 +1974,7 @@ var PaymentLifecycleService = class {
    * Verify a callback from the payment gateway
    */
   async verifyPayment(authority, userId, ipAddress) {
-    const payment = await prisma4.payment.findFirst({
+    const payment = await prisma5.payment.findFirst({
       where: { gatewayReference: authority }
     });
     if (!payment) {
@@ -1971,7 +1988,7 @@ var PaymentLifecycleService = class {
     }
     const paymentGateway = await PaymentServiceFactory.getService();
     const verification = await paymentGateway.verifyPayment(authority, Number(payment.amount));
-    return await prisma4.$transaction(async (tx) => {
+    return await prisma5.$transaction(async (tx) => {
       const newStatus = verification.success ? PaymentStatus.PAID : PaymentStatus.FAILED;
       const updatedPayment = await tx.payment.update({
         where: { id: payment.id },
@@ -2004,10 +2021,10 @@ var PaymentLifecycleService = class {
    * Admin: Refund a payment
    */
   async refundPayment(paymentId, adminId) {
-    const payment = await prisma4.payment.findUnique({ where: { id: paymentId } });
+    const payment = await prisma5.payment.findUnique({ where: { id: paymentId } });
     if (!payment) throw new Error("Payment not found");
     if (payment.status !== PaymentStatus.PAID) throw new Error("Can only refund PAID payments");
-    return await prisma4.$transaction(async (tx) => {
+    return await prisma5.$transaction(async (tx) => {
       const updated = await tx.payment.update({
         where: { id: paymentId },
         data: { status: PaymentStatus.REFUNDED }
@@ -2033,14 +2050,14 @@ var PaymentLifecycleService = class {
 };
 
 // src/services/financial/Jobs.ts
-var prisma5 = getPrisma();
+var prisma6 = getPrisma();
 var paymentService = new PaymentLifecycleService();
 var FinancialJobs = class {
   static async pollPendingPayments() {
     console.log("[Background Job] Polling for pending payments...");
     const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1e3);
     try {
-      const pendingPayments = await prisma5.payment.findMany({
+      const pendingPayments = await prisma6.payment.findMany({
         where: {
           status: PaymentStatus.PENDING,
           gatewayReference: { not: null },
@@ -2088,7 +2105,7 @@ var reportQuerySchema = import_zod.z.object({
 });
 
 // server.ts
-var import_child_process2 = require("child_process");
+var import_child_process3 = require("child_process");
 var import_util = __toESM(require("util"));
 
 // src/services/integrations/woocommerce/EncryptionService.ts
@@ -2117,10 +2134,9 @@ var EncryptionService = class {
 
 // src/services/integrations/woocommerce/ConnectionService.ts
 init_prisma();
-var prisma6 = getPrisma();
+var prisma7 = getPrisma();
 var ConnectionService = class {
   static async testConnection(storeUrl, consumerKey, consumerSecret) {
-    var _a, _b;
     try {
       const url = new URL("/wp-json/wc/v3/system_status", storeUrl);
       const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
@@ -2138,8 +2154,8 @@ var ConnectionService = class {
       return {
         success: true,
         data: {
-          wooVersion: (_a = data.environment) == null ? void 0 : _a.version,
-          wpVersion: (_b = data.environment) == null ? void 0 : _b.wp_version
+          wooVersion: data.environment?.version,
+          wpVersion: data.environment?.wp_version
         }
       };
     } catch (error) {
@@ -2149,7 +2165,7 @@ var ConnectionService = class {
   static async connect(storeId, storeUrl, consumerKey, consumerSecret) {
     const encKey = EncryptionService.encrypt(consumerKey);
     const encSecret = EncryptionService.encrypt(consumerSecret);
-    return await prisma6.storeConnection.upsert({
+    return await prisma7.storeConnection.upsert({
       where: { storeId },
       update: {
         storeUrl,
@@ -2167,7 +2183,7 @@ var ConnectionService = class {
     });
   }
   static async disconnect(storeId) {
-    return await prisma6.storeConnection.update({
+    return await prisma7.storeConnection.update({
       where: { storeId },
       data: {
         status: "DISCONNECTED",
@@ -2177,7 +2193,7 @@ var ConnectionService = class {
     });
   }
   static async getConnection(storeId) {
-    const conn = await prisma6.storeConnection.findUnique({
+    const conn = await prisma7.storeConnection.findUnique({
       where: { storeId }
     });
     if (!conn) return null;
@@ -2191,13 +2207,12 @@ var ConnectionService = class {
 
 // src/services/integrations/woocommerce/ProductService.ts
 init_prisma();
-var prisma7 = getPrisma();
+var prisma8 = getPrisma();
 var ProductService = class {
   static async syncProducts(storeId) {
-    var _a;
     const conn = await ConnectionService.getConnection(storeId);
     if (!conn || conn.status !== "CONNECTED") throw new Error("Not connected");
-    const selections = await prisma7.storeProductSelection.findMany({
+    const selections = await prisma8.storeProductSelection.findMany({
       where: { storeId },
       include: { product: { include: { category: true, images: true } } }
     });
@@ -2209,7 +2224,7 @@ var ProductService = class {
         const productData = {
           name: sel.product.name,
           type: "simple",
-          regular_price: ((_a = sel.product.finalPrice) == null ? void 0 : _a.toString()) || "0",
+          regular_price: sel.product.finalPrice?.toString() || "0",
           description: sel.product.longDescription || "",
           short_description: sel.product.shortDescription || "",
           manage_stock: true,
@@ -2234,7 +2249,7 @@ var ProductService = class {
         });
         if (response.ok) {
           const data = await response.json();
-          await prisma7.storeProductSelection.update({
+          await prisma8.storeProductSelection.update({
             where: { id: sel.id },
             data: { status: "SYNCED", wc_product_id: data.id }
           });
@@ -2251,7 +2266,7 @@ var ProductService = class {
   static async syncStock(storeId) {
     const conn = await ConnectionService.getConnection(storeId);
     if (!conn || conn.status !== "CONNECTED") throw new Error("Not connected");
-    const selections = await prisma7.storeProductSelection.findMany({
+    const selections = await prisma8.storeProductSelection.findMany({
       where: { storeId, status: "SYNCED", wc_product_id: { not: null } },
       include: { product: true }
     });
@@ -2283,7 +2298,7 @@ var ProductService = class {
 
 // src/services/integrations/woocommerce/OrderService.ts
 init_prisma();
-var prisma8 = getPrisma();
+var prisma9 = getPrisma();
 var OrderService = class {
   static async syncOrders(storeId) {
     const conn = await ConnectionService.getConnection(storeId);
@@ -2309,10 +2324,10 @@ var OrderService = class {
 
 // src/services/integrations/woocommerce/SyncService.ts
 init_prisma();
-var prisma9 = getPrisma();
+var prisma10 = getPrisma();
 var SyncService = class {
   static async logSync(connectionId, type, direction, status, message, executionTime) {
-    await prisma9.syncLog.create({
+    await prisma10.syncLog.create({
       data: {
         connectionId,
         type,
@@ -2324,14 +2339,14 @@ var SyncService = class {
     });
   }
   static async runProductSync(storeId) {
-    const conn = await prisma9.storeConnection.findUnique({ where: { storeId } });
+    const conn = await prisma10.storeConnection.findUnique({ where: { storeId } });
     if (!conn) return;
     const start = Date.now();
     try {
       const result = await ProductService.syncProducts(storeId);
       const executionTime = Date.now() - start;
       await this.logSync(conn.id, "PRODUCTS", "EXPORT", "SUCCESS", `Synced ${result.successCount}, Failed ${result.failedCount}`, executionTime);
-      await prisma9.storeConnection.update({
+      await prisma10.storeConnection.update({
         where: { id: conn.id },
         data: { lastSync: /* @__PURE__ */ new Date(), lastSuccessfulSync: /* @__PURE__ */ new Date() }
       });
@@ -2343,14 +2358,14 @@ var SyncService = class {
     }
   }
   static async runStockSync(storeId) {
-    const conn = await prisma9.storeConnection.findUnique({ where: { storeId } });
+    const conn = await prisma10.storeConnection.findUnique({ where: { storeId } });
     if (!conn) return;
     const start = Date.now();
     try {
       const result = await ProductService.syncStock(storeId);
       const executionTime = Date.now() - start;
       await this.logSync(conn.id, "STOCK", "EXPORT", "SUCCESS", `Synced ${result.successCount}, Failed ${result.failedCount}`, executionTime);
-      await prisma9.storeConnection.update({
+      await prisma10.storeConnection.update({
         where: { id: conn.id },
         data: { lastSync: /* @__PURE__ */ new Date(), lastSuccessfulSync: /* @__PURE__ */ new Date() }
       });
@@ -2362,14 +2377,14 @@ var SyncService = class {
     }
   }
   static async runOrderSync(storeId) {
-    const conn = await prisma9.storeConnection.findUnique({ where: { storeId } });
+    const conn = await prisma10.storeConnection.findUnique({ where: { storeId } });
     if (!conn) return;
     const start = Date.now();
     try {
       const result = await OrderService.syncOrders(storeId);
       const executionTime = Date.now() - start;
       await this.logSync(conn.id, "ORDERS", "IMPORT", "SUCCESS", `Synced ${result.successCount}, Failed ${result.failedCount}`, executionTime);
-      await prisma9.storeConnection.update({
+      await prisma10.storeConnection.update({
         where: { id: conn.id },
         data: { lastSync: /* @__PURE__ */ new Date(), lastSuccessfulSync: /* @__PURE__ */ new Date() }
       });
@@ -2386,7 +2401,7 @@ var SyncService = class {
 init_prisma();
 var import_crypto2 = __toESM(require("crypto"));
 init_WalletService();
-var prisma11 = getPrisma();
+var prisma12 = getPrisma();
 var walletService = new WalletService();
 var retryQueue = [];
 var MAX_RETRIES = 3;
@@ -2411,7 +2426,7 @@ async function processOrderQueue() {
 setInterval(processOrderQueue, 1e4);
 var WebhookService = class {
   static async handleWebhook(payload, signature, storeId) {
-    const connection = await prisma11.storeConnection.findUnique({
+    const connection = await prisma12.storeConnection.findUnique({
       where: { storeId }
     });
     if (!connection) {
@@ -2440,7 +2455,7 @@ async function processOrderPayload(payload, storeId) {
     return;
   }
   const orderId = payload.id.toString();
-  const existingLedger = await prisma11.ledgerEntry.findFirst({
+  const existingLedger = await prisma12.ledgerEntry.findFirst({
     where: {
       referenceId: orderId,
       type: LedgerType.ORDER_REVENUE
@@ -2453,7 +2468,7 @@ async function processOrderPayload(payload, storeId) {
   for (const item of payload.line_items) {
     const wcProductId = item.product_id;
     const itemTotal = parseFloat(item.total);
-    const storeProduct = await prisma11.storeProductSelection.findUnique({
+    const storeProduct = await prisma12.storeProductSelection.findUnique({
       where: { wc_product_id: wcProductId },
       include: { product: true }
     });
@@ -2470,7 +2485,7 @@ async function processOrderPayload(payload, storeId) {
       }
       const supplierRevenue = itemTotal - commissionAmount;
       if (supplierRevenue > 0) {
-        const wallet = await prisma11.wallet.findUnique({
+        const wallet = await prisma12.wallet.findUnique({
           where: { supplierId }
         });
         if (wallet) {
@@ -2495,16 +2510,15 @@ async function processOrderPayload(payload, storeId) {
 // src/services/integrations/woocommerce/OrderSync.ts
 init_prisma();
 var import_woocommerce_rest_api = __toESM(require("@woocommerce/woocommerce-rest-api"));
-var prisma12 = getPrisma();
+var prisma13 = getPrisma();
 async function syncSingleOrder(storeId, orderId) {
-  var _a;
-  const connection = await prisma12.storeConnection.findUnique({
+  const connection = await prisma13.storeConnection.findUnique({
     where: { storeId }
   });
   if (!connection) {
     throw new Error("Store connection not found");
   }
-  const WC = ((_a = import_woocommerce_rest_api.default.default) == null ? void 0 : _a.default) || import_woocommerce_rest_api.default.default || import_woocommerce_rest_api.default;
+  const WC = import_woocommerce_rest_api.default.default?.default || import_woocommerce_rest_api.default.default || import_woocommerce_rest_api.default;
   const api = new WC({
     url: connection.storeUrl,
     consumerKey: connection.consumerKey,
@@ -2523,14 +2537,14 @@ async function syncSingleOrder(storeId, orderId) {
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);
   try {
-    import_fs4.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNCAUGHT EXCEPTION: " + (err.stack || err) + "\n");
+    import_fs3.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNCAUGHT EXCEPTION: " + (err.stack || err) + "\n");
   } catch (e) {
   }
 });
 process.on("unhandledRejection", (reason, promise) => {
   console.error("UNHANDLED REJECTION at:", promise, "reason:", reason);
   try {
-    import_fs4.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNHANDLED REJECTION: " + ((reason == null ? void 0 : reason.stack) || reason) + "\n");
+    import_fs3.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNHANDLED REJECTION: " + (reason?.stack || reason) + "\n");
   } catch (e) {
   }
 });
@@ -2538,10 +2552,10 @@ var originalConsoleError = console.error;
 console.error = function(...args) {
   originalConsoleError.apply(console, args);
   try {
-    const errorLogPath = import_path4.default.join(process.cwd(), "error.log");
+    const errorLogPath = import_path3.default.join(process.cwd(), "error.log");
     const logLine = `[${(/* @__PURE__ */ new Date()).toISOString()}] ERROR: ${args.map((a) => typeof a === "object" ? JSON.stringify(a) : a).join(" ")}
 `;
-    import_fs4.default.appendFileSync(errorLogPath, logLine);
+    import_fs3.default.appendFileSync(errorLogPath, logLine);
   } catch (e) {
   }
 };
@@ -2569,11 +2583,11 @@ try {
 }
 function findTrueRootDir2() {
   const current = typeof __dirname !== "undefined" ? __dirname : process.cwd();
-  if (import_fs4.default.existsSync(import_path4.default.join(current, "package.json"))) {
+  if (import_fs3.default.existsSync(import_path3.default.join(current, "package.json"))) {
     return current;
   }
-  const parent = import_path4.default.join(current, "..");
-  if (import_fs4.default.existsSync(import_path4.default.join(parent, "package.json"))) {
+  const parent = import_path3.default.join(current, "..");
+  if (import_fs3.default.existsSync(import_path3.default.join(parent, "package.json"))) {
     return parent;
   }
   return current;
@@ -2581,13 +2595,13 @@ function findTrueRootDir2() {
 var isAIStudioEnv2 = !!process.env.APPLET_ID;
 var isCloudRunEnv2 = !!process.env.K_SERVICE || !!process.env.PORT && process.env.NODE_ENV === "production";
 var rootDir2 = isAIStudioEnv2 || isCloudRunEnv2 ? process.cwd() : findTrueRootDir2();
-import_dotenv2.default.config({ path: import_path4.default.join(rootDir2, ".env") });
+import_dotenv2.default.config({ path: import_path3.default.join(rootDir2, ".env") });
 try {
   if (!isAIStudioEnv2) {
-    const distDir = import_path4.default.join(rootDir2, "prod_output");
+    const distDir = import_path3.default.join(rootDir2, "prod_output");
     let enginePath = null;
-    if (import_fs4.default.existsSync(distDir)) {
-      const files = import_fs4.default.readdirSync(distDir);
+    if (import_fs3.default.existsSync(distDir)) {
+      const files = import_fs3.default.readdirSync(distDir);
       let engineFile = files.find((f) => {
         const isEngine = (f.includes("query-engine") || f.includes("query_engine")) && f.endsWith(".node");
         return isEngine && f.includes("rhel");
@@ -2596,11 +2610,11 @@ try {
         engineFile = files.find((f) => (f.includes("query-engine") || f.includes("query_engine")) && f.endsWith(".node"));
       }
       if (engineFile) {
-        enginePath = import_path4.default.join(distDir, engineFile);
+        enginePath = import_path3.default.join(distDir, engineFile);
       }
     }
-    if (!enginePath && import_fs4.default.existsSync(rootDir2)) {
-      const files = import_fs4.default.readdirSync(rootDir2);
+    if (!enginePath && import_fs3.default.existsSync(rootDir2)) {
+      const files = import_fs3.default.readdirSync(rootDir2);
       let engineFile = files.find((f) => {
         const isEngine = (f.includes("query-engine") || f.includes("query_engine")) && f.endsWith(".node");
         return isEngine && f.includes("rhel");
@@ -2609,7 +2623,7 @@ try {
         engineFile = files.find((f) => (f.includes("query-engine") || f.includes("query_engine")) && f.endsWith(".node"));
       }
       if (engineFile) {
-        enginePath = import_path4.default.join(rootDir2, engineFile);
+        enginePath = import_path3.default.join(rootDir2, engineFile);
       }
     }
     if (enginePath && !isCloudRunEnv2 && !process.env.VERCEL) {
@@ -2682,14 +2696,14 @@ if (dbUrl2) {
 } else {
   if (isAIStudio || isCloudRun) {
     provider = "sqlite";
-    const dbDir = import_path4.default.join(process.cwd(), "prisma");
-    if (!import_fs4.default.existsSync(dbDir)) {
+    const dbDir = import_path3.default.join(process.cwd(), "prisma");
+    if (!import_fs3.default.existsSync(dbDir)) {
       try {
-        import_fs4.default.mkdirSync(dbDir, { recursive: true });
+        import_fs3.default.mkdirSync(dbDir, { recursive: true });
       } catch (e) {
       }
     }
-    dbUrl2 = `file:${import_path4.default.join(dbDir, "dev.db")}`;
+    dbUrl2 = `file:${import_path3.default.join(dbDir, "dev.db")}`;
     process.env.DATABASE_URL = dbUrl2;
   } else {
     provider = "postgresql";
@@ -2697,28 +2711,6 @@ if (dbUrl2) {
     process.env.DATABASE_URL = dbUrl2;
     console.log("[Server Startup] No database URL found, defaulting to postgresql for Vercel/Neon.");
   }
-}
-if (dbUrl2 && !process.env.VERCEL) {
-  setTimeout(async () => {
-    console.log("[Auto DB] Running setup-db.js in background...");
-    try {
-      (0, import_child_process.execSync)("node setup-db.js", { stdio: "inherit", env: { ...process.env, DATABASE_URL: dbUrl2 } });
-      console.log("[Auto DB] Database synchronized successfully.");
-      try {
-        Object.keys(require.cache).forEach((key2) => {
-          if (key2.includes(".prisma") || key2.includes("@prisma")) {
-            delete require.cache[key2];
-          }
-        });
-        realPrisma = null;
-        console.log("[Auto DB] Prisma require cache cleared and client reset.");
-      } catch (cacheErr) {
-        console.warn("[Auto DB] Failed to clear prisma require cache:", cacheErr);
-      }
-    } catch (err) {
-      console.error("[Auto DB] Background setup-db.js warning:", (err == null ? void 0 : err.message) || err);
-    }
-  }, 1e3);
 }
 var realPrisma = null;
 var isPrismaMock = false;
@@ -2846,12 +2838,11 @@ var MemoryDatabase = class {
     return cloned;
   }
   async execute(model, method, args = {}) {
-    var _a, _b;
     const list = this.getCollection(model);
     switch (method) {
       case "findMany": {
-        let results = list.filter((item) => this.matchWhere(item, args == null ? void 0 : args.where));
-        if (args == null ? void 0 : args.orderBy) {
+        let results = list.filter((item) => this.matchWhere(item, args?.where));
+        if (args?.orderBy) {
           const orderRules = Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy];
           results.sort((a, b) => {
             for (const rule of orderRules) {
@@ -2866,13 +2857,13 @@ var MemoryDatabase = class {
             return 0;
           });
         }
-        if (args == null ? void 0 : args.skip) {
+        if (args?.skip) {
           results = results.slice(args.skip);
         }
-        if (args == null ? void 0 : args.take) {
+        if (args?.take) {
           results = results.slice(0, args.take);
         }
-        if (args == null ? void 0 : args.include) {
+        if (args?.include) {
           results = results.map((it) => this.attachRelations(model, it, args.include));
         }
         return results.map((it) => ({ ...it }));
@@ -2882,54 +2873,54 @@ var MemoryDatabase = class {
         return results.length > 0 ? results[0] : null;
       }
       case "findUnique": {
-        const item = list.find((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        const item = list.find((it) => this.matchWhere(it, args?.where));
         if (!item) return null;
-        if (args == null ? void 0 : args.include) {
+        if (args?.include) {
           return this.attachRelations(model, item, args.include);
         }
         return { ...item };
       }
       case "create": {
-        const nextId = ((_a = args == null ? void 0 : args.data) == null ? void 0 : _a.id) || this.getNextId(model);
+        const nextId = args?.data?.id || this.getNextId(model);
         const newItem = {
           id: nextId,
-          ...args == null ? void 0 : args.data,
-          createdAt: ((_b = args == null ? void 0 : args.data) == null ? void 0 : _b.createdAt) || /* @__PURE__ */ new Date(),
+          ...args?.data,
+          createdAt: args?.data?.createdAt || /* @__PURE__ */ new Date(),
           updatedAt: /* @__PURE__ */ new Date()
         };
         list.push(newItem);
-        if (args == null ? void 0 : args.include) {
+        if (args?.include) {
           return this.attachRelations(model, newItem, args.include);
         }
         return { ...newItem };
       }
       case "update": {
-        const index = list.findIndex((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        const index = list.findIndex((it) => this.matchWhere(it, args?.where));
         if (index === -1) {
-          return this.execute(model, "create", { data: { ...(args == null ? void 0 : args.where) || {}, ...(args == null ? void 0 : args.data) || {} } });
+          return this.execute(model, "create", { data: { ...args?.where || {}, ...args?.data || {} } });
         }
         const existing = list[index];
         const updated = {
           ...existing,
-          ...args == null ? void 0 : args.data,
+          ...args?.data,
           updatedAt: /* @__PURE__ */ new Date()
         };
         list[index] = updated;
-        if (args == null ? void 0 : args.include) {
+        if (args?.include) {
           return this.attachRelations(model, updated, args.include);
         }
         return { ...updated };
       }
       case "upsert": {
-        const existing = list.find((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        const existing = list.find((it) => this.matchWhere(it, args?.where));
         if (existing) {
           return this.execute(model, "update", { where: args.where, data: args.update, include: args.include });
         } else {
-          return this.execute(model, "create", { data: { ...(args == null ? void 0 : args.where) || {}, ...(args == null ? void 0 : args.create) || {} }, include: args.include });
+          return this.execute(model, "create", { data: { ...args?.where || {}, ...args?.create || {} }, include: args.include });
         }
       }
       case "delete": {
-        const index = list.findIndex((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        const index = list.findIndex((it) => this.matchWhere(it, args?.where));
         if (index !== -1) {
           const removed = list.splice(index, 1)[0];
           return { ...removed };
@@ -2938,28 +2929,28 @@ var MemoryDatabase = class {
       }
       case "deleteMany": {
         const initialLen = list.length;
-        const remaining = list.filter((it) => !this.matchWhere(it, args == null ? void 0 : args.where));
+        const remaining = list.filter((it) => !this.matchWhere(it, args?.where));
         this.collections.set(this.normalizeModel(model), remaining);
         return { count: initialLen - remaining.length };
       }
       case "updateMany": {
         let count = 0;
         for (let i = 0; i < list.length; i++) {
-          if (this.matchWhere(list[i], args == null ? void 0 : args.where)) {
-            list[i] = { ...list[i], ...args == null ? void 0 : args.data, updatedAt: /* @__PURE__ */ new Date() };
+          if (this.matchWhere(list[i], args?.where)) {
+            list[i] = { ...list[i], ...args?.data, updatedAt: /* @__PURE__ */ new Date() };
             count++;
           }
         }
         return { count };
       }
       case "count": {
-        if (!(args == null ? void 0 : args.where)) return list.length;
+        if (!args?.where) return list.length;
         return list.filter((it) => this.matchWhere(it, args.where)).length;
       }
       case "aggregate": {
-        const filtered = list.filter((it) => this.matchWhere(it, args == null ? void 0 : args.where));
+        const filtered = list.filter((it) => this.matchWhere(it, args?.where));
         const result = { _sum: {}, _avg: {}, _count: filtered.length, _min: {}, _max: {} };
-        if (args == null ? void 0 : args._sum) {
+        if (args?._sum) {
           for (const key2 of Object.keys(args._sum)) {
             result._sum[key2] = filtered.reduce((acc, it) => acc + (Number(it[key2]) || 0), 0);
           }
@@ -3222,7 +3213,7 @@ function getActivePrisma() {
   }
   return realPrisma;
 }
-var prisma13 = new Proxy({}, {
+var prisma14 = new Proxy({}, {
   get(target, prop) {
     if (typeof prop !== "string") {
       return Reflect.get(target, prop);
@@ -3236,7 +3227,7 @@ var prisma13 = new Proxy({}, {
     if (prop === "$transaction") {
       return async (cbOrList) => {
         if (typeof cbOrList === "function") {
-          return await cbOrList(prisma13);
+          return await cbOrList(prisma14);
         }
         if (Array.isArray(cbOrList)) {
           return await Promise.all(cbOrList);
@@ -3263,14 +3254,13 @@ var prisma13 = new Proxy({}, {
           return void 0;
         }
         return async (...args) => {
-          var _a;
           const active = getActivePrisma();
-          if (isRealRemoteDb2 && active && !isPrismaMock && typeof ((_a = active[prop]) == null ? void 0 : _a[subProp]) === "function") {
+          if (isRealRemoteDb2 && active && !isPrismaMock && typeof active[prop]?.[subProp] === "function") {
             try {
               return await active[prop][subProp](...args);
             } catch (err) {
-              const errMsg = (err == null ? void 0 : err.message) || "";
-              const isInitOrConnError = (err == null ? void 0 : err.name) === "PrismaClientInitializationError" || (err == null ? void 0 : err.name) === "PrismaClientKnownRequestError" || (err == null ? void 0 : err.name) === "PrismaClientRustPanicError" || errMsg.includes("Can't reach database server") || errMsg.includes("database server") || errMsg.includes("Connection") || errMsg.includes("timed out") || errMsg.includes("dummy");
+              const errMsg = err?.message || "";
+              const isInitOrConnError = err?.name === "PrismaClientInitializationError" || err?.name === "PrismaClientKnownRequestError" || err?.name === "PrismaClientRustPanicError" || errMsg.includes("Can't reach database server") || errMsg.includes("database server") || errMsg.includes("Connection") || errMsg.includes("timed out") || errMsg.includes("dummy");
               if (isInitOrConnError) {
                 console.warn(`[Prisma Query Fallback] ${prop}.${subProp} fallback to memory store:`, errMsg);
                 return await memoryStore.execute(prop, subProp, args[0]);
@@ -3286,10 +3276,10 @@ var prisma13 = new Proxy({}, {
 });
 var app = (0, import_express.default)();
 var googleClient = new import_google_auth_library.OAuth2Client(process.env.GOOGLE_CLIENT_ID || "dummy_client_id_for_build");
-var labelsUploadDir = import_path4.default.join(process.cwd(), "uploads", "labels");
-if (!import_fs4.default.existsSync(labelsUploadDir)) {
+var labelsUploadDir = import_path3.default.join(process.cwd(), "uploads", "labels");
+if (!import_fs3.default.existsSync(labelsUploadDir)) {
   try {
-    import_fs4.default.mkdirSync(labelsUploadDir, { recursive: true });
+    import_fs3.default.mkdirSync(labelsUploadDir, { recursive: true });
   } catch (e) {
   }
 }
@@ -3307,9 +3297,9 @@ function processPostalLabel(orderId, postalLabel) {
         else if (contentType.includes("png")) ext = "png";
         else if (contentType.includes("jpeg") || contentType.includes("jpg")) ext = "jpg";
         const filename = `label_${orderId}_${Date.now()}.${ext}`;
-        const filePath = import_path4.default.join(labelsUploadDir, filename);
-        import_fs4.default.writeFileSync(filePath, buffer);
-        import_fs4.default.writeFileSync(filePath + ".meta", contentType);
+        const filePath = import_path3.default.join(labelsUploadDir, filename);
+        import_fs3.default.writeFileSync(filePath, buffer);
+        import_fs3.default.writeFileSync(filePath + ".meta", contentType);
         return `/api/orders/${orderId}/postal-label/file`;
       }
     } catch (err) {
@@ -3325,10 +3315,10 @@ app.get("/api/orders/:id/postal-label/file", async (req, res) => {
     if (isNaN(orderId)) {
       return res.status(400).send("Invalid order ID");
     }
-    if (!import_fs4.default.existsSync(labelsUploadDir)) {
+    if (!import_fs3.default.existsSync(labelsUploadDir)) {
       return res.status(404).send("No labels directory found");
     }
-    const files = import_fs4.default.readdirSync(labelsUploadDir);
+    const files = import_fs3.default.readdirSync(labelsUploadDir);
     const orderFiles = files.filter((f) => f.startsWith(`label_${orderId}_`) && !f.endsWith(".meta"));
     if (orderFiles.length === 0) {
       return res.status(404).send("Label file not found");
@@ -3339,11 +3329,11 @@ app.get("/api/orders/:id/postal-label/file", async (req, res) => {
       return timeB - timeA;
     });
     const latestFile = orderFiles[0];
-    const filePath = import_path4.default.join(labelsUploadDir, latestFile);
+    const filePath = import_path3.default.join(labelsUploadDir, latestFile);
     const metaPath = filePath + ".meta";
     let contentType = "application/octet-stream";
-    if (import_fs4.default.existsSync(metaPath)) {
-      contentType = import_fs4.default.readFileSync(metaPath, "utf8").trim();
+    if (import_fs3.default.existsSync(metaPath)) {
+      contentType = import_fs3.default.readFileSync(metaPath, "utf8").trim();
     } else {
       if (latestFile.endsWith(".pdf")) contentType = "application/pdf";
       else if (latestFile.endsWith(".png")) contentType = "image/png";
@@ -3360,10 +3350,10 @@ app.get("/api/orders/:id/postal-label/file", async (req, res) => {
 app.use((0, import_cors.default)({ origin: true, credentials: true }));
 app.use(import_express.default.json({ limit: "50mb" }));
 app.use(import_express.default.urlencoded({ limit: "50mb", extended: true }));
-var rootUploadsDir = import_path4.default.join(process.cwd(), "uploads");
-if (!import_fs4.default.existsSync(rootUploadsDir)) {
+var rootUploadsDir = import_path3.default.join(process.cwd(), "uploads");
+if (!import_fs3.default.existsSync(rootUploadsDir)) {
   try {
-    import_fs4.default.mkdirSync(rootUploadsDir, { recursive: true });
+    import_fs3.default.mkdirSync(rootUploadsDir, { recursive: true });
   } catch (e) {
   }
 }
@@ -3414,7 +3404,7 @@ async function seedSuperAdmin() {
     const adminUser = process.env.SUPER_ADMIN_USERNAME || "admin";
     const adminPass = process.env.SUPER_ADMIN_PASSWORD || "!Bahankala@2026";
     const hashedPassword = await import_bcryptjs.default.hash(adminPass, 10);
-    const existingAdmin = await prisma13.user.findFirst({
+    const existingAdmin = await prisma14.user.findFirst({
       where: {
         OR: [
           { role: "SUPER_ADMIN" },
@@ -3423,7 +3413,7 @@ async function seedSuperAdmin() {
       }
     });
     if (!existingAdmin) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: adminUser,
           email: "admin@marketplace.com",
@@ -3437,7 +3427,7 @@ async function seedSuperAdmin() {
       });
       console.log("\u2705 Super Admin created successfully!");
     } else {
-      await prisma13.user.update({
+      await prisma14.user.update({
         where: { id: existingAdmin.id },
         data: {
           status: "ACTIVE",
@@ -3457,9 +3447,9 @@ async function seedDemoUsers() {
     const passwordTestshop = await import_bcryptjs.default.hash("Testshop", 10);
     const passwordSupplier = await import_bcryptjs.default.hash("supplier", 10);
     const standardTestPassword = await import_bcryptjs.default.hash("!Bahankala@2026", 10);
-    const existingStore = await prisma13.user.findUnique({ where: { username: "store" } });
+    const existingStore = await prisma14.user.findUnique({ where: { username: "store" } });
     if (!existingStore) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "store",
           password: passwordStore,
@@ -3477,9 +3467,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: store");
     }
-    const existingStore1 = await prisma13.user.findUnique({ where: { username: "store1" } });
+    const existingStore1 = await prisma14.user.findUnique({ where: { username: "store1" } });
     if (!existingStore1) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "store1",
           password: standardTestPassword,
@@ -3497,9 +3487,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: store1");
     }
-    const existingStore2 = await prisma13.user.findUnique({ where: { username: "store2" } });
+    const existingStore2 = await prisma14.user.findUnique({ where: { username: "store2" } });
     if (!existingStore2) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "store2",
           password: standardTestPassword,
@@ -3517,9 +3507,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: store2");
     }
-    const existingTestshop = await prisma13.user.findUnique({ where: { username: "Testshop" } });
+    const existingTestshop = await prisma14.user.findUnique({ where: { username: "Testshop" } });
     if (!existingTestshop) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "Testshop",
           password: passwordTestshop,
@@ -3536,9 +3526,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: Testshop");
     }
-    const existingSupplier1 = await prisma13.user.findUnique({ where: { username: "supplier1" } });
+    const existingSupplier1 = await prisma14.user.findUnique({ where: { username: "supplier1" } });
     if (!existingSupplier1) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "supplier1",
           password: standardTestPassword,
@@ -3555,9 +3545,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: supplier1");
     }
-    const existingSupplier2 = await prisma13.user.findUnique({ where: { username: "supplier2" } });
+    const existingSupplier2 = await prisma14.user.findUnique({ where: { username: "supplier2" } });
     if (!existingSupplier2) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "supplier2",
           password: standardTestPassword,
@@ -3574,9 +3564,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: supplier2");
     }
-    const existingSupplier = await prisma13.user.findUnique({ where: { username: "supplier" } });
+    const existingSupplier = await prisma14.user.findUnique({ where: { username: "supplier" } });
     if (!existingSupplier) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "supplier",
           password: passwordSupplier,
@@ -3593,9 +3583,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: supplier");
     }
-    const existingCust = await prisma13.user.findUnique({ where: { username: "customer1" } });
+    const existingCust = await prisma14.user.findUnique({ where: { username: "customer1" } });
     if (!existingCust) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "customer1",
           password: standardTestPassword,
@@ -3609,9 +3599,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: customer1");
     }
-    const existingRef = await prisma13.user.findUnique({ where: { username: "referrer1" } });
+    const existingRef = await prisma14.user.findUnique({ where: { username: "referrer1" } });
     if (!existingRef) {
-      await prisma13.user.create({
+      await prisma14.user.create({
         data: {
           username: "referrer1",
           password: standardTestPassword,
@@ -3637,7 +3627,7 @@ async function seedDatabase() {
   await seedSuperAdmin();
   await seedDemoUsers();
   try {
-    const categoryCount = await prisma13.category.count();
+    const categoryCount = await prisma14.category.count();
     if (categoryCount <= 1) {
       console.log("\u{1F331} Seeding 16 standard categories...");
       const defaultCategories = [
@@ -3660,9 +3650,9 @@ async function seedDatabase() {
       ];
       for (let i = 0; i < defaultCategories.length; i++) {
         const catName = defaultCategories[i];
-        const exists = await prisma13.category.findFirst({ where: { name: catName } });
+        const exists = await prisma14.category.findFirst({ where: { name: catName } });
         if (!exists) {
-          await prisma13.category.create({
+          await prisma14.category.create({
             data: {
               name: catName,
               isActive: true,
@@ -3672,13 +3662,13 @@ async function seedDatabase() {
         }
       }
     }
-    const productCount = await prisma13.product.count();
+    const productCount = await prisma14.product.count();
     if (productCount > 0) {
       return;
     }
     console.log("\u{1F331} Seeding database with initial supplier, category, and explore products...");
     const supplierPass = await import_bcryptjs.default.hash("Supplier123!", 10);
-    const supplier = await prisma13.user.create({
+    const supplier = await prisma14.user.create({
       data: {
         username: "supplier_test",
         password: supplierPass,
@@ -3693,7 +3683,7 @@ async function seedDatabase() {
         storeLink: "ariadigital.ir"
       }
     });
-    const category = await prisma13.category.create({
+    const category = await prisma14.category.create({
       data: {
         name: "\u062F\u06CC\u062C\u06CC\u062A\u0627\u0644 \u0648 \u0644\u0648\u0627\u0632\u0645 \u0627\u0644\u06A9\u062A\u0631\u0648\u0646\u06CC\u06A9\u06CC",
         isActive: true,
@@ -3750,7 +3740,7 @@ async function seedDatabase() {
       }
     ];
     for (const mp of mockProducts) {
-      const product = await prisma13.product.create({
+      const product = await prisma14.product.create({
         data: {
           supplierId: supplier.id,
           categoryId: category.id,
@@ -3763,13 +3753,13 @@ async function seedDatabase() {
           inventory: 50
         }
       });
-      await prisma13.productImage.create({
+      await prisma14.productImage.create({
         data: {
           productId: product.id,
           url: mp.imageUrl
         }
       });
-      await prisma13.productExploreContent.create({
+      await prisma14.productExploreContent.create({
         data: {
           productId: product.id,
           customTitle: mp.exploreTitle,
@@ -3780,7 +3770,7 @@ async function seedDatabase() {
         }
       });
       for (const c of mp.comments) {
-        await prisma13.productComment.create({
+        await prisma14.productComment.create({
           data: {
             productId: product.id,
             authorName: c.authorName,
@@ -3790,7 +3780,7 @@ async function seedDatabase() {
         });
       }
       for (const q of mp.questions) {
-        await prisma13.productQuestion.create({
+        await prisma14.productQuestion.create({
           data: {
             productId: product.id,
             askerName: q.askerName,
@@ -3831,9 +3821,9 @@ async function seedDatabase() {
       { key: "EDUCATION_TELEGRAM", value: "https://t.me" }
     ];
     for (const item of configKeys) {
-      const exists = await prisma13.systemConfig.findUnique({ where: { key: item.key } });
+      const exists = await prisma14.systemConfig.findUnique({ where: { key: item.key } });
       if (!exists) {
-        await prisma13.systemConfig.create({ data: { key: item.key, value: item.value } });
+        await prisma14.systemConfig.create({ data: { key: item.key, value: item.value } });
         console.log(`\u{1F331} Seeded system config: ${item.key}`);
       }
     }
@@ -3850,7 +3840,7 @@ app.post("/api/auth/register", async (req, res) => {
     const finalMobile = phone || "09120000000";
     const defaultPass = password || "!Bahankala@2026";
     const hashedPassword = await import_bcryptjs.default.hash(defaultPass, 10);
-    let existingUser = await prisma13.user.findFirst({
+    let existingUser = await prisma14.user.findFirst({
       where: {
         OR: [
           { username: finalUsername },
@@ -3860,7 +3850,7 @@ app.post("/api/auth/register", async (req, res) => {
       }
     });
     if (!existingUser) {
-      existingUser = await prisma13.user.create({
+      existingUser = await prisma14.user.create({
         data: {
           username: finalUsername,
           password: hashedPassword,
@@ -3932,12 +3922,12 @@ app.post("/api/auth/register/supplier", async (req, res) => {
     if (!agreementAccepted) {
       return res.status(400).json({ error: "\u067E\u0630\u06CC\u0631\u0634 \u0642\u0648\u0627\u0646\u06CC\u0646 \u0648 \u0645\u0642\u0631\u0631\u0627\u062A \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A." });
     }
-    const existingUser = await prisma13.user.findUnique({ where: { username } });
+    const existingUser = await prisma14.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0642\u0628\u0644\u0627\u064B \u062F\u0631 \u0633\u06CC\u0633\u062A\u0645 \u062B\u0628\u062A \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma13.user.create({
+    const user = await prisma14.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -4002,12 +3992,12 @@ app.post("/api/auth/register/customer", async (req, res) => {
     if (email && !EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: "\u0622\u062F\u0631\u0633 \u0627\u06CC\u0645\u06CC\u0644 \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A." });
     }
-    const existingUser = await prisma13.user.findUnique({ where: { username } });
+    const existingUser = await prisma14.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0642\u0628\u0644\u0627\u064B \u062F\u0631 \u0633\u06CC\u0633\u062A\u0645 \u062B\u0628\u062A \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma13.user.create({
+    const user = await prisma14.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -4057,12 +4047,12 @@ app.post("/api/auth/register-referrer", async (req, res) => {
     if (email && !EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: "\u0622\u062F\u0631\u0633 \u0627\u06CC\u0645\u06CC\u0644 \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A." });
     }
-    const existingUser = await prisma13.user.findUnique({ where: { username } });
+    const existingUser = await prisma14.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0642\u0628\u0644\u0627\u064B \u062F\u0631 \u0633\u06CC\u0633\u062A\u0645 \u062B\u0628\u062A \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma13.user.create({
+    const user = await prisma14.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -4121,12 +4111,12 @@ app.post("/api/auth/register/store-manager", async (req, res) => {
     if (!/^\d{10}$/.test(nationalCode)) {
       return res.status(400).json({ error: "\u06A9\u062F \u0645\u0644\u06CC \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A. \u06A9\u062F \u0645\u0644\u06CC \u0628\u0627\u06CC\u062F \u062F\u0642\u06CC\u0642\u0627\u064B \u06F1\u06F0 \u0631\u0642\u0645 \u0628\u0627\u0634\u062F." });
     }
-    const existingUser = await prisma13.user.findUnique({ where: { username } });
+    const existingUser = await prisma14.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0642\u0628\u0644\u0627\u064B \u062F\u0631 \u0633\u06CC\u0633\u062A\u0645 \u062B\u0628\u062A \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma13.user.create({
+    const user = await prisma14.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -4165,7 +4155,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     if (!identity || !nationalCode || !newPassword) {
       return res.status(400).json({ error: "\u0644\u0637\u0641\u0627\u064B \u062A\u0645\u0627\u0645\u06CC \u0641\u06CC\u0644\u062F\u0647\u0627\u06CC \u0627\u062C\u0628\u0627\u0631\u06CC (\u0634\u0646\u0627\u0633\u0647/\u0634\u0645\u0627\u0631\u0647 \u062A\u0645\u0627\u0633\u060C \u06A9\u062F\u0645\u0644\u06CC \u0648 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062C\u062F\u06CC\u062F) \u0631\u0627 \u0648\u0627\u0631\u062F \u0646\u0645\u0627\u06CC\u06CC\u062F." });
     }
-    const user = await prisma13.user.findFirst({
+    const user = await prisma14.user.findFirst({
       where: {
         OR: [
           { username: identity },
@@ -4178,7 +4168,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
       return res.status(404).json({ error: "\u06A9\u0627\u0631\u0628\u0631\u06CC \u0628\u0627 \u0627\u06CC\u0646 \u0645\u0634\u062E\u0635\u0627\u062A \u0648 \u06A9\u062F \u0645\u0644\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(newPassword, 10);
-    await prisma13.user.update({
+    await prisma14.user.update({
       where: { id: user.id },
       data: { password: hashedPassword }
     });
@@ -4203,9 +4193,9 @@ app.post("/api/auth/google", async (req, res) => {
       return res.status(400).json({ error: "\u062D\u0633\u0627\u0628 \u06AF\u0648\u06AF\u0644 \u0634\u0645\u0627 \u0627\u06CC\u0645\u06CC\u0644 \u0645\u0639\u062A\u0628\u0631\u06CC \u0646\u062F\u0627\u0631\u062F." });
     }
     const email = payload.email;
-    let user = await prisma13.user.findFirst({ where: { email } });
+    let user = await prisma14.user.findFirst({ where: { email } });
     if (!user) {
-      user = await prisma13.user.create({
+      user = await prisma14.user.create({
         data: {
           username: "user_" + Math.random().toString(36).substring(7),
           email,
@@ -4241,7 +4231,7 @@ app.post("/api/auth/google", async (req, res) => {
 });
 app.get("/api/auth/me", authenticateToken, async (req, res) => {
   try {
-    const user = await prisma13.user.findUnique({ where: { id: req.user.userId } });
+    const user = await prisma14.user.findUnique({ where: { id: req.user.userId } });
     if (!user) {
       return res.status(401).json({ error: "Account Not Found (\u062D\u0633\u0627\u0628 \u06A9\u0627\u0631\u0628\u0631\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F.)" });
     }
@@ -4261,9 +4251,9 @@ app.post("/api/auth/login", async (req, res) => {
     const isSuperAdminCandidate = cleanUsername === "admin" || cleanUsername === "superadmin" || cleanUsername === "09120000000";
     let user = null;
     try {
-      user = await prisma13.user.findUnique({ where: { username: cleanUsername } });
+      user = await prisma14.user.findUnique({ where: { username: cleanUsername } });
       if (!user && isSuperAdminCandidate) {
-        user = await prisma13.user.findFirst({ where: { role: "SUPER_ADMIN" } });
+        user = await prisma14.user.findFirst({ where: { role: "SUPER_ADMIN" } });
       }
     } catch (dbErr) {
       console.warn("[Login] DB query notice:", dbErr.message);
@@ -4273,7 +4263,7 @@ app.post("/api/auth/login", async (req, res) => {
       if (allowedAdminPasswords.includes(password)) {
         try {
           const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-          user = await prisma13.user.create({
+          user = await prisma14.user.create({
             data: {
               username: "admin",
               email: "admin@marketplace.com",
@@ -4342,28 +4332,26 @@ function authenticateToken(req, res, next) {
   });
 }
 function requireSupplier(req, res, next) {
-  var _a;
-  if (((_a = req.user) == null ? void 0 : _a.role) !== "SUPPLIER") {
+  if (req.user?.role !== "SUPPLIER") {
     return res.status(403).json({ error: "\u0641\u0642\u0637 \u062A\u0627\u0645\u06CC\u0646\u06A9\u0646\u0646\u062F\u06AF\u0627\u0646 \u062F\u0633\u062A\u0631\u0633\u06CC \u062F\u0627\u0631\u0646\u062F" });
   }
   next();
 }
 function requireCustomer(req, res, next) {
-  var _a;
-  if (((_a = req.user) == null ? void 0 : _a.role) !== "CUSTOMER") {
+  if (req.user?.role !== "CUSTOMER") {
     return res.status(403).json({ error: "\u0641\u0642\u0637 \u0645\u0634\u062A\u0631\u06CC\u0627\u0646 \u062F\u0633\u062A\u0631\u0633\u06CC \u062F\u0627\u0631\u0646\u062F" });
   }
   next();
 }
 app.get("/api/customer/orders", authenticateToken, requireCustomer, async (req, res) => {
   try {
-    const user = await prisma13.user.findUnique({
+    const user = await prisma14.user.findUnique({
       where: { id: req.user.userId }
     });
     if (!user) {
       return res.status(404).json({ error: "Account Not Found (\u062D\u0633\u0627\u0628 \u06A9\u0627\u0631\u0628\u0631\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F.)" });
     }
-    const orders = await prisma13.order.findMany({
+    const orders = await prisma14.order.findMany({
       where: {
         customerPhone: user.mobile
       },
@@ -4401,7 +4389,7 @@ app.put("/api/customer/profile", authenticateToken, requireCustomer, async (req,
     if (email && !EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: "\u0622\u062F\u0631\u0633 \u0627\u06CC\u0645\u06CC\u0644 \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A." });
     }
-    const updatedUser = await prisma13.user.update({
+    const updatedUser = await prisma14.user.update({
       where: { id: req.user.userId },
       data: {
         firstName,
@@ -4423,15 +4411,15 @@ app.put("/api/customer/profile", authenticateToken, requireCustomer, async (req,
 app.get("/api/supplier/products", authenticateToken, requireSupplier, async (req, res) => {
   try {
     const supplierId = parseInt(req.user.userId);
-    let products = await prisma13.product.findMany({
+    let products = await prisma14.product.findMany({
       where: { supplierId },
       include: { category: true, images: true, variants: true, exploreContent: true },
       orderBy: { id: "desc" }
     });
     if (products.length === 0) {
-      const firstCategory = await prisma13.category.findFirst();
+      const firstCategory = await prisma14.category.findFirst();
       const catId = firstCategory ? firstCategory.id : 1;
-      await prisma13.product.create({
+      await prisma14.product.create({
         data: {
           supplierId,
           categoryId: catId,
@@ -4449,7 +4437,7 @@ app.get("/api/supplier/products", authenticateToken, requireSupplier, async (req
           }
         }
       });
-      await prisma13.product.create({
+      await prisma14.product.create({
         data: {
           supplierId,
           categoryId: catId,
@@ -4467,7 +4455,7 @@ app.get("/api/supplier/products", authenticateToken, requireSupplier, async (req
           }
         }
       });
-      products = await prisma13.product.findMany({
+      products = await prisma14.product.findMany({
         where: { supplierId },
         include: { category: true, images: true, variants: true, exploreContent: true },
         orderBy: { id: "desc" }
@@ -4485,25 +4473,25 @@ app.post("/api/supplier/products", authenticateToken, requireSupplier, async (re
     const supplierId = parseInt(req.user.userId);
     let actualCategoryId = parseInt(categoryId);
     if (actualCategoryId) {
-      const categoryExists = await prisma13.category.findUnique({ where: { id: actualCategoryId } });
+      const categoryExists = await prisma14.category.findUnique({ where: { id: actualCategoryId } });
       if (!categoryExists) {
-        await prisma13.category.create({
+        await prisma14.category.create({
           data: { id: actualCategoryId, name: "\u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC " + actualCategoryId, isActive: true, sortOrder: 0 }
         });
       }
     } else {
-      const firstCategory = await prisma13.category.findFirst();
+      const firstCategory = await prisma14.category.findFirst();
       if (firstCategory) {
         actualCategoryId = firstCategory.id;
       } else {
-        const newCategory = await prisma13.category.create({
+        const newCategory = await prisma14.category.create({
           data: { name: "\u0639\u0645\u0648\u0645\u06CC", isActive: true, sortOrder: 0 }
         });
         actualCategoryId = newCategory.id;
       }
     }
     const totalInventory = variants && variants.length > 0 ? variants.reduce((sum, v) => sum + safeParseInt(v.stock), 0) : safeParseInt(stock);
-    const product = await prisma13.product.create({
+    const product = await prisma14.product.create({
       data: {
         supplierId,
         categoryId: actualCategoryId,
@@ -4556,26 +4544,26 @@ app.put("/api/supplier/products/:id", authenticateToken, requireSupplier, async 
     const { id } = req.params;
     const supplierId = parseInt(req.user.userId);
     const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl } = req.body;
-    const existing = await prisma13.product.findFirst({
+    const existing = await prisma14.product.findFirst({
       where: { id: parseInt(id), supplierId }
     });
     if (!existing) return res.status(404).json({ error: "\u0645\u062D\u0635\u0648\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     let actualCategoryId = parseInt(categoryId);
     if (actualCategoryId) {
-      const categoryExists = await prisma13.category.findUnique({ where: { id: actualCategoryId } });
+      const categoryExists = await prisma14.category.findUnique({ where: { id: actualCategoryId } });
       if (!categoryExists) {
-        await prisma13.category.create({
+        await prisma14.category.create({
           data: { id: actualCategoryId, name: "\u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC " + actualCategoryId, isActive: true, sortOrder: 0 }
         });
       }
     } else {
-      const firstCategory = await prisma13.category.findFirst();
+      const firstCategory = await prisma14.category.findFirst();
       actualCategoryId = firstCategory ? firstCategory.id : existing.categoryId;
     }
-    await prisma13.productImage.deleteMany({ where: { productId: parseInt(id) } });
-    await prisma13.productVariant.deleteMany({ where: { productId: parseInt(id) } });
+    await prisma14.productImage.deleteMany({ where: { productId: parseInt(id) } });
+    await prisma14.productVariant.deleteMany({ where: { productId: parseInt(id) } });
     const totalInventory = variants && variants.length > 0 ? variants.reduce((sum, v) => sum + safeParseInt(v.stock), 0) : safeParseInt(stock);
-    const product = await prisma13.product.update({
+    const product = await prisma14.product.update({
       where: { id: parseInt(id) },
       data: {
         categoryId: actualCategoryId,
@@ -4622,7 +4610,7 @@ app.put("/api/supplier/products/:id", authenticateToken, requireSupplier, async 
         }
       }
     });
-    await prisma13.announcement.create({
+    await prisma14.announcement.create({
       data: {
         title: `\u062A\u0639\u0644\u06CC\u0642 \u0645\u062D\u0635\u0648\u0644 \u0634\u0645\u0627\u0631\u0647 ${id} \u062C\u0647\u062A \u0628\u0631\u0631\u0633\u06CC \u0648 \u062A\u0627\u06CC\u06CC\u062F \u0645\u062C\u062F\u062F`,
         content: `\u0645\u062D\u0635\u0648\u0644 \u0634\u0645\u0627\u0631\u0647 ${id} (${name}) \u062A\u0648\u0633\u0637 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0648\u06CC\u0631\u0627\u06CC\u0634 \u0634\u062F. \u0645\u0634\u062E\u0635\u0627\u062A/\u0642\u06CC\u0645\u062A \u062C\u062F\u06CC\u062F \u0628\u0647 \u062B\u0628\u062A \u0631\u0633\u06CC\u062F \u0648 \u062C\u0647\u062A \u062D\u0641\u0638 \u0635\u062D\u062A \u062F\u0627\u062F\u0647\u200C\u0647\u0627\u060C \u06A9\u0627\u0644\u0627 \u062A\u0627 \u0632\u0645\u0627\u0646 \u062A\u0627\u06CC\u06CC\u062F \u0646\u0647\u0627\u06CC\u06CC \u062A\u0648\u0633\u0637 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0627\u0631\u0634\u062F \u063A\u06CC\u0631\u0641\u0639\u0627\u0644 \u06AF\u0631\u062F\u06CC\u062F.`,
@@ -4638,7 +4626,7 @@ app.put("/api/supplier/products/:id", authenticateToken, requireSupplier, async 
 });
 app.get("/api/supplier/orders", authenticateToken, requireSupplier, async (req, res) => {
   try {
-    const orderItems = await prisma13.orderItem.findMany({
+    const orderItems = await prisma14.orderItem.findMany({
       where: { supplierId: req.user.userId },
       include: {
         order: {
@@ -4661,7 +4649,7 @@ app.post("/api/supplier/orders/approve-batch", authenticateToken, requireSupplie
     if (!Array.isArray(itemIds)) {
       return res.status(400).json({ error: "\u0644\u06CC\u0633\u062A \u0634\u0646\u0627\u0633\u0647\u200C\u0647\u0627 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     }
-    await prisma13.orderItem.updateMany({
+    await prisma14.orderItem.updateMany({
       where: {
         id: { in: itemIds.map((id) => parseInt(id)) },
         supplierId: req.user.userId
@@ -4670,7 +4658,7 @@ app.post("/api/supplier/orders/approve-batch", authenticateToken, requireSupplie
         status: "SUPPLIER_APPROVED"
       }
     });
-    const items = await prisma13.orderItem.findMany({
+    const items = await prisma14.orderItem.findMany({
       where: {
         id: { in: itemIds.map((id) => parseInt(id)) }
       },
@@ -4678,7 +4666,7 @@ app.post("/api/supplier/orders/approve-batch", authenticateToken, requireSupplie
     });
     const orderIds = Array.from(new Set(items.map((i) => i.orderId)));
     for (const orderId of orderIds) {
-      const parentOrder = await prisma13.order.findUnique({
+      const parentOrder = await prisma14.order.findUnique({
         where: { id: orderId },
         include: { items: true }
       });
@@ -4687,7 +4675,7 @@ app.post("/api/supplier/orders/approve-batch", authenticateToken, requireSupplie
           (i) => itemIds.includes(i.id) || i.status === "SUPPLIER_APPROVED"
         );
         if (allApproved) {
-          await prisma13.order.update({
+          await prisma14.order.update({
             where: { id: parentOrder.id },
             data: {
               status: "WAITING_SHIPPING_COST",
@@ -4714,20 +4702,20 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
   try {
     const { status, trackingCode } = req.body;
     const { itemId } = req.params;
-    const item = await prisma13.orderItem.findFirst({
+    const item = await prisma14.orderItem.findFirst({
       where: { id: parseInt(itemId), supplierId: req.user.userId }
     });
     if (!item) {
       return res.status(404).json({ error: "\u0633\u0641\u0627\u0631\u0634 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    const updated = await prisma13.orderItem.update({
+    const updated = await prisma14.orderItem.update({
       where: { id: item.id },
       data: { status, trackingCode }
     });
     const isStage5 = ["SHIPPED", "DELIVERED", "COMPLETED"].includes(status);
     const wasStage5 = ["SHIPPED", "DELIVERED", "COMPLETED"].includes(item.status);
     if (isStage5 && !wasStage5) {
-      await prisma13.product.update({
+      await prisma14.product.update({
         where: { id: item.productId },
         data: {
           inventory: {
@@ -4736,7 +4724,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
         }
       });
       if (item.variantId) {
-        await prisma13.productVariant.update({
+        await prisma14.productVariant.update({
           where: { id: item.variantId },
           data: {
             stock: {
@@ -4747,12 +4735,12 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
       }
     }
     if (trackingCode) {
-      await prisma13.order.update({
+      await prisma14.order.update({
         where: { id: item.orderId },
         data: { trackingCode }
       });
     }
-    const parentOrder = await prisma13.order.findUnique({
+    const parentOrder = await prisma14.order.findUnique({
       where: { id: item.orderId },
       include: { items: true }
     });
@@ -4762,7 +4750,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
           (i) => i.id === item.id ? true : i.status === "SUPPLIER_APPROVED"
         );
         if (allApproved) {
-          await prisma13.order.update({
+          await prisma14.order.update({
             where: { id: parentOrder.id },
             data: {
               status: "WAITING_SHIPPING_COST",
@@ -4781,11 +4769,11 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
       } else if (status === "REJECTED" || status === "OUT_OF_STOCK") {
         const itemAmt = (item.supplierPrice || 0) * (item.quantity || 1);
         if (itemAmt > 0) {
-          const wallet = await prisma13.wallet.findUnique({
+          const wallet = await prisma14.wallet.findUnique({
             where: { supplierId: req.user.userId }
           });
           if (wallet) {
-            await prisma13.wallet.update({
+            await prisma14.wallet.update({
               where: { id: wallet.id },
               data: {
                 balance: {
@@ -4793,7 +4781,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
                 }
               }
             });
-            await prisma13.ledgerEntry.create({
+            await prisma14.ledgerEntry.create({
               data: {
                 walletId: wallet.id,
                 amount: -itemAmt,
@@ -4806,7 +4794,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
           }
         }
         const refundNote = `\u26A0\uFE0F \u0627\u062E\u0637\u0627\u0631 \u0627\u062A\u0645\u0627\u0645 \u0645\u0648\u062C\u0648\u062F\u06CC \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647: \u0633\u0641\u0627\u0631\u0634 \u0634\u0645\u0627\u0631\u0647 ${parentOrder.id} \u0628\u0647 \u0639\u0644\u062A \u0627\u062A\u0645\u0627\u0645 \u0645\u0648\u062C\u0648\u062F\u06CC \u062A\u0648\u0633\u0637 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0631\u062F \u0634\u062F. \u0645\u0628\u0644\u063A ${(parentOrder.totalAmount || 0).toLocaleString()} \u062A\u0648\u0645\u0627\u0646 \u0628\u0627\u06CC\u062F \u0628\u0647 \u0634\u0645\u0627\u0631\u0647 \u06A9\u0627\u0631\u062A/\u062D\u0633\u0627\u0628 \u062E\u0631\u06CC\u062F\u0627\u0631 \u0639\u0648\u062F\u062A \u062F\u0627\u062F\u0647 \u0634\u0648\u062F.`;
-        await prisma13.order.update({
+        await prisma14.order.update({
           where: { id: parentOrder.id },
           data: {
             status: "REJECTED",
@@ -4822,11 +4810,11 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
           }
         });
         try {
-          const admins = await prisma13.user.findMany({
+          const admins = await prisma14.user.findMany({
             where: { role: "SUPER_ADMIN" }
           });
           for (const admin of admins) {
-            await prisma13.notification.create({
+            await prisma14.notification.create({
               data: {
                 userId: admin.id,
                 title: `\u26A0\uFE0F \u0647\u0634\u062F\u0627\u0631 \u0639\u0648\u062F\u062A \u0648\u062C\u0647 - \u0627\u062A\u0645\u0627\u0645 \u0645\u0648\u062C\u0648\u062F\u06CC \u0633\u0641\u0627\u0631\u0634 #${parentOrder.id}`,
@@ -4840,7 +4828,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
           console.error("Error creating admin notification for rejected order:", e);
         }
       } else if (["PREPARING", "SHIPPED", "DELIVERED", "COMPLETED"].includes(status)) {
-        await prisma13.order.update({
+        await prisma14.order.update({
           where: { id: parentOrder.id },
           data: {
             status,
@@ -4866,16 +4854,15 @@ var payoutRequestSchema = import_zod2.z.object({
   amount: import_zod2.z.number().int().positive("\u0645\u0628\u0644\u063A \u062A\u0633\u0648\u06CC\u0647 \u0628\u0627\u06CC\u062F \u0639\u062F\u062F \u0635\u062D\u06CC\u062D \u0648 \u0645\u062B\u0628\u062A \u0628\u0627\u0634\u062F")
 });
 app.post("/api/supplier/payout/request", authenticateToken, requireSupplier, payoutRequestLimiter, async (req, res) => {
-  var _a;
   try {
     const validatedData = payoutRequestSchema.parse(req.body);
     const { amount } = validatedData;
     const supplierId = req.user.userId;
-    const user = await prisma13.user.findUnique({ where: { id: supplierId } });
+    const user = await prisma14.user.findUnique({ where: { id: supplierId } });
     if (!user || !user.shaba) {
       return res.status(400).json({ error: "\u0644\u0637\u0641\u0627 \u0627\u0628\u062A\u062F\u0627 \u0634\u0645\u0627\u0631\u0647 \u0634\u0628\u0627 \u062E\u0648\u062F \u0631\u0627 \u062F\u0631 \u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u062B\u0628\u062A \u06A9\u0646\u06CC\u062F" });
     }
-    const wallet = await prisma13.wallet.findUnique({ where: { supplierId } });
+    const wallet = await prisma14.wallet.findUnique({ where: { supplierId } });
     if (!wallet) {
       return res.status(404).json({ error: "\u06A9\u06CC\u0641 \u067E\u0648\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
@@ -4885,7 +4872,7 @@ app.post("/api/supplier/payout/request", authenticateToken, requireSupplier, pay
     res.json({ success: true, message: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062B\u0628\u062A \u0634\u062F", payoutRequest });
   } catch (err) {
     if (err instanceof import_zod2.z.ZodError) {
-      return res.status(400).json({ error: ((_a = err.errors) == null ? void 0 : _a.map((e) => e.message).join(", ")) || err.message });
+      return res.status(400).json({ error: err.errors?.map((e) => e.message).join(", ") || err.message });
     }
     res.status(400).json({ error: err.message });
   }
@@ -4894,13 +4881,13 @@ app.get("/api/supplier/reports", authenticateToken, requireSupplier, async (req,
   try {
     const supplierId = req.user.userId;
     const { status, type, page = "1", limit = "10" } = req.query;
-    const wallet = await prisma13.wallet.findUnique({
+    const wallet = await prisma14.wallet.findUnique({
       where: { supplierId }
     });
     if (!wallet) {
       return res.status(404).json({ error: "Wallet not found" });
     }
-    const earningsResult = await prisma13.ledgerEntry.aggregate({
+    const earningsResult = await prisma14.ledgerEntry.aggregate({
       where: {
         walletId: wallet.id,
         type: "ORDER_REVENUE",
@@ -4908,7 +4895,7 @@ app.get("/api/supplier/reports", authenticateToken, requireSupplier, async (req,
       },
       _sum: { amount: true }
     });
-    const withdrawnResult = await prisma13.ledgerEntry.aggregate({
+    const withdrawnResult = await prisma14.ledgerEntry.aggregate({
       where: {
         walletId: wallet.id,
         type: "WITHDRAWAL",
@@ -4921,13 +4908,13 @@ app.get("/api/supplier/reports", authenticateToken, requireSupplier, async (req,
     const whereClause = { walletId: wallet.id };
     if (status) whereClause.status = status;
     if (type) whereClause.type = type;
-    const history = await prisma13.ledgerEntry.findMany({
+    const history = await prisma14.ledgerEntry.findMany({
       where: whereClause,
       orderBy: { id: "desc" },
       skip: (pageNum - 1) * limitNum,
       take: limitNum
     });
-    const totalHistory = await prisma13.ledgerEntry.count({ where: whereClause });
+    const totalHistory = await prisma14.ledgerEntry.count({ where: whereClause });
     res.json({
       balance: wallet.balance.toString(),
       totalEarnings: (earningsResult._sum.amount || 0).toString(),
@@ -4946,7 +4933,7 @@ app.get("/api/supplier/reports", authenticateToken, requireSupplier, async (req,
 });
 app.get("/api/supplier/wallet", authenticateToken, requireSupplier, async (req, res) => {
   try {
-    let wallet = await prisma13.wallet.findUnique({
+    let wallet = await prisma14.wallet.findUnique({
       where: { supplierId: req.user.userId },
       include: {
         ledgerEntries: {
@@ -4956,7 +4943,7 @@ app.get("/api/supplier/wallet", authenticateToken, requireSupplier, async (req, 
       }
     });
     if (!wallet) {
-      wallet = await prisma13.wallet.create({
+      wallet = await prisma14.wallet.create({
         data: { supplierId: req.user.userId, balance: 0 },
         include: {
           ledgerEntries: true
@@ -4987,7 +4974,7 @@ app.get("/api/supplier/wallet", authenticateToken, requireSupplier, async (req, 
 app.put("/api/supplier/profile", authenticateToken, requireSupplier, async (req, res) => {
   try {
     const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address } = req.body;
-    const user = await prisma13.user.update({
+    const user = await prisma14.user.update({
       where: { id: req.user.userId },
       data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address }
     });
@@ -4999,7 +4986,7 @@ app.put("/api/supplier/profile", authenticateToken, requireSupplier, async (req,
 app.patch("/api/supplier/profile", authenticateToken, requireSupplier, async (req, res) => {
   try {
     const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address } = req.body;
-    const user = await prisma13.user.update({
+    const user = await prisma14.user.update({
       where: { id: req.user.userId },
       data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address }
     });
@@ -5010,7 +4997,7 @@ app.patch("/api/supplier/profile", authenticateToken, requireSupplier, async (re
 });
 app.get("/api/supplier/tickets", authenticateToken, requireSupplier, async (req, res) => {
   try {
-    const tickets = await prisma13.ticket.findMany({
+    const tickets = await prisma14.ticket.findMany({
       where: { userId: req.user.userId },
       include: { messages: true },
       orderBy: { id: "desc" }
@@ -5023,7 +5010,7 @@ app.get("/api/supplier/tickets", authenticateToken, requireSupplier, async (req,
 app.post("/api/supplier/tickets", authenticateToken, requireSupplier, async (req, res) => {
   try {
     const { subject, department, priority, message, attachmentUrl } = req.body;
-    const ticket = await prisma13.ticket.create({
+    const ticket = await prisma14.ticket.create({
       data: {
         userId: req.user.userId,
         subject,
@@ -5043,11 +5030,11 @@ app.post("/api/supplier/tickets/:id/messages", authenticateToken, requireSupplie
   try {
     const { message, attachmentUrl } = req.body;
     const { id } = req.params;
-    const existing = await prisma13.ticket.findFirst({
+    const existing = await prisma14.ticket.findFirst({
       where: { id: parseInt(id), userId: req.user.userId }
     });
     if (!existing) return res.status(404).json({ error: "\u062A\u06CC\u06A9\u062A \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
-    const ticketMsg = await prisma13.ticketMessage.create({
+    const ticketMsg = await prisma14.ticketMessage.create({
       data: {
         ticketId: parseInt(id),
         userId: req.user.userId,
@@ -5061,29 +5048,26 @@ app.post("/api/supplier/tickets/:id/messages", authenticateToken, requireSupplie
   }
 });
 function requireSuperAdmin(req, res, next) {
-  var _a;
-  if (((_a = req.user) == null ? void 0 : _a.role) !== "SUPER_ADMIN") {
+  if (req.user?.role !== "SUPER_ADMIN") {
     return res.status(403).json({ error: "\u062F\u0633\u062A\u0631\u0633\u06CC \u063A\u06CC\u0631\u0645\u062C\u0627\u0632" });
   }
   next();
 }
 function requireAdmin(req, res, next) {
-  var _a;
-  if (((_a = req.user) == null ? void 0 : _a.role) !== "SUPER_ADMIN") {
+  if (req.user?.role !== "SUPER_ADMIN") {
     return res.status(403).json({ error: "\u062F\u0633\u062A\u0631\u0633\u06CC \u0641\u0642\u0637 \u0628\u0631\u0627\u06CC \u0645\u062F\u06CC\u0631 \u06A9\u0644 \u0645\u062C\u0627\u0632 \u0627\u0633\u062A" });
   }
   next();
 }
 function requireStoreManager(req, res, next) {
-  var _a;
-  if (((_a = req.user) == null ? void 0 : _a.role) !== "STORE_MANAGER") {
+  if (req.user?.role !== "STORE_MANAGER") {
     return res.status(403).json({ error: "\u062F\u0633\u062A\u0631\u0633\u06CC \u0641\u0642\u0637 \u0628\u0631\u0627\u06CC \u0645\u062F\u06CC\u0631 \u0641\u0631\u0648\u0634\u06AF\u0627\u0647 \u0645\u062C\u0627\u0632 \u0627\u0633\u062A" });
   }
   next();
 }
 app.get("/api/store-manager/tickets", authenticateToken, requireStoreManager, async (req, res) => {
   try {
-    const tickets = await prisma13.ticket.findMany({
+    const tickets = await prisma14.ticket.findMany({
       where: { userId: req.user.userId },
       include: { messages: true },
       orderBy: { id: "desc" }
@@ -5096,7 +5080,7 @@ app.get("/api/store-manager/tickets", authenticateToken, requireStoreManager, as
 app.post("/api/store-manager/tickets", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const { subject, department, priority, message, attachmentUrl } = req.body;
-    const ticket = await prisma13.ticket.create({
+    const ticket = await prisma14.ticket.create({
       data: {
         userId: req.user.userId,
         subject,
@@ -5117,11 +5101,11 @@ app.post("/api/store-manager/tickets/:id/messages", authenticateToken, requireSt
   try {
     const { message, attachmentUrl } = req.body;
     const { id } = req.params;
-    const existing = await prisma13.ticket.findFirst({
+    const existing = await prisma14.ticket.findFirst({
       where: { id: parseInt(id), userId: req.user.userId }
     });
     if (!existing) return res.status(404).json({ error: "\u062A\u06CC\u06A9\u062A \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
-    const ticketMsg = await prisma13.ticketMessage.create({
+    const ticketMsg = await prisma14.ticketMessage.create({
       data: {
         ticketId: parseInt(id),
         userId: req.user.userId,
@@ -5136,7 +5120,7 @@ app.post("/api/store-manager/tickets/:id/messages", authenticateToken, requireSt
 });
 app.get("/api/tickets", authenticateToken, async (req, res) => {
   try {
-    const tickets = await prisma13.ticket.findMany({
+    const tickets = await prisma14.ticket.findMany({
       where: { userId: req.user.userId },
       include: {
         messages: {
@@ -5157,7 +5141,7 @@ app.get("/api/tickets", authenticateToken, async (req, res) => {
 app.post("/api/tickets", authenticateToken, async (req, res) => {
   try {
     const { subject, department, message, attachmentUrl } = req.body;
-    const ticket = await prisma13.ticket.create({
+    const ticket = await prisma14.ticket.create({
       data: {
         userId: req.user.userId,
         subject: subject || "\u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u06CC \u0639\u0645\u0648\u0645\u06CC",
@@ -5167,7 +5151,7 @@ app.post("/api/tickets", authenticateToken, async (req, res) => {
         status: "OPEN"
       }
     });
-    await prisma13.ticketMessage.create({
+    await prisma14.ticketMessage.create({
       data: {
         ticketId: ticket.id,
         userId: req.user.userId,
@@ -5182,7 +5166,7 @@ app.post("/api/tickets", authenticateToken, async (req, res) => {
 app.get("/api/tickets/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const ticket = await prisma13.ticket.findFirst({
+    const ticket = await prisma14.ticket.findFirst({
       where: { id: parseInt(id, 10), userId: req.user.userId },
       include: {
         messages: {
@@ -5204,11 +5188,11 @@ app.post("/api/tickets/:id/messages", authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { message, attachmentUrl } = req.body;
     const ticketId = parseInt(id, 10);
-    const existing = await prisma13.ticket.findFirst({
+    const existing = await prisma14.ticket.findFirst({
       where: { id: ticketId, userId: req.user.userId }
     });
     if (!existing) return res.status(404).json({ error: "\u062A\u06CC\u06A9\u062A \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
-    const msg = await prisma13.ticketMessage.create({
+    const msg = await prisma14.ticketMessage.create({
       data: {
         ticketId,
         userId: req.user.userId,
@@ -5216,7 +5200,7 @@ app.post("/api/tickets/:id/messages", authenticateToken, async (req, res) => {
         attachmentUrl: attachmentUrl || null
       }
     });
-    await prisma13.ticket.update({
+    await prisma14.ticket.update({
       where: { id: ticketId },
       data: { status: "OPEN", updatedAt: /* @__PURE__ */ new Date() }
     });
@@ -5228,7 +5212,7 @@ app.post("/api/tickets/:id/messages", authenticateToken, async (req, res) => {
 app.put("/api/store-manager/profile", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl } = req.body;
-    const user = await prisma13.user.update({
+    const user = await prisma14.user.update({
       where: { id: req.user.userId },
       data: { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl }
     });
@@ -5240,7 +5224,7 @@ app.put("/api/store-manager/profile", authenticateToken, requireStoreManager, as
 app.patch("/api/store-manager/profile", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl } = req.body;
-    const user = await prisma13.user.update({
+    const user = await prisma14.user.update({
       where: { id: req.user.userId },
       data: { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl }
     });
@@ -5252,10 +5236,10 @@ app.patch("/api/store-manager/profile", authenticateToken, requireStoreManager, 
 app.get("/api/store-manager/stats", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId;
-    const totalOrders = await prisma13.order.count({ where: { storeId } });
-    const paidInvoices = await prisma13.storeInvoice.findMany({ where: { storeManagerId: storeId, status: "PAID" } });
+    const totalOrders = await prisma14.order.count({ where: { storeId } });
+    const paidInvoices = await prisma14.storeInvoice.findMany({ where: { storeManagerId: storeId, status: "PAID" } });
     const totalPaid = paidInvoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
-    const recentActivity = await prisma13.order.findMany({
+    const recentActivity = await prisma14.order.findMany({
       where: { storeId },
       orderBy: { id: "desc" },
       take: 5
@@ -5298,7 +5282,7 @@ app.get("/api/store-manager/marketplace-products", authenticateToken, requireSto
     if (category) {
       where.category = { name: category };
     }
-    const products = await prisma13.product.findMany({
+    const products = await prisma14.product.findMany({
       where,
       include: {
         category: true,
@@ -5312,9 +5296,8 @@ app.get("/api/store-manager/marketplace-products", authenticateToken, requireSto
       skip,
       take: limit
     });
-    const total = await prisma13.product.count({ where });
+    const total = await prisma14.product.count({ where });
     const sanitizedProducts = products.map((product) => {
-      var _a;
       let fPrice = product.finalPrice;
       if (!fPrice) {
         fPrice = product.supplierBasePrice;
@@ -5324,7 +5307,7 @@ app.get("/api/store-manager/marketplace-products", authenticateToken, requireSto
           fPrice = product.supplierBasePrice + product.marginValue;
         }
       }
-      const mappedVariants = (_a = product.variants) == null ? void 0 : _a.map((v) => {
+      const mappedVariants = product.variants?.map((v) => {
         let vfPrice = v.finalPrice;
         if (!vfPrice) {
           vfPrice = v.supplierBasePrice;
@@ -5361,7 +5344,7 @@ app.post("/api/store-manager/my-catalog", authenticateToken, requireStoreManager
     if (!productId) {
       return res.status(400).json({ error: "Product ID is required." });
     }
-    const totalSelections = await prisma13.storeProductSelection.count({
+    const totalSelections = await prisma14.storeProductSelection.count({
       where: { storeId }
     });
     if (totalSelections >= 20) {
@@ -5369,9 +5352,9 @@ app.post("/api/store-manager/my-catalog", authenticateToken, requireStoreManager
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const setting = await prisma13.systemSettings.findUnique({ where: { key: "DAILY_PRODUCT_LIMIT" } });
+      const setting = await prisma14.systemSettings.findUnique({ where: { key: "DAILY_PRODUCT_LIMIT" } });
       const limit = setting ? parseInt(setting.value) : 3;
-      const selectionsToday = await prisma13.storeProductSelection.count({
+      const selectionsToday = await prisma14.storeProductSelection.count({
         where: {
           storeId,
           selected_at: { gte: today, lt: tomorrow }
@@ -5381,13 +5364,13 @@ app.post("/api/store-manager/my-catalog", authenticateToken, requireStoreManager
         return res.status(400).json({ error: "\u0634\u0645\u0627 \u0628\u0647 \u0633\u0642\u0641 \u0645\u062C\u0627\u0632 \u0627\u0646\u062A\u062E\u0627\u0628 \u0645\u062D\u0635\u0648\u0644 \u062F\u0631 \u06F2\u06F4 \u0633\u0627\u0639\u062A \u06AF\u0630\u0634\u062A\u0647 \u0631\u0633\u06CC\u062F\u0647\u200C\u0627\u06CC\u062F. \u067E\u0633 \u0627\u0632 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u0633\u0647\u0645\u06CC\u0647 \u0627\u0648\u0644\u06CC\u0647 \u06F2\u06F0 \u06A9\u0627\u0644\u0627\u060C \u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0634\u0645\u0627 \u0631\u0648\u0632\u0627\u0646\u0647 \u06F3 \u0645\u062D\u0635\u0648\u0644 \u0627\u0633\u062A." });
       }
     }
-    const existing = await prisma13.storeProductSelection.findFirst({
+    const existing = await prisma14.storeProductSelection.findFirst({
       where: { storeId, productId }
     });
     if (existing) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0645\u062D\u0635\u0648\u0644 \u0642\u0628\u0644\u0627\u064B \u0628\u0647 \u0632\u0648\u067E\u06CC\u062A\u06CC \u0634\u0645\u0627 \u0627\u0636\u0627\u0641\u0647 \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
-    const selection = await prisma13.storeProductSelection.create({
+    const selection = await prisma14.storeProductSelection.create({
       data: {
         storeId,
         productId,
@@ -5403,7 +5386,7 @@ app.delete("/api/store-manager/my-catalog/:productId", authenticateToken, requir
   try {
     const storeId = req.user.userId || req.user.id;
     const productId = parseInt(req.params.productId);
-    await prisma13.storeProductSelection.deleteMany({
+    await prisma14.storeProductSelection.deleteMany({
       where: { storeId, productId }
     });
     res.json({ message: "\u0645\u062D\u0635\u0648\u0644 \u0627\u0632 \u0632\u0648\u067E\u06CC\u062A\u06CC \u0634\u0645\u0627 \u062D\u0630\u0641 \u0634\u062F." });
@@ -5414,7 +5397,7 @@ app.delete("/api/store-manager/my-catalog/:productId", authenticateToken, requir
 app.get("/api/store-manager/my-catalog", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId || req.user.id;
-    const selections = await prisma13.storeProductSelection.findMany({
+    const selections = await prisma14.storeProductSelection.findMany({
       where: { storeId },
       include: {
         product: {
@@ -5428,7 +5411,6 @@ app.get("/api/store-manager/my-catalog", authenticateToken, requireStoreManager,
       orderBy: { selected_at: "desc" }
     });
     const sanitizedSelections = selections.map((s) => {
-      var _a;
       const product = s.product;
       if (!product) return s;
       let fPrice = product.finalPrice;
@@ -5440,7 +5422,7 @@ app.get("/api/store-manager/my-catalog", authenticateToken, requireStoreManager,
           fPrice = product.supplierBasePrice + product.marginValue;
         }
       }
-      const mappedVariants = (_a = product.variants) == null ? void 0 : _a.map((v) => {
+      const mappedVariants = product.variants?.map((v) => {
         let vfPrice = v.finalPrice;
         if (!vfPrice) {
           vfPrice = v.supplierBasePrice;
@@ -5468,7 +5450,7 @@ app.get("/api/store-manager/daily-limit", authenticateToken, requireStoreManager
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const totalSelections = await prisma13.storeProductSelection.count({
+    const totalSelections = await prisma14.storeProductSelection.count({
       where: { storeId }
     });
     if (totalSelections < 20) {
@@ -5479,9 +5461,9 @@ app.get("/api/store-manager/daily-limit", authenticateToken, requireStoreManager
         reason: "\u0641\u0631\u0648\u0634\u06AF\u0627\u0647 \u062C\u062F\u06CC\u062F (\u0633\u0647\u0645\u06CC\u0647 \u0627\u0648\u0644\u06CC\u0647 \u06F2\u06F0 \u0645\u062D\u0635\u0648\u0644 \u0628\u062F\u0648\u0646 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0632\u0645\u0627\u0646\u06CC)"
       });
     } else {
-      const setting = await prisma13.systemSettings.findUnique({ where: { key: "DAILY_PRODUCT_LIMIT" } });
+      const setting = await prisma14.systemSettings.findUnique({ where: { key: "DAILY_PRODUCT_LIMIT" } });
       const limit = setting ? parseInt(setting.value) : 3;
-      const selectionsToday = await prisma13.storeProductSelection.count({
+      const selectionsToday = await prisma14.storeProductSelection.count({
         where: {
           storeId,
           selected_at: { gte: today, lt: tomorrow }
@@ -5506,7 +5488,7 @@ app.post("/api/store-manager/orders", authenticateToken, requireStoreManager, as
       return res.status(400).json({ error: "\u06A9\u062F \u0645\u062D\u0635\u0648\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A." });
     }
     const qty = parseInt(quantity) || 1;
-    const product = await prisma13.product.findUnique({
+    const product = await prisma14.product.findUnique({
       where: { id: parseInt(productId) }
     });
     if (!product) {
@@ -5516,7 +5498,7 @@ app.post("/api/store-manager/orders", authenticateToken, requireStoreManager, as
     let supplierPrice = product.supplierBasePrice;
     let finalVariantId = null;
     if (variantId) {
-      const variant = await prisma13.productVariant.findUnique({
+      const variant = await prisma14.productVariant.findUnique({
         where: { id: parseInt(variantId) }
       });
       if (variant && variant.productId === product.id) {
@@ -5535,7 +5517,7 @@ app.post("/api/store-manager/orders", authenticateToken, requireStoreManager, as
       }
     }
     const totalAmount = price * qty;
-    const order = await prisma13.order.create({
+    const order = await prisma14.order.create({
       data: {
         storeId,
         totalAmount,
@@ -5569,8 +5551,8 @@ app.post("/api/store-manager/orders", authenticateToken, requireStoreManager, as
       }
     });
     if (product.supplierId) {
-      prisma13.user.findUnique({ where: { id: product.supplierId } }).then((supplier) => {
-        if (supplier == null ? void 0 : supplier.mobile) {
+      prisma14.user.findUnique({ where: { id: product.supplierId } }).then((supplier) => {
+        if (supplier?.mobile) {
           notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
         }
       }).catch((smsErr) => console.warn("SMS supplier notification error:", smsErr));
@@ -5605,7 +5587,7 @@ app.get("/api/store-manager/orders", authenticateToken, requireStoreManager, asy
     } else if (status === "paid") {
       whereClause.storeInvoiceId = { not: null };
     }
-    const orders = await prisma13.order.findMany({
+    const orders = await prisma14.order.findMany({
       where: whereClause,
       include: {
         items: { include: { product: { include: { supplier: true } }, variant: true } }
@@ -5625,7 +5607,7 @@ app.get("/api/store-manager/notifications/check-new-orders", authenticateToken, 
     if (lastOrderId > 0) {
       whereClause.id = { gt: lastOrderId };
     }
-    const newOrders = await prisma13.order.findMany({
+    const newOrders = await prisma14.order.findMany({
       where: whereClause,
       include: {
         items: {
@@ -5638,7 +5620,7 @@ app.get("/api/store-manager/notifications/check-new-orders", authenticateToken, 
       orderBy: { id: "desc" },
       take: 10
     });
-    const latestOrder = await prisma13.order.findFirst({
+    const latestOrder = await prisma14.order.findFirst({
       where: { storeId },
       orderBy: { id: "desc" },
       select: { id: true }
@@ -5646,7 +5628,7 @@ app.get("/api/store-manager/notifications/check-new-orders", authenticateToken, 
     res.json({
       newOrders,
       unnotifiedCount: newOrders.length,
-      latestOrderId: (latestOrder == null ? void 0 : latestOrder.id) || 0
+      latestOrderId: latestOrder?.id || 0
     });
   } catch (err) {
     console.warn("Error checking store-manager new orders:", err.message);
@@ -5657,7 +5639,7 @@ app.get("/api/store-manager/notifications/settings", authenticateToken, requireS
   try {
     const storeId = req.user.userId;
     const key2 = `STORE_NOTIF_SETTINGS_${storeId}`;
-    const setting = await prisma13.systemConfig.findUnique({ where: { key: key2 } });
+    const setting = await prisma14.systemConfig.findUnique({ where: { key: key2 } });
     if (setting && setting.value) {
       return res.json(JSON.parse(setting.value));
     }
@@ -5685,7 +5667,7 @@ app.post("/api/store-manager/notifications/settings", authenticateToken, require
     const storeId = req.user.userId;
     const key2 = `STORE_NOTIF_SETTINGS_${storeId}`;
     const value = JSON.stringify(req.body);
-    await prisma13.systemConfig.upsert({
+    await prisma14.systemConfig.upsert({
       where: { key: key2 },
       create: { key: key2, value },
       update: { value }
@@ -5700,7 +5682,7 @@ app.post("/api/store-manager/push-subscription", authenticateToken, requireStore
     const storeId = req.user.userId;
     const key2 = `STORE_PUSH_SUB_${storeId}`;
     const value = JSON.stringify(req.body);
-    await prisma13.systemConfig.upsert({
+    await prisma14.systemConfig.upsert({
       where: { key: key2 },
       create: { key: key2, value },
       update: { value }
@@ -5727,7 +5709,7 @@ app.post("/api/store-manager/notifications/test-push", authenticateToken, requir
 app.get("/api/store-manager/customers", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId;
-    const orders = await prisma13.order.findMany({
+    const orders = await prisma14.order.findMany({
       where: { storeId },
       orderBy: { id: "desc" }
     });
@@ -5762,10 +5744,9 @@ app.get("/api/store-manager/customers", authenticateToken, requireStoreManager, 
   }
 });
 app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStoreManager, async (req, res) => {
-  var _a;
   console.log("--- PUT /api/store-manager/orders/:id/shipping ---");
   console.log("Params ID:", req.params.id);
-  console.log("User ID:", (_a = req.user) == null ? void 0 : _a.userId);
+  console.log("User ID:", req.user?.userId);
   console.log("Body:", JSON.stringify(req.body));
   try {
     const orderId = parseInt(req.params.id);
@@ -5777,7 +5758,7 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
       console.log("Invalid order ID");
       return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     }
-    const order = await prisma13.order.findUnique({
+    const order = await prisma14.order.findUnique({
       where: { id: orderId },
       include: { items: true }
     });
@@ -5791,16 +5772,16 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
       return res.status(400).json({ error: "\u0627\u0645\u06A9\u0627\u0646 \u062B\u0628\u062A \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u067E\u0633\u062A\u06CC \u0628\u0631\u0627\u06CC \u0633\u0641\u0627\u0631\u0634\u0627\u062A \u062A\u06A9\u0645\u06CC\u0644 \u0634\u062F\u0647 \u06CC\u0627 \u0644\u063A\u0648 \u0634\u062F\u0647 \u0648\u062C\u0648\u062F \u0646\u062F\u0627\u0631\u062F" });
     }
     const savedLabel = processPostalLabel(orderId, postalLabel);
-    const fixedConfig = await prisma13.systemConfig.findUnique({ where: { key: "FIXED_SHIPPING_ENABLED" } });
-    const isFixedEnabled = (fixedConfig == null ? void 0 : fixedConfig.value) === "true";
+    const fixedConfig = await prisma14.systemConfig.findUnique({ where: { key: "FIXED_SHIPPING_ENABLED" } });
+    const isFixedEnabled = fixedConfig?.value === "true";
     let calculatedFee = 0;
     let nextStatus = "WAITING_SHIPPING_COST";
     let newTotalAmount = order.totalAmount;
     if (isFixedEnabled) {
-      const postConfig = await prisma13.systemConfig.findUnique({ where: { key: "FIXED_POST_SHIPPING_FEE" } });
-      const tipaxConfig = await prisma13.systemConfig.findUnique({ where: { key: "FIXED_TIPAX_SHIPPING_FEE" } });
-      const postFee = parseFloat((postConfig == null ? void 0 : postConfig.value) || "50000");
-      const tipaxFee = parseFloat((tipaxConfig == null ? void 0 : tipaxConfig.value) || "80000");
+      const postConfig = await prisma14.systemConfig.findUnique({ where: { key: "FIXED_POST_SHIPPING_FEE" } });
+      const tipaxConfig = await prisma14.systemConfig.findUnique({ where: { key: "FIXED_TIPAX_SHIPPING_FEE" } });
+      const postFee = parseFloat(postConfig?.value || "50000");
+      const tipaxFee = parseFloat(tipaxConfig?.value || "80000");
       calculatedFee = shippingMethod === "TIPAX" || shippingMethod === "EXPRESS" ? tipaxFee : postFee;
       if (!order.shippingFee || order.shippingFee === 0) {
         newTotalAmount = order.totalAmount + calculatedFee;
@@ -5809,7 +5790,7 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
       }
       nextStatus = "PENDING_PAYMENT";
     }
-    const updatedOrder = await prisma13.order.update({
+    const updatedOrder = await prisma14.order.update({
       where: { id: orderId },
       data: {
         shippingMethod: shippingMethod || "PLATFORM_PANEL",
@@ -5831,7 +5812,7 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
         }
       }
     });
-    await prisma13.orderItem.updateMany({
+    await prisma14.orderItem.updateMany({
       where: { orderId },
       data: { status: nextStatus }
     });
@@ -5846,7 +5827,6 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
   }
 });
 async function creditSuppliersForOrders(tx, orders) {
-  var _a, _b;
   try {
     for (const o of orders) {
       const orderItems = await tx.orderItem.findMany({
@@ -5855,9 +5835,9 @@ async function creditSuppliersForOrders(tx, orders) {
       });
       const supplierAmounts = {};
       for (const item of orderItems) {
-        const suppId = item.supplierId || ((_a = item.product) == null ? void 0 : _a.supplierId);
+        const suppId = item.supplierId || item.product?.supplierId;
         if (!suppId) continue;
-        const basePrice = item.supplierPrice || ((_b = item.product) == null ? void 0 : _b.supplierBasePrice) || item.price || 0;
+        const basePrice = item.supplierPrice || item.product?.supplierBasePrice || item.price || 0;
         const amt = basePrice * (item.quantity || 1);
         if (amt > 0) {
           supplierAmounts[suppId] = (supplierAmounts[suppId] || 0) + amt;
@@ -5927,7 +5907,7 @@ async function syncAllPaidOrdersSupplierWallets() {
     return;
   }
   try {
-    const paidOrders = await prisma13.order.findMany({
+    const paidOrders = await prisma14.order.findMany({
       where: {
         status: {
           in: ["PAID", "PROCESSING", "READY_TO_SHIP", "SHIPPED", "COMPLETED", "DELIVERED", "PREPARING", "PENDING_POSTAL_LABEL"]
@@ -5935,7 +5915,7 @@ async function syncAllPaidOrdersSupplierWallets() {
       }
     });
     if (paidOrders.length > 0) {
-      await creditSuppliersForOrders(prisma13, paidOrders);
+      await creditSuppliersForOrders(prisma14, paidOrders);
     }
   } catch (err) {
     console.error("Error syncing supplier wallets:", err);
@@ -5954,8 +5934,7 @@ async function debitSupplierForRejectedOrder(tx, orderId, supplierId, reason) {
       suppliersToProcess.add(supplierId);
     } else {
       orderItems.forEach((item) => {
-        var _a;
-        const sId = item.supplierId || ((_a = item.product) == null ? void 0 : _a.supplierId);
+        const sId = item.supplierId || item.product?.supplierId;
         if (sId) suppliersToProcess.add(sId);
       });
     }
@@ -6037,12 +6016,12 @@ async function debitSupplierForRejectedOrder(tx, orderId, supplierId, reason) {
   }
 }
 async function getOrCreateWallet(userId) {
-  let wallet = await prisma13.wallet.findUnique({
+  let wallet = await prisma14.wallet.findUnique({
     where: { supplierId: userId },
     include: { ledgerEntries: { orderBy: { id: "desc" } } }
   });
   if (!wallet) {
-    wallet = await prisma13.wallet.create({
+    wallet = await prisma14.wallet.create({
       data: { supplierId: userId },
       include: { ledgerEntries: true }
     });
@@ -6062,7 +6041,7 @@ app.post("/api/store-manager/settle-orders", authenticateToken, requireStoreMana
       return res.status(400).json({ error: "\u0633\u0641\u0627\u0631\u0634\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A" });
     }
     const storeId = req.user.userId;
-    const ordersToPay = await prisma13.order.findMany({
+    const ordersToPay = await prisma14.order.findMany({
       where: {
         id: { in: orderIds },
         storeId,
@@ -6074,7 +6053,7 @@ app.post("/api/store-manager/settle-orders", authenticateToken, requireStoreMana
     }
     const totalAmount = ordersToPay.reduce((acc, o) => acc + o.totalAmount, 0);
     if (paymentMethod === "MANUAL") {
-      const invoice = await prisma13.$transaction(async (tx) => {
+      const invoice = await prisma14.$transaction(async (tx) => {
         const inv = await tx.storeInvoice.create({
           data: {
             storeManagerId: storeId,
@@ -6104,7 +6083,7 @@ app.post("/api/store-manager/settle-orders", authenticateToken, requireStoreMana
       });
       return res.json({ manual: true, invoiceId: invoice.id });
     } else {
-      const invoice = await prisma13.$transaction(async (tx) => {
+      const invoice = await prisma14.$transaction(async (tx) => {
         const inv = await tx.storeInvoice.create({
           data: {
             storeManagerId: storeId,
@@ -6130,7 +6109,7 @@ app.post("/api/store-manager/settle-orders", authenticateToken, requireStoreMana
           callbackUrl
         );
         payLink = zibalResult.payLink;
-        await prisma13.storeInvoice.update({
+        await prisma14.storeInvoice.update({
           where: { id: invoice.id },
           data: { trackId: zibalResult.authority }
         });
@@ -6153,13 +6132,13 @@ app.post("/api/store-manager/invoices/:id/receipt", authenticateToken, requireSt
     if (!receiptUrl) {
       return res.status(400).json({ error: "\u0622\u062F\u0631\u0633 \u0641\u06CC\u0634 \u0648\u0627\u0631\u06CC\u0632\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A" });
     }
-    const invoice = await prisma13.storeInvoice.findUnique({
+    const invoice = await prisma14.storeInvoice.findUnique({
       where: { id: invoiceId }
     });
     if (!invoice || invoice.storeManagerId !== storeId) {
       return res.status(404).json({ error: "\u0641\u0627\u06A9\u062A\u0648\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    await prisma13.storeInvoice.update({
+    await prisma14.storeInvoice.update({
       where: { id: invoiceId },
       data: {
         receiptUrl,
@@ -6178,7 +6157,7 @@ app.post("/api/store-manager/invoices/:id/pay", authenticateToken, requireStoreM
   try {
     const invoiceId = parseInt(req.params.id);
     const storeId = req.user.userId;
-    const invoice = await prisma13.storeInvoice.findUnique({
+    const invoice = await prisma14.storeInvoice.findUnique({
       where: { id: invoiceId }
     });
     if (!invoice || invoice.storeManagerId !== storeId) {
@@ -6192,7 +6171,7 @@ app.post("/api/store-manager/invoices/:id/pay", authenticateToken, requireStoreM
 });
 app.get("/api/admin/manual-invoices", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const invoices = await prisma13.storeInvoice.findMany({
+    const invoices = await prisma14.storeInvoice.findMany({
       where: {
         paymentMethod: "MANUAL"
       },
@@ -6208,16 +6187,15 @@ app.get("/api/admin/manual-invoices", authenticateToken, requireAdmin, async (re
   }
 });
 app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({ dest: rootUploadsDir }).any(), async (req, res) => {
-  var _a;
   try {
     const uploadedFile = req.files && req.files.length > 0 ? req.files[0] : req.file;
     if (!uploadedFile) {
       return res.status(400).json({ error: "\u0641\u0627\u06CC\u0644\u06CC \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A" });
     }
     const zipPath = uploadedFile.path;
-    const newVersion = (_a = req.body) == null ? void 0 : _a.version;
+    const newVersion = req.body?.version;
     if (newVersion) {
-      await prisma13.systemConfig.upsert({
+      await prisma14.systemConfig.upsert({
         where: { key: "PLATFORM_VERSION" },
         update: { value: newVersion },
         create: { key: "PLATFORM_VERSION", value: newVersion }
@@ -6225,16 +6203,16 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
     }
     const ZipClass = typeof import_adm_zip.default === "function" ? import_adm_zip.default : import_adm_zip.default.default || require("adm-zip");
     const zip = new ZipClass(zipPath);
-    const extractDir = import_path4.default.join(process.cwd(), "temp_update_" + Date.now());
+    const extractDir = import_path3.default.join(process.cwd(), "temp_update_" + Date.now());
     zip.extractAllTo(extractDir, true);
     const findProjectRootDir = (dir) => {
-      if (import_fs4.default.existsSync(import_path4.default.join(dir, "package.json")) || import_fs4.default.existsSync(import_path4.default.join(dir, "server.ts"))) {
+      if (import_fs3.default.existsSync(import_path3.default.join(dir, "package.json")) || import_fs3.default.existsSync(import_path3.default.join(dir, "server.ts"))) {
         return dir;
       }
-      const entries = import_fs4.default.readdirSync(dir, { withFileTypes: true });
+      const entries = import_fs3.default.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name !== "__MACOSX" && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
-          const subPath = import_path4.default.join(dir, entry.name);
+          const subPath = import_path3.default.join(dir, entry.name);
           const found = findProjectRootDir(subPath);
           if (found !== dir) return found;
         }
@@ -6243,14 +6221,14 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
     };
     const sourceDir = findProjectRootDir(extractDir);
     const copyRecursiveSync = (src, dest) => {
-      const exists = import_fs4.default.existsSync(src);
-      const stats = exists && import_fs4.default.statSync(src);
+      const exists = import_fs3.default.existsSync(src);
+      const stats = exists && import_fs3.default.statSync(src);
       const isDirectory = exists && stats.isDirectory();
       if (isDirectory) {
-        if (!import_fs4.default.existsSync(dest)) {
-          import_fs4.default.mkdirSync(dest, { recursive: true });
+        if (!import_fs3.default.existsSync(dest)) {
+          import_fs3.default.mkdirSync(dest, { recursive: true });
         }
-        import_fs4.default.readdirSync(src).forEach((childItemName) => {
+        import_fs3.default.readdirSync(src).forEach((childItemName) => {
           const ignoredAtRoot = [
             "node_modules",
             ".env",
@@ -6267,31 +6245,31 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
             return;
           }
           if (childItemName === "__MACOSX" || childItemName === ".DS_Store") return;
-          copyRecursiveSync(import_path4.default.join(src, childItemName), import_path4.default.join(dest, childItemName));
+          copyRecursiveSync(import_path3.default.join(src, childItemName), import_path3.default.join(dest, childItemName));
         });
       } else {
-        const fileName = import_path4.default.basename(src);
+        const fileName = import_path3.default.basename(src);
         if (fileName === ".env" || fileName.endsWith(".db") || fileName.endsWith(".sqlite")) {
           return;
         }
-        const destDir = import_path4.default.dirname(dest);
-        if (!import_fs4.default.existsSync(destDir)) {
-          import_fs4.default.mkdirSync(destDir, { recursive: true });
+        const destDir = import_path3.default.dirname(dest);
+        if (!import_fs3.default.existsSync(destDir)) {
+          import_fs3.default.mkdirSync(destDir, { recursive: true });
         }
-        import_fs4.default.copyFileSync(src, dest);
+        import_fs3.default.copyFileSync(src, dest);
       }
     };
     copyRecursiveSync(sourceDir, process.cwd());
     try {
-      import_fs4.default.rmSync(extractDir, { recursive: true, force: true });
+      import_fs3.default.rmSync(extractDir, { recursive: true, force: true });
     } catch (e) {
     }
     try {
-      import_fs4.default.unlinkSync(zipPath);
+      import_fs3.default.unlinkSync(zipPath);
     } catch (e) {
     }
     try {
-      (0, import_child_process.execSync)("node setup-db.js", { stdio: "inherit", env: process.env });
+      (0, import_child_process2.execSync)("node setup-db.js", { stdio: "inherit", env: process.env });
     } catch (dbErr) {
       console.warn("Post-update setup-db warning:", dbErr.message);
     }
@@ -6326,14 +6304,14 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
 app.post("/api/admin/manual-invoices/:id/approve", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id);
-    const invoice = await prisma13.storeInvoice.findUnique({
+    const invoice = await prisma14.storeInvoice.findUnique({
       where: { id: invoiceId },
       include: { orders: true }
     });
     if (!invoice) {
       return res.status(404).json({ error: "\u0641\u0627\u06A9\u062A\u0648\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    await prisma13.$transaction(async (tx) => {
+    await prisma14.$transaction(async (tx) => {
       await tx.storeInvoice.update({
         where: { id: invoiceId },
         data: {
@@ -6372,23 +6350,23 @@ app.post("/api/admin/manual-invoices/:id/approve", authenticateToken, requireAdm
 app.post("/api/admin/manual-invoices/:id/reject", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id);
-    const invoice = await prisma13.storeInvoice.findUnique({
+    const invoice = await prisma14.storeInvoice.findUnique({
       where: { id: invoiceId }
     });
     if (!invoice) {
       return res.status(404).json({ error: "\u0641\u0627\u06A9\u062A\u0648\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    await prisma13.storeInvoice.update({
+    await prisma14.storeInvoice.update({
       where: { id: invoiceId },
       data: {
         receiptStatus: "REJECTED"
       }
     });
-    const orders = await prisma13.order.findMany({
+    const orders = await prisma14.order.findMany({
       where: { storeInvoiceId: invoiceId }
     });
     for (const o of orders) {
-      await prisma13.orderStatusHistory.create({
+      await prisma14.orderStatusHistory.create({
         data: {
           orderId: o.id,
           fromStatus: o.status,
@@ -6449,7 +6427,7 @@ app.get("/api/public/wallet/deposit-simulate", async (req, res) => {
       return res.status(400).send("<h1>\u067E\u0627\u0631\u0627\u0645\u062A\u0631\u0647\u0627\u06CC \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A</h1>");
     }
     const wallet = await getOrCreateWallet(userId);
-    await prisma13.$transaction(async (tx) => {
+    await prisma14.$transaction(async (tx) => {
       await tx.wallet.update({
         where: { id: wallet.id },
         data: {
@@ -6481,7 +6459,7 @@ app.get("/api/public/store-invoice/callback", async (req, res) => {
     if (isNaN(invoiceId)) {
       return res.redirect("/?payment_status=error&message=InvalidInvoiceId");
     }
-    const invoice = await prisma13.storeInvoice.findUnique({
+    const invoice = await prisma14.storeInvoice.findUnique({
       where: { id: invoiceId },
       include: { orders: true }
     });
@@ -6500,7 +6478,7 @@ app.get("/api/public/store-invoice/callback", async (req, res) => {
       refId = "MOCK_REF_" + Date.now();
     }
     if (isPaid) {
-      await prisma13.$transaction(async (tx) => {
+      await prisma14.$transaction(async (tx) => {
         await tx.storeInvoice.update({
           where: { id: invoiceId },
           data: {
@@ -6542,14 +6520,14 @@ app.get("/api/public/store-invoice/pay-simulate", async (req, res) => {
     if (isNaN(invoiceId)) {
       return res.status(400).send("<h1>\u0634\u0646\u0627\u0633\u0647 \u0641\u0627\u06A9\u062A\u0648\u0631 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A</h1>");
     }
-    const invoice = await prisma13.storeInvoice.findUnique({
+    const invoice = await prisma14.storeInvoice.findUnique({
       where: { id: invoiceId },
       include: { orders: true }
     });
     if (!invoice) {
       return res.status(404).send("<h1>\u0641\u0627\u06A9\u062A\u0648\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</h1>");
     }
-    await prisma13.$transaction(async (tx) => {
+    await prisma14.$transaction(async (tx) => {
       await tx.storeInvoice.update({
         where: { id: invoiceId },
         data: {
@@ -6587,7 +6565,7 @@ app.get("/api/public/store-invoice/pay-simulate", async (req, res) => {
 app.get("/api/store-manager/invoices", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId;
-    const invoices = await prisma13.storeInvoice.findMany({
+    const invoices = await prisma14.storeInvoice.findMany({
       where: { storeManagerId: storeId },
       orderBy: { id: "desc" }
     });
@@ -6599,11 +6577,11 @@ app.get("/api/store-manager/invoices", authenticateToken, requireStoreManager, a
 app.get("/api/store-manager/settings", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId;
-    let settings = await prisma13.storeSettings.findUnique({
+    let settings = await prisma14.storeSettings.findUnique({
       where: { storeManagerId: storeId }
     });
     if (!settings) {
-      settings = await prisma13.storeSettings.create({
+      settings = await prisma14.storeSettings.create({
         data: { storeManagerId: storeId }
       });
     }
@@ -6616,7 +6594,7 @@ app.post("/api/store-manager/settings", authenticateToken, requireStoreManager, 
   try {
     const storeId = req.user.userId;
     const { platformType, apiKey, webhookUrl } = req.body;
-    const settings = await prisma13.storeSettings.upsert({
+    const settings = await prisma14.storeSettings.upsert({
       where: { storeManagerId: storeId },
       update: { platformType, apiKey, webhookUrl },
       create: { storeManagerId: storeId, platformType, apiKey, webhookUrl }
@@ -6629,10 +6607,10 @@ app.post("/api/store-manager/settings", authenticateToken, requireStoreManager, 
 app.get("/api/store-manager/pro/status", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const proAccount = await prisma13.proAccount.findUnique({
+    const proAccount = await prisma14.proAccount.findUnique({
       where: { userId }
     });
-    const settingsRows = await prisma13.systemSettings.findMany({
+    const settingsRows = await prisma14.systemSettings.findMany({
       where: {
         key: {
           in: [
@@ -6675,12 +6653,12 @@ app.post("/api/store-manager/pro/register", authenticateToken, requireStoreManag
     if (!fullName || !nationalCode || !mobile || !signatureImage) {
       return res.status(400).json({ error: "\u062A\u06A9\u0645\u06CC\u0644 \u062A\u0645\u0627\u0645\u06CC \u0645\u0648\u0627\u0631\u062F \u0627\u0644\u0632\u0627\u0645\u200C\u0622\u0648\u0631 \u0627\u0632 \u062C\u0645\u0644\u0647 \u06A9\u062F \u0645\u0644\u06CC\u060C \u0634\u0645\u0627\u0631\u0647 \u0647\u0645\u0631\u0627\u0647 \u0648 \u0627\u0645\u0636\u0627\u06CC \u062F\u06CC\u062C\u06CC\u062A\u0627\u0644 \u0627\u062C\u0628\u0627\u0631\u06CC \u0627\u0633\u062A." });
     }
-    const autoApproveSetting = await prisma13.systemSettings.findUnique({
+    const autoApproveSetting = await prisma14.systemSettings.findUnique({
       where: { key: "pro_auto_approve" }
     });
     const isAutoApprove = !autoApproveSetting || autoApproveSetting.value !== "false";
     const initialStatus = isAutoApprove ? "APPROVED" : "PENDING";
-    const proAccount = await prisma13.proAccount.upsert({
+    const proAccount = await prisma14.proAccount.upsert({
       where: { userId },
       update: {
         fullName,
@@ -6703,7 +6681,7 @@ app.post("/api/store-manager/pro/register", authenticateToken, requireStoreManag
     const nameParts = fullName.trim().split(" ");
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
-    await prisma13.user.update({
+    await prisma14.user.update({
       where: { id: userId },
       data: {
         nationalCode: nationalCode.trim(),
@@ -6725,8 +6703,8 @@ app.post("/api/store-manager/pro/register", authenticateToken, requireStoreManag
 app.post("/api/store-manager/pro/renew-host", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const hostDiscountedSetting = await prisma13.systemSettings.findUnique({ where: { key: "pro_host_discounted_price" } });
-    const amount = parseInt((hostDiscountedSetting == null ? void 0 : hostDiscountedSetting.value) || "198000", 10);
+    const hostDiscountedSetting = await prisma14.systemSettings.findUnique({ where: { key: "pro_host_discounted_price" } });
+    const amount = parseInt(hostDiscountedSetting?.value || "198000", 10);
     const paymentGateway = await PaymentServiceFactory.getService();
     const baseUrl = getPublicUrl(req);
     const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=HOST_RENEWAL`;
@@ -6751,8 +6729,8 @@ app.post("/api/store-manager/pro/renew-host", authenticateToken, requireStoreMan
 app.post("/api/store-manager/pro/pay-torob", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const torobPriceSetting = await prisma13.systemSettings.findUnique({ where: { key: "pro_torob_price" } });
-    const amount = parseInt((torobPriceSetting == null ? void 0 : torobPriceSetting.value) || "150000", 10);
+    const torobPriceSetting = await prisma14.systemSettings.findUnique({ where: { key: "pro_torob_price" } });
+    const amount = parseInt(torobPriceSetting?.value || "150000", 10);
     const paymentGateway = await PaymentServiceFactory.getService();
     const baseUrl = getPublicUrl(req);
     const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=TOROB_SETUP`;
@@ -6781,13 +6759,13 @@ app.get("/api/public/pro/callback", async (req, res) => {
       if (type === "HOST_RENEWAL") {
         const nextMonth = /* @__PURE__ */ new Date();
         nextMonth.setDate(nextMonth.getDate() + 30);
-        await prisma13.proAccount.update({
+        await prisma14.proAccount.update({
           where: { userId: parsedUserId },
           data: { hostExpiresAt: nextMonth, status: "APPROVED" }
         }).catch(() => {
         });
       } else if (type === "TOROB_SETUP") {
-        await prisma13.proAccount.update({
+        await prisma14.proAccount.update({
           where: { userId: parsedUserId },
           data: { torobConnected: true }
         }).catch(() => {
@@ -6821,7 +6799,7 @@ app.get("/api/public/pro/callback", async (req, res) => {
 });
 app.get("/api/superadmin/pro/accounts", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const proAccounts = await prisma13.proAccount.findMany({
+    const proAccounts = await prisma14.proAccount.findMany({
       include: {
         user: {
           select: {
@@ -6856,7 +6834,7 @@ app.put("/api/superadmin/pro/accounts/:id", authenticateToken, requireAdmin, asy
       wpUsername,
       wpPassword
     } = req.body;
-    const updated = await prisma13.proAccount.update({
+    const updated = await prisma14.proAccount.update({
       where: { id },
       data: {
         status: status || void 0,
@@ -6878,7 +6856,7 @@ app.put("/api/superadmin/pro/accounts/:id", authenticateToken, requireAdmin, asy
 });
 app.get("/api/superadmin/pro/settings", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const rows = await prisma13.systemSettings.findMany({
+    const rows = await prisma14.systemSettings.findMany({
       where: {
         key: {
           in: [
@@ -6931,7 +6909,7 @@ app.post("/api/superadmin/pro/settings", authenticateToken, requireAdmin, async 
       { key: "pro_terms_content", value: String(termsContent ?? "") }
     ];
     for (const item of updates) {
-      await prisma13.systemSettings.upsert({
+      await prisma14.systemSettings.upsert({
         where: { key: item.key },
         update: { value: item.value },
         create: { key: item.key, value: item.value }
@@ -6950,14 +6928,14 @@ app.put("/api/admin/payouts/:id", authenticateToken, requireAdmin, async (req, r
     if (!["SUCCESS", "FAILED"].includes(status)) {
       return res.status(400).json({ error: "Invalid status" });
     }
-    const payoutRequest = await prisma13.payoutRequest.findUnique({ where: { id: payoutId } });
+    const payoutRequest = await prisma14.payoutRequest.findUnique({ where: { id: payoutId } });
     if (!payoutRequest) {
       return res.status(404).json({ error: "Payout request not found" });
     }
     if (payoutRequest.status === "SUCCESS" || payoutRequest.status === "FAILED") {
       return res.status(400).json({ error: "Payout is already in a final state" });
     }
-    await prisma13.$transaction(async (tx) => {
+    await prisma14.$transaction(async (tx) => {
       await tx.payoutRequest.update({
         where: { id: payoutId },
         data: { status }
@@ -6985,7 +6963,7 @@ app.put("/api/admin/payouts/:id", authenticateToken, requireAdmin, async (req, r
 app.get("/api/orders/:id/timeline", authenticateToken, async (req, res) => {
   try {
     const orderId = parseInt(req.params.id);
-    const order = await prisma13.order.findUnique({
+    const order = await prisma14.order.findUnique({
       where: { id: orderId },
       include: {
         statusHistory: {
@@ -7019,7 +6997,7 @@ app.get("/api/orders/:id/timeline", authenticateToken, async (req, res) => {
 });
 app.get("/api/admin/settlements", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const payouts = await prisma13.payoutRequest.findMany({
+    const payouts = await prisma14.payoutRequest.findMany({
       include: {
         wallet: {
           include: {
@@ -7032,24 +7010,23 @@ app.get("/api/admin/settlements", authenticateToken, requireAdmin, async (req, r
       }
     });
     const settlements = payouts.map((p) => {
-      var _a, _b, _c, _d, _e, _f, _g;
-      const supplier = (_a = p.wallet) == null ? void 0 : _a.supplier;
+      const supplier = p.wallet?.supplier;
       return {
         id: p.id,
-        supplierId: (supplier == null ? void 0 : supplier.id) || 0,
+        supplierId: supplier?.id || 0,
         supplierName: supplier ? `${supplier.firstName || ""} ${supplier.lastName || ""} (${supplier.brandName || "\u0628\u0631\u0646\u062F \u062B\u0628\u062A \u0646\u0634\u062F\u0647"})` : "\u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0646\u0627\u0634\u0646\u0627\u0633",
-        walletBalance: parseFloat(((_c = (_b = p.wallet) == null ? void 0 : _b.balance) == null ? void 0 : _c.toString()) || "0"),
-        requestedAmount: parseFloat(((_d = p.amount) == null ? void 0 : _d.toString()) || "0"),
-        remainingBalance: parseFloat(((_e = p.remainingBalance) == null ? void 0 : _e.toString()) || "0") || parseFloat(((_g = (_f = p.wallet) == null ? void 0 : _f.balance) == null ? void 0 : _g.toString()) || "0"),
+        walletBalance: parseFloat(p.wallet?.balance?.toString() || "0"),
+        requestedAmount: parseFloat(p.amount?.toString() || "0"),
+        remainingBalance: parseFloat(p.remainingBalance?.toString() || "0") || parseFloat(p.wallet?.balance?.toString() || "0"),
         iban: p.shaba,
-        bankName: p.bankName || (supplier == null ? void 0 : supplier.bankName) || "\u0646\u0627\u0645\u0634\u062E\u0635",
-        accountHolderName: p.accountHolderName || (supplier == null ? void 0 : supplier.accountHolderName) || `${(supplier == null ? void 0 : supplier.firstName) || ""} ${(supplier == null ? void 0 : supplier.lastName) || ""}`,
+        bankName: p.bankName || supplier?.bankName || "\u0646\u0627\u0645\u0634\u062E\u0635",
+        accountHolderName: p.accountHolderName || supplier?.accountHolderName || `${supplier?.firstName || ""} ${supplier?.lastName || ""}`,
         requestDate: p.createdAt.toISOString(),
         status: p.status,
         // PENDING, PROCESSING, SUCCESS, FAILED
         trackId: p.trackId,
-        supplierMobile: (supplier == null ? void 0 : supplier.mobile) || "\u062B\u0628\u062A \u0646\u0634\u062F\u0647",
-        supplierEmail: (supplier == null ? void 0 : supplier.email) || "\u062B\u0628\u062A \u0646\u0634\u062F\u0647"
+        supplierMobile: supplier?.mobile || "\u062B\u0628\u062A \u0646\u0634\u062F\u0647",
+        supplierEmail: supplier?.email || "\u062B\u0628\u062A \u0646\u0634\u062F\u0647"
       };
     });
     res.json({ success: true, settlements });
@@ -7060,14 +7037,14 @@ app.get("/api/admin/settlements", authenticateToken, requireAdmin, async (req, r
 app.post("/api/admin/settlements/:id/approve", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const payoutId = req.params.id;
-    const payoutRequest = await prisma13.payoutRequest.findUnique({ where: { id: payoutId } });
+    const payoutRequest = await prisma14.payoutRequest.findUnique({ where: { id: payoutId } });
     if (!payoutRequest) {
       return res.status(404).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
     if (payoutRequest.status !== "PENDING" && payoutRequest.status !== "PROCESSING") {
       return res.status(400).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062F\u0631 \u0648\u0636\u0639\u06CC\u062A \u0646\u0647\u0627\u06CC\u06CC \u0627\u0633\u062A" });
     }
-    await prisma13.payoutRequest.update({
+    await prisma14.payoutRequest.update({
       where: { id: payoutId },
       data: { status: "PROCESSING" }
     });
@@ -7079,14 +7056,14 @@ app.post("/api/admin/settlements/:id/approve", authenticateToken, requireAdmin, 
 app.post("/api/admin/settlements/:id/reject", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const payoutId = req.params.id;
-    const payoutRequest = await prisma13.payoutRequest.findUnique({ where: { id: payoutId } });
+    const payoutRequest = await prisma14.payoutRequest.findUnique({ where: { id: payoutId } });
     if (!payoutRequest) {
       return res.status(404).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
     if (payoutRequest.status === "SUCCESS" || payoutRequest.status === "FAILED") {
       return res.status(400).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u0642\u0628\u0644\u0627\u064B \u0646\u0647\u0627\u06CC\u06CC \u0634\u062F\u0647 \u0627\u0633\u062A" });
     }
-    await prisma13.$transaction(async (tx) => {
+    await prisma14.$transaction(async (tx) => {
       await tx.payoutRequest.update({
         where: { id: payoutId },
         data: { status: "FAILED" }
@@ -7113,14 +7090,14 @@ app.post("/api/admin/settlements/:id/pay", authenticateToken, requireAdmin, asyn
   try {
     const payoutId = req.params.id;
     const { receiptUrl, transactionRef, paymentDate, paymentNotes } = req.body;
-    const payoutRequest = await prisma13.payoutRequest.findUnique({ where: { id: payoutId } });
+    const payoutRequest = await prisma14.payoutRequest.findUnique({ where: { id: payoutId } });
     if (!payoutRequest) {
       return res.status(404).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
     if (payoutRequest.status === "SUCCESS" || payoutRequest.status === "FAILED") {
       return res.status(400).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u0642\u0628\u0644\u0627\u064B \u0646\u0647\u0627\u06CC\u06CC \u0634\u062F\u0647 \u0627\u0633\u062A" });
     }
-    await prisma13.$transaction(async (tx) => {
+    await prisma14.$transaction(async (tx) => {
       await tx.payoutRequest.update({
         where: { id: payoutId },
         data: {
@@ -7143,10 +7120,9 @@ app.post("/api/admin/settlements/:id/pay", authenticateToken, requireAdmin, asyn
   }
 });
 app.get("/api/admin/settlements/:id", authenticateToken, requireAdmin, async (req, res) => {
-  var _a, _b, _c, _d, _e, _f, _g;
   try {
     const payoutId = req.params.id;
-    const p = await prisma13.payoutRequest.findUnique({
+    const p = await prisma14.payoutRequest.findUnique({
       where: { id: payoutId },
       include: {
         wallet: {
@@ -7164,17 +7140,17 @@ app.get("/api/admin/settlements/:id", authenticateToken, requireAdmin, async (re
     if (!p) {
       return res.status(404).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    const supplier = (_a = p.wallet) == null ? void 0 : _a.supplier;
+    const supplier = p.wallet?.supplier;
     const mappedSettlement = {
       id: p.id,
-      supplierId: (supplier == null ? void 0 : supplier.id) || 0,
+      supplierId: supplier?.id || 0,
       supplierName: supplier ? `${supplier.firstName || ""} ${supplier.lastName || ""} (${supplier.brandName || "\u0628\u0631\u0646\u062F \u062B\u0628\u062A \u0646\u0634\u062F\u0647"})` : "\u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0646\u0627\u0634\u0646\u0627\u0633",
-      walletBalance: parseFloat(((_c = (_b = p.wallet) == null ? void 0 : _b.balance) == null ? void 0 : _c.toString()) || "0"),
-      requestedAmount: parseFloat(((_d = p.amount) == null ? void 0 : _d.toString()) || "0"),
-      remainingBalance: parseFloat(((_e = p.remainingBalance) == null ? void 0 : _e.toString()) || "0") || parseFloat(((_g = (_f = p.wallet) == null ? void 0 : _f.balance) == null ? void 0 : _g.toString()) || "0"),
+      walletBalance: parseFloat(p.wallet?.balance?.toString() || "0"),
+      requestedAmount: parseFloat(p.amount?.toString() || "0"),
+      remainingBalance: parseFloat(p.remainingBalance?.toString() || "0") || parseFloat(p.wallet?.balance?.toString() || "0"),
       iban: p.shaba,
-      bankName: p.bankName || (supplier == null ? void 0 : supplier.bankName) || "\u0646\u0627\u0645\u0634\u062E\u0635",
-      accountHolderName: p.accountHolderName || (supplier == null ? void 0 : supplier.accountHolderName) || `${(supplier == null ? void 0 : supplier.firstName) || ""} ${(supplier == null ? void 0 : supplier.lastName) || ""}`,
+      bankName: p.bankName || supplier?.bankName || "\u0646\u0627\u0645\u0634\u062E\u0635",
+      accountHolderName: p.accountHolderName || supplier?.accountHolderName || `${supplier?.firstName || ""} ${supplier?.lastName || ""}`,
       requestDate: p.createdAt.toISOString(),
       status: p.status,
       trackId: p.trackId,
@@ -7192,9 +7168,9 @@ app.get("/api/admin/settlements/:id", authenticateToken, requireAdmin, async (re
         createdAt: a.createdAt.toISOString()
       }))
     };
-    const orderItems = await prisma13.orderItem.findMany({
+    const orderItems = await prisma14.orderItem.findMany({
       where: {
-        supplierId: (supplier == null ? void 0 : supplier.id) || 0,
+        supplierId: supplier?.id || 0,
         order: {
           status: "PAID"
         }
@@ -7206,21 +7182,20 @@ app.get("/api/admin/settlements/:id", authenticateToken, requireAdmin, async (re
       take: 20
     });
     const breakdown = orderItems.map((item) => {
-      var _a2, _b2, _c2;
       const baseCost = (item.supplierPrice || 0) * (item.quantity || 1);
       const saleAmount = (item.price || 0) * (item.quantity || 1);
       const profit = saleAmount - baseCost;
       return {
         id: String(item.id),
         orderId: String(item.orderId),
-        orderNumber: ((_a2 = item.order) == null ? void 0 : _a2.id) ? `#${item.order.id}` : "\u0646\u0627\u0634\u0646\u0627\u0633",
-        itemName: ((_b2 = item.product) == null ? void 0 : _b2.name) || "\u0645\u062D\u0635\u0648\u0644 \u062D\u0630\u0641 \u0634\u062F\u0647",
+        orderNumber: item.order?.id ? `#${item.order.id}` : "\u0646\u0627\u0634\u0646\u0627\u0633",
+        itemName: item.product?.name || "\u0645\u062D\u0635\u0648\u0644 \u062D\u0630\u0641 \u0634\u062F\u0647",
         quantity: item.quantity,
         saleAmount,
         baseCost,
         platformCommission: profit > 0 ? profit : 0,
         walletCreditAmount: baseCost,
-        createdAt: ((_c2 = item.order) == null ? void 0 : _c2.createdAt.toISOString()) || p.createdAt.toISOString()
+        createdAt: item.order?.createdAt.toISOString() || p.createdAt.toISOString()
       };
     });
     const totalSupplierRevenue = breakdown.reduce((sum, item) => sum + item.baseCost, 0);
@@ -7231,9 +7206,9 @@ app.get("/api/admin/settlements/:id", authenticateToken, requireAdmin, async (re
       totalPlatformCommission,
       totalWalletCredits
     };
-    const logs = await prisma13.activityLog.findMany({
+    const logs = await prisma14.activityLog.findMany({
       where: {
-        userId: supplier == null ? void 0 : supplier.id
+        userId: supplier?.id
       },
       orderBy: {
         createdAt: "desc"
@@ -7265,14 +7240,14 @@ app.post("/api/admin/settlements/:id/adjust", authenticateToken, requireAdmin, a
     if (isNaN(numericAmount) || numericAmount <= 0) {
       return res.status(400).json({ error: "\u0645\u0628\u0644\u063A \u0627\u0635\u0644\u0627\u062D\u06CC\u0647 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     }
-    const payoutRequest = await prisma13.payoutRequest.findUnique({
+    const payoutRequest = await prisma14.payoutRequest.findUnique({
       where: { id: payoutId },
       include: { wallet: true }
     });
     if (!payoutRequest) {
       return res.status(404).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    await prisma13.$transaction(async (tx) => {
+    await prisma14.$transaction(async (tx) => {
       await tx.adjustmentRecord.create({
         data: {
           payoutRequestId: payoutId,
@@ -7310,7 +7285,7 @@ app.post("/api/admin/settlements/:id/adjust", authenticateToken, requireAdmin, a
 app.get("/api/admin/suppliers/:id/profile", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const supplierId = parseInt(req.params.id);
-    const supplier = await prisma13.user.findUnique({
+    const supplier = await prisma14.user.findUnique({
       where: { id: supplierId }
     });
     if (!supplier) {
@@ -7342,11 +7317,11 @@ app.get("/api/admin/stores/performance", authenticateToken, requireAdmin, async 
 });
 app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const suppliersCount = await prisma13.user.count({ where: { role: "SUPPLIER" } });
-    const storesCount = await prisma13.user.count({ where: { role: "STORE_MANAGER" } });
-    const productsCount = await prisma13.product.count();
-    const ordersCount = await prisma13.order.count();
-    const totalRevenue = await prisma13.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PAID" } });
+    const suppliersCount = await prisma14.user.count({ where: { role: "SUPPLIER" } });
+    const storesCount = await prisma14.user.count({ where: { role: "STORE_MANAGER" } });
+    const productsCount = await prisma14.product.count();
+    const ordersCount = await prisma14.order.count();
+    const totalRevenue = await prisma14.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PAID" } });
     res.json({
       suppliers: suppliersCount,
       stores: storesCount,
@@ -7360,23 +7335,23 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req, res) =>
 });
 app.get("/api/admin/export-all-data", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const users = await prisma13.user.findMany().catch(() => []);
-    const products = await prisma13.product.findMany().catch(() => []);
-    const categories = await prisma13.category.findMany().catch(() => []);
-    const productImages = await prisma13.productImage.findMany().catch(() => []);
-    const productVariants = await prisma13.productVariant.findMany().catch(() => []);
-    const orders = await prisma13.order.findMany().catch(() => []);
-    const orderItems = await prisma13.orderItem.findMany().catch(() => []);
-    const storeInvoices = await prisma13.storeInvoice.findMany().catch(() => []);
-    const tickets = await prisma13.ticket.findMany().catch(() => []);
-    const ticketMessages = await prisma13.ticketMessage.findMany().catch(() => []);
-    const settlements = await prisma13.settlement.findMany().catch(() => []);
-    const systemConfigs = await prisma13.systemConfig.findMany().catch(() => []);
-    const wallets = await prisma13.wallet.findMany().catch(() => []);
-    const payouts = await prisma13.payoutRequest.findMany().catch(() => []);
-    const auditTrails = await prisma13.auditTrail.findMany().catch(() => []);
-    const notifications = await prisma13.notification.findMany().catch(() => []);
-    const announcements = await prisma13.announcement.findMany().catch(() => []);
+    const users = await prisma14.user.findMany().catch(() => []);
+    const products = await prisma14.product.findMany().catch(() => []);
+    const categories = await prisma14.category.findMany().catch(() => []);
+    const productImages = await prisma14.productImage.findMany().catch(() => []);
+    const productVariants = await prisma14.productVariant.findMany().catch(() => []);
+    const orders = await prisma14.order.findMany().catch(() => []);
+    const orderItems = await prisma14.orderItem.findMany().catch(() => []);
+    const storeInvoices = await prisma14.storeInvoice.findMany().catch(() => []);
+    const tickets = await prisma14.ticket.findMany().catch(() => []);
+    const ticketMessages = await prisma14.ticketMessage.findMany().catch(() => []);
+    const settlements = await prisma14.settlement.findMany().catch(() => []);
+    const systemConfigs = await prisma14.systemConfig.findMany().catch(() => []);
+    const wallets = await prisma14.wallet.findMany().catch(() => []);
+    const payouts = await prisma14.payoutRequest.findMany().catch(() => []);
+    const auditTrails = await prisma14.auditTrail.findMany().catch(() => []);
+    const notifications = await prisma14.notification.findMany().catch(() => []);
+    const announcements = await prisma14.announcement.findMany().catch(() => []);
     const backupData = {
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
       version: "1.0",
@@ -7409,7 +7384,7 @@ app.get("/api/admin/export-all-data", authenticateToken, requireAdmin, async (re
 });
 app.get("/api/admin/products", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const products = await prisma13.product.findMany({
+    const products = await prisma14.product.findMany({
       include: {
         category: true,
         supplier: { select: { firstName: true, lastName: true, brandName: true } },
@@ -7427,19 +7402,19 @@ app.patch("/api/admin/products/:id/publish", authenticateToken, requireAdmin, as
     const { id } = req.params;
     const { finalPrice, marginType, marginValue, publishStartDate, publishEndDate, isPinned } = req.body;
     if (isPinned) {
-      const pinnedCount = await prisma13.product.count({ where: { isPinned: true, status: "PUBLISHED" } });
+      const pinnedCount = await prisma14.product.count({ where: { isPinned: true, status: "PUBLISHED" } });
       if (pinnedCount >= 10) {
         return res.status(400).json({ error: "Maximum 10 pinned products allowed." });
       }
     }
-    const existingProduct = await prisma13.product.findUnique({
+    const existingProduct = await prisma14.product.findUnique({
       where: { id: parseInt(id) }
     });
-    let productSku = existingProduct == null ? void 0 : existingProduct.sku;
+    let productSku = existingProduct?.sku;
     if (!productSku) {
       productSku = "BK-" + Math.floor(1e5 + Math.random() * 9e5);
     }
-    const product = await prisma13.product.update({
+    const product = await prisma14.product.update({
       where: { id: parseInt(id) },
       data: {
         finalPrice: finalPrice ? parseFloat(finalPrice) : null,
@@ -7463,14 +7438,14 @@ app.patch("/api/admin/products/:id/status", authenticateToken, requireAdmin, asy
     const { status } = req.body;
     let updateData = { status };
     if (status === "PUBLISHED" || status === "ACTIVE") {
-      const existingProduct = await prisma13.product.findUnique({
+      const existingProduct = await prisma14.product.findUnique({
         where: { id: parseInt(id) }
       });
-      if (!(existingProduct == null ? void 0 : existingProduct.sku)) {
+      if (!existingProduct?.sku) {
         updateData.sku = "BK-" + Math.floor(1e5 + Math.random() * 9e5);
       }
     }
-    const product = await prisma13.product.update({
+    const product = await prisma14.product.update({
       where: { id: parseInt(id) },
       data: updateData
     });
@@ -7484,7 +7459,7 @@ app.post("/api/admin/products", authenticateToken, requireAdmin, async (req, res
     const { name, categoryId, supplierId, shortDescription, longDescription, technicalSpecs, supplierBasePrice, finalPrice, sku, brand, inventory, imageUrl } = req.body;
     let actualSupplierId = supplierId ? parseInt(supplierId) : void 0;
     if (!actualSupplierId) {
-      const firstSupplier = await prisma13.user.findFirst({ where: { role: "SUPPLIER" } });
+      const firstSupplier = await prisma14.user.findFirst({ where: { role: "SUPPLIER" } });
       if (firstSupplier) {
         actualSupplierId = firstSupplier.id;
       } else {
@@ -7493,7 +7468,7 @@ app.post("/api/admin/products", authenticateToken, requireAdmin, async (req, res
     }
     const basePrice = parseFloat(toEngDigits(supplierBasePrice)) || 0;
     const computedFinalPrice = finalPrice ? parseFloat(finalPrice) : null;
-    const product = await prisma13.product.create({
+    const product = await prisma14.product.create({
       data: {
         supplierId: actualSupplierId,
         categoryId: parseInt(categoryId),
@@ -7544,26 +7519,26 @@ app.put("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, 
     if (supplierId) {
       updateData.supplierId = parseInt(supplierId);
     }
-    const product = await prisma13.product.update({
+    const product = await prisma14.product.update({
       where: { id },
       data: updateData
     });
     if (imageUrl) {
-      const existingImg = await prisma13.productImage.findFirst({ where: { productId: id } });
+      const existingImg = await prisma14.productImage.findFirst({ where: { productId: id } });
       if (existingImg) {
-        await prisma13.productImage.update({
+        await prisma14.productImage.update({
           where: { id: existingImg.id },
           data: { url: imageUrl }
         });
       } else {
-        await prisma13.productImage.create({
+        await prisma14.productImage.create({
           data: { productId: id, url: imageUrl }
         });
       }
     }
-    const defaultVariant = await prisma13.productVariant.findFirst({ where: { productId: id } });
+    const defaultVariant = await prisma14.productVariant.findFirst({ where: { productId: id } });
     if (defaultVariant) {
-      await prisma13.productVariant.update({
+      await prisma14.productVariant.update({
         where: { id: defaultVariant.id },
         data: {
           supplierBasePrice: parseFloat(toEngDigits(supplierBasePrice)) || 0,
@@ -7579,7 +7554,7 @@ app.put("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, 
 });
 app.get("/api/admin/explore-products", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const products = await prisma13.product.findMany({
+    const products = await prisma14.product.findMany({
       include: {
         category: true,
         exploreContent: true,
@@ -7595,16 +7570,16 @@ app.post("/api/admin/explore-products/:id/publish", authenticateToken, requireAd
   try {
     const productId = parseInt(req.params.id);
     const { customTitle, customDescription, customImageUrl, customVideoUrl, isPublished } = req.body;
-    const existing = await prisma13.productExploreContent.findUnique({
+    const existing = await prisma14.productExploreContent.findUnique({
       where: { productId }
     });
     if (existing) {
-      await prisma13.productExploreContent.update({
+      await prisma14.productExploreContent.update({
         where: { productId },
         data: { customTitle, customDescription, customImageUrl, customVideoUrl, isPublished }
       });
     } else {
-      await prisma13.productExploreContent.create({
+      await prisma14.productExploreContent.create({
         data: { productId, customTitle, customDescription, customImageUrl, customVideoUrl, isPublished }
       });
     }
@@ -7616,14 +7591,14 @@ app.post("/api/admin/explore-products/:id/publish", authenticateToken, requireAd
 app.delete("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await prisma13.productImage.deleteMany({ where: { productId: id } });
-    await prisma13.productVariant.deleteMany({ where: { productId: id } });
-    await prisma13.productComment.deleteMany({ where: { productId: id } });
-    await prisma13.productQuestion.deleteMany({ where: { productId: id } });
-    await prisma13.orderItem.deleteMany({ where: { productId: id } });
-    await prisma13.dailySelection.deleteMany({ where: { productId: id } });
-    await prisma13.storeProductSelection.deleteMany({ where: { productId: id } });
-    const product = await prisma13.product.delete({
+    await prisma14.productImage.deleteMany({ where: { productId: id } });
+    await prisma14.productVariant.deleteMany({ where: { productId: id } });
+    await prisma14.productComment.deleteMany({ where: { productId: id } });
+    await prisma14.productQuestion.deleteMany({ where: { productId: id } });
+    await prisma14.orderItem.deleteMany({ where: { productId: id } });
+    await prisma14.dailySelection.deleteMany({ where: { productId: id } });
+    await prisma14.storeProductSelection.deleteMany({ where: { productId: id } });
+    const product = await prisma14.product.delete({
       where: { id }
     });
     res.json({ message: "Product deleted successfully", product });
@@ -7637,12 +7612,12 @@ app.post("/api/admin/users", authenticateToken, requireAdmin, async (req, res) =
     if (!username || !password || !role) {
       return res.status(400).json({ error: "\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC\u060C \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0648 \u0646\u0642\u0634 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A" });
     }
-    const existing = await prisma13.user.findUnique({ where: { username } });
+    const existing = await prisma14.user.findUnique({ where: { username } });
     if (existing) {
       return res.status(400).json({ error: "\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u062A\u06A9\u0631\u0627\u0631\u06CC \u0627\u0633\u062A" });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma13.user.create({
+    const user = await prisma14.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -7665,7 +7640,7 @@ app.put("/api/admin/users/:id", authenticateToken, requireAdmin, async (req, res
   try {
     const id = parseInt(req.params.id);
     const { firstName, lastName, mobile, brandName, storeName, nationalCode, shaba, cardNumber } = req.body;
-    const user = await prisma13.user.update({
+    const user = await prisma14.user.update({
       where: { id },
       data: { firstName, lastName, mobile, brandName, storeName, nationalCode, shaba, cardNumber }
     });
@@ -7682,7 +7657,7 @@ app.post("/api/admin/users/:id/reset-password", authenticateToken, requireAdmin,
       return res.status(400).json({ error: "\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0628\u0627\u06CC\u062F \u062D\u062F\u0627\u0642\u0644 \u06F6 \u06A9\u0627\u0631\u0627\u06A9\u062A\u0631 \u0628\u0627\u0634\u062F" });
     }
     const hashedPassword = await import_bcryptjs.default.hash(newPassword, 10);
-    await prisma13.user.update({
+    await prisma14.user.update({
       where: { id },
       data: { password: hashedPassword }
     });
@@ -7695,12 +7670,12 @@ app.patch("/api/admin/users/:id/status", authenticateToken, requireAdmin, async 
   try {
     const id = parseInt(req.params.id);
     const { status, reason } = req.body;
-    await prisma13.user.update({
+    await prisma14.user.update({
       where: { id },
       data: { status }
     });
     if (reason) {
-      await prisma13.activityLog.create({
+      await prisma14.activityLog.create({
         data: {
           userId: id,
           action: "STATUS_CHANGE",
@@ -7715,7 +7690,7 @@ app.patch("/api/admin/users/:id/status", authenticateToken, requireAdmin, async 
 });
 app.get("/api/admin/all-users", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const users = await prisma13.user.findMany({
+    const users = await prisma14.user.findMany({
       select: {
         id: true,
         username: true,
@@ -7771,10 +7746,10 @@ app.get("/api/admin/all-users", authenticateToken, requireAdmin, async (req, res
 app.post("/api/admin/users/:id/toggle-status", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await prisma13.user.findUnique({ where: { id: parseInt(id) } });
+    const user = await prisma14.user.findUnique({ where: { id: parseInt(id) } });
     if (!user) return res.status(404).json({ error: "\u06A9\u0627\u0631\u0628\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     const newStatus = user.status === "BLOCKED" ? "ACTIVE" : "BLOCKED";
-    const updated = await prisma13.user.update({
+    const updated = await prisma14.user.update({
       where: { id: parseInt(id) },
       data: { status: newStatus }
     });
@@ -7786,7 +7761,7 @@ app.post("/api/admin/users/:id/toggle-status", authenticateToken, requireAdmin, 
 app.post("/api/admin/impersonate/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const targetUser = await prisma13.user.findUnique({ where: { id: parseInt(id) } });
+    const targetUser = await prisma14.user.findUnique({ where: { id: parseInt(id) } });
     if (!targetUser) return res.status(404).json({ error: "\u06A9\u0627\u0631\u0628\u0631 \u062C\u0647\u062A \u0648\u0631\u0648\u062F \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     const token = import_jsonwebtoken.default.sign(
       { userId: targetUser.id, username: targetUser.username, role: targetUser.role, isImpersonated: true, originalAdminId: req.user.userId },
@@ -7816,7 +7791,7 @@ app.post("/api/admin/impersonate-exit", authenticateToken, async (req, res) => {
     if (!req.user.isImpersonated || !req.user.originalAdminId) {
       return res.status(400).json({ error: "\u0634\u0645\u0627 \u062F\u0631 \u062D\u0627\u0644\u062A \u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u0646\u06CC\u0633\u062A\u06CC\u062F" });
     }
-    const adminUser = await prisma13.user.findUnique({ where: { id: req.user.originalAdminId } });
+    const adminUser = await prisma14.user.findUnique({ where: { id: req.user.originalAdminId } });
     if (!adminUser) return res.status(404).json({ error: "\u062D\u0633\u0627\u0628 \u0645\u062F\u06CC\u0631 \u0627\u0631\u0634\u062F \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     const token = import_jsonwebtoken.default.sign(
       { userId: adminUser.id, username: adminUser.username, role: adminUser.role, status: adminUser.status },
@@ -7835,7 +7810,7 @@ app.post("/api/admin/impersonate-exit", authenticateToken, async (req, res) => {
 });
 app.get("/api/admin/suppliers", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const suppliers = await prisma13.user.findMany({
+    const suppliers = await prisma14.user.findMany({
       where: { role: "SUPPLIER" },
       select: { id: true, firstName: true, lastName: true, brandName: true, status: true, mobile: true }
     });
@@ -7846,7 +7821,7 @@ app.get("/api/admin/suppliers", authenticateToken, requireAdmin, async (req, res
 });
 app.get("/api/admin/stores", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const stores = await prisma13.user.findMany({
+    const stores = await prisma14.user.findMany({
       where: { role: "STORE_MANAGER" },
       select: { id: true, firstName: true, lastName: true, storeName: true, status: true, mobile: true }
     });
@@ -7857,7 +7832,7 @@ app.get("/api/admin/stores", authenticateToken, requireAdmin, async (req, res) =
 });
 app.get("/api/admin/orders", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const orders = await prisma13.order.findMany({
+    const orders = await prisma14.order.findMany({
       include: {
         store: {
           select: {
@@ -7906,10 +7881,10 @@ app.patch("/api/admin/orders/:id/shipping-fee", authenticateToken, requireAdmin,
     const orderId = parseInt(id, 10);
     if (isNaN(orderId)) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     const fee = parseFloat(shippingFee) || 0;
-    const existingOrder = await prisma13.order.findUnique({ where: { id: orderId } });
+    const existingOrder = await prisma14.order.findUnique({ where: { id: orderId } });
     if (!existingOrder) return res.status(404).json({ error: "\u0633\u0641\u0627\u0631\u0634 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     const updatedTotal = existingOrder.totalAmount + fee;
-    const updatedOrder = await prisma13.order.update({
+    const updatedOrder = await prisma14.order.update({
       where: { id: orderId },
       data: {
         shippingFee: fee,
@@ -7932,13 +7907,13 @@ app.patch("/api/admin/orders/:id/status", authenticateToken, requireAdmin, async
     const { status, trackingCode } = req.body;
     const orderId = parseInt(id, 10);
     if (isNaN(orderId)) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
-    const existingOrder = await prisma13.order.findUnique({
+    const existingOrder = await prisma14.order.findUnique({
       where: { id: orderId }
     });
     const dataToUpdate = {};
     if (status) dataToUpdate.status = status;
     if (trackingCode !== void 0) dataToUpdate.trackingCode = trackingCode;
-    const updatedOrder = await prisma13.order.update({
+    const updatedOrder = await prisma14.order.update({
       where: { id: orderId },
       data: dataToUpdate
     });
@@ -7946,9 +7921,9 @@ app.patch("/api/admin/orders/:id/status", authenticateToken, requireAdmin, async
       const paidStatuses = ["PAID", "PROCESSING", "READY_TO_SHIP", "SHIPPED", "COMPLETED", "DELIVERED", "PREPARING", "PENDING_POSTAL_LABEL"];
       const rejectedStatuses = ["REJECTED", "CANCELLED", "OUT_OF_STOCK"];
       if (paidStatuses.includes(status)) {
-        await creditSuppliersForOrders(prisma13, [updatedOrder]);
+        await creditSuppliersForOrders(prisma14, [updatedOrder]);
       } else if (rejectedStatuses.includes(status)) {
-        await debitSupplierForRejectedOrder(prisma13, orderId);
+        await debitSupplierForRejectedOrder(prisma14, orderId);
       }
     }
     res.json({ message: "\u0648\u0636\u0639\u06CC\u062A \u0633\u0641\u0627\u0631\u0634 \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0634\u062F", order: updatedOrder });
@@ -7960,10 +7935,10 @@ app.patch("/api/admin/orders/:id/status", authenticateToken, requireAdmin, async
 app.get("/api/admin/badges", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const [orders, tickets, invoices, settlements] = await Promise.all([
-      prisma13.order.count({ where: { status: { in: ["REQUESTED", "PENDING_SHIPPING_ESTIMATE", "PENDING_POSTAL_LABEL"] } } }),
-      prisma13.ticket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] } } }),
-      prisma13.manualInvoice.count({ where: { status: "PENDING" } }),
-      prisma13.settlementRequest.count({ where: { status: "PENDING" } })
+      prisma14.order.count({ where: { status: { in: ["REQUESTED", "PENDING_SHIPPING_ESTIMATE", "PENDING_POSTAL_LABEL"] } } }),
+      prisma14.ticket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] } } }),
+      prisma14.manualInvoice.count({ where: { status: "PENDING" } }),
+      prisma14.settlementRequest.count({ where: { status: "PENDING" } })
     ]);
     res.json({ orders, tickets, invoices, settlements });
   } catch (err) {
@@ -7978,7 +7953,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
     if (isNaN(orderId)) {
       return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     }
-    const order = await prisma13.order.findUnique({
+    const order = await prisma14.order.findUnique({
       where: { id: orderId },
       include: { items: true }
     });
@@ -7987,7 +7962,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
     }
     const savedLabel = processPostalLabel(orderId, postalLabel);
     const isTransitioningToProcessing = order.status === "NEW" || order.status === "PAID";
-    const updatedOrder = await prisma13.order.update({
+    const updatedOrder = await prisma14.order.update({
       where: { id: orderId },
       data: {
         postalLabel: savedLabel,
@@ -7997,7 +7972,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
     if (isTransitioningToProcessing) {
       if (order.orderSource === "direct" && order.items && order.items.length > 0) {
         try {
-          await prisma13.$transaction(async (tx) => {
+          await prisma14.$transaction(async (tx) => {
             for (const item of order.items) {
               if (!item.supplierId) continue;
               const supplierAmount = item.supplierPrice * item.quantity;
@@ -8030,7 +8005,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
         }
       }
       try {
-        await prisma13.orderStatusHistory.create({
+        await prisma14.orderStatusHistory.create({
           data: {
             orderId,
             fromStatus: order.status,
@@ -8051,7 +8026,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
 });
 app.get("/api/admin/customers", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const orders = await prisma13.order.findMany({
+    const orders = await prisma14.order.findMany({
       orderBy: { id: "desc" }
     });
     const customerMap = /* @__PURE__ */ new Map();
@@ -8088,11 +8063,11 @@ app.patch("/api/admin/suppliers/:id/status", authenticateToken, requireAdmin, as
   try {
     const { id } = req.params;
     const { status, reason } = req.body;
-    const updated = await prisma13.user.update({
+    const updated = await prisma14.user.update({
       where: { id: parseInt(id) },
       data: { status }
     });
-    await prisma13.activityLog.create({
+    await prisma14.activityLog.create({
       data: { userId: req.user.userId, action: "CHANGE_SUPPLIER_STATUS", details: `Supplier ${id} changed to ${status}. Reason: ${reason || "none"}` }
     });
     res.json(updated);
@@ -8102,9 +8077,9 @@ app.patch("/api/admin/suppliers/:id/status", authenticateToken, requireAdmin, as
 });
 app.get("/api/admin/financial", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const totalRevenue = await prisma13.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PAID" } });
-    const pendingStorePayments = await prisma13.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PENDING" } });
-    const supplierWalletTotal = await prisma13.supplierWallet.aggregate({ _sum: { balance: true, pending: true } });
+    const totalRevenue = await prisma14.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PAID" } });
+    const pendingStorePayments = await prisma14.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PENDING" } });
+    const supplierWalletTotal = await prisma14.supplierWallet.aggregate({ _sum: { balance: true, pending: true } });
     res.json({
       totalRevenue: totalRevenue._sum.totalAmount || 0,
       pendingStorePayments: pendingStorePayments._sum.totalAmount || 0,
@@ -8117,7 +8092,7 @@ app.get("/api/admin/financial", authenticateToken, requireAdmin, async (req, res
 });
 app.get("/api/admin/categories", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    let cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
+    let cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
     if (cats.length === 0) {
       const defaultCategories = [
         "\u0645\u0648\u0628\u0627\u06CC\u0644",
@@ -8140,16 +8115,16 @@ app.get("/api/admin/categories", authenticateToken, requireAdmin, async (req, re
       for (let i = 0; i < defaultCategories.length; i++) {
         try {
           const catName = defaultCategories[i];
-          const exists = await prisma13.category.findFirst({ where: { name: catName } });
+          const exists = await prisma14.category.findFirst({ where: { name: catName } });
           if (!exists) {
-            await prisma13.category.create({
+            await prisma14.category.create({
               data: { name: catName, isActive: true, sortOrder: i + 1 }
             });
           }
         } catch (e) {
         }
       }
-      cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
+      cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
     }
     res.json(cats);
   } catch (err) {
@@ -8162,7 +8137,7 @@ app.post("/api/admin/categories", authenticateToken, requireAdmin, async (req, r
     if (!name || typeof name !== "string") {
       return res.status(400).json({ error: "\u0646\u0627\u0645 \u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A." });
     }
-    const cat = await prisma13.category.create({
+    const cat = await prisma14.category.create({
       data: {
         name: name.trim(),
         isActive: isActive !== void 0 ? Boolean(isActive) : true,
@@ -8178,7 +8153,7 @@ app.put("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req
   try {
     const id = Number(req.params.id);
     const { name, isActive, sortOrder } = req.body;
-    const cat = await prisma13.category.update({
+    const cat = await prisma14.category.update({
       where: { id },
       data: {
         ...name !== void 0 && { name: name.trim() },
@@ -8194,7 +8169,7 @@ app.put("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req
 app.delete("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    await prisma13.category.delete({ where: { id } });
+    await prisma14.category.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u062D\u0630\u0641 \u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC" });
@@ -8223,15 +8198,15 @@ app.post("/api/admin/categories/seed", authenticateToken, requireAdmin, async (r
     let added = 0;
     for (let i = 0; i < defaultCategories.length; i++) {
       const catName = defaultCategories[i];
-      const exists = await prisma13.category.findFirst({ where: { name: catName } });
+      const exists = await prisma14.category.findFirst({ where: { name: catName } });
       if (!exists) {
-        await prisma13.category.create({
+        await prisma14.category.create({
           data: { name: catName, isActive: true, sortOrder: i + 1 }
         });
         added++;
       }
     }
-    const cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
+    const cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
     res.json({ success: true, added, categories: cats });
   } catch (err) {
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u0627\u06CC\u062C\u0627\u062F \u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC\u200C\u0647\u0627\u06CC \u067E\u06CC\u0634\u200C\u0641\u0631\u0636" });
@@ -8239,7 +8214,7 @@ app.post("/api/admin/categories/seed", authenticateToken, requireAdmin, async (r
 });
 app.get("/api/admin/tickets", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const tickets = await prisma13.ticket.findMany({
+    const tickets = await prisma14.ticket.findMany({
       include: {
         user: { select: { firstName: true, lastName: true, role: true, username: true } },
         messages: { orderBy: { createdAt: "asc" }, include: { user: { select: { firstName: true, lastName: true, role: true } } } }
@@ -8255,7 +8230,7 @@ app.post("/api/admin/tickets/:id/reply", authenticateToken, requireAdmin, async 
   try {
     const { id } = req.params;
     const { message, attachmentUrl } = req.body;
-    const msg = await prisma13.ticketMessage.create({
+    const msg = await prisma14.ticketMessage.create({
       data: {
         ticketId: parseInt(id),
         userId: req.user.userId,
@@ -8263,7 +8238,7 @@ app.post("/api/admin/tickets/:id/reply", authenticateToken, requireAdmin, async 
         attachmentUrl: attachmentUrl || null
       }
     });
-    await prisma13.ticket.update({ where: { id: parseInt(id) }, data: { status: "ANSWERED", updatedAt: /* @__PURE__ */ new Date() } });
+    await prisma14.ticket.update({ where: { id: parseInt(id) }, data: { status: "ANSWERED", updatedAt: /* @__PURE__ */ new Date() } });
     res.json(msg);
   } catch (err) {
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u062B\u0628\u062A \u067E\u0627\u0633\u062E \u062A\u06CC\u06A9\u062A" });
@@ -8271,7 +8246,7 @@ app.post("/api/admin/tickets/:id/reply", authenticateToken, requireAdmin, async 
 });
 app.get("/api/admin/logs", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const logs = await prisma13.activityLog.findMany({
+    const logs = await prisma14.activityLog.findMany({
       include: { user: { select: { username: true, role: true } } },
       orderBy: { id: "desc" },
       take: 100
@@ -8294,18 +8269,18 @@ app.get("/api/admin/health", authenticateToken, requireAdmin, async (req, res) =
     res.status(500).json({ error: "\u062E\u0637\u0627" });
   }
 });
-var execPromise = import_util.default.promisify(import_child_process2.exec);
+var execPromise = import_util.default.promisify(import_child_process3.exec);
 app.get("/api/admin/dev/files", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const getFiles = (dir) => {
       let dirents;
       try {
-        dirents = import_fs4.default.readdirSync(dir, { withFileTypes: true });
+        dirents = import_fs3.default.readdirSync(dir, { withFileTypes: true });
       } catch (err) {
         return [];
       }
       const files = dirents.map((dirent) => {
-        const fullPath = import_path4.default.resolve(dir, dirent.name);
+        const fullPath = import_path3.default.resolve(dir, dirent.name);
         const relPath = fullPath.replace(process.cwd(), "");
         if (["node_modules", ".git", "dist", "prod_output", ".cache"].includes(dirent.name)) return null;
         if (dirent.isDirectory()) {
@@ -8325,16 +8300,16 @@ app.get("/api/admin/dev/files", authenticateToken, requireAdmin, async (req, res
   }
 });
 app.get("/api/download-release", (req, res) => {
-  const filePath = import_path4.default.join(process.cwd(), "public", "zopit-release.zip");
-  if (import_fs4.default.existsSync(filePath)) {
+  const filePath = import_path3.default.join(process.cwd(), "public", "zopit-release.zip");
+  if (import_fs3.default.existsSync(filePath)) {
     res.download(filePath, "zopit-release.zip");
   } else {
     res.status(404).send("Release not found");
   }
 });
 app.get("/api/download-cpanel-release", (req, res) => {
-  const filePath = import_path4.default.join(process.cwd(), "public", "cpanel-release.zip");
-  if (import_fs4.default.existsSync(filePath)) {
+  const filePath = import_path3.default.join(process.cwd(), "public", "cpanel-release.zip");
+  if (import_fs3.default.existsSync(filePath)) {
     res.download(filePath, "cpanel-release.zip");
   } else {
     res.status(404).send("Release not found");
@@ -8344,9 +8319,9 @@ app.get("/api/admin/dev/file", authenticateToken, requireAdmin, async (req, res)
   try {
     const filePath = req.query.path;
     if (!filePath || filePath.includes("..")) return res.status(400).json({ error: "\u0645\u0633\u06CC\u0631 \u0646\u0627\u0645\u0639\u062A\u0628\u0631" });
-    const fullPath = import_path4.default.join(process.cwd(), filePath);
-    if (!import_fs4.default.existsSync(fullPath)) return res.status(404).json({ error: "\u0641\u0627\u06CC\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
-    const content = import_fs4.default.readFileSync(fullPath, "utf8");
+    const fullPath = import_path3.default.join(process.cwd(), filePath);
+    if (!import_fs3.default.existsSync(fullPath)) return res.status(404).json({ error: "\u0641\u0627\u06CC\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
+    const content = import_fs3.default.readFileSync(fullPath, "utf8");
     res.json({ content });
   } catch (error) {
     console.error("Dev File Read Error:", error);
@@ -8357,12 +8332,12 @@ app.post("/api/admin/dev/file", authenticateToken, requireAdmin, async (req, res
   try {
     const { path: filePath, content } = req.body;
     if (!filePath || filePath.includes("..")) return res.status(400).json({ error: "\u0645\u0633\u06CC\u0631 \u0646\u0627\u0645\u0639\u062A\u0628\u0631" });
-    const fullPath = import_path4.default.join(process.cwd(), filePath);
-    const dir = import_path4.default.dirname(fullPath);
-    if (!import_fs4.default.existsSync(dir)) {
-      import_fs4.default.mkdirSync(dir, { recursive: true });
+    const fullPath = import_path3.default.join(process.cwd(), filePath);
+    const dir = import_path3.default.dirname(fullPath);
+    if (!import_fs3.default.existsSync(dir)) {
+      import_fs3.default.mkdirSync(dir, { recursive: true });
     }
-    import_fs4.default.writeFileSync(fullPath, content, "utf8");
+    import_fs3.default.writeFileSync(fullPath, content, "utf8");
     res.json({ success: true });
   } catch (error) {
     console.error("Dev File Write Error:", error);
@@ -8393,10 +8368,10 @@ app.post("/api/upload", authenticateToken, multerFn({ dest: rootUploadsDir }).si
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded." });
     }
-    const ext = import_path4.default.extname(req.file.originalname) || "";
+    const ext = import_path3.default.extname(req.file.originalname) || "";
     const newFilename = `${req.file.filename}${ext}`;
-    const newPath = import_path4.default.join(rootUploadsDir, newFilename);
-    import_fs4.default.renameSync(req.file.path, newPath);
+    const newPath = import_path3.default.join(rootUploadsDir, newFilename);
+    import_fs3.default.renameSync(req.file.path, newPath);
     const fileUrl = `/uploads/${newFilename}`;
     res.json({ url: fileUrl });
   } catch (err) {
@@ -8404,10 +8379,10 @@ app.post("/api/upload", authenticateToken, multerFn({ dest: rootUploadsDir }).si
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u0622\u067E\u0644\u0648\u062F \u0641\u0627\u06CC\u0644" });
   }
 });
-var devUploadDir = import_path4.default.join(process.cwd(), "uploads");
-if (!import_fs4.default.existsSync(devUploadDir)) {
+var devUploadDir = import_path3.default.join(process.cwd(), "uploads");
+if (!import_fs3.default.existsSync(devUploadDir)) {
   try {
-    import_fs4.default.mkdirSync(devUploadDir, { recursive: true });
+    import_fs3.default.mkdirSync(devUploadDir, { recursive: true });
   } catch (e) {
   }
 }
@@ -8420,7 +8395,7 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
     const zipPath = req.file.path;
     const newVersion = req.body.version;
     if (newVersion) {
-      await prisma13.systemConfig.upsert({
+      await prisma14.systemConfig.upsert({
         where: { key: "PLATFORM_VERSION" },
         update: { value: newVersion },
         create: { key: "PLATFORM_VERSION", value: newVersion }
@@ -8428,16 +8403,16 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
     }
     const ZipClass = typeof import_adm_zip.default === "function" ? import_adm_zip.default : import_adm_zip.default.default || require("adm-zip");
     const zip = new ZipClass(zipPath);
-    const extractDir = import_path4.default.join(process.cwd(), "temp_update_" + Date.now());
+    const extractDir = import_path3.default.join(process.cwd(), "temp_update_" + Date.now());
     zip.extractAllTo(extractDir, true);
     const findProjectRootDir = (dir) => {
-      if (import_fs4.default.existsSync(import_path4.default.join(dir, "package.json")) || import_fs4.default.existsSync(import_path4.default.join(dir, "server.ts"))) {
+      if (import_fs3.default.existsSync(import_path3.default.join(dir, "package.json")) || import_fs3.default.existsSync(import_path3.default.join(dir, "server.ts"))) {
         return dir;
       }
-      const entries = import_fs4.default.readdirSync(dir, { withFileTypes: true });
+      const entries = import_fs3.default.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name !== "__MACOSX" && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
-          const subPath = import_path4.default.join(dir, entry.name);
+          const subPath = import_path3.default.join(dir, entry.name);
           const found = findProjectRootDir(subPath);
           if (found !== dir) return found;
         }
@@ -8446,14 +8421,14 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
     };
     const sourceDir = findProjectRootDir(extractDir);
     const copyRecursiveSync = (src, dest) => {
-      const exists = import_fs4.default.existsSync(src);
-      const stats = exists && import_fs4.default.statSync(src);
+      const exists = import_fs3.default.existsSync(src);
+      const stats = exists && import_fs3.default.statSync(src);
       const isDirectory = exists && stats.isDirectory();
       if (isDirectory) {
-        if (!import_fs4.default.existsSync(dest)) {
-          import_fs4.default.mkdirSync(dest, { recursive: true });
+        if (!import_fs3.default.existsSync(dest)) {
+          import_fs3.default.mkdirSync(dest, { recursive: true });
         }
-        import_fs4.default.readdirSync(src).forEach((childItemName) => {
+        import_fs3.default.readdirSync(src).forEach((childItemName) => {
           const ignoredAtRoot = [
             "node_modules",
             ".env",
@@ -8470,27 +8445,27 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
             return;
           }
           if (childItemName === "__MACOSX" || childItemName === ".DS_Store") return;
-          copyRecursiveSync(import_path4.default.join(src, childItemName), import_path4.default.join(dest, childItemName));
+          copyRecursiveSync(import_path3.default.join(src, childItemName), import_path3.default.join(dest, childItemName));
         });
       } else {
-        const fileName = import_path4.default.basename(src);
+        const fileName = import_path3.default.basename(src);
         if (fileName === ".env" || fileName.endsWith(".db") || fileName.endsWith(".sqlite")) {
           return;
         }
-        const destDir = import_path4.default.dirname(dest);
-        if (!import_fs4.default.existsSync(destDir)) {
-          import_fs4.default.mkdirSync(destDir, { recursive: true });
+        const destDir = import_path3.default.dirname(dest);
+        if (!import_fs3.default.existsSync(destDir)) {
+          import_fs3.default.mkdirSync(destDir, { recursive: true });
         }
-        import_fs4.default.copyFileSync(src, dest);
+        import_fs3.default.copyFileSync(src, dest);
       }
     };
     copyRecursiveSync(sourceDir, process.cwd());
     try {
-      import_fs4.default.rmSync(extractDir, { recursive: true, force: true });
+      import_fs3.default.rmSync(extractDir, { recursive: true, force: true });
     } catch (e) {
     }
     try {
-      import_fs4.default.unlinkSync(zipPath);
+      import_fs3.default.unlinkSync(zipPath);
     } catch (e) {
     }
     let buildSuccess = false;
@@ -8523,9 +8498,9 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
 });
 app.get("/api/admin/dev/error-logs", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const logFile = import_path4.default.join(process.cwd(), "error.log");
-    if (import_fs4.default.existsSync(logFile)) {
-      const logs = import_fs4.default.readFileSync(logFile, "utf8");
+    const logFile = import_path3.default.join(process.cwd(), "error.log");
+    if (import_fs3.default.existsSync(logFile)) {
+      const logs = import_fs3.default.readFileSync(logFile, "utf8");
       res.json({ logs: logs.slice(-1e5) });
     } else {
       res.json({ logs: "\u0644\u0627\u06AF\u06CC \u062B\u0628\u062A \u0646\u0634\u062F\u0647 \u0627\u0633\u062A." });
@@ -8558,9 +8533,9 @@ var wooRateLimiter = (req, res, next) => {
 };
 app.get("/api/admin/woocommerce/status", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const config = await prisma13.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
+    const config = await prisma14.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
     const enabled = config ? config.value === "true" : false;
-    const connections = await prisma13.wooCommerceConnection.findMany({
+    const connections = await prisma14.wooCommerceConnection.findMany({
       include: { store: { select: { id: true, firstName: true, lastName: true, username: true } } }
     });
     res.json({ enabled, connections });
@@ -8571,7 +8546,7 @@ app.get("/api/admin/woocommerce/status", authenticateToken, requireAdmin, async 
 app.post("/api/admin/woocommerce/toggle", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { enabled } = req.body;
-    await prisma13.systemConfig.upsert({
+    await prisma14.systemConfig.upsert({
       where: { key: "WOOCOMMERCE_SYNC_ENABLED" },
       update: { value: String(enabled) },
       create: { key: "WOOCOMMERCE_SYNC_ENABLED", value: String(enabled) }
@@ -8583,12 +8558,12 @@ app.post("/api/admin/woocommerce/toggle", authenticateToken, requireAdmin, async
 });
 app.get("/api/store/connection", authenticateToken, requireStoreManager, async (req, res) => {
   try {
-    const config = await prisma13.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
+    const config = await prisma14.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
     const isEnabled = config ? config.value === "true" : false;
     const storeId = req.user.userId;
     const conn = await ConnectionService.getConnection(storeId);
     if (conn) {
-      const logs = await prisma13.syncLog.findMany({ where: { connectionId: conn.id }, orderBy: { id: "desc" }, take: 5 });
+      const logs = await prisma14.syncLog.findMany({ where: { connectionId: conn.id }, orderBy: { id: "desc" }, take: 5 });
       res.json({ ...conn, isGloballyEnabled: isEnabled, syncLogs: logs });
     } else {
       res.json({ isGloballyEnabled: isEnabled });
@@ -8599,7 +8574,7 @@ app.get("/api/store/connection", authenticateToken, requireStoreManager, async (
 });
 app.post("/api/store/test", wooRateLimiter, authenticateToken, requireStoreManager, async (req, res) => {
   try {
-    const config = await prisma13.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
+    const config = await prisma14.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
     if (!config || config.value !== "true") {
       return res.status(403).json({ error: "\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0627\u062A\u0635\u0627\u0644 \u0648\u0648\u06A9\u0627\u0645\u0631\u0633 \u062A\u0648\u0633\u0637 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0627\u0631\u0634\u062F \u063A\u06CC\u0631\u0641\u0639\u0627\u0644 \u0627\u0633\u062A." });
     }
@@ -8747,7 +8722,7 @@ app.get("/api/public/products", async (req, res) => {
         { longDescription: { contains: search } }
       ];
     }
-    const products = await prisma13.product.findMany({
+    const products = await prisma14.product.findMany({
       where: whereClause,
       include: {
         images: true,
@@ -8765,7 +8740,6 @@ app.get("/api/public/products", async (req, res) => {
       take: limit
     });
     const formattedProducts = products.map((p) => {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i;
       let finalPrice = p.finalPrice;
       if (!finalPrice) {
         finalPrice = p.supplierBasePrice;
@@ -8779,17 +8753,17 @@ app.get("/api/public/products", async (req, res) => {
       }
       return {
         id: p.id,
-        name: ((_a = p.exploreContent) == null ? void 0 : _a.customTitle) || p.name,
-        description: ((_b = p.exploreContent) == null ? void 0 : _b.customDescription) || p.longDescription || p.shortDescription || "",
-        imageUrl: ((_c = p.exploreContent) == null ? void 0 : _c.customImageUrl) || ((_e = (_d = p.images) == null ? void 0 : _d[0]) == null ? void 0 : _e.url) || "",
-        customVideoUrl: ((_f = p.exploreContent) == null ? void 0 : _f.customVideoUrl) || null,
+        name: p.exploreContent?.customTitle || p.name,
+        description: p.exploreContent?.customDescription || p.longDescription || p.shortDescription || "",
+        imageUrl: p.exploreContent?.customImageUrl || p.images?.[0]?.url || "",
+        customVideoUrl: p.exploreContent?.customVideoUrl || null,
         supplierBasePrice: p.supplierBasePrice,
         finalPrice,
         price: finalPrice,
         storeId: p.supplierId,
-        storeName: ((_g = p.supplier) == null ? void 0 : _g.storeName) || "",
-        storeUrl: ((_h = p.supplier) == null ? void 0 : _h.storeUrl) || "",
-        storeLink: ((_i = p.supplier) == null ? void 0 : _i.storeLink) || "",
+        storeName: p.supplier?.storeName || "",
+        storeUrl: p.supplier?.storeUrl || "",
+        storeLink: p.supplier?.storeLink || "",
         images: p.images || [],
         technicalSpecs: p.technicalSpecs
       };
@@ -8803,15 +8777,15 @@ app.get("/api/public/products/:productId/stats", async (req, res) => {
   try {
     const productId = parseInt(req.params.productId);
     const deviceId = req.query.deviceId;
-    const likesCount = await prisma13.productLike.count({
+    const likesCount = await prisma14.productLike.count({
       where: { productId }
     });
-    const commentsCount = await prisma13.productComment.count({
+    const commentsCount = await prisma14.productComment.count({
       where: { productId, isApproved: true }
     });
     let isLiked = false;
     if (deviceId) {
-      const like = await prisma13.productLike.findUnique({
+      const like = await prisma14.productLike.findUnique({
         where: {
           productId_deviceId: {
             productId,
@@ -8837,7 +8811,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
     if (!deviceId) {
       return res.status(400).json({ error: "Device ID is required" });
     }
-    const existingLike = await prisma13.productLike.findUnique({
+    const existingLike = await prisma14.productLike.findUnique({
       where: {
         productId_deviceId: {
           productId,
@@ -8847,7 +8821,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
     });
     let liked = false;
     if (existingLike) {
-      await prisma13.productLike.delete({
+      await prisma14.productLike.delete({
         where: {
           productId_deviceId: {
             productId,
@@ -8856,7 +8830,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
         }
       });
     } else {
-      await prisma13.productLike.create({
+      await prisma14.productLike.create({
         data: {
           productId,
           deviceId
@@ -8864,7 +8838,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
       });
       liked = true;
     }
-    const likesCount = await prisma13.productLike.count({
+    const likesCount = await prisma14.productLike.count({
       where: { productId }
     });
     res.json({
@@ -8877,7 +8851,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
 });
 app.get("/api/public/categories", async (req, res) => {
   try {
-    let cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
+    let cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
     if (cats.length === 0) {
       const defaultCategories = [
         "\u0645\u0648\u0628\u0627\u06CC\u0644",
@@ -8900,16 +8874,16 @@ app.get("/api/public/categories", async (req, res) => {
       for (let i = 0; i < defaultCategories.length; i++) {
         try {
           const catName = defaultCategories[i];
-          const exists = await prisma13.category.findFirst({ where: { name: catName } });
+          const exists = await prisma14.category.findFirst({ where: { name: catName } });
           if (!exists) {
-            await prisma13.category.create({
+            await prisma14.category.create({
               data: { name: catName, isActive: true, sortOrder: i + 1 }
             });
           }
         } catch (e) {
         }
       }
-      cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
+      cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
     }
     res.json(cats);
   } catch (err) {
@@ -8918,7 +8892,7 @@ app.get("/api/public/categories", async (req, res) => {
 });
 app.get("/api/categories", async (req, res) => {
   try {
-    let cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
+    let cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
     if (cats.length === 0) {
       const defaultCategories = [
         "\u0645\u0648\u0628\u0627\u06CC\u0644",
@@ -8941,16 +8915,16 @@ app.get("/api/categories", async (req, res) => {
       for (let i = 0; i < defaultCategories.length; i++) {
         try {
           const catName = defaultCategories[i];
-          const exists = await prisma13.category.findFirst({ where: { name: catName } });
+          const exists = await prisma14.category.findFirst({ where: { name: catName } });
           if (!exists) {
-            await prisma13.category.create({
+            await prisma14.category.create({
               data: { name: catName, isActive: true, sortOrder: i + 1 }
             });
           }
         } catch (e) {
         }
       }
-      cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
+      cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
     }
     res.json(cats);
   } catch (err) {
@@ -8960,7 +8934,7 @@ app.get("/api/categories", async (req, res) => {
 app.get("/api/public/products/:productId/comments", async (req, res) => {
   try {
     const productId = parseInt(req.params.productId);
-    const comments = await prisma13.productComment.findMany({
+    const comments = await prisma14.productComment.findMany({
       where: {
         productId,
         isApproved: true
@@ -8981,7 +8955,7 @@ app.post("/api/public/products/:productId/comments", async (req, res) => {
     if (!text) {
       return res.status(400).json({ error: "Comment text is required" });
     }
-    const comment = await prisma13.productComment.create({
+    const comment = await prisma14.productComment.create({
       data: {
         productId,
         authorName: authorName || "\u06A9\u0627\u0631\u0628\u0631 \u0645\u0647\u0645\u0627\u0646",
@@ -8997,7 +8971,7 @@ app.post("/api/public/products/:productId/comments", async (req, res) => {
 app.get("/api/public/products/:productId/questions", async (req, res) => {
   try {
     const productId = parseInt(req.params.productId);
-    const questions = await prisma13.productQuestion.findMany({
+    const questions = await prisma14.productQuestion.findMany({
       where: {
         productId,
         isAnswered: true
@@ -9017,7 +8991,7 @@ app.post("/api/public/questions", async (req, res) => {
     if (!productId || !questionText) {
       return res.status(400).json({ error: "Product ID and question text are required" });
     }
-    const question = await prisma13.productQuestion.create({
+    const question = await prisma14.productQuestion.create({
       data: {
         productId: parseInt(productId),
         storeManagerId: storeManagerId ? parseInt(storeManagerId) : null,
@@ -9042,13 +9016,12 @@ var checkoutSchema = import_zod2.z.object({
   customerCardNumber: import_zod2.z.string().length(16, "\u0634\u0645\u0627\u0631\u0647 \u06A9\u0627\u0631\u062A \u0628\u0627\u06CC\u062F \u06F1\u06F6 \u0631\u0642\u0645 \u0628\u0627\u0634\u062F.")
 });
 app.post("/api/public/checkout", async (req, res) => {
-  var _a;
   try {
     const validatedData = checkoutSchema.parse(req.body);
     const { items, customerName, customerPhone, customerAddress, customerCardNumber } = validatedData;
     const cleanPhone = customerPhone.trim();
     let customerCreated = false;
-    let existingUser = await prisma13.user.findFirst({
+    let existingUser = await prisma14.user.findFirst({
       where: {
         OR: [
           { mobile: cleanPhone },
@@ -9062,7 +9035,7 @@ app.post("/api/public/checkout", async (req, res) => {
         const firstName = nameParts[0] || customerName;
         const lastName = nameParts.slice(1).join(" ") || "\u062E\u0631\u06CC\u062F\u0627\u0631";
         const hashedPassword = await import_bcryptjs.default.hash(cleanPhone, 10);
-        existingUser = await prisma13.user.create({
+        existingUser = await prisma14.user.create({
           data: {
             username: cleanPhone,
             password: hashedPassword,
@@ -9082,7 +9055,7 @@ app.post("/api/public/checkout", async (req, res) => {
     let totalAmount = 0;
     const orderItemsData = [];
     for (const item of items) {
-      const product = await prisma13.product.findUnique({
+      const product = await prisma14.product.findUnique({
         where: { id: item.id }
       });
       if (!product) {
@@ -9107,7 +9080,7 @@ app.post("/api/public/checkout", async (req, res) => {
         error: "\u062B\u0628\u062A \u0633\u0641\u0627\u0631\u0634 \u0627\u0632 \u0686\u0646\u062F \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0645\u062E\u062A\u0644\u0641 \u062F\u0631 \u06CC\u06A9 \u0645\u0631\u0633\u0648\u0644\u0647 \u0627\u0645\u06A9\u0627\u0646\u200C\u067E\u0630\u06CC\u0631 \u0646\u06CC\u0633\u062A. \u062C\u0647\u062A \u0645\u062D\u0627\u0633\u0628\u0647 \u062F\u0642\u06CC\u0642 \u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644\u060C \u0644\u0637\u0641\u0627\u064B \u0628\u0631\u0627\u06CC \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC \u0647\u0631 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0633\u0641\u0627\u0631\u0634 \u0645\u062C\u0632\u0627 \u062B\u0628\u062A \u0646\u0645\u0627\u06CC\u06CC\u062F."
       });
     }
-    const order = await prisma13.order.create({
+    const order = await prisma14.order.create({
       data: {
         totalAmount,
         status: "NEW",
@@ -9132,8 +9105,8 @@ app.post("/api/public/checkout", async (req, res) => {
     });
     if (orderItemsData.length > 0 && orderItemsData[0].supplierId) {
       const suppId = orderItemsData[0].supplierId;
-      prisma13.user.findUnique({ where: { id: suppId } }).then((supplier) => {
-        if (supplier == null ? void 0 : supplier.mobile) {
+      prisma14.user.findUnique({ where: { id: suppId } }).then((supplier) => {
+        if (supplier?.mobile) {
           notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
         }
       }).catch((smsErr) => console.warn("SMS supplier notification error:", smsErr));
@@ -9151,7 +9124,7 @@ app.post("/api/public/checkout", async (req, res) => {
       );
       payLink = zibalResult.payLink;
       authority = zibalResult.authority;
-      await prisma13.order.update({
+      await prisma14.order.update({
         where: { id: order.id },
         data: {
           statusHistory: {
@@ -9177,7 +9150,7 @@ app.post("/api/public/checkout", async (req, res) => {
     });
   } catch (err) {
     if (err instanceof import_zod2.z.ZodError) {
-      return res.status(400).json({ error: ((_a = err.errors) == null ? void 0 : _a.map((e) => e.message).join(", ")) || err.message });
+      return res.status(400).json({ error: err.errors?.map((e) => e.message).join(", ") || err.message });
     }
     res.status(500).json({ error: err.message });
   }
@@ -9188,7 +9161,7 @@ app.get("/api/public/shipping/callback", async (req, res) => {
     if (!invoiceId) {
       return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0641\u0627\u06A9\u062A\u0648\u0631 \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
-    const invoice = await prisma13.shippingInvoice.findUnique({
+    const invoice = await prisma14.shippingInvoice.findUnique({
       where: { id: parseInt(invoiceId) },
       include: { order: true }
     });
@@ -9205,12 +9178,12 @@ app.get("/api/public/shipping/callback", async (req, res) => {
       refId = `MOCK_REF_${Date.now()}`;
     }
     if (isPaid) {
-      await prisma13.$transaction([
-        prisma13.shippingInvoice.update({
+      await prisma14.$transaction([
+        prisma14.shippingInvoice.update({
           where: { id: invoice.id },
           data: { status: "PAID" }
         }),
-        prisma13.order.update({
+        prisma14.order.update({
           where: { id: invoice.orderId },
           data: {
             status: "PENDING_POSTAL_LABEL",
@@ -9241,7 +9214,7 @@ app.get("/api/public/checkout/callback", async (req, res) => {
       return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const parsedOrderId = parseInt(orderId);
-    const order = await prisma13.order.findUnique({
+    const order = await prisma14.order.findUnique({
       where: { id: parsedOrderId }
     });
     if (!order) {
@@ -9260,7 +9233,7 @@ app.get("/api/public/checkout/callback", async (req, res) => {
     }
     if (isPaid) {
       const nextStatus = order.orderSource === "store" ? "WAITING_SUPPLIER_CONFIRMATION" : "PROCESSING";
-      const updatedOrder = await prisma13.order.update({
+      const updatedOrder = await prisma14.order.update({
         where: { id: parsedOrderId },
         data: {
           status: nextStatus,
@@ -9275,7 +9248,7 @@ app.get("/api/public/checkout/callback", async (req, res) => {
           }
         }
       });
-      await creditSuppliersForOrders(prisma13, [updatedOrder]);
+      await creditSuppliersForOrders(prisma14, [updatedOrder]);
       res.redirect(`/?payment_status=success&trackId=${trackId || refId || "DIRECT"}&invoiceId=DIRECT_${orderId}`);
     } else {
       res.redirect(`/?payment_status=failed&trackId=${trackId || "DIRECT"}&invoiceId=DIRECT_${orderId}`);
@@ -9343,12 +9316,12 @@ app.get("/api/payment/zibal/simulated-gateway", (req, res) => {
   res.send(html);
 });
 registerConfig(app);
-registerNewFeatures(app, prisma13);
-registerAdminShippingRoutes(app, prisma13, authenticateToken, requireSuperAdmin);
-registerStoreShippingRoutes(app, prisma13, authenticateToken, requireStoreManager);
+registerNewFeatures(app, prisma14);
+registerAdminShippingRoutes(app, prisma14, authenticateToken, requireSuperAdmin);
+registerStoreShippingRoutes(app, prisma14, authenticateToken, requireStoreManager);
 registerAnnouncements(app);
-registerOrderLabels(app, prisma13);
-registerPenaltyRoutes(app, prisma13);
+registerOrderLabels(app, prisma14);
+registerPenaltyRoutes(app, prisma14);
 async function startServer() {
   NotificationService.init();
   FinancialJobs.start();
@@ -9373,7 +9346,7 @@ async function startServer() {
         return res.status(400).json({ error: "Missing trackId" });
       }
       const ipAddress = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-      const result = await paymentService2.verifyPayment(trackId.toString(), 0, (ipAddress == null ? void 0 : ipAddress.toString()) || "");
+      const result = await paymentService2.verifyPayment(trackId.toString(), 0, ipAddress?.toString() || "");
       if (result.payment.status === "PAID") {
         res.redirect(`/?payment_status=success&trackId=${trackId}`);
       } else {
@@ -9405,15 +9378,15 @@ async function startServer() {
           lte: new Date(query.endDate)
         };
       }
-      const payments = await prisma13.payment.findMany({
+      const payments = await prisma14.payment.findMany({
         where: whereClause,
         include: { user: { select: { id: true, username: true, role: true } } },
         orderBy: { id: "desc" },
         skip: (pageNum - 1) * limitNum,
         take: limitNum
       });
-      const total = await prisma13.payment.count({ where: whereClause });
-      const settlements = await prisma13.settlement.findMany({
+      const total = await prisma14.payment.count({ where: whereClause });
+      const settlements = await prisma14.settlement.findMany({
         orderBy: { id: "desc" },
         take: 10,
         include: { supplier: { select: { id: true, username: true, brandName: true } } }
@@ -9499,7 +9472,7 @@ async function startServer() {
       res.write("<p>\u23F3 \u06AF\u0627\u0645 \u06F3: \u062F\u0631 \u062D\u0627\u0644 \u0627\u062A\u0635\u0627\u0644 \u0645\u062C\u062F\u062F \u0628\u0631\u0646\u0627\u0645\u0647 \u0628\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633...</p>");
       const prismaModule = require("@prisma/client");
       PrismaClient2 = prismaModule.PrismaClient;
-      prisma13 = new PrismaClient2({
+      prisma14 = new PrismaClient2({
         datasources: {
           db: {
             url: dbUrl3
@@ -9511,8 +9484,8 @@ async function startServer() {
       if (provider === "sqlite" && process.env.K_SERVICE) {
         console.log("[Server Startup] Production Cloud Run detected. Pushing SQLite schema to /tmp/prisma...");
         try {
-          const { execSync: execSync2 } = require("child_process");
-          execSync2("npx prisma db push --accept-data-loss", { stdio: "inherit" });
+          const { execSync: execSync3 } = require("child_process");
+          execSync3("npx prisma db push --accept-data-loss", { stdio: "inherit" });
         } catch (e) {
           console.error("[Server Startup] Error pushing schema:", e);
         }
@@ -9531,7 +9504,7 @@ async function startServer() {
   app.get("/api/health", (req, res) => res.json({ status: "ok" }));
   app.get("/api/config", async (req, res) => {
     try {
-      const settings = await prisma13.systemConfig.findMany();
+      const settings = await prisma14.systemConfig.findMany();
       const configMap = (settings || []).reduce((acc, curr) => {
         acc[curr.key] = curr.value;
         return acc;
@@ -9545,7 +9518,7 @@ async function startServer() {
     try {
       const { key: key2, value } = req.body;
       if (!key2) return res.status(400).json({ error: "Missing key" });
-      await prisma13.systemConfig.upsert({
+      await prisma14.systemConfig.upsert({
         where: { key: key2 },
         update: { value: String(value) },
         create: { key: key2, value: String(value) }
@@ -9560,8 +9533,8 @@ async function startServer() {
       const { merchantCode } = req.body;
       let merchantToTest = merchantCode;
       if (!merchantToTest || merchantToTest === "zibal_merchant_key") {
-        const savedSetting = await prisma13.systemConfig.findUnique({ where: { key: "PAYMENT_GATEWAY_MERCHANT_CODE" } });
-        merchantToTest = (savedSetting == null ? void 0 : savedSetting.value) || process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588";
+        const savedSetting = await prisma14.systemConfig.findUnique({ where: { key: "PAYMENT_GATEWAY_MERCHANT_CODE" } });
+        merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588";
       }
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6e3);
@@ -9622,7 +9595,7 @@ async function startServer() {
     };
     try {
       const keys = Object.keys(defaultSupport);
-      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
+      const settings = await prisma14.systemConfig.findMany({ where: { key: { in: keys } } });
       const map = { ...defaultSupport };
       if (Array.isArray(settings)) {
         settings.forEach((s) => {
@@ -9643,7 +9616,7 @@ async function startServer() {
     };
     try {
       const keys = Object.keys(defaultTerms);
-      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
+      const settings = await prisma14.systemConfig.findMany({ where: { key: { in: keys } } });
       const map = { ...defaultTerms };
       if (Array.isArray(settings)) {
         settings.forEach((s) => {
@@ -9662,7 +9635,7 @@ async function startServer() {
     };
     try {
       const keys = Object.keys(defaultCode);
-      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
+      const settings = await prisma14.systemConfig.findMany({ where: { key: { in: keys } } });
       const map = { ...defaultCode };
       if (Array.isArray(settings)) {
         settings.forEach((s) => {
@@ -9698,12 +9671,12 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    let distPath = isAIStudioEnv2 ? import_path4.default.join(rootDir2, "prod_output") : __dirname;
-    if (!import_fs4.default.existsSync(import_path4.default.join(distPath, "index.html"))) {
-      if (import_fs4.default.existsSync(import_path4.default.join(rootDir2, "prod_output", "index.html"))) {
-        distPath = import_path4.default.join(rootDir2, "prod_output");
-      } else if (import_fs4.default.existsSync(import_path4.default.join(rootDir2, "dist", "index.html"))) {
-        distPath = import_path4.default.join(rootDir2, "dist");
+    let distPath = isAIStudioEnv2 ? import_path3.default.join(rootDir2, "prod_output") : __dirname;
+    if (!import_fs3.default.existsSync(import_path3.default.join(distPath, "index.html"))) {
+      if (import_fs3.default.existsSync(import_path3.default.join(rootDir2, "prod_output", "index.html"))) {
+        distPath = import_path3.default.join(rootDir2, "prod_output");
+      } else if (import_fs3.default.existsSync(import_path3.default.join(rootDir2, "dist", "index.html"))) {
+        distPath = import_path3.default.join(rootDir2, "dist");
       }
     }
     console.log("[Express Static] Serving static files from distPath:", distPath);
@@ -9712,7 +9685,7 @@ async function startServer() {
       if (req.path.includes(".") && !req.path.endsWith(".html") || req.path.startsWith("/assets/")) {
         return res.status(404).send("File not found");
       }
-      res.sendFile(import_path4.default.join(distPath, "index.html"));
+      res.sendFile(import_path3.default.join(distPath, "index.html"));
     });
   }
   if (process.env.VERCEL) {
@@ -9729,7 +9702,7 @@ async function startServer() {
           await seedDatabase();
           await syncAllPaidOrdersSupplierWallets();
         } catch (err) {
-          console.warn("[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:", (err == null ? void 0 : err.message) || err);
+          console.warn("[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:", err?.message || err);
         }
       });
     });
@@ -9741,7 +9714,7 @@ async function startServer() {
           await seedDatabase();
           await syncAllPaidOrdersSupplierWallets();
         } catch (err) {
-          console.warn("[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:", (err == null ? void 0 : err.message) || err);
+          console.warn("[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:", err?.message || err);
         }
       });
     });
