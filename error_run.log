@@ -1,2 +1,0 @@
-⚠️ WARNING: JWT_SECRET environment variable is missing. Using fallback for development.
-⚠️ WARNING: ENCRYPTION_KEY environment variable is missing. Using fallback for development.

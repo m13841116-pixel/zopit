@@ -49,9 +49,23 @@ export default function registerAIStudioRoute(app: Express) {
 
       const userMessage = `کدهای فعلی CSS سایت:\n${currentCss || '/* هنوز کدی ثبت نشده است */'}\n\nدرخواست کاربر:\n${prompt}`;
 
-      const selectedModel = (model === 'gemini-1.5-pro' || model === 'gemini-3.1-pro-preview')
+      const initialModel = (model === 'gemini-1.5-pro' || model === 'gemini-3.1-pro-preview')
         ? 'gemini-3.1-pro-preview'
         : 'gemini-3.6-flash';
+
+      // Define fallback models from heavy to lightweight
+      const modelFallbacks = [
+        initialModel,
+        'gemini-1.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-2.5-flash'
+      ];
+      // Deduplicate fallback models
+      const modelsToTry = Array.from(new Set(modelFallbacks));
+
+      let response: any = null;
+      let usedModel = initialModel;
+      let lastError: any = null;
 
       let contents: any;
       if (imageFile && imageFile.data && imageFile.mimeType) {
@@ -75,12 +89,30 @@ export default function registerAIStudioRoute(app: Express) {
         ];
       }
 
-      const response = await ai.models.generateContent({
-        model: selectedModel,
-        contents: contents
-      });
+      for (const candidateModel of modelsToTry) {
+        try {
+          usedModel = candidateModel;
+          console.log(`[AI Studio] Attempting generation with model: ${candidateModel}`);
+          response = await ai.models.generateContent({
+            model: candidateModel,
+            contents: contents
+          });
+          if (response && (response.text || response.candidates)) {
+            break;
+          }
+        } catch (err: any) {
+          lastError = err;
+          const errMsg = err?.message || String(err);
+          console.warn(`[AI Studio] Model ${candidateModel} failed or exceeded quota: ${errMsg}. Trying fallback...`);
+          // Check if error indicates quota/rate limit or general failure, continue to next fallback
+        }
+      }
 
-      const responseText = response.text || '';
+      if (!response || (!response.text && !response.candidates)) {
+        throw lastError || new Error('All Gemini model fallbacks exhausted or returned empty responses.');
+      }
+
+      const responseText = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || '';
 
       // Extract JSON if present in ```json ... ```
       let parsedData: any = null;
@@ -106,7 +138,7 @@ export default function registerAIStudioRoute(app: Express) {
 
       return res.json({
         success: true,
-        model: selectedModel,
+        model: usedModel,
         responseText: responseText,
         aiResult: parsedData
       });
@@ -114,7 +146,7 @@ export default function registerAIStudioRoute(app: Express) {
     } catch (err: any) {
       console.error('AI Studio Generation Error:', err);
       return res.status(500).json({
-        error: err.message || 'خطا در ارتباط با سرویس گوگل AI استودیو'
+        error: err.message || 'خطا در ارتباط با سرویس گوگل AI استودیو (محدودیت سهمیه یا خطای شبکه)'
       });
     }
   });

@@ -3,7 +3,6 @@
     "dev": "tsx server.ts",
     "build": "node build.js",
     "start": "node dist/server.cjs",
-    "setup-db": "node setup-db.js",
     "generate": "npx prisma generate",
     "postinstall": "npx prisma generate",
     "lint": "tsc --noEmit"

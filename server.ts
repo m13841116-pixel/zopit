@@ -206,7 +206,7 @@ process.env.DATABASE_URL = dbUrl;
 
 const isCloudRun = !!process.env.K_SERVICE || (!!process.env.PORT && dbUrl.includes('localhost'));
 
-let provider = 'mysql'; // Default for production/cPanel
+let provider = 'sqlite';
 
 const isRealRemoteDb = dbUrl && (
   dbUrl.startsWith('mysql://') || 
@@ -215,32 +215,30 @@ const isRealRemoteDb = dbUrl && (
   dbUrl.startsWith('postgres://')
 ) && !dbUrl.includes('localhost') && !dbUrl.includes('127.0.0.1') && !dbUrl.includes('dummy_db');
 
-if (!isRealRemoteDb) {
-  provider = 'postgresql';
-  dbUrl = 'postgresql://dummy:dummy@dummy_db/dummy';
-  process.env.DATABASE_URL = dbUrl;
-  console.log('[Server Startup] No real remote DB URL found, but defaulting to postgresql for Vercel/Neon deployment.');
-} else {
-  // Outside AI Studio (on user's cPanel host), keep existing database provider and config untouched.
+if (dbUrl) {
   if (dbUrl.startsWith('mysql://') || dbUrl.startsWith('mysqls://')) {
     provider = 'mysql';
   } else if (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) {
     provider = 'postgresql';
   } else if (dbUrl.startsWith('file:') || dbUrl.includes('.db')) {
     provider = 'sqlite';
+  } else {
+    provider = 'mysql';
   }
-
-  // Automate DB schema synchronization and client generation on remote database deployment in a non-blocking background process
-  if (dbUrl) {
-    setTimeout(async () => {
-      console.log('[Auto DB] Running setup-db.js in background...');
-      try {
-        execSync('node setup-db.js', { stdio: 'inherit', env: { ...process.env, DATABASE_URL: dbUrl } });
-        console.log('[Auto DB] Database synchronized successfully.');
-      } catch (err: any) {
-        console.error('[Auto DB] Background setup-db.js warning:', err?.message || err);
-      }
-    }, 1000);
+} else {
+  if (isAIStudio || isCloudRun) {
+    provider = 'sqlite';
+    const dbDir = path.join(process.cwd(), 'prisma');
+    if (!fs.existsSync(dbDir)) {
+      try { fs.mkdirSync(dbDir, { recursive: true }); } catch (e) {}
+    }
+    dbUrl = `file:${path.join(dbDir, 'dev.db')}`;
+    process.env.DATABASE_URL = dbUrl;
+  } else {
+    provider = 'postgresql';
+    dbUrl = 'postgresql://dummy:dummy@dummy_db/dummy';
+    process.env.DATABASE_URL = dbUrl;
+    console.log('[Server Startup] No database URL found, defaulting to postgresql for Vercel/Neon.');
   }
 }
 
@@ -320,6 +318,7 @@ class MemoryDatabase {
 
   private matchWhere(item: any, where?: any): boolean {
     if (!where || typeof where !== 'object') return true;
+    if (!item) return false;
 
     for (const [key, val] of Object.entries(where)) {
       if (key === 'OR') {
@@ -7203,11 +7202,10 @@ app.get('/api/public/products', async (req, res) => {
 
     let whereClause: any = {
       status: { in: ['ACTIVE', 'PUBLISHED'] },
-      NOT: {
-        exploreContent: {
-          isPublished: false
-        }
-      }
+      OR: [
+        { exploreContent: { is: null } },
+        { exploreContent: { isPublished: true } }
+      ]
     };
 
     if (categoryId) {

@@ -74,32 +74,67 @@ function createDummyPrismaProxy() {
   };
   return new Proxy({}, dummyHandler);
 }
-function getPrisma() {
-  if (!prismaInstance) {
+function getActivePrismaInstance() {
+  if (prismaInstance) return prismaInstance;
+  try {
+    const dbUrl3 = process.env.DATABASE_URL;
+    let schemaProvider = "sqlite";
     try {
-      const dbUrl3 = process.env.DATABASE_URL;
-      if (dbUrl3) {
-        prismaInstance = new import_client.PrismaClient({
-          datasources: {
-            db: {
-              url: dbUrl3
-            }
-          }
-        });
-      } else {
-        prismaInstance = new import_client.PrismaClient();
+      const schemaPath = import_path2.default.join(process.cwd(), "prisma", "schema.prisma");
+      if (import_fs2.default.existsSync(schemaPath)) {
+        const content = import_fs2.default.readFileSync(schemaPath, "utf8");
+        const match = content.match(/provider\s*=\s*"([^"]+)"/);
+        if (match) {
+          schemaProvider = match[1];
+        }
       }
-    } catch (err) {
-      console.warn("[Prisma Singleton] Initial creation failed, returning dynamic safe fallback proxy:", err.message);
+    } catch (e) {
+    }
+    const isSqliteUrl = dbUrl3 && (dbUrl3.startsWith("file:") || dbUrl3.startsWith("sqlite:") || dbUrl3.includes(".db"));
+    const isPostgresUrl = dbUrl3 && (dbUrl3.startsWith("postgresql://") || dbUrl3.startsWith("postgres://"));
+    const isMysqlUrl = dbUrl3 && (dbUrl3.startsWith("mysql://") || dbUrl3.startsWith("mysqls://"));
+    const isMismatch = schemaProvider === "sqlite" && (isPostgresUrl || isMysqlUrl) || schemaProvider === "postgresql" && (isSqliteUrl || isMysqlUrl) || schemaProvider === "mysql" && (isSqliteUrl || isPostgresUrl);
+    if (isMismatch) {
+      console.warn(`[Prisma Mismatch] Schema provider is "${schemaProvider}" but DATABASE_URL is incompatible. Returning safe fallback proxy.`);
       return createDummyPrismaProxy();
     }
+    if (dbUrl3) {
+      prismaInstance = new import_client.PrismaClient({
+        datasources: {
+          db: {
+            url: dbUrl3
+          }
+        }
+      });
+    } else {
+      prismaInstance = new import_client.PrismaClient();
+    }
+  } catch (err) {
+    console.warn("[Prisma Singleton] Dynamic creation failed, returning fallback proxy:", err.message);
+    return createDummyPrismaProxy();
   }
   return prismaInstance;
 }
-var import_client, prismaInstance;
+function getPrisma() {
+  return new Proxy({}, {
+    get(_target, prop) {
+      if (prop === "then" || prop === "catch" || prop === "finally") {
+        return void 0;
+      }
+      const active = getActivePrismaInstance();
+      if (typeof active[prop] === "function") {
+        return active[prop].bind(active);
+      }
+      return active[prop];
+    }
+  });
+}
+var import_client, import_fs2, import_path2, prismaInstance;
 var init_prisma = __esm({
   "src/prisma.ts"() {
     import_client = require("@prisma/client");
+    import_fs2 = __toESM(require("fs"));
+    import_path2 = __toESM(require("path"));
     prismaInstance = null;
   }
 });
@@ -775,9 +810,10 @@ function sanitizeDbUrl(url) {
 }
 dbUrl = sanitizeDbUrl(dbUrl);
 process.env.DATABASE_URL = dbUrl;
-var isRealRemoteDb = dbUrl && (dbUrl.startsWith("mysql://") || dbUrl.startsWith("mysqls://") || dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://"));
-if (!isRealRemoteDb || (isAIStudioEnv || isCloudRunEnv) && !process.env.FORCE_PRODUCTION_DB) {
-  const dbDir = process.env.SQLITE_DIR ? process.env.SQLITE_DIR : process.env.NODE_ENV === "production" && isCloudRunEnv ? "/tmp/prisma" : import_path.default.join(rootDir || process.cwd(), "prisma");
+var isRealRemoteDb = dbUrl && (dbUrl.startsWith("mysql://") || dbUrl.startsWith("mysqls://") || dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://")) && !dbUrl.includes("localhost") && !dbUrl.includes("127.0.0.1") && !dbUrl.includes("dummy_db");
+var isVercelEnv = !!process.env.VERCEL;
+if (!isRealRemoteDb || isAIStudioEnv && !process.env.FORCE_PRODUCTION_DB) {
+  const dbDir = process.env.SQLITE_DIR ? process.env.SQLITE_DIR : process.env.NODE_ENV === "production" && isCloudRunEnv || isVercelEnv ? "/tmp/prisma" : import_path.default.join(rootDir || process.cwd(), "prisma");
   if (!import_fs.default.existsSync(dbDir)) {
     try {
       import_fs.default.mkdirSync(dbDir, { recursive: true });
@@ -785,6 +821,25 @@ if (!isRealRemoteDb || (isAIStudioEnv || isCloudRunEnv) && !process.env.FORCE_PR
     }
   }
   const dbPath = import_path.default.join(dbDir, "dev.db");
+  if (!import_fs.default.existsSync(dbPath) || import_fs.default.statSync(dbPath).size === 0) {
+    const possibleSources = [
+      import_path.default.join(process.cwd(), "dist", "dev.db"),
+      import_path.default.join(process.cwd(), "prisma", "dev.db"),
+      import_path.default.join(rootDir || process.cwd(), "dist", "dev.db"),
+      import_path.default.join(rootDir || process.cwd(), "prisma", "dev.db")
+    ];
+    for (const src of possibleSources) {
+      if (import_fs.default.existsSync(src) && import_fs.default.statSync(src).size > 0) {
+        try {
+          import_fs.default.copyFileSync(src, dbPath);
+          console.log(`[Env Loader] Copied pre-built database from ${src} to ${dbPath}`);
+          break;
+        } catch (copyErr) {
+          console.warn(`[Env Loader] Failed to copy database from ${src}:`, copyErr.message);
+        }
+      }
+    }
+  }
   dbUrl = `file:///${dbPath.replace(/^\//, "")}`;
   process.env.DATABASE_URL = dbUrl;
 }
@@ -990,8 +1045,8 @@ var import_dotenv2 = __toESM(require("dotenv"));
 var import_cors = __toESM(require("cors"));
 var import_bcryptjs = __toESM(require("bcryptjs"));
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"));
-var import_path3 = __toESM(require("path"));
-var import_fs3 = __toESM(require("fs"));
+var import_path4 = __toESM(require("path"));
+var import_fs4 = __toESM(require("fs"));
 var import_child_process = require("child_process");
 init_NotificationService();
 
@@ -1389,12 +1444,12 @@ function registerAnnouncements(app2) {
 }
 
 // src/services/orderLabelRoute.ts
-var import_fs2 = __toESM(require("fs"));
-var import_path2 = __toESM(require("path"));
+var import_fs3 = __toESM(require("fs"));
+var import_path3 = __toESM(require("path"));
 function registerOrderLabels(app2, prisma14) {
-  const uploadDir = import_path2.default.join(process.cwd(), "uploads", "labels");
-  if (!import_fs2.default.existsSync(uploadDir)) {
-    import_fs2.default.mkdirSync(uploadDir, { recursive: true });
+  const uploadDir = import_path3.default.join(process.cwd(), "uploads", "labels");
+  if (!import_fs3.default.existsSync(uploadDir)) {
+    import_fs3.default.mkdirSync(uploadDir, { recursive: true });
   }
   app2.post("/api/orders/:id/label", async (req, res) => {
     try {
@@ -1420,9 +1475,9 @@ function registerOrderLabels(app2, prisma14) {
             else if (contentType.includes("png")) ext = "png";
             else if (contentType.includes("jpeg") || contentType.includes("jpg")) ext = "jpg";
             const filename = `label_${orderId}_${Date.now()}.${ext}`;
-            const filePath = import_path2.default.join(uploadDir, filename);
-            import_fs2.default.writeFileSync(filePath, buffer);
-            import_fs2.default.writeFileSync(filePath + ".meta", contentType);
+            const filePath = import_path3.default.join(uploadDir, filename);
+            import_fs3.default.writeFileSync(filePath, buffer);
+            import_fs3.default.writeFileSync(filePath + ".meta", contentType);
             savedLabelPath = `/api/orders/${orderId}/postal-label/file`;
           }
         } catch (err) {
@@ -2468,14 +2523,14 @@ async function syncSingleOrder(storeId, orderId) {
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);
   try {
-    import_fs3.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNCAUGHT EXCEPTION: " + (err.stack || err) + "\n");
+    import_fs4.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNCAUGHT EXCEPTION: " + (err.stack || err) + "\n");
   } catch (e) {
   }
 });
 process.on("unhandledRejection", (reason, promise) => {
   console.error("UNHANDLED REJECTION at:", promise, "reason:", reason);
   try {
-    import_fs3.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNHANDLED REJECTION: " + ((reason == null ? void 0 : reason.stack) || reason) + "\n");
+    import_fs4.default.appendFileSync("server.log", (/* @__PURE__ */ new Date()).toISOString() + " - UNHANDLED REJECTION: " + ((reason == null ? void 0 : reason.stack) || reason) + "\n");
   } catch (e) {
   }
 });
@@ -2483,10 +2538,10 @@ var originalConsoleError = console.error;
 console.error = function(...args) {
   originalConsoleError.apply(console, args);
   try {
-    const errorLogPath = import_path3.default.join(process.cwd(), "error.log");
+    const errorLogPath = import_path4.default.join(process.cwd(), "error.log");
     const logLine = `[${(/* @__PURE__ */ new Date()).toISOString()}] ERROR: ${args.map((a) => typeof a === "object" ? JSON.stringify(a) : a).join(" ")}
 `;
-    import_fs3.default.appendFileSync(errorLogPath, logLine);
+    import_fs4.default.appendFileSync(errorLogPath, logLine);
   } catch (e) {
   }
 };
@@ -2514,11 +2569,11 @@ try {
 }
 function findTrueRootDir2() {
   const current = typeof __dirname !== "undefined" ? __dirname : process.cwd();
-  if (import_fs3.default.existsSync(import_path3.default.join(current, "package.json"))) {
+  if (import_fs4.default.existsSync(import_path4.default.join(current, "package.json"))) {
     return current;
   }
-  const parent = import_path3.default.join(current, "..");
-  if (import_fs3.default.existsSync(import_path3.default.join(parent, "package.json"))) {
+  const parent = import_path4.default.join(current, "..");
+  if (import_fs4.default.existsSync(import_path4.default.join(parent, "package.json"))) {
     return parent;
   }
   return current;
@@ -2526,13 +2581,13 @@ function findTrueRootDir2() {
 var isAIStudioEnv2 = !!process.env.APPLET_ID;
 var isCloudRunEnv2 = !!process.env.K_SERVICE || !!process.env.PORT && process.env.NODE_ENV === "production";
 var rootDir2 = isAIStudioEnv2 || isCloudRunEnv2 ? process.cwd() : findTrueRootDir2();
-import_dotenv2.default.config({ path: import_path3.default.join(rootDir2, ".env") });
+import_dotenv2.default.config({ path: import_path4.default.join(rootDir2, ".env") });
 try {
   if (!isAIStudioEnv2) {
-    const distDir = import_path3.default.join(rootDir2, "prod_output");
+    const distDir = import_path4.default.join(rootDir2, "prod_output");
     let enginePath = null;
-    if (import_fs3.default.existsSync(distDir)) {
-      const files = import_fs3.default.readdirSync(distDir);
+    if (import_fs4.default.existsSync(distDir)) {
+      const files = import_fs4.default.readdirSync(distDir);
       let engineFile = files.find((f) => {
         const isEngine = (f.includes("query-engine") || f.includes("query_engine")) && f.endsWith(".node");
         return isEngine && f.includes("rhel");
@@ -2541,11 +2596,11 @@ try {
         engineFile = files.find((f) => (f.includes("query-engine") || f.includes("query_engine")) && f.endsWith(".node"));
       }
       if (engineFile) {
-        enginePath = import_path3.default.join(distDir, engineFile);
+        enginePath = import_path4.default.join(distDir, engineFile);
       }
     }
-    if (!enginePath && import_fs3.default.existsSync(rootDir2)) {
-      const files = import_fs3.default.readdirSync(rootDir2);
+    if (!enginePath && import_fs4.default.existsSync(rootDir2)) {
+      const files = import_fs4.default.readdirSync(rootDir2);
       let engineFile = files.find((f) => {
         const isEngine = (f.includes("query-engine") || f.includes("query_engine")) && f.endsWith(".node");
         return isEngine && f.includes("rhel");
@@ -2554,7 +2609,7 @@ try {
         engineFile = files.find((f) => (f.includes("query-engine") || f.includes("query_engine")) && f.endsWith(".node"));
       }
       if (engineFile) {
-        enginePath = import_path3.default.join(rootDir2, engineFile);
+        enginePath = import_path4.default.join(rootDir2, engineFile);
       }
     }
     if (enginePath && !isCloudRunEnv2 && !process.env.VERCEL) {
@@ -2612,32 +2667,58 @@ function sanitizeDbUrl2(rawUrl) {
 dbUrl2 = sanitizeDbUrl2(dbUrl2);
 process.env.DATABASE_URL = dbUrl2;
 var isCloudRun = !!process.env.K_SERVICE || !!process.env.PORT && dbUrl2.includes("localhost");
-var provider = "mysql";
+var provider = "sqlite";
 var isRealRemoteDb2 = dbUrl2 && (dbUrl2.startsWith("mysql://") || dbUrl2.startsWith("mysqls://") || dbUrl2.startsWith("postgresql://") || dbUrl2.startsWith("postgres://")) && !dbUrl2.includes("localhost") && !dbUrl2.includes("127.0.0.1") && !dbUrl2.includes("dummy_db");
-if (!isRealRemoteDb2) {
-  provider = "postgresql";
-  dbUrl2 = "postgresql://dummy:dummy@dummy_db/dummy";
-  process.env.DATABASE_URL = dbUrl2;
-  console.log("[Server Startup] No real remote DB URL found, but defaulting to postgresql for Vercel/Neon deployment.");
-} else {
+if (dbUrl2) {
   if (dbUrl2.startsWith("mysql://") || dbUrl2.startsWith("mysqls://")) {
     provider = "mysql";
   } else if (dbUrl2.startsWith("postgresql://") || dbUrl2.startsWith("postgres://")) {
     provider = "postgresql";
   } else if (dbUrl2.startsWith("file:") || dbUrl2.includes(".db")) {
     provider = "sqlite";
+  } else {
+    provider = "mysql";
   }
-  if (dbUrl2) {
-    setTimeout(async () => {
-      console.log("[Auto DB] Running setup-db.js in background...");
+} else {
+  if (isAIStudio || isCloudRun) {
+    provider = "sqlite";
+    const dbDir = import_path4.default.join(process.cwd(), "prisma");
+    if (!import_fs4.default.existsSync(dbDir)) {
       try {
-        (0, import_child_process.execSync)("node setup-db.js", { stdio: "inherit", env: { ...process.env, DATABASE_URL: dbUrl2 } });
-        console.log("[Auto DB] Database synchronized successfully.");
-      } catch (err) {
-        console.error("[Auto DB] Background setup-db.js warning:", (err == null ? void 0 : err.message) || err);
+        import_fs4.default.mkdirSync(dbDir, { recursive: true });
+      } catch (e) {
       }
-    }, 1e3);
+    }
+    dbUrl2 = `file:${import_path4.default.join(dbDir, "dev.db")}`;
+    process.env.DATABASE_URL = dbUrl2;
+  } else {
+    provider = "postgresql";
+    dbUrl2 = "postgresql://dummy:dummy@dummy_db/dummy";
+    process.env.DATABASE_URL = dbUrl2;
+    console.log("[Server Startup] No database URL found, defaulting to postgresql for Vercel/Neon.");
   }
+}
+if (dbUrl2 && !process.env.VERCEL) {
+  setTimeout(async () => {
+    console.log("[Auto DB] Running setup-db.js in background...");
+    try {
+      (0, import_child_process.execSync)("node setup-db.js", { stdio: "inherit", env: { ...process.env, DATABASE_URL: dbUrl2 } });
+      console.log("[Auto DB] Database synchronized successfully.");
+      try {
+        Object.keys(require.cache).forEach((key2) => {
+          if (key2.includes(".prisma") || key2.includes("@prisma")) {
+            delete require.cache[key2];
+          }
+        });
+        realPrisma = null;
+        console.log("[Auto DB] Prisma require cache cleared and client reset.");
+      } catch (cacheErr) {
+        console.warn("[Auto DB] Failed to clear prisma require cache:", cacheErr);
+      }
+    } catch (err) {
+      console.error("[Auto DB] Background setup-db.js warning:", (err == null ? void 0 : err.message) || err);
+    }
+  }, 1e3);
 }
 var realPrisma = null;
 var isPrismaMock = false;
@@ -2705,6 +2786,7 @@ var MemoryDatabase = class {
   }
   matchWhere(item, where) {
     if (!where || typeof where !== "object") return true;
+    if (!item) return false;
     for (const [key2, val] of Object.entries(where)) {
       if (key2 === "OR") {
         if (Array.isArray(val)) {
@@ -3204,10 +3286,10 @@ var prisma13 = new Proxy({}, {
 });
 var app = (0, import_express.default)();
 var googleClient = new import_google_auth_library.OAuth2Client(process.env.GOOGLE_CLIENT_ID || "dummy_client_id_for_build");
-var labelsUploadDir = import_path3.default.join(process.cwd(), "uploads", "labels");
-if (!import_fs3.default.existsSync(labelsUploadDir)) {
+var labelsUploadDir = import_path4.default.join(process.cwd(), "uploads", "labels");
+if (!import_fs4.default.existsSync(labelsUploadDir)) {
   try {
-    import_fs3.default.mkdirSync(labelsUploadDir, { recursive: true });
+    import_fs4.default.mkdirSync(labelsUploadDir, { recursive: true });
   } catch (e) {
   }
 }
@@ -3225,9 +3307,9 @@ function processPostalLabel(orderId, postalLabel) {
         else if (contentType.includes("png")) ext = "png";
         else if (contentType.includes("jpeg") || contentType.includes("jpg")) ext = "jpg";
         const filename = `label_${orderId}_${Date.now()}.${ext}`;
-        const filePath = import_path3.default.join(labelsUploadDir, filename);
-        import_fs3.default.writeFileSync(filePath, buffer);
-        import_fs3.default.writeFileSync(filePath + ".meta", contentType);
+        const filePath = import_path4.default.join(labelsUploadDir, filename);
+        import_fs4.default.writeFileSync(filePath, buffer);
+        import_fs4.default.writeFileSync(filePath + ".meta", contentType);
         return `/api/orders/${orderId}/postal-label/file`;
       }
     } catch (err) {
@@ -3243,10 +3325,10 @@ app.get("/api/orders/:id/postal-label/file", async (req, res) => {
     if (isNaN(orderId)) {
       return res.status(400).send("Invalid order ID");
     }
-    if (!import_fs3.default.existsSync(labelsUploadDir)) {
+    if (!import_fs4.default.existsSync(labelsUploadDir)) {
       return res.status(404).send("No labels directory found");
     }
-    const files = import_fs3.default.readdirSync(labelsUploadDir);
+    const files = import_fs4.default.readdirSync(labelsUploadDir);
     const orderFiles = files.filter((f) => f.startsWith(`label_${orderId}_`) && !f.endsWith(".meta"));
     if (orderFiles.length === 0) {
       return res.status(404).send("Label file not found");
@@ -3257,11 +3339,11 @@ app.get("/api/orders/:id/postal-label/file", async (req, res) => {
       return timeB - timeA;
     });
     const latestFile = orderFiles[0];
-    const filePath = import_path3.default.join(labelsUploadDir, latestFile);
+    const filePath = import_path4.default.join(labelsUploadDir, latestFile);
     const metaPath = filePath + ".meta";
     let contentType = "application/octet-stream";
-    if (import_fs3.default.existsSync(metaPath)) {
-      contentType = import_fs3.default.readFileSync(metaPath, "utf8").trim();
+    if (import_fs4.default.existsSync(metaPath)) {
+      contentType = import_fs4.default.readFileSync(metaPath, "utf8").trim();
     } else {
       if (latestFile.endsWith(".pdf")) contentType = "application/pdf";
       else if (latestFile.endsWith(".png")) contentType = "image/png";
@@ -3278,10 +3360,10 @@ app.get("/api/orders/:id/postal-label/file", async (req, res) => {
 app.use((0, import_cors.default)({ origin: true, credentials: true }));
 app.use(import_express.default.json({ limit: "50mb" }));
 app.use(import_express.default.urlencoded({ limit: "50mb", extended: true }));
-var rootUploadsDir = import_path3.default.join(process.cwd(), "uploads");
-if (!import_fs3.default.existsSync(rootUploadsDir)) {
+var rootUploadsDir = import_path4.default.join(process.cwd(), "uploads");
+if (!import_fs4.default.existsSync(rootUploadsDir)) {
   try {
-    import_fs3.default.mkdirSync(rootUploadsDir, { recursive: true });
+    import_fs4.default.mkdirSync(rootUploadsDir, { recursive: true });
   } catch (e) {
   }
 }
@@ -6143,16 +6225,16 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
     }
     const ZipClass = typeof import_adm_zip.default === "function" ? import_adm_zip.default : import_adm_zip.default.default || require("adm-zip");
     const zip = new ZipClass(zipPath);
-    const extractDir = import_path3.default.join(process.cwd(), "temp_update_" + Date.now());
+    const extractDir = import_path4.default.join(process.cwd(), "temp_update_" + Date.now());
     zip.extractAllTo(extractDir, true);
     const findProjectRootDir = (dir) => {
-      if (import_fs3.default.existsSync(import_path3.default.join(dir, "package.json")) || import_fs3.default.existsSync(import_path3.default.join(dir, "server.ts"))) {
+      if (import_fs4.default.existsSync(import_path4.default.join(dir, "package.json")) || import_fs4.default.existsSync(import_path4.default.join(dir, "server.ts"))) {
         return dir;
       }
-      const entries = import_fs3.default.readdirSync(dir, { withFileTypes: true });
+      const entries = import_fs4.default.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name !== "__MACOSX" && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
-          const subPath = import_path3.default.join(dir, entry.name);
+          const subPath = import_path4.default.join(dir, entry.name);
           const found = findProjectRootDir(subPath);
           if (found !== dir) return found;
         }
@@ -6161,14 +6243,14 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
     };
     const sourceDir = findProjectRootDir(extractDir);
     const copyRecursiveSync = (src, dest) => {
-      const exists = import_fs3.default.existsSync(src);
-      const stats = exists && import_fs3.default.statSync(src);
+      const exists = import_fs4.default.existsSync(src);
+      const stats = exists && import_fs4.default.statSync(src);
       const isDirectory = exists && stats.isDirectory();
       if (isDirectory) {
-        if (!import_fs3.default.existsSync(dest)) {
-          import_fs3.default.mkdirSync(dest, { recursive: true });
+        if (!import_fs4.default.existsSync(dest)) {
+          import_fs4.default.mkdirSync(dest, { recursive: true });
         }
-        import_fs3.default.readdirSync(src).forEach((childItemName) => {
+        import_fs4.default.readdirSync(src).forEach((childItemName) => {
           const ignoredAtRoot = [
             "node_modules",
             ".env",
@@ -6185,27 +6267,27 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
             return;
           }
           if (childItemName === "__MACOSX" || childItemName === ".DS_Store") return;
-          copyRecursiveSync(import_path3.default.join(src, childItemName), import_path3.default.join(dest, childItemName));
+          copyRecursiveSync(import_path4.default.join(src, childItemName), import_path4.default.join(dest, childItemName));
         });
       } else {
-        const fileName = import_path3.default.basename(src);
+        const fileName = import_path4.default.basename(src);
         if (fileName === ".env" || fileName.endsWith(".db") || fileName.endsWith(".sqlite")) {
           return;
         }
-        const destDir = import_path3.default.dirname(dest);
-        if (!import_fs3.default.existsSync(destDir)) {
-          import_fs3.default.mkdirSync(destDir, { recursive: true });
+        const destDir = import_path4.default.dirname(dest);
+        if (!import_fs4.default.existsSync(destDir)) {
+          import_fs4.default.mkdirSync(destDir, { recursive: true });
         }
-        import_fs3.default.copyFileSync(src, dest);
+        import_fs4.default.copyFileSync(src, dest);
       }
     };
     copyRecursiveSync(sourceDir, process.cwd());
     try {
-      import_fs3.default.rmSync(extractDir, { recursive: true, force: true });
+      import_fs4.default.rmSync(extractDir, { recursive: true, force: true });
     } catch (e) {
     }
     try {
-      import_fs3.default.unlinkSync(zipPath);
+      import_fs4.default.unlinkSync(zipPath);
     } catch (e) {
     }
     try {
@@ -8218,12 +8300,12 @@ app.get("/api/admin/dev/files", authenticateToken, requireAdmin, async (req, res
     const getFiles = (dir) => {
       let dirents;
       try {
-        dirents = import_fs3.default.readdirSync(dir, { withFileTypes: true });
+        dirents = import_fs4.default.readdirSync(dir, { withFileTypes: true });
       } catch (err) {
         return [];
       }
       const files = dirents.map((dirent) => {
-        const fullPath = import_path3.default.resolve(dir, dirent.name);
+        const fullPath = import_path4.default.resolve(dir, dirent.name);
         const relPath = fullPath.replace(process.cwd(), "");
         if (["node_modules", ".git", "dist", "prod_output", ".cache"].includes(dirent.name)) return null;
         if (dirent.isDirectory()) {
@@ -8243,16 +8325,16 @@ app.get("/api/admin/dev/files", authenticateToken, requireAdmin, async (req, res
   }
 });
 app.get("/api/download-release", (req, res) => {
-  const filePath = import_path3.default.join(process.cwd(), "public", "zopit-release.zip");
-  if (import_fs3.default.existsSync(filePath)) {
+  const filePath = import_path4.default.join(process.cwd(), "public", "zopit-release.zip");
+  if (import_fs4.default.existsSync(filePath)) {
     res.download(filePath, "zopit-release.zip");
   } else {
     res.status(404).send("Release not found");
   }
 });
 app.get("/api/download-cpanel-release", (req, res) => {
-  const filePath = import_path3.default.join(process.cwd(), "public", "cpanel-release.zip");
-  if (import_fs3.default.existsSync(filePath)) {
+  const filePath = import_path4.default.join(process.cwd(), "public", "cpanel-release.zip");
+  if (import_fs4.default.existsSync(filePath)) {
     res.download(filePath, "cpanel-release.zip");
   } else {
     res.status(404).send("Release not found");
@@ -8262,9 +8344,9 @@ app.get("/api/admin/dev/file", authenticateToken, requireAdmin, async (req, res)
   try {
     const filePath = req.query.path;
     if (!filePath || filePath.includes("..")) return res.status(400).json({ error: "\u0645\u0633\u06CC\u0631 \u0646\u0627\u0645\u0639\u062A\u0628\u0631" });
-    const fullPath = import_path3.default.join(process.cwd(), filePath);
-    if (!import_fs3.default.existsSync(fullPath)) return res.status(404).json({ error: "\u0641\u0627\u06CC\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
-    const content = import_fs3.default.readFileSync(fullPath, "utf8");
+    const fullPath = import_path4.default.join(process.cwd(), filePath);
+    if (!import_fs4.default.existsSync(fullPath)) return res.status(404).json({ error: "\u0641\u0627\u06CC\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
+    const content = import_fs4.default.readFileSync(fullPath, "utf8");
     res.json({ content });
   } catch (error) {
     console.error("Dev File Read Error:", error);
@@ -8275,12 +8357,12 @@ app.post("/api/admin/dev/file", authenticateToken, requireAdmin, async (req, res
   try {
     const { path: filePath, content } = req.body;
     if (!filePath || filePath.includes("..")) return res.status(400).json({ error: "\u0645\u0633\u06CC\u0631 \u0646\u0627\u0645\u0639\u062A\u0628\u0631" });
-    const fullPath = import_path3.default.join(process.cwd(), filePath);
-    const dir = import_path3.default.dirname(fullPath);
-    if (!import_fs3.default.existsSync(dir)) {
-      import_fs3.default.mkdirSync(dir, { recursive: true });
+    const fullPath = import_path4.default.join(process.cwd(), filePath);
+    const dir = import_path4.default.dirname(fullPath);
+    if (!import_fs4.default.existsSync(dir)) {
+      import_fs4.default.mkdirSync(dir, { recursive: true });
     }
-    import_fs3.default.writeFileSync(fullPath, content, "utf8");
+    import_fs4.default.writeFileSync(fullPath, content, "utf8");
     res.json({ success: true });
   } catch (error) {
     console.error("Dev File Write Error:", error);
@@ -8311,10 +8393,10 @@ app.post("/api/upload", authenticateToken, multerFn({ dest: rootUploadsDir }).si
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded." });
     }
-    const ext = import_path3.default.extname(req.file.originalname) || "";
+    const ext = import_path4.default.extname(req.file.originalname) || "";
     const newFilename = `${req.file.filename}${ext}`;
-    const newPath = import_path3.default.join(rootUploadsDir, newFilename);
-    import_fs3.default.renameSync(req.file.path, newPath);
+    const newPath = import_path4.default.join(rootUploadsDir, newFilename);
+    import_fs4.default.renameSync(req.file.path, newPath);
     const fileUrl = `/uploads/${newFilename}`;
     res.json({ url: fileUrl });
   } catch (err) {
@@ -8322,10 +8404,10 @@ app.post("/api/upload", authenticateToken, multerFn({ dest: rootUploadsDir }).si
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u0622\u067E\u0644\u0648\u062F \u0641\u0627\u06CC\u0644" });
   }
 });
-var devUploadDir = import_path3.default.join(process.cwd(), "uploads");
-if (!import_fs3.default.existsSync(devUploadDir)) {
+var devUploadDir = import_path4.default.join(process.cwd(), "uploads");
+if (!import_fs4.default.existsSync(devUploadDir)) {
   try {
-    import_fs3.default.mkdirSync(devUploadDir, { recursive: true });
+    import_fs4.default.mkdirSync(devUploadDir, { recursive: true });
   } catch (e) {
   }
 }
@@ -8346,16 +8428,16 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
     }
     const ZipClass = typeof import_adm_zip.default === "function" ? import_adm_zip.default : import_adm_zip.default.default || require("adm-zip");
     const zip = new ZipClass(zipPath);
-    const extractDir = import_path3.default.join(process.cwd(), "temp_update_" + Date.now());
+    const extractDir = import_path4.default.join(process.cwd(), "temp_update_" + Date.now());
     zip.extractAllTo(extractDir, true);
     const findProjectRootDir = (dir) => {
-      if (import_fs3.default.existsSync(import_path3.default.join(dir, "package.json")) || import_fs3.default.existsSync(import_path3.default.join(dir, "server.ts"))) {
+      if (import_fs4.default.existsSync(import_path4.default.join(dir, "package.json")) || import_fs4.default.existsSync(import_path4.default.join(dir, "server.ts"))) {
         return dir;
       }
-      const entries = import_fs3.default.readdirSync(dir, { withFileTypes: true });
+      const entries = import_fs4.default.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name !== "__MACOSX" && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
-          const subPath = import_path3.default.join(dir, entry.name);
+          const subPath = import_path4.default.join(dir, entry.name);
           const found = findProjectRootDir(subPath);
           if (found !== dir) return found;
         }
@@ -8364,14 +8446,14 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
     };
     const sourceDir = findProjectRootDir(extractDir);
     const copyRecursiveSync = (src, dest) => {
-      const exists = import_fs3.default.existsSync(src);
-      const stats = exists && import_fs3.default.statSync(src);
+      const exists = import_fs4.default.existsSync(src);
+      const stats = exists && import_fs4.default.statSync(src);
       const isDirectory = exists && stats.isDirectory();
       if (isDirectory) {
-        if (!import_fs3.default.existsSync(dest)) {
-          import_fs3.default.mkdirSync(dest, { recursive: true });
+        if (!import_fs4.default.existsSync(dest)) {
+          import_fs4.default.mkdirSync(dest, { recursive: true });
         }
-        import_fs3.default.readdirSync(src).forEach((childItemName) => {
+        import_fs4.default.readdirSync(src).forEach((childItemName) => {
           const ignoredAtRoot = [
             "node_modules",
             ".env",
@@ -8388,27 +8470,27 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
             return;
           }
           if (childItemName === "__MACOSX" || childItemName === ".DS_Store") return;
-          copyRecursiveSync(import_path3.default.join(src, childItemName), import_path3.default.join(dest, childItemName));
+          copyRecursiveSync(import_path4.default.join(src, childItemName), import_path4.default.join(dest, childItemName));
         });
       } else {
-        const fileName = import_path3.default.basename(src);
+        const fileName = import_path4.default.basename(src);
         if (fileName === ".env" || fileName.endsWith(".db") || fileName.endsWith(".sqlite")) {
           return;
         }
-        const destDir = import_path3.default.dirname(dest);
-        if (!import_fs3.default.existsSync(destDir)) {
-          import_fs3.default.mkdirSync(destDir, { recursive: true });
+        const destDir = import_path4.default.dirname(dest);
+        if (!import_fs4.default.existsSync(destDir)) {
+          import_fs4.default.mkdirSync(destDir, { recursive: true });
         }
-        import_fs3.default.copyFileSync(src, dest);
+        import_fs4.default.copyFileSync(src, dest);
       }
     };
     copyRecursiveSync(sourceDir, process.cwd());
     try {
-      import_fs3.default.rmSync(extractDir, { recursive: true, force: true });
+      import_fs4.default.rmSync(extractDir, { recursive: true, force: true });
     } catch (e) {
     }
     try {
-      import_fs3.default.unlinkSync(zipPath);
+      import_fs4.default.unlinkSync(zipPath);
     } catch (e) {
     }
     let buildSuccess = false;
@@ -8441,9 +8523,9 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
 });
 app.get("/api/admin/dev/error-logs", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const logFile = import_path3.default.join(process.cwd(), "error.log");
-    if (import_fs3.default.existsSync(logFile)) {
-      const logs = import_fs3.default.readFileSync(logFile, "utf8");
+    const logFile = import_path4.default.join(process.cwd(), "error.log");
+    if (import_fs4.default.existsSync(logFile)) {
+      const logs = import_fs4.default.readFileSync(logFile, "utf8");
       res.json({ logs: logs.slice(-1e5) });
     } else {
       res.json({ logs: "\u0644\u0627\u06AF\u06CC \u062B\u0628\u062A \u0646\u0634\u062F\u0647 \u0627\u0633\u062A." });
@@ -8650,11 +8732,10 @@ app.get("/api/public/products", async (req, res) => {
     }
     let whereClause = {
       status: { in: ["ACTIVE", "PUBLISHED"] },
-      NOT: {
-        exploreContent: {
-          isPublished: false
-        }
-      }
+      OR: [
+        { exploreContent: { is: null } },
+        { exploreContent: { isPublished: true } }
+      ]
     };
     if (categoryId) {
       whereClause.categoryId = categoryId;
@@ -9617,12 +9698,12 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    let distPath = isAIStudioEnv2 ? import_path3.default.join(rootDir2, "prod_output") : __dirname;
-    if (!import_fs3.default.existsSync(import_path3.default.join(distPath, "index.html"))) {
-      if (import_fs3.default.existsSync(import_path3.default.join(rootDir2, "prod_output", "index.html"))) {
-        distPath = import_path3.default.join(rootDir2, "prod_output");
-      } else if (import_fs3.default.existsSync(import_path3.default.join(rootDir2, "dist", "index.html"))) {
-        distPath = import_path3.default.join(rootDir2, "dist");
+    let distPath = isAIStudioEnv2 ? import_path4.default.join(rootDir2, "prod_output") : __dirname;
+    if (!import_fs4.default.existsSync(import_path4.default.join(distPath, "index.html"))) {
+      if (import_fs4.default.existsSync(import_path4.default.join(rootDir2, "prod_output", "index.html"))) {
+        distPath = import_path4.default.join(rootDir2, "prod_output");
+      } else if (import_fs4.default.existsSync(import_path4.default.join(rootDir2, "dist", "index.html"))) {
+        distPath = import_path4.default.join(rootDir2, "dist");
       }
     }
     console.log("[Express Static] Serving static files from distPath:", distPath);
@@ -9631,7 +9712,7 @@ async function startServer() {
       if (req.path.includes(".") && !req.path.endsWith(".html") || req.path.startsWith("/assets/")) {
         return res.status(404).send("File not found");
       }
-      res.sendFile(import_path3.default.join(distPath, "index.html"));
+      res.sendFile(import_path4.default.join(distPath, "index.html"));
     });
   }
   if (process.env.VERCEL) {
