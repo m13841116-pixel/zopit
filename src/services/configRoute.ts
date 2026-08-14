@@ -51,19 +51,32 @@ export default function registerConfig(app: any) {
       }
 
       // 3. Single key update format: { key, value }
-      const { key, value } = body;
-      if (!key) {
-        return res.status(400).json({ error: 'Missing key parameter' });
+      if (body.key !== undefined) {
+        const config = await prisma.systemConfig.upsert({
+          where: { key: String(body.key) },
+          update: { value: String(body.value ?? '') },
+          create: { key: String(body.key), value: String(body.value ?? '') }
+        });
+        return res.json({ success: true, config });
       }
-      const config = await prisma.systemConfig.upsert({
-        where: { key: String(key) },
-        update: { value: String(value ?? '') },
-        create: { key: String(key), value: String(value ?? '') }
-      });
-      res.json(config);
+
+      // 4. Direct key-value dictionary: { KEY1: VAL1, KEY2: VAL2, ... }
+      if (typeof body === 'object' && Object.keys(body).length > 0) {
+        const entries = Object.entries(body);
+        for (const [key, value] of entries) {
+          await prisma.systemConfig.upsert({
+            where: { key: String(key) },
+            update: { value: String(value ?? '') },
+            create: { key: String(key), value: String(value ?? '') }
+          });
+        }
+        return res.json({ success: true, updatedCount: entries.length });
+      }
+
+      return res.status(400).json({ error: 'محتوای تنظیمات ارسال نشده است' });
     } catch (error: any) {
       console.error('Error saving configs in route:', error);
-      res.status(500).json({ error: 'Internal server error', details: error?.message || String(error) });
+      res.status(500).json({ error: 'خطای داخلی سرور در ذخیره‌سازی تنظیمات', details: error?.message || String(error) });
     }
   });
 }

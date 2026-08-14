@@ -2568,11 +2568,8 @@ app.post('/api/admin/sms/test', authenticateToken, requireAdmin, async (req: any
       return res.json({
         success: true,
         result,
-        message: result.simulated
-          ? (result.message || 'پیامک شبیه‌سازی شد (اطلاعات پنل در دیتابیس کامل نیست).')
-          : (result.message || 'پیامک تستی با موفقیت به سامانه پیامک ارسال شد.'),
-        trackingCode: result.trackingCode,
-        simulated: result.simulated
+        message: result.message || 'پیامک تستی با موفقیت ارسال شد.',
+        response: result.response
       });
     } else {
       return res.status(400).json({
@@ -9448,14 +9445,29 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       }
 
       // Single key update
-      const { key, value } = body;
-      if (!key) return res.status(400).json({ error: 'Missing key' });
-      await prisma.systemConfig.upsert({
-        where: { key: String(key) },
-        update: { value: String(value ?? '') },
-        create: { key: String(key), value: String(value ?? '') }
-      });
-      res.json({ success: true });
+      if (body.key !== undefined) {
+        await prisma.systemConfig.upsert({
+          where: { key: String(body.key) },
+          update: { value: String(body.value ?? '') },
+          create: { key: String(body.key), value: String(body.value ?? '') }
+        });
+        return res.json({ success: true });
+      }
+
+      // Direct key-value dictionary object
+      if (typeof body === 'object' && Object.keys(body).length > 0) {
+        const entries = Object.entries(body);
+        for (const [key, value] of entries) {
+          await prisma.systemConfig.upsert({
+            where: { key: String(key) },
+            update: { value: String(value ?? '') },
+            create: { key: String(key), value: String(value ?? '') }
+          });
+        }
+        return res.json({ success: true, updatedCount: entries.length });
+      }
+
+      return res.status(400).json({ error: 'محتوای تنظیمات ارسال نشده است' });
     } catch (err: any) {
       console.error('Error updating config:', err);
       res.status(500).json({ error: 'Failed to save config', details: err?.message || String(err) });
