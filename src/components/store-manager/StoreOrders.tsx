@@ -1212,7 +1212,8 @@ export default function StoreOrders({
                             <div>
                               <span className="text-muted block mb-0.5">روش ارسال انتخاب شده:</span>
                               <span className="font-bold text-primary">
-                                {selectedOrderForDetails.shippingMethod === "POST" ? "پست ایران" :
+                                {["POST", "POST_PISHTAZ"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست پیشتاز" :
+                                 ["POST_VIZHE", "POST_EXPRESS"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست ویژه (اکسپرس)" :
                                  selectedOrderForDetails.shippingMethod === "TIPAX" ? "تیپاکس" :
                                  selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" ? "پنل پستی اختصاصی" : "پنل ارسال پلتفرم"}
                               </span>
@@ -1242,7 +1243,8 @@ export default function StoreOrders({
                           <div>
                             <span className="text-muted block mb-0.5">روش ارسال:</span>
                             <span className="font-bold text-primary">
-                              {selectedOrderForDetails.shippingMethod === "POST" ? "پست ایران" :
+                              {["POST", "POST_PISHTAZ"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست پیشتاز" :
+                               ["POST_VIZHE", "POST_EXPRESS"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست ویژه (اکسپرس)" :
                                selectedOrderForDetails.shippingMethod === "TIPAX" ? "تیپاکس" :
                                selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" ? "پنل پستی اختصاصی" : "پنل ارسال پلتفرم"}
                             </span>
@@ -1291,16 +1293,17 @@ export default function StoreOrders({
                                 "نشانی پیش‌فرض فروشگاه"}
                             </span>
                           </div>
-                          <div>
-                            <span className="text-muted block mb-0.5">
-                              روش ارسال:
-                            </span>
-                            <span className="font-bold text-primary">
-                              {selectedOrderForDetails.shippingMethod === "POST" ? "پست ایران" :
-                               selectedOrderForDetails.shippingMethod === "TIPAX" ? "تیپاکس" :
-                               selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" ? "پنل پستی اختصاصی" : "پنل ارسال پلتفرم"}
-                            </span>
-                          </div>
+                           <div>
+                             <span className="text-muted block mb-0.5">
+                               روش ارسال:
+                             </span>
+                             <span className="font-bold text-primary">
+                               {["POST", "POST_PISHTAZ"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست پیشتاز" :
+                                ["POST_VIZHE", "POST_EXPRESS"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست ویژه (اکسپرس)" :
+                                selectedOrderForDetails.shippingMethod === "TIPAX" ? "تیپاکس" :
+                                selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" ? "پنل پستی اختصاصی" : "پنل ارسال پلتفرم"}
+                             </span>
+                           </div>
                           <div>
                             <span className="text-muted block mb-0.5">
                               کد رهگیری مرسوله:
@@ -1546,13 +1549,9 @@ export default function StoreOrders({
                     <input type="radio" name="shipMethod" value="POST_PISHTAZ" checked={shippingMethod === "POST_PISHTAZ" || shippingMethod === "POST"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
                     پست پیشتاز
                   </label>
-                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_VIZHE" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
-                    <input type="radio" name="shipMethod" value="POST_VIZHE" checked={shippingMethod === "POST_VIZHE"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
-                    پست ویژه
-                  </label>
-                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_EXPRESS" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
-                    <input type="radio" name="shipMethod" value="POST_EXPRESS" checked={shippingMethod === "POST_EXPRESS"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
-                    پست اکسپرس
+                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_VIZHE" || shippingMethod === "POST_EXPRESS" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
+                    <input type="radio" name="shipMethod" value="POST_VIZHE" checked={shippingMethod === "POST_VIZHE" || shippingMethod === "POST_EXPRESS"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                    پست ویژه (اکسپرس)
                   </label>
                   <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "TIPAX" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
                     <input type="radio" name="shipMethod" value="TIPAX" checked={shippingMethod === "TIPAX"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />

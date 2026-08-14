@@ -2364,8 +2364,13 @@ app.post('/api/auth/send-otp', async (req, res) => {
     activeOtps.set(cleanMobile, { code, expires: Date.now() + 180000 }); // 3 min expiry
     activeOtps.set(withZero, { code, expires: Date.now() + 180000 });
     activeOtps.set(withoutZero, { code, expires: Date.now() + 180000 });
+    activeOtps.set(user.username, { code, expires: Date.now() + 180000 });
     if (user.mobile) {
-      activeOtps.set(user.mobile, { code, expires: Date.now() + 180000 });
+      const dbMobileClean = sanitizeMobileDigits(user.mobile);
+      const dbMobileNorm = dbMobileClean.startsWith('0') ? dbMobileClean.slice(1) : dbMobileClean;
+      activeOtps.set(dbMobileClean, { code, expires: Date.now() + 180000 });
+      activeOtps.set('0' + dbMobileNorm, { code, expires: Date.now() + 180000 });
+      activeOtps.set(dbMobileNorm, { code, expires: Date.now() + 180000 });
     }
 
     // Send SMS via MelliPayamak

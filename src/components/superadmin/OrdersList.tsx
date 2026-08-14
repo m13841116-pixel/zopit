@@ -699,7 +699,7 @@ export default function OrdersList() {
                           }`}
                         >
                           <Truck className="w-3 h-3" />
-                          {o.shippingMethod === "TIPAX" ? "تیپاکس" : "پست پیشتاز"}
+                          {o.shippingMethod === "TIPAX" ? "تیپاکس" : (o.shippingMethod === "POST_VIZHE" || o.shippingMethod === "POST_EXPRESS" ? "پست ویژه (اکسپرس)" : "پست پیشتاز")}
                         </span>
                       </td>
 

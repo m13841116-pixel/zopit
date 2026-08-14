@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { getPrisma } from '../../prisma.js';
 
 // Human-readable translations for MelliPayamak status/error codes
