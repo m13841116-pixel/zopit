@@ -1,6 +1,13 @@
 let prismaInstance: any = null;
 
+// Use globalThis to persist Prisma client in development or serverless environments
+const globalForPrisma = globalThis as unknown as { prisma: any };
+
 export function getPrisma(): any {
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
+  }
+
   if (!prismaInstance) {
     try {
       const dbUrl = process.env.DATABASE_URL || '';
@@ -24,6 +31,10 @@ export function getPrisma(): any {
               },
             },
           });
+          // Attempt eager connection to detect immediate failures
+          prismaInstance.$connect().catch((err: any) => {
+            console.error('[Prisma] Database eager connection failed:', err);
+          });
         } else {
           prismaInstance = createMemoryPrismaProxy();
         }
@@ -32,6 +43,7 @@ export function getPrisma(): any {
       console.warn('[Prisma] Initialization failed, falling back to mock proxy:', err.message);
       prismaInstance = createMemoryPrismaProxy();
     }
+    globalForPrisma.prisma = prismaInstance;
   }
   return prismaInstance;
 }

@@ -1704,11 +1704,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                         ) : (
                           /* Step 2: Enter 5-digit OTP Code */
                           <form onSubmit={handleVerifyLoginOtp} className="space-y-4">
-                            <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between gap-2">
+                            <div className="p-3.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                                <span className="text-xs text-emerald-800 dark:text-emerald-200 font-bold">
-                                  کد تایید به شماره <span className="font-mono dir-ltr inline-block font-black">{loginOtpMobile}</span> پیامک شد.
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span className="text-xs text-slate-800 dark:text-slate-100 font-bold">
+                                  کد تایید به شماره <span className="font-mono dir-ltr inline-block font-black text-slate-950 dark:text-white">{loginOtpMobile}</span> پیامک شد.
                                 </span>
                               </div>
                               <button
@@ -1718,7 +1718,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                                   setLoginOtpCode("");
                                   setLoginSimulatedCode(null);
                                 }}
-                                className="text-[11px] text-emerald-700 dark:text-emerald-300 font-extrabold underline hover:text-emerald-900 cursor-pointer"
+                                className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-extrabold underline cursor-pointer"
                               >
                                 ویرایش شماره
                               </button>
@@ -2043,13 +2043,13 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                         </div>
 
                         {forgotOtpSent && (
-                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                          <div className="p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] text-slate-800 dark:text-slate-100 flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                               کد ورود با پیامک ارسال شد.
                             </span>
                             {forgotSimulatedCode && (
-                              <span className="font-mono font-bold bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-800 dark:text-emerald-200">
+                              <span className="font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-900 dark:text-slate-100">
                                 کد تست: {forgotSimulatedCode}
                               </span>
                             )}
@@ -2137,13 +2137,13 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                         </div>
 
                         {forgotOtpSent && (
-                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                          <div className="p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] text-slate-800 dark:text-slate-100 flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                               کد تایید پیامک شد.
                             </span>
                             {forgotSimulatedCode && (
-                              <span className="font-mono font-bold bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-800 dark:text-emerald-200">
+                              <span className="font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-900 dark:text-slate-100">
                                 کد تست: {forgotSimulatedCode}
                               </span>
                             )}
