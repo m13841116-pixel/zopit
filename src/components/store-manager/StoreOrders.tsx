@@ -343,24 +343,25 @@ export default function StoreOrders({
   const getStatusText = (status: string) => {
     const statusMap: any = {
       NEW: "جدید",
-      PENDING_PAYMENT: "۴. نیازمند پرداخت توسط مدیر فروشگاه",
-      WAITING_SUPPLIER_CONFIRMATION: "۱. در انتظار تایید تامین‌کننده",
-      WAITING_STORE_ADDRESS: "۲. در انتظار دریافت آدرس پستی",
-      SUPPLIER_APPROVED: "تایید شده تامین‌کننده (آماده پرداخت)",
-      WAITING_SHIPPING_COST: "۳. در انتظار برآورد هزینه ارسال",
-      WAITING_SHIPPING_PAYMENT: "در انتظار پرداخت هزینه ارسال",
+      PENDING_PAYMENT: "۴. در انتظار پرداخت",
+      WAITING_SUPPLIER_CONFIRMATION: "۱. در انتظار تایید تأمین‌کننده",
+      WAITING_STORE_ADDRESS: "۲. در انتظار ثبت آدرس",
+      SUPPLIER_APPROVED: "۱. در انتظار تایید تأمین‌کننده",
+      WAITING_SHIPPING_COST: "۳. در انتظار برآورد هزینه پستی",
+      WAITING_SHIPPING_PAYMENT: "۴. در انتظار پرداخت",
       SHIPPING_PAID: "هزینه ارسال پرداخت شده",
-      PENDING_POSTAL_LABEL: "۵. نیازمند دریافت لیبل",
-      READY_TO_SHIP: "آماده ارسال",
-      SHIPPED: "۶. در حال ارسال",
-      DELIVERED: "تحویل داده شده",
-      COMPLETED: "تکمیل شده",
+      PENDING_POSTAL_LABEL: "۵. در انتظار لیبل پستی",
+      READY_TO_SHIP: "۵. در انتظار لیبل پستی",
+      SHIPPED: "۶. تکمیل شده و باید ارسال شود",
+      DELIVERED: "تکمیل شده (تحویل شده)",
+      COMPLETED: "۶. تکمیل شده و باید ارسال شود",
       CANCELLED: "لغو شده",
       REJECTED: "رد شده",
-      REQUESTED: "درخواست شده",
-      WAITING_FOR_PAYMENT: "۴. نیازمند پرداخت توسط مدیر فروشگاه",
-      PAID: "پرداخت شده",
-      PROCESSING: "در حال پردازش"
+      REQUESTED: "۱. در انتظار تایید تأمین‌کننده",
+      WAITING_FOR_PAYMENT: "۴. در انتظار پرداخت",
+      PAID: "۵. در انتظار لیبل پستی",
+      PROCESSING: "۶. تکمیل شده و باید ارسال شود",
+      PREPARING: "۵. در انتظار لیبل پستی"
     };
     return statusMap[status] || status;
   };

@@ -333,23 +333,26 @@ export default function OrdersList() {
     switch (status) {
       case "REQUESTED":
       case "WAITING_SUPPLIER_CONFIRMATION":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-500/10 text-purple-600 border border-purple-500/20">۱. در انتظار تایید تامین‌کننده</span>;
+      case "PENDING":
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-500/10 text-purple-600 border border-purple-500/20">۱. در انتظار تایید تأمین‌کننده</span>;
       case "WAITING_STORE_ADDRESS":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">۲. در انتظار دریافت آدرس پستی</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">۲. در انتظار ثبت آدرس</span>;
       case "WAITING_SHIPPING_COST":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 border border-amber-500/20">۳. در انتظار برآورد هزینه</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 border border-amber-500/20">۳. در انتظار برآورد هزینه پستی</span>;
       case "PENDING_PAYMENT":
       case "WAITING_FOR_PAYMENT":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-orange-500/10 text-orange-600 border border-orange-500/20">۴. نیازمند پرداخت توسط مدیر فروشگاه</span>;
+      case "WAITING_SHIPPING_PAYMENT":
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-orange-500/10 text-orange-600 border border-orange-500/20">۴. در انتظار پرداخت</span>;
+      case "PAID":
       case "PENDING_POSTAL_LABEL":
       case "READY_TO_SHIP":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">۵. نیازمند دریافت لیبل</span>;
+      case "PREPARING":
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">۵. در انتظار لیبل پستی</span>;
       case "SHIPPED":
       case "PROCESSING":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-teal-500/10 text-teal-600 border border-teal-500/20">۶. در حال ارسال</span>;
       case "COMPLETED":
       case "DELIVERED":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">تکمیل شده</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">۶. تکمیل شده و باید ارسال شود</span>;
       default:
         return <span className="px-3 py-1 rounded-full text-xs font-black bg-gray-500/10 text-gray-600">{status}</span>;
     }

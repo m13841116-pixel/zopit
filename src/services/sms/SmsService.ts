@@ -1,22 +1,51 @@
 import { getPrisma } from '../../prisma.js';
 
+/**
+ * Standardizes mobile numbers to local Iranian format starting with 09...
+ */
+function sanitizeMobileNumber(mobile: string): string {
+  let cleanMobile = mobile ? String(mobile).trim().replace(/\s+/g, '') : '';
+  if (cleanMobile.startsWith('+98')) {
+    cleanMobile = '0' + cleanMobile.slice(3);
+  } else if (cleanMobile.startsWith('98') && cleanMobile.length === 12) {
+    cleanMobile = '0' + cleanMobile.slice(2);
+  }
+  return cleanMobile;
+}
+
+/**
+ * Core function to send an SMS pattern/template via the bankkalaha.ir proxy.
+ */
 export async function sendPattern(mobile: string, patternKey: string, textValues: string[]) {
   try {
     const prisma = getPrisma();
     
-    // Get customized bodyId from database config based on patternKey
-    const dbPattern = await prisma.systemConfig.findUnique({ where: { key: patternKey } });
-    const dbGeneralPattern = await prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_ID' } });
+    // Read MelliPayamak configuration dynamically from Database
+    const [dbUser, dbPass, dbFrom, dbPattern, dbGeneralPattern] = await Promise.all([
+      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_USERNAME' } }),
+      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PASSWORD' } }),
+      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_FROM_NUMBER' } }),
+      prisma.systemConfig.findUnique({ where: { key: patternKey } }),
+      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_ID' } })
+    ]);
 
-    // Extract body ID value (check DB, fallback to environment)
-    const rawBodyId = 
-      dbPattern?.value?.trim() || 
-      dbGeneralPattern?.value?.trim() || 
-      process.env[patternKey] || 
-      '';
+    const username = dbUser?.value?.trim() || '';
+    const password = dbPass?.value?.trim() || ''; // Token
+    const fromNumber = dbFrom?.value?.trim() || '50001'; // Sender line
 
-    // Map default pattern IDs if nothing is configured
+    if (!username || !password) {
+      console.error('[SMS Service] MelliPayamak credentials (username/password/token) are missing from Database.');
+      return { 
+        success: false, 
+        error: 'تنظیمات نام کاربری و کلمه عبور ملی‌پیامک در پایگاه‌داده یافت نشد.' 
+      };
+    }
+
+    // Extract body ID value
+    const rawBodyId = dbPattern?.value?.trim() || dbGeneralPattern?.value?.trim() || '';
     let bodyId: string | number = rawBodyId;
+
+    // Map default pattern IDs if nothing is configured in DB
     if (!bodyId) {
       if (patternKey === 'MELLIPAYAMAK_PATTERN_OTP') {
         bodyId = 223344; // standard fallback OTP pattern
@@ -29,28 +58,29 @@ export async function sendPattern(mobile: string, patternKey: string, textValues
       }
     }
 
-    // Convert to number if it is numeric
     const parsedBodyId = isNaN(Number(bodyId)) ? bodyId : Number(bodyId);
-
-    // Sanitize mobile number format
-    let cleanMobile = mobile ? String(mobile).trim().replace(/\s+/g, '') : '';
-    if (cleanMobile.startsWith('+98')) cleanMobile = '0' + cleanMobile.slice(3);
-    else if (cleanMobile.startsWith('98')) cleanMobile = '0' + cleanMobile.slice(2);
+    const cleanMobile = sanitizeMobileNumber(mobile);
     
     if (!cleanMobile || cleanMobile.length < 10) {
       return { success: false, error: 'شماره موبایل نامعتبر است' };
     }
 
-    // Build API payload
+    // Ensure args is always an array of strings
+    const args = Array.isArray(textValues) ? textValues : [String(textValues)];
+
+    // Build JSON payload with fields: to, bodyId, args, plus token/line config
     const payload = {
+      username,
+      password,
+      from: fromNumber,
       to: cleanMobile,
       bodyId: parsedBodyId,
-      args: textValues
+      args: args,
+      text: args.join(';') // text field for older versions of proxy
     };
 
-    console.log(`[SMS Service] Sending POST request to bankkalaha proxy. Target: ${cleanMobile}, bodyId: ${parsedBodyId}`);
+    console.log(`[SMS Service] Sending POST pattern request to bankkalaha proxy. Recipient: ${cleanMobile}, bodyId: ${parsedBodyId}`);
 
-    // Real fetch request to the proxy
     const response = await fetch('https://bankkalaha.ir/sms-proxy.php', {
       method: 'POST',
       headers: {
@@ -69,6 +99,7 @@ export async function sendPattern(mobile: string, patternKey: string, textValues
         response: data
       };
     } else {
+      console.error('[SMS Service Proxy Error Response]', response.status, data);
       return {
         success: false,
         error: `خطا در سرور پروکسی پیامک (کد ${response.status})`,
@@ -76,17 +107,87 @@ export async function sendPattern(mobile: string, patternKey: string, textValues
       };
     }
   } catch (err: any) {
-    console.error('[SMS Proxy Error]', err);
+    console.error('[SMS Service Proxy Exception]', err);
     return { success: false, error: err?.message || String(err) };
   }
 }
 
-// Map general sendSms to a generic pattern of the proxy to ensure no simulation is ever used
+/**
+ * Sends a normal plain-text SMS message via the bankkalaha.ir proxy.
+ */
 export async function sendSms(mobile: string, message: string) {
-  // Use a general pattern or map the full text as argument
-  return sendPattern(mobile, 'MELLIPAYAMAK_PATTERN_GENERAL', [message]);
+  try {
+    const prisma = getPrisma();
+    
+    // Read MelliPayamak configuration dynamically from Database
+    const [dbUser, dbPass, dbFrom] = await Promise.all([
+      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_USERNAME' } }),
+      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PASSWORD' } }),
+      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_FROM_NUMBER' } })
+    ]);
+
+    const username = dbUser?.value?.trim() || '';
+    const password = dbPass?.value?.trim() || '';
+    const fromNumber = dbFrom?.value?.trim() || '50001';
+
+    if (!username || !password) {
+      console.error('[SMS Service] MelliPayamak credentials (username/password) are missing from Database.');
+      return { 
+        success: false, 
+        error: 'تنظیمات نام کاربری و کلمه عبور ملی‌پیامک در پایگاه‌داده یافت نشد.' 
+      };
+    }
+
+    const cleanMobile = sanitizeMobileNumber(mobile);
+    if (!cleanMobile || cleanMobile.length < 10) {
+      return { success: false, error: 'شماره موبایل نامعتبر است' };
+    }
+
+    // Build standard MelliPayamak JSON payload for normal text message
+    const payload = {
+      username,
+      password,
+      to: cleanMobile,
+      from: fromNumber,
+      text: message
+    };
+
+    console.log(`[SMS Service] Sending POST normal message request to bankkalaha proxy. Recipient: ${cleanMobile}`);
+
+    const response = await fetch('https://bankkalaha.ir/sms-proxy.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': 'ZopitSMS2026Key'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json().catch(() => ({}));
+    
+    if (response.ok) {
+      return {
+        success: true,
+        message: 'پیامک با موفقیت از طریق پروکسی ارسال شد',
+        response: data
+      };
+    } else {
+      console.error('[SMS Service Proxy Normal SMS Error]', response.status, data);
+      return {
+        success: false,
+        error: `خطا در سرور پروکسی پیامک (کد ${response.status})`,
+        response: data
+      };
+    }
+  } catch (err: any) {
+    console.error('[SMS Service Normal SMS Exception]', err);
+    return { success: false, error: err?.message || String(err) };
+  }
 }
 
+/**
+ * Compatible export aliases
+ */
 export async function sendSmsViaMelliPayamak(mobile: string, message: string, orderId?: number) {
   return sendSms(mobile, message);
 }

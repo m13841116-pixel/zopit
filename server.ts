@@ -8969,97 +8969,79 @@ app.post('/api/payment/zibal/request-invoice-url', async (req: any, res: any) =>
 // Express Route 1: Payment Request via Proxy or Direct
 app.post('/api/payment/request', async (req: any, res: any) => {
   try {
-    const { amount, description, orderId: inputOrderId, storeId, customerName, customerPhone, customerAddress } = req.body || {};
+    const { amount, description, storeId, customerName, customerPhone, customerAddress } = req.body || {};
 
-    const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-    const merchantId = process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588';
-    const appUrl = process.env.APP_URL || getPublicUrl(req) || 'https://www.zopit.ir';
+    // 1. Read Merchant ID from Database
+    const dbMerchant = await prisma.systemConfig.findUnique({
+      where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
+    });
+    const merchantId = dbMerchant?.value?.trim() || 'zibal';
 
-    // 1. Create a new Order in Prisma DB with status PENDING (or update existing)
-    let order: any = null;
-    if (inputOrderId) {
-      const parsedId = Number(inputOrderId);
-      if (!isNaN(parsedId)) {
-        order = await prisma.order.findUnique({ where: { id: parsedId } }).catch(() => null);
-        if (order) {
-          order = await prisma.order.update({
-            where: { id: parsedId },
-            data: {
-              status: 'PENDING',
-              ...(amount ? { totalAmount: Number(amount) } : {}),
-            },
-          }).catch(() => order);
-        }
+    // 2. Create a new Order in Prisma DB with status PENDING as requested
+    const order = await prisma.order.create({
+      data: {
+        totalAmount: Number(amount || 0),
+        status: 'PENDING',
+        storeId: storeId ? Number(storeId) : undefined,
+        customerName: customerName || undefined,
+        customerPhone: customerPhone || undefined,
+        customerAddress: customerAddress || undefined,
+      },
+    });
+
+    const callbackUrl = 'https://www.zopit.ir/api/payment/callback';
+    const proxyUrl = 'https://bankkalaha.ir/zibal-proxy.php';
+    const proxySecret = 'ZopitPay2026Key';
+
+    console.log(`[Zibal Payment Request] Sending request to proxy for Order #${order.id}, Amount: ${order.totalAmount}`);
+
+    // 3. Send real POST request to proxy
+    const proxyResponse = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': proxySecret,
+      },
+      body: JSON.stringify({
+        action: 'request',
+        merchant: merchantId,
+        amount: Number(order.totalAmount),
+        orderId: order.id,
+        callbackUrl,
+        description: description || `پرداخت سفارش #${order.id}`,
+      }),
+    });
+
+    const data = await proxyResponse.json().catch(() => ({}));
+    console.log('[Zibal Payment Proxy Response]', data);
+
+    const trackId = data.trackId || data.authority;
+
+    if ((data.success || Number(data.result) === 100) && trackId) {
+      // Store the trackId on the order for callback lookup
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { trackingCode: String(trackId) }
+      }).catch((err) => console.error('Error storing trackingCode on order:', err));
+
+      const payLink = `https://gateway.zibal.ir/start/${trackId}`;
+
+      if (req.headers.accept && req.headers.accept.includes('text/html')) {
+        return res.redirect(payLink);
       }
-    }
 
-    if (!order) {
-      order = await prisma.order.create({
-        data: {
-          totalAmount: Number(amount || 0),
-          status: 'PENDING',
-          storeId: storeId ? Number(storeId) : undefined,
-          customerName: customerName || undefined,
-          customerPhone: customerPhone || undefined,
-          customerAddress: customerAddress || undefined,
-        },
-      });
-    }
-
-    const callbackUrl = `${appUrl.replace(/\/$/, '')}/api/payment/callback?orderId=${order.id}`;
-
-    if (proxyUrl && proxySecret) {
-      const proxyResponse = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': proxySecret,
-        },
-        body: JSON.stringify({
-          action: 'request',
-          merchant: merchantId,
-          amount: Number(amount || order.totalAmount),
-          orderId: order.id,
-          callbackUrl,
-          description: description || `پرداخت سفارش #${order.id}`,
-        }),
-      });
-
-      const data = await proxyResponse.json();
-      const trackId = data.trackId || data.authority;
-
-      if ((data.success || Number(data.result) === 100) && trackId) {
-        const payLink = `https://gateway.zibal.ir/start/${trackId}`;
-
-        if (req.headers.accept && req.headers.accept.includes('text/html')) {
-          return res.redirect(payLink);
-        }
-
-        return res.json({
-          success: true,
-          trackId,
-          orderId: order.id,
-          payLink,
-          redirectUrl: payLink,
-          message: 'درخواست پرداخت با موفقیت ثبت شد.',
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          error: data.message || data.error || 'خطا در دریافت پاسخ از پروکسی درگاه زیبال',
-        });
-      }
-    } else {
-      // Fallback to internal PaymentServiceFactory
-      const paymentGateway = await PaymentServiceFactory.getService();
-      const zibalResult = await paymentGateway.createPayment(Number(amount || order.totalAmount), description, callbackUrl);
       return res.json({
         success: true,
-        payLink: zibalResult.payLink,
-        trackId: zibalResult.authority,
+        trackId,
         orderId: order.id,
-        message: 'درخواست پرداخت با موفقیت ایجاد شد.',
+        payLink,
+        redirectUrl: payLink,
+        message: 'درخواست پرداخت با موفقیت ثبت شد.',
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: data.message || data.error || 'خطا در دریافت پاسخ از پروکسی درگاه زیبال',
       });
     }
   } catch (error: any) {
@@ -9077,11 +9059,7 @@ app.all('/api/payment/callback', async (req: any, res: any) => {
   const successStatus = req.query.success || req.query.status || req.body?.success || req.body?.status;
   const orderId = req.query.orderId || req.body?.orderId;
 
-  const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-  const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  const merchantId = process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588';
   const appUrl = process.env.APP_URL || getPublicUrl(req) || 'https://www.zopit.ir';
-
   const redirectBase = appUrl.replace(/\/$/, '');
 
   if (!trackId) {
@@ -9093,96 +9071,106 @@ app.all('/api/payment/callback', async (req: any, res: any) => {
   }
 
   try {
-    let isSuccess = false;
-    let refNumber = trackId;
+    // 1. Read Merchant ID from Database
+    const dbMerchant = await prisma.systemConfig.findUnique({
+      where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
+    });
+    const merchantId = dbMerchant?.value?.trim() || 'zibal';
 
-    if (proxyUrl && proxySecret) {
-      const verifyResponse = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': proxySecret,
-        },
-        body: JSON.stringify({
-          action: 'verify',
-          merchant: merchantId,
-          trackId: trackId,
-        }),
-      });
+    const proxyUrl = 'https://bankkalaha.ir/zibal-proxy.php';
+    const proxySecret = 'ZopitPay2026Key';
 
-      const verifyData = await verifyResponse.json();
-      const resCode = Number(verifyData.result);
+    console.log(`[Zibal Payment Verify] Verifying trackId: ${trackId} with proxy`);
 
-      if (verifyData.success || resCode === 100 || resCode === 201) {
-        isSuccess = true;
-        refNumber = verifyData.refNumber || verifyData.refId || trackId;
+    // 2. Send real POST verification request to proxy
+    const verifyResponse = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': proxySecret,
+      },
+      body: JSON.stringify({
+        action: 'verify',
+        merchant: merchantId,
+        trackId: String(trackId),
+      }),
+    });
+
+    const verifyData = await verifyResponse.json().catch(() => ({}));
+    console.log('[Zibal Payment Verify Proxy Response]', verifyData);
+
+    const resCode = Number(verifyData.result);
+
+    // If result is 100 (successful verification)
+    if (resCode === 100) {
+      // Find the associated order (either by trackingCode matching trackId, or by orderId query)
+      let orderToUpdate: any = null;
+      
+      if (trackId) {
+        orderToUpdate = await prisma.order.findFirst({
+          where: { trackingCode: String(trackId) },
+          include: { items: true }
+        }).catch(() => null);
       }
-    } else {
-      const paymentGateway = await PaymentServiceFactory.getService();
-      const verification = await paymentGateway.verifyPayment(trackId.toString(), 0);
-      isSuccess = verification.success;
-      refNumber = verification.refId || trackId;
-    }
 
-    if (isSuccess) {
-      // If orderId exists, update order status in Prisma DB to PAID and save refNumber
-      if (orderId && !orderId.toString().startsWith('DIRECT')) {
+      if (!orderToUpdate && orderId) {
         const numericOrderId = parseInt(orderId.toString().replace(/\D/g, ''), 10);
         if (!isNaN(numericOrderId)) {
-          const orderToUpdate = await prisma.order.findUnique({
-             where: { id: numericOrderId },
-             include: { items: true }
+          orderToUpdate = await prisma.order.findUnique({
+            where: { id: numericOrderId },
+            include: { items: true }
           }).catch(() => null);
+        }
+      }
 
-          if (orderToUpdate) {
-             await prisma.order.update({
-               where: { id: numericOrderId },
-               data: {
-                 status: 'PAID',
-                 trackingCode: String(refNumber),
-               }
-             }).catch(() => null);
+      if (orderToUpdate) {
+        await prisma.order.update({
+          where: { id: orderToUpdate.id },
+          data: {
+            status: 'PAID',
+            trackingCode: String(verifyData.refNumber || trackId),
+          }
+        }).catch(() => null);
 
-             // Charge supplier wallets based on supplier base price
-             if (orderToUpdate.items) {
-               for (const item of orderToUpdate.items) {
-                 const amountToAdd = Number(item.supplierPrice || 0) * Number(item.quantity || 1);
-                 if (amountToAdd > 0 && item.supplierId) {
-                    let wallet = await prisma.wallet.findUnique({ where: { supplierId: item.supplierId } }).catch(() => null);
-                    if (!wallet) {
-                       wallet = await prisma.wallet.create({
-                          data: { supplierId: item.supplierId, balance: 0, currency: 'IRR' }
-                       }).catch(() => null);
-                    }
-                    if (wallet) {
-                      await prisma.wallet.update({
-                         where: { id: wallet.id },
-                         data: { balance: { increment: amountToAdd } }
-                      }).catch(() => null);
-                      await prisma.ledgerEntry.create({
-                         data: {
-                            walletId: wallet.id,
-                            amount: amountToAdd,
-                            type: 'CREDIT',
-                            status: 'COMPLETED',
-                            description: `درآمد از فروش محصول در سفارش #${orderToUpdate.id}`,
-                            referenceId: orderToUpdate.id.toString()
-                         }
-                      }).catch(() => null);
-                    }
-                 }
-               }
-             }
+        // Charge supplier wallets based on supplier base price
+        if (orderToUpdate.items) {
+          for (const item of orderToUpdate.items) {
+            const amountToAdd = Number(item.supplierPrice || 0) * Number(item.quantity || 1);
+            if (amountToAdd > 0 && item.supplierId) {
+              let wallet = await prisma.wallet.findUnique({ where: { supplierId: item.supplierId } }).catch(() => null);
+              if (!wallet) {
+                wallet = await prisma.wallet.create({
+                  data: { supplierId: item.supplierId, balance: 0, currency: 'IRR' }
+                }).catch(() => null);
+              }
+              if (wallet) {
+                await prisma.wallet.update({
+                  where: { id: wallet.id },
+                  data: { balance: { increment: amountToAdd } }
+                }).catch(() => null);
+                await prisma.ledgerEntry.create({
+                  data: {
+                    walletId: wallet.id,
+                    amount: amountToAdd,
+                    type: 'CREDIT',
+                    status: 'COMPLETED',
+                    description: `درآمد از فروش محصول در سفارش #${orderToUpdate.id}`,
+                    referenceId: orderToUpdate.id.toString()
+                  }
+                }).catch(() => null);
+              }
+            }
           }
         }
       }
 
       return res.redirect(
-        `${redirectBase}/checkout/success?trackId=${trackId}&refNumber=${refNumber}&orderId=${orderId || ''}`
+        `${redirectBase}/checkout/success?trackId=${trackId}&orderId=${orderToUpdate?.id || orderId || ''}&refNumber=${verifyData.refNumber || ''}`
       );
     } else {
+      console.error('[Zibal Payment Verify Failed]', verifyData);
       return res.redirect(
-        `${redirectBase}/checkout/failed?trackId=${trackId}&orderId=${orderId || ''}`
+        `${redirectBase}/checkout/failed?trackId=${trackId}&orderId=${orderId || ''}&message=${encodeURIComponent(verifyData.message || 'تایید تراکنش با خطا مواجه شد')}`
       );
     }
   } catch (error: any) {

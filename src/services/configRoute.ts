@@ -1,10 +1,9 @@
 import { getPrisma } from '../prisma.js';
 
-const prisma = getPrisma();
-
 export default function registerConfig(app: any) {
   app.get('/api/config', async (req: any, res: any) => {
     try {
+      const prisma = getPrisma();
       const configs = await prisma.systemConfig.findMany();
       const configMap = configs.reduce((acc: any, c: any) => {
         if (c.value === 'true') acc[c.key] = true;
@@ -13,13 +12,15 @@ export default function registerConfig(app: any) {
         return acc;
       }, {});
       res.json(configMap);
-    } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+    } catch (error: any) {
+      console.error('Error fetching config:', error);
+      res.status(500).json({ error: 'Internal server error', details: error?.message || String(error) });
     }
   });
 
   app.put('/api/config', async (req: any, res: any) => {
     try {
+      const prisma = getPrisma();
       const body = req.body || {};
       
       // 1. Bulk array format: { items: [{ key, value }] }
