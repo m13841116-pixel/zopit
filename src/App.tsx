@@ -53,6 +53,11 @@ import {
   PlusSquare,
   ExternalLink,
   X,
+  KeyRound,
+  Key,
+  Send,
+  Clock,
+  ShieldAlert,
 } from "lucide-react";
 import { CustomCodeInjector } from "./components/CustomCodeInjector";
 import { SupplierDashboard } from "./components/supplier/SupplierDashboard";
@@ -279,7 +284,13 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   const [captchaVal, setCaptchaVal] = useState("");
   const [captchaInput, setCaptchaInput] = useState("");
   
-  // Forgot Password state
+  // Forgot Password state & Tabs
+  const [forgotTab, setForgotTab] = useState<"sms_login" | "sms_reset" | "national_code">("sms_login");
+  const [forgotOtpMobile, setForgotOtpMobile] = useState("");
+  const [forgotOtpCode, setForgotOtpCode] = useState("");
+  const [forgotOtpSent, setForgotOtpSent] = useState(false);
+  const [forgotOtpTimer, setForgotOtpTimer] = useState(0);
+  const [forgotSimulatedCode, setForgotSimulatedCode] = useState<string | null>(null);
   const [forgotIdentity, setForgotIdentity] = useState("");
   const [forgotNationalCode, setForgotNationalCode] = useState("");
   const [forgotNewPassword, setForgotNewPassword] = useState("");
@@ -295,6 +306,35 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   useEffect(() => {
     generateCaptcha();
   }, [view]);
+
+  // Login Mode & SMS OTP state (Defaults to OTP for fastest, smoothest experience)
+  const [loginMode, setLoginMode] = useState<"otp" | "password">("otp");
+  const [loginOtpMobile, setLoginOtpMobile] = useState("");
+  const [loginOtpCode, setLoginOtpCode] = useState("");
+  const [loginOtpSent, setLoginOtpSent] = useState(false);
+  const [loginOtpTimer, setLoginOtpTimer] = useState(0);
+  const [loginSimulatedCode, setLoginSimulatedCode] = useState<string | null>(null);
+
+  // Countdown timers for OTP
+  useEffect(() => {
+    let interval: any = null;
+    if (loginOtpTimer > 0) {
+      interval = setInterval(() => {
+        setLoginOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [loginOtpTimer]);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (forgotOtpTimer > 0) {
+      interval = setInterval(() => {
+        setForgotOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [forgotOtpTimer]);
 
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [refForm, setRefForm] = useState({
@@ -766,7 +806,199 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       setForgotNationalCode("");
       setForgotNewPassword("");
       setForgotConfirmPassword("");
-      setView("explore");
+      setView("login");
+    } catch (err: any) {
+      showNotification(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send OTP for Quick Login
+  const handleSendLoginOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!loginOtpMobile || loginOtpMobile.trim().length < 8) {
+      showNotification("لطفاً شماره همراه یا نام کاربری حساب خود را وارد نمایید.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: loginOtpMobile.trim() }),
+      });
+      const data = await parseJsonResponse(res, "خطا در ارسال کد پیامکی");
+      if (!res.ok) {
+        throw new Error(data.error || "خطا در ارسال کد تایید");
+      }
+      setLoginOtpSent(true);
+      setLoginOtpTimer(120);
+      if (data.simulated && data.code) {
+        setLoginSimulatedCode(data.code);
+        showNotification(`کد تایید پیامکی: ${data.code}`, "success");
+      } else {
+        showNotification("کد تایید ۵ رقمی پیامک شد. لطفاً آن را وارد نمایید.", "success");
+      }
+    } catch (err: any) {
+      showNotification(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Verify OTP and Log In
+  const handleVerifyLoginOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginOtpCode || loginOtpCode.trim().length < 4) {
+      showNotification("لطفاً کد تایید ۵ رقمی را به طور کامل وارد نمایید.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/login-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: loginOtpMobile.trim(), code: loginOtpCode.trim() }),
+      });
+      const data = await parseJsonResponse(res, "خطا در تایید کد و ورود");
+      if (!res.ok) {
+        setLoginShake(true);
+        setTimeout(() => setLoginShake(false), 500);
+        throw new Error(data.error || "کد تایید نامعتبر است یا منقضی شده");
+      }
+
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+      setCurrentUser(data.user);
+      showNotification("ورود سریع با پیامک با موفقیت انجام شد.", "success");
+
+      const userRole = data.user?.role;
+      if (userRole !== "SUPERADMIN" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+        const userId = data.user?.id || data.user?.username || "default";
+        if (!localStorage.getItem(`terms_accepted_${userId}`)) {
+          setShowTermsModal(userRole || "GENERAL");
+        }
+      }
+      setView("dashboard");
+    } catch (err: any) {
+      showNotification(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send OTP for Forgot Password
+  const handleSendForgotOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!forgotOtpMobile || forgotOtpMobile.trim().length < 8) {
+      showNotification("لطفاً شماره همراه یا نام کاربری حساب خود را وارد نمایید.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: forgotOtpMobile.trim() }),
+      });
+      const data = await parseJsonResponse(res, "خطا در ارسال پیامک");
+      if (!res.ok) {
+        throw new Error(data.error || "خطا در ارسال کد پیامکی");
+      }
+      setForgotOtpSent(true);
+      setForgotOtpTimer(120);
+      if (data.simulated && data.code) {
+        setForgotSimulatedCode(data.code);
+        showNotification(`کد تایید پیامکی: ${data.code}`, "success");
+      } else {
+        showNotification("کد تایید پیامکی ارسال شد.", "success");
+      }
+    } catch (err: any) {
+      showNotification(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Forgot Password: Direct SMS Login (Option 1)
+  const handleForgotOtpDirectLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotOtpCode || forgotOtpCode.trim().length < 4) {
+      showNotification("لطفاً کد ۵ رقمی دریافتی از پیامک را وارد کنید.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/login-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: forgotOtpMobile.trim(), code: forgotOtpCode.trim() }),
+      });
+      const data = await parseJsonResponse(res, "خطا در ورود با پیامک");
+      if (!res.ok) {
+        throw new Error(data.error || "کد تایید پیامکی نامعتبر است");
+      }
+
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+      setCurrentUser(data.user);
+      showNotification("ورود مستقیم به حساب با پیامک با موفقیت انجام شد.", "success");
+
+      const userRole = data.user?.role;
+      if (userRole !== "SUPERADMIN" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+        const userId = data.user?.id || data.user?.username || "default";
+        if (!localStorage.getItem(`terms_accepted_${userId}`)) {
+          setShowTermsModal(userRole || "GENERAL");
+        }
+      }
+      setView("dashboard");
+    } catch (err: any) {
+      showNotification(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Forgot Password: Reset Password via SMS (Option 2)
+  const handleForgotOtpResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotOtpCode || forgotOtpCode.trim().length < 4) {
+      showNotification("لطفاً کد تایید پیامک شده را وارد کنید.", "error");
+      return;
+    }
+    if (!forgotNewPassword || forgotNewPassword.length < 6) {
+      showNotification("رمز عبور جدید باید حداقل ۶ کاراکتر باشد.", "error");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      showNotification("تکرار رمز عبور با رمز وارد شده مطابقت ندارد.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/reset-password-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mobile: forgotOtpMobile.trim(),
+          code: forgotOtpCode.trim(),
+          newPassword: forgotNewPassword,
+        }),
+      });
+      const data = await parseJsonResponse(res, "خطا در بازنشانی رمز");
+      if (!res.ok) {
+        throw new Error(data.error || "خطا در تغییر رمز عبور");
+      }
+
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+      setCurrentUser(data.user);
+      showNotification("رمز عبور جدید با موفقیت تنظیم شد و وارد حساب شدید.", "success");
+      setView("dashboard");
     } catch (err: any) {
       showNotification(err.message, "error");
     } finally {
@@ -1370,7 +1602,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                         </button>
                       </div>
 
-                    <div className="mb-8 text-right">
+                    <div className="mb-6 text-right">
                       <h2 className="text-xl font-black text-text-primary mb-2">
                         ورود به حساب کاربری
                       </h2>
@@ -1379,83 +1611,290 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                       </p>
                     </div>
 
-                    <form onSubmit={handleLoginSubmit} className="space-y-5">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary">
-                          نام کاربری
-                        </label>
-                        <div className="relative group">
-                          <input
-                            type="text"
-                            required
-                            dir="ltr"
-                            value={loginUsername}
-                            onChange={(e) => setLoginUsername(e.target.value)}
-                            className="w-full pl-4 pr-11 py-3.5 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50 text-left"
-                            placeholder="نام کاربری یا موبایل"
-                          />
-                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
-                            <User className="w-5 h-5" />
-                          </div>
-                        </div>
-                      </div>
+                    {/* Mode Switch Tabs: Password vs SMS OTP */}
+                    <div className="flex rounded-2xl bg-surface/80 p-1.5 border border-border-default/60 mb-6 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setLoginMode("otp")}
+                        className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          loginMode === "otp"
+                            ? "bg-primary-default text-white shadow-md shadow-primary-default/25"
+                            : "text-text-muted hover:text-text-primary hover:bg-background/50"
+                        }`}
+                      >
+                        <Smartphone className="w-4 h-4" />
+                        <span>ورود با پیامک (کد یکبار مصرف)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLoginMode("password")}
+                        className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          loginMode === "password"
+                            ? "bg-primary-default text-white shadow-md shadow-primary-default/25"
+                            : "text-text-muted hover:text-text-primary hover:bg-background/50"
+                        }`}
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span>ورود با رمز عبور</span>
+                      </button>
+                    </div>
 
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center">
+                    {/* SMS OTP Login Mode (Fast & Standard) */}
+                    {loginMode === "otp" && (
+                      <div className="space-y-4">
+                        {!loginOtpSent ? (
+                          /* Step 1: Enter Mobile Number */
+                          <form onSubmit={handleSendLoginOtp} className="space-y-5">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-text-secondary">
+                                شماره همراه یا نام کاربری
+                              </label>
+                              <div className="relative group">
+                                <input
+                                  type="text"
+                                  required
+                                  dir="ltr"
+                                  autoFocus
+                                  value={loginOtpMobile}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                      .replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d).toString())
+                                      .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d).toString());
+                                    setLoginOtpMobile(val);
+                                  }}
+                                  className="w-full pl-4 pr-11 py-3.5 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50 text-left font-mono tracking-wider"
+                                  placeholder="09123456789"
+                                />
+                                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                                  <Smartphone className="w-5 h-5" />
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-text-muted leading-relaxed">
+                                کد تایید یکبار مصرف ۵ رقمی از طریق پیامک برای این شماره ارسال خواهد شد.
+                              </p>
+                            </div>
+
+                            <div>
+                              <button
+                                type="submit"
+                                disabled={loading || !loginOtpMobile.trim()}
+                                className="w-full bg-primary-default hover:bg-primary-hover text-white font-black py-4 rounded-xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50 cursor-pointer"
+                              >
+                                {loading ? (
+                                  <RefreshCw className="w-5 h-5 animate-spin" />
+                                ) : (
+                                  <span className="flex items-center gap-2">
+                                    <Send className="w-4 h-4" />
+                                    <span>دریافت کد تایید پیامکی</span>
+                                  </span>
+                                )}
+                              </button>
+                            </div>
+
+                            <div className="text-center pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setLoginMode("password")}
+                                className="text-xs text-text-muted hover:text-primary-default font-bold transition-colors cursor-pointer"
+                              >
+                                ورود با رمز عبور ثابت
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          /* Step 2: Enter 5-digit OTP Code */
+                          <form onSubmit={handleVerifyLoginOtp} className="space-y-4">
+                            <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                                <span className="text-xs text-emerald-800 dark:text-emerald-200 font-bold">
+                                  کد تایید به شماره <span className="font-mono dir-ltr inline-block font-black">{loginOtpMobile}</span> پیامک شد.
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLoginOtpSent(false);
+                                  setLoginOtpCode("");
+                                  setLoginSimulatedCode(null);
+                                }}
+                                className="text-[11px] text-emerald-700 dark:text-emerald-300 font-extrabold underline hover:text-emerald-900 cursor-pointer"
+                              >
+                                ویرایش شماره
+                              </button>
+                            </div>
+
+                            {loginSimulatedCode && (
+                              <button
+                                type="button"
+                                onClick={() => setLoginOtpCode(loginSimulatedCode)}
+                                className="w-full p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-800 dark:text-amber-300 font-bold flex items-center justify-between cursor-pointer hover:bg-amber-500/20 transition-colors text-right"
+                              >
+                                <span>کد تست شبیه‌سازی‌شده: <strong className="font-mono text-sm">{loginSimulatedCode}</strong></span>
+                                <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded">کلیک جهت درج خودکار</span>
+                              </button>
+                            )}
+
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-text-secondary">
+                                  کد تایید ۵ رقمی را وارد کنید
+                                </label>
+                                {loginOtpTimer > 0 ? (
+                                  <span className="text-[11px] font-mono text-text-muted flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    {Math.floor(loginOtpTimer / 60)}:{(loginOtpTimer % 60).toString().padStart(2, "0")}
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendLoginOtp()}
+                                    disabled={loading}
+                                    className="text-[11px] text-primary-default font-extrabold hover:underline cursor-pointer"
+                                  >
+                                    ارسال مجدد کد
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="relative group">
+                                <input
+                                  type="text"
+                                  required
+                                  maxLength={6}
+                                  dir="ltr"
+                                  autoFocus
+                                  value={loginOtpCode}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                      .replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d).toString())
+                                      .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d).toString())
+                                      .replace(/\D/g, "");
+                                    setLoginOtpCode(val);
+                                  }}
+                                  className="w-full pl-4 pr-11 py-3.5 bg-background hover:bg-surface/80 border rounded-xl text-xl tracking-[0.4em] text-center font-mono font-black focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary border-gray-300 dark:border-indigo-500/50"
+                                  placeholder="• • • • •"
+                                />
+                                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                                  <KeyRound className="w-5 h-5" />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <button
+                                type="submit"
+                                disabled={loading || loginOtpCode.length < 4}
+                                className="w-full bg-primary-default hover:bg-primary-hover text-white font-black py-4 rounded-xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50 cursor-pointer"
+                              >
+                                {loading ? (
+                                  <RefreshCw className="w-5 h-5 animate-spin" />
+                                ) : (
+                                  <span className="flex items-center gap-2">
+                                    <CheckCircle className="w-5 h-5" />
+                                    <span>تایید و ورود به حساب</span>
+                                  </span>
+                                )}
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Password Login Mode */}
+                    {loginMode === "password" && (
+                      <form onSubmit={handleLoginSubmit} className="space-y-5">
+                        <div className="space-y-1.5">
                           <label className="text-xs font-bold text-text-secondary">
-                            رمز عبور
+                            نام کاربری یا شماره همراه
                           </label>
-                          <button
-                            type="button"
-                            onClick={() => setView("forgot_password")}
-                            className="text-[10px] text-primary-default font-bold hover:underline cursor-pointer"
-                          >
-                            فراموشی رمز؟
-                          </button>
-                        </div>
-                        <div className="relative group">
-                          <input
-                            type={showLoginPassword ? "text" : "password"}
-                            required
-                            dir="ltr"
-                            value={loginPassword}
-                            onChange={(e) => setLoginPassword(e.target.value)}
-                            className="w-full pl-12 pr-11 py-3.5 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50 text-left"
-                            placeholder="رمز عبور"
-                          />
-                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
-                            <Lock className="w-5 h-5" />
+                          <div className="relative group">
+                            <input
+                              type="text"
+                              required
+                              dir="ltr"
+                              value={loginUsername}
+                              onChange={(e) => setLoginUsername(e.target.value)}
+                              className="w-full pl-4 pr-11 py-3.5 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50 text-left"
+                              placeholder="نام کاربری یا موبایل"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <User className="w-5 h-5" />
+                            </div>
                           </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-text-secondary">
+                              رمز عبور
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForgotTab("sms_login");
+                                setView("forgot_password");
+                              }}
+                              className="text-[10px] text-primary-default font-bold hover:underline cursor-pointer"
+                            >
+                              فراموشی رمز یا ورود با پیامک؟
+                            </button>
+                          </div>
+                          <div className="relative group">
+                            <input
+                              type={showLoginPassword ? "text" : "password"}
+                              required
+                              dir="ltr"
+                              value={loginPassword}
+                              onChange={(e) => setLoginPassword(e.target.value)}
+                              className="w-full pl-12 pr-11 py-3.5 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50 text-left"
+                              placeholder="رمز عبور"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <Lock className="w-5 h-5" />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShowLoginPassword(!showLoginPassword)
+                              }
+                              className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted hover:text-primary-default transition-colors"
+                            >
+                              {showLoginPassword ? (
+                                <EyeOff className="w-5 h-5" />
+                              ) : (
+                                <Eye className="w-5 h-5" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
                           <button
-                            type="button"
-                            onClick={() =>
-                              setShowLoginPassword(!showLoginPassword)
-                            }
-                            className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted hover:text-primary-default transition-colors"
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-primary-default hover:bg-primary-hover text-white font-black py-4 rounded-xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-75 cursor-pointer"
                           >
-                            {showLoginPassword ? (
-                              <EyeOff className="w-5 h-5" />
+                            {loading ? (
+                              <RefreshCw className="w-5 h-5 animate-spin" />
                             ) : (
-                              <Eye className="w-5 h-5" />
+                              <span>ورود به سیستم</span>
                             )}
                           </button>
                         </div>
-                      </div>
 
-                      <div>
-                        <button
-                          type="submit"
-                          disabled={loading}
-                          className="w-full bg-primary-default hover:bg-primary-hover text-white font-black py-4 rounded-xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-75 cursor-pointer"
-                        >
-                          {loading ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <span>ورود به سیستم</span>
-                          )}
-                        </button>
-                      </div>
-                    </form>
+                        <div className="text-center pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setLoginMode("otp")}
+                            className="text-xs text-text-muted hover:text-primary-default font-bold transition-colors cursor-pointer"
+                          >
+                            ورود بدون رمز با کد تایید پیامکی (OTP)
+                          </button>
+                        </div>
+                      </form>
+                    )}
 
                     <div className="mt-6 border-t border-border-default/50 dark:border-border-subtle/50 pt-4 space-y-3">
                       <div className="flex items-center justify-between text-xs">
@@ -1501,155 +1940,432 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                   <div className="w-full p-8 md:p-12 flex flex-col justify-center relative">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-primary-default/10 rounded-full blur-3xl -z-10 translate-x-1/3 -translate-y-1/3"></div>
 
-                    <div className="flex items-center gap-3 mb-8">
+                    <div className="flex items-center gap-3 mb-6">
                       <ZopitLogo size="lg" />
                       <div>
                         <p className="text-xs font-bold text-primary-default mt-1">
-                          بازیابی رمز عبور حساب کاربری
+                          بازیابی رمز و ورود اضطراری به حساب
                         </p>
                       </div>
                     </div>
 
-                    <div className="mb-6 text-right">
-                      <h2 className="text-xl font-black text-text-primary mb-2">
-                        فراموشی رمز عبور
+                    <div className="mb-5 text-right">
+                      <h2 className="text-xl font-black text-text-primary mb-1.5">
+                        فراموشی رمز عبور یا ورود با پیامک
                       </h2>
-                      <p className="text-sm text-text-muted font-medium">
-                        برای تغییر رمز عبور، اطلاعات هویتی خود را تایید کنید.
+                      <p className="text-xs text-text-muted font-medium">
+                        در صورت فراموشی رمز عبور، می‌توانید مستقیماً با پیامک وارد شوید یا رمز جدید تعیین کنید.
                       </p>
                     </div>
 
-                    <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary">
-                          نام کاربری یا شماره تماس *
-                        </label>
-                        <div className="relative group">
-                          <input
-                            type="text"
-                            required
-                            value={forgotIdentity}
-                            onChange={(e) => setForgotIdentity(e.target.value)}
-                            className="w-full pl-4 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
-                            placeholder="مثال: s_ahmadi یا 09121111111"
-                          />
-                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
-                            <User className="w-5 h-5" />
-                          </div>
-                        </div>
-                      </div>
+                    {/* Tabs for Forgot Password */}
+                    <div className="flex rounded-2xl bg-surface/80 p-1 border border-border-default/60 mb-6 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setForgotTab("sms_login")}
+                        className={`flex-1 py-2.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          forgotTab === "sms_login"
+                            ? "bg-primary-default text-white shadow-md shadow-primary-default/25"
+                            : "text-text-muted hover:text-text-primary hover:bg-background/50"
+                        }`}
+                      >
+                        <Smartphone className="w-3.5 h-3.5" />
+                        <span>ورود مستقیم با پیامک</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForgotTab("sms_reset")}
+                        className={`flex-1 py-2.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          forgotTab === "sms_reset"
+                            ? "bg-primary-default text-white shadow-md shadow-primary-default/25"
+                            : "text-text-muted hover:text-text-primary hover:bg-background/50"
+                        }`}
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>تعیین رمز با پیامک</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForgotTab("national_code")}
+                        className={`flex-1 py-2.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          forgotTab === "national_code"
+                            ? "bg-primary-default text-white shadow-md shadow-primary-default/25"
+                            : "text-text-muted hover:text-text-primary hover:bg-background/50"
+                        }`}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>کد ملی</span>
+                      </button>
+                    </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary">
-                          کد ملی *
-                        </label>
-                        <div className="relative group">
-                          <input
-                            type="text"
-                            required
-                            maxLength={10}
-                            value={forgotNationalCode}
-                            onChange={(e) => setForgotNationalCode(e.target.value)}
-                            className="w-full pl-4 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary text-center font-mono font-bold border-gray-300 dark:border-indigo-500/50"
-                            placeholder="کد ملی ۱۰ رقمی"
-                            style={{ direction: "ltr" }}
-                          />
-                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
-                            <FileText className="w-5 h-5" />
-                          </div>
+                    {/* Tab 1: Direct SMS Login */}
+                    {forgotTab === "sms_login" && (
+                      <form onSubmit={handleForgotOtpDirectLogin} className="space-y-4">
+                        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs text-indigo-700 dark:text-indigo-300">
+                          با وارد کردن شماره همراه، کد تایید برای شما پیامک شده و می‌توانید بدون نیاز به رمز وارد حساب خود شوید.
                         </div>
-                      </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary">
-                          رمز عبور جدید *
-                        </label>
-                        <div className="relative group">
-                          <input
-                            type={forgotShowPassword ? "text" : "password"}
-                            required
-                            value={forgotNewPassword}
-                            onChange={(e) => setForgotNewPassword(e.target.value)}
-                            className="w-full pl-12 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
-                            placeholder="حداقل ۶ کاراکتر با امنیت متوسط"
-                          />
-                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
-                            <Lock className="w-5 h-5" />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setForgotShowPassword(!forgotShowPassword)}
-                            className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted hover:text-primary-default transition-colors"
-                          >
-                            {forgotShowPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary">
-                          تکرار رمز عبور جدید *
-                        </label>
-                        <div className="relative group">
-                          <input
-                            type={forgotShowPassword ? "text" : "password"}
-                            required
-                            value={forgotConfirmPassword}
-                            onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                            className="w-full pl-12 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
-                            placeholder="تکرار کلمه عبور جدید"
-                          />
-                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
-                            <Lock className="w-5 h-5" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* CAPTCHA block */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary">
-                          کد امنیتی (کپچا) *
-                        </label>
-                        <div className="flex gap-3 items-center">
-                          <input
-                            type="text"
-                            required
-                            maxLength={4}
-                            value={captchaInput}
-                            onChange={(e) => setCaptchaInput(e.target.value)}
-                            className="flex-1 px-4 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary text-center font-mono font-bold border-gray-300 dark:border-indigo-500/50"
-                            placeholder="کد ۴ رقمی روبرو"
-                          />
-                          <div className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 px-4 py-2.5 rounded-xl border border-subtle select-none">
-                            <span className="font-mono font-black text-lg text-slate-700 dark:text-slate-200 tracking-widest line-through select-none italic transform -skew-x-12">
-                              {captchaVal}
-                            </span>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            شماره همراه یا نام کاربری *
+                          </label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1 group">
+                              <input
+                                type="text"
+                                required
+                                dir="ltr"
+                                value={forgotOtpMobile}
+                                onChange={(e) => setForgotOtpMobile(e.target.value)}
+                                className="w-full pl-4 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50 text-left font-mono"
+                                placeholder="09121111111"
+                              />
+                              <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                                <Smartphone className="w-4 h-4" />
+                              </div>
+                            </div>
                             <button
                               type="button"
-                              onClick={generateCaptcha}
-                              className="p-1 text-muted hover:text-primary transition-colors cursor-pointer"
-                              title="تغییر کد امنیتی"
+                              onClick={() => handleSendForgotOtp()}
+                              disabled={loading || forgotOtpTimer > 0}
+                              className="px-4 py-3 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
                             >
-                              <RefreshCw className="w-4 h-4" />
+                              {forgotOtpTimer > 0 ? (
+                                <span className="font-mono">{Math.floor(forgotOtpTimer / 60)}:{(forgotOtpTimer % 60).toString().padStart(2, '0')}</span>
+                              ) : (
+                                <>
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>{forgotOtpSent ? "ارسال مجدد" : "دریافت کد"}</span>
+                                </>
+                              )}
                             </button>
                           </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <button
-                          type="submit"
-                          disabled={loading}
-                          className="w-full bg-primary-default hover:bg-primary-hover text-white font-black py-4 rounded-xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-75 cursor-pointer"
-                        >
-                          {loading ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <span>بروزرسانی رمز عبور</span>
-                          )}
-                        </button>
-                      </div>
-                    </form>
+                        {forgotOtpSent && (
+                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                              کد ورود با پیامک ارسال شد.
+                            </span>
+                            {forgotSimulatedCode && (
+                              <span className="font-mono font-bold bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-800 dark:text-emerald-200">
+                                کد تست: {forgotSimulatedCode}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            کد تایید ۵ رقمی دریافتی *
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type="text"
+                              required
+                              maxLength={6}
+                              dir="ltr"
+                              value={forgotOtpCode}
+                              onChange={(e) => setForgotOtpCode(e.target.value)}
+                              className="w-full pl-4 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-base tracking-widest text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="• • • • •"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <KeyRound className="w-5 h-5" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <button
+                            type="submit"
+                            disabled={loading || !forgotOtpCode}
+                            className="w-full bg-primary-default hover:bg-primary-hover text-white font-black py-4 rounded-xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-75 cursor-pointer"
+                          >
+                            {loading ? (
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <span className="flex items-center gap-2">
+                                <CheckCircle className="w-5 h-5" />
+                                <span>ورود مستقیم به حساب کاربری</span>
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {/* Tab 2: Reset Password via SMS */}
+                    {forgotTab === "sms_reset" && (
+                      <form onSubmit={handleForgotOtpResetPassword} className="space-y-3.5">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            شماره همراه یا نام کاربری *
+                          </label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1 group">
+                              <input
+                                type="text"
+                                required
+                                dir="ltr"
+                                value={forgotOtpMobile}
+                                onChange={(e) => setForgotOtpMobile(e.target.value)}
+                                className="w-full pl-4 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50 text-left font-mono"
+                                placeholder="09121111111"
+                              />
+                              <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                                <Smartphone className="w-4 h-4" />
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSendForgotOtp()}
+                              disabled={loading || forgotOtpTimer > 0}
+                              className="px-4 py-3 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+                            >
+                              {forgotOtpTimer > 0 ? (
+                                <span className="font-mono">{Math.floor(forgotOtpTimer / 60)}:{(forgotOtpTimer % 60).toString().padStart(2, '0')}</span>
+                              ) : (
+                                <>
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>{forgotOtpSent ? "ارسال مجدد" : "دریافت کد"}</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {forgotOtpSent && (
+                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                              کد تایید پیامک شد.
+                            </span>
+                            {forgotSimulatedCode && (
+                              <span className="font-mono font-bold bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-800 dark:text-emerald-200">
+                                کد تست: {forgotSimulatedCode}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            کد تایید ۵ رقمی *
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type="text"
+                              required
+                              maxLength={6}
+                              dir="ltr"
+                              value={forgotOtpCode}
+                              onChange={(e) => setForgotOtpCode(e.target.value)}
+                              className="w-full pl-4 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-base tracking-widest text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="• • • • •"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <KeyRound className="w-5 h-5" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            رمز عبور جدید *
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type={forgotShowPassword ? "text" : "password"}
+                              required
+                              value={forgotNewPassword}
+                              onChange={(e) => setForgotNewPassword(e.target.value)}
+                              className="w-full pl-12 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="حداقل ۶ کاراکتر"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <Lock className="w-5 h-5" />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setForgotShowPassword(!forgotShowPassword)}
+                              className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted hover:text-primary-default transition-colors"
+                            >
+                              {forgotShowPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            تکرار رمز عبور جدید *
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type={forgotShowPassword ? "text" : "password"}
+                              required
+                              value={forgotConfirmPassword}
+                              onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                              className="w-full pl-12 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="تکرار کلمه عبور جدید"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <Lock className="w-5 h-5" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <button
+                            type="submit"
+                            disabled={loading || !forgotOtpCode || !forgotNewPassword}
+                            className="w-full bg-primary-default hover:bg-primary-hover text-white font-black py-4 rounded-xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-75 cursor-pointer"
+                          >
+                            {loading ? (
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <span>تغییر رمز عبور و ورود به حساب</span>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {/* Tab 3: National Code Recovery (Legacy) */}
+                    {forgotTab === "national_code" && (
+                      <form onSubmit={handleForgotPasswordSubmit} className="space-y-3.5">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            نام کاربری یا شماره تماس *
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type="text"
+                              required
+                              value={forgotIdentity}
+                              onChange={(e) => setForgotIdentity(e.target.value)}
+                              className="w-full pl-4 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="مثال: s_ahmadi یا 09121111111"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <User className="w-5 h-5" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            کد ملی ۱۰ رقمی *
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type="text"
+                              required
+                              maxLength={10}
+                              value={forgotNationalCode}
+                              onChange={(e) => setForgotNationalCode(e.target.value)}
+                              className="w-full pl-4 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary text-center font-mono font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="کد ملی ۱۰ رقمی"
+                              style={{ direction: "ltr" }}
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            رمز عبور جدید *
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type={forgotShowPassword ? "text" : "password"}
+                              required
+                              value={forgotNewPassword}
+                              onChange={(e) => setForgotNewPassword(e.target.value)}
+                              className="w-full pl-12 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="حداقل ۶ کاراکتر"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <Lock className="w-5 h-5" />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setForgotShowPassword(!forgotShowPassword)}
+                              className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted hover:text-primary-default transition-colors"
+                            >
+                              {forgotShowPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            تکرار رمز عبور جدید *
+                          </label>
+                          <div className="relative group">
+                            <input
+                              type={forgotShowPassword ? "text" : "password"}
+                              required
+                              value={forgotConfirmPassword}
+                              onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                              className="w-full pl-12 pr-11 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="تکرار کلمه عبور جدید"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-text-muted group-focus-within:text-primary-default transition-colors">
+                              <Lock className="w-5 h-5" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* CAPTCHA block */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-text-secondary">
+                            کد امنیتی (کپچا) *
+                          </label>
+                          <div className="flex gap-3 items-center">
+                            <input
+                              type="text"
+                              required
+                              maxLength={4}
+                              value={captchaInput}
+                              onChange={(e) => setCaptchaInput(e.target.value)}
+                              className="flex-1 px-4 py-3 bg-background hover:bg-surface/80 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all text-text-primary text-center font-mono font-bold border-gray-300 dark:border-indigo-500/50"
+                              placeholder="کد ۴ رقمی روبرو"
+                            />
+                            <div className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 px-4 py-2.5 rounded-xl border border-subtle select-none">
+                              <span className="font-mono font-black text-lg text-slate-700 dark:text-slate-200 tracking-widest line-through select-none italic transform -skew-x-12">
+                                {captchaVal}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={generateCaptcha}
+                                className="p-1 text-muted hover:text-primary transition-colors cursor-pointer"
+                                title="تغییر کد امنیتی"
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-primary-default hover:bg-primary-hover text-white font-black py-4 rounded-xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-75 cursor-pointer"
+                          >
+                            {loading ? (
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <span>بروزرسانی رمز عبور</span>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    )}
 
                     <div className="mt-6 text-center border-t border-border-default/50 dark:border-border-subtle/50 pt-4">
                       <p className="text-xs text-text-muted">
@@ -3264,7 +3980,6 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     </>
   );
 }
-
 
 export default function App() {
   const [currentUser, setCurrentUser] = React.useState<any>(null);

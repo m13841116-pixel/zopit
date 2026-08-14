@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://cdn.fontcdn.ir/Font/Persian/Yekan/Yekan.css');
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/font-face.css');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -6,16 +8,13 @@
   --color-surface: var(--surface);
   --color-card: var(--card);
   --color-elevated: var(--elevated);
-
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-text-inverse: var(--text-inverse);
   --color-inverse: var(--text-inverse);
-
   --color-border-default: var(--border);
   --color-border-subtle: var(--border-subtle);
-
   --color-primary: var(--primary);
   --color-primary-default: var(--primary);
   --color-primary-hover: var(--primary-hover);
@@ -26,49 +25,51 @@
   --color-warning: var(--warning);
   --color-danger: var(--danger);
 
-  --font-sans: "Vazirmatn", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Yekan", "Shabnam", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 @layer base {
   :root {
-    --background: #F8F8FC;
-    --surface: #F3F2FF;
+    color-scheme: light;
+    --background: #F8F7FC;
+    --surface: #F5F3FF;
     --card: #FFFFFF;
     --elevated: #FFFFFF;
 
-    --text-primary: #111827;
-    --text-secondary: #374151;
-    --text-muted: #6B7280;
+    --text-primary: #172033;
+    --text-secondary: #475569;
+    --text-muted: #64748B;
     --text-inverse: #FFFFFF;
 
-    --border: #CBD5E1;
-    --border-subtle: #E2E8F0;
+    --border: #E2E8F0;
+    --border-subtle: #EDE9FE;
 
-    --primary: #6D28D9;
-    --primary-hover: #5B21B6;
+    --primary: #7C3AED;
+    --primary-hover: #6D28D9;
     --primary-light: #8B5CF6;
-    --secondary: #7C3AED;
+    --secondary: #6D28D9;
     --accent: #A855F7;
     
-    --success: #22C55E;
+    --success: #16A34A;
     --warning: #F59E0B;
-    --danger: #EF4444;
+    --danger: #DC2626;
   }
 
   .dark {
-    --background: #0F172A;
-    --surface: #1E1B4B;
-    --card: #2E1065;
-    --elevated: #2E1065;
+    color-scheme: dark;
+    --background: #0B0F19;
+    --surface: #171E2E;
+    --card: #111827;
+    --elevated: #1F2937;
 
     --text-primary: #F8FAFC;
     --text-secondary: #E2E8F0;
     --text-muted: #94A3B8;
     --text-inverse: #FFFFFF;
 
-    --border: #4338CA;
-    --border-subtle: #3730A3;
+    --border: #2D3748;
+    --border-subtle: #1F2937;
 
     --primary: #8B5CF6;
     --primary-hover: #A855F7;
@@ -77,7 +78,7 @@
     --accent: #D8B4FE;
     
     --success: #22C55E;
-    --warning: #F59E0B;
+    --warning: #FBBF24;
     --danger: #EF4444;
   }
 
@@ -87,57 +88,92 @@
     color: var(--text-primary);
   }
 
-  /* Smooth transitions */
-  *, *::before, *::after {
-    transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
-                color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
-                border-color 300ms cubic-bezier(0.4, 0, 0.2, 1), 
-                box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Smooth transitions for interactive controls */
+  button, .card, .transition-all-custom {
+    transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1), 
+                color 150ms cubic-bezier(0.4, 0, 0.2, 1), 
+                border-color 150ms cubic-bezier(0.4, 0, 0.2, 1), 
+                box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Modern input fields styling */
-  input[type="text"],
-  input[type="number"],
-  input[type="email"],
-  input[type="password"],
-  input[type="tel"],
-  input[type="url"],
-  select,
-  textarea {
-    @apply bg-surface border border-border-default rounded-xl px-4 py-2.5 text-sm outline-none text-text-primary;
+  /* Modern input and select fields styling with absolute high-contrast readability */
+  :is(input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="tel"], input[type="url"], textarea) {
+    background-color: #FFFFFF;
+    color: #172033 !important;
     border: 1px solid var(--border);
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+    border-radius: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    outline: none;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
   }
 
-  .dark input[type="text"],
-  .dark input[type="number"],
-  .dark input[type="email"],
-  .dark input[type="password"],
-  .dark input[type="tel"],
-  .dark input[type="url"],
-  .dark select,
-  .dark textarea {
-    background-color: var(--background);
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3);
+  .dark :is(input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="tel"], input[type="url"], textarea) {
+    background-color: #111827;
+    color: #F8FAFC !important;
+    border-color: var(--border);
+    box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  /* Force select and option dropdown options to be solid and readable in both light and dark modes */
+  select {
+    background-color: #FFFFFF !important;
+    color: #172033 !important;
+    border: 1px solid var(--border);
+    border-radius: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    outline: none;
+  }
+  .dark select {
+    background-color: #111827 !important;
+    color: #F8FAFC !important;
+    border-color: var(--border);
+  }
+
+  option, optgroup {
+    background-color: #FFFFFF !important;
+    color: #172033 !important;
+    font-weight: 500;
+  }
+  .dark option, .dark optgroup {
+    background-color: #111827 !important;
+    color: #F8FAFC !important;
+  }
+  select option {
+    color: #172033 !important;
+    background-color: #FFFFFF !important;
+  }
+  .dark select option {
+    color: #F8FAFC !important;
+    background-color: #111827 !important;
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: var(--text-muted);
+    color: #94A3B8;
+    -webkit-text-fill-color: #94A3B8;
     opacity: 1;
   }
-
-  input:focus, select:focus, textarea:focus {
-    @apply bg-card border-primary-default ring-4 ring-primary-default/20 scale-[1.01] shadow-lg shadow-primary-default/10;
-    transform: translateY(-1px) scale(1.01);
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: #64748B;
+    -webkit-text-fill-color: #64748B;
   }
 
-  .dark input:focus, .dark select:focus, .dark textarea:focus {
-    @apply bg-surface border-primary-default;
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25), 0 4px 12px rgba(0, 0, 0, 0.5);
+  :is(input, select, textarea):focus {
+    border-color: #7C3AED;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
   }
 
-  input:disabled, select:disabled, textarea:disabled {
+  .dark :is(input, select, textarea):focus {
+    border-color: #8B5CF6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+  }
+
+  :is(input, select, textarea):disabled {
     @apply bg-surface text-text-muted border-border-subtle opacity-70 cursor-not-allowed;
   }
 
@@ -146,19 +182,9 @@
     font-family: var(--font-sans);
   }
 
-  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  :is(button, a, input, select, textarea):focus-visible {
     @apply outline-none ring-2 ring-primary-default ring-offset-2 ring-offset-background;
   }
-}
-
-/* Card and Surface styles for dark mode */
-.dark .bg-card, .dark .bg-surface {
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
-}
-
-html:not(.dark) .bg-card, html:not(.dark) .bg-surface {
-  border: 1px solid var(--border-subtle);
 }
 
 /* Custom Floating Animations */
@@ -202,13 +228,18 @@ html:not(.dark) .bg-card, html:not(.dark) .bg-surface {
     background-color: color-mix(in srgb, var(--surface) 30%, transparent);
   }
 
-  /* Consistent border radius and subtle shadows for cards */
+  /* Consistent border radius and subtle shadows for cards with centralized light/dark rules */
   .bg-card {
     @apply rounded-[1.25rem] shadow-sm;
   }
 
-  .dark .bg-card {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  :is(.bg-card, .bg-surface) {
+    border: 1px solid var(--border-subtle);
+  }
+
+  .dark :is(.bg-card, .bg-surface) {
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
 
   /* Typography improvements */
@@ -296,49 +327,19 @@ html:not(.dark) .bg-card, html:not(.dark) .bg-surface {
   }
 }
 
-/* High-contrast and darker shade updates as requested by the user */
-#view-role .group.bg-card.border-2.border-subtle.p-5 h3,
-#view-role .group.bg-card.border-2.border-subtle.p-5 .text-primary,
-#view-role .group.bg-card.border-2.border-subtle.p-5 .text-lg.font-black,
-#view-role .text-xs.text-primary.mt-1.leading-relaxed.font-medium,
-#view-customer h2,
-#view-customer p.text-primary,
-#view-customer .text-primary,
-#view-supplier-form h2,
-#view-supplier-form .text-primary,
-#view-store-form h2,
-#view-store-form .text-primary {
+/* High-contrast and darker shade updates - Simplified utilizing CSS pseudo-class nesting */
+:is(#view-role, #view-customer, #view-supplier-form, #view-store-form) :is(h2, h3, .text-primary, .text-lg.font-black, p.text-primary, .text-xs.text-primary) {
   color: #1e293b !important;
 }
 
 /* Maintain readability in dark mode */
-.dark #view-role .group.bg-card.border-2.border-subtle.p-5 h3,
-.dark #view-role .group.bg-card.border-2.border-subtle.p-5 .text-primary,
-.dark #view-role .group.bg-card.border-2.border-subtle.p-5 .text-lg.font-black,
-.dark #view-role .text-xs.text-primary.mt-1.leading-relaxed.font-medium,
-.dark #view-customer h2,
-.dark #view-customer p.text-primary,
-.dark #view-customer .text-primary,
-.dark #view-supplier-form h2,
-.dark #view-supplier-form .text-primary,
-.dark #view-store-form h2,
-.dark #view-store-form .text-primary {
+.dark :is(#view-role, #view-customer, #view-supplier-form, #view-store-form) :is(h2, h3, .text-primary, .text-lg.font-black, p.text-primary, .text-xs.text-primary) {
   color: #f8fafc !important;
 }
 
-
-
-/* Remove number input spinners */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type=number] {
-  -moz-appearance: textfield;
-}
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
+/* Remove number input spinners - Consolidated rules */
+:is(input[type="number"], input)::-webkit-outer-spin-button,
+:is(input[type="number"], input)::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }

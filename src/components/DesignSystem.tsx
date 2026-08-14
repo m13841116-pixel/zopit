@@ -318,48 +318,52 @@ export function Card({ children, title, subtitle, action, className = "", id }: 
 // --- UNIFIED STATUS BADGE COMPONENT ---
 const statusMapping: Record<string, { label: string; colorClass: string }> = {
   // Active states
-  ACTIVE: { label: "فعال", colorClass: "bg-success/10 text-success dark:text-success border border-success/20" },
-  ACTIVE_NEW: { label: "فعال جدید", colorClass: "bg-success/10 text-success dark:text-success border border-success/20" },
-  APPROVED: { label: "تایید شده", colorClass: "bg-success/10 text-success dark:text-success border border-success/20" },
-  SUCCESS: { label: "موفق", colorClass: "bg-success/10 text-success dark:text-success border border-success/20" },
-  COMPLETED: { label: "تکمیل شده", colorClass: "bg-success/10 text-success dark:text-success border border-success/20" },
-  PAID: { label: "پرداخت شده", colorClass: "bg-success/10 text-success dark:text-success border border-success/20" },
-  DELIVERED: { label: "تحویل شده", colorClass: "bg-success/10 text-success dark:text-success border border-success/20" },
+  ACTIVE: { label: "فعال", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
+  ACTIVE_NEW: { label: "فعال (تازه وارد)", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
+  APPROVED: { label: "تایید شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
+  SUCCESS: { label: "موفق", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
+  COMPLETED: { label: "تکمیل شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
+  PAID: { label: "پرداخت شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
+  DELIVERED: { label: "تحویل شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
+  PUBLISHED: { label: "منتشر شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
 
   // Pending states
-  PENDING: { label: "در انتظار بررسی", colorClass: "bg-warning/10 text-warning dark:text-warning border border-warning/20" },
-  PENDING_APPROVAL: { label: "در انتظار تایید", colorClass: "bg-warning/10 text-warning dark:text-warning border border-warning/20" },
-  REQUESTED: { label: "ثبت اولیه / در انتظار", colorClass: "bg-warning/10 text-warning dark:text-warning border border-warning/20" },
-  NEW: { label: "جدید", colorClass: "bg-primary-default/10 text-primary-default dark:text-primary-default border border-primary-default/20" },
+  PENDING: { label: "در انتظار بررسی", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  PENDING_APPROVAL: { label: "در انتظار تایید", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  PENDING_REVIEW: { label: "در حال بازبینی", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  REQUESTED: { label: "ثبت اولیه / در انتظار", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  NEW: { label: "جدید", colorClass: "bg-indigo-600 text-white font-black shadow-sm" },
+  PENDING_SYNC: { label: "در انتظار اتصال", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  SYNCED: { label: "متصل / سینک شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
   
   // Warning / Suspension states
-  UNDER_REVIEW: { label: "در حال بازبینی عملکرد", colorClass: "bg-warning/15 text-warning dark:text-warning border border-warning/30" },
-  WARNING: { label: "دارای اخطار انضباطی", colorClass: "bg-warning/15 text-warning dark:text-warning border border-warning/30" },
-  TEMPORARILY_SUSPENDED: { label: "تعلیق موقت", colorClass: "bg-danger/10 text-danger dark:text-danger border border-danger/20" },
-  SUSPENDED: { label: "معلق", colorClass: "bg-danger/10 text-danger dark:text-danger border border-danger/20" },
-  BLOCKED: { label: "مسدود شده", colorClass: "bg-danger/15 text-danger dark:text-danger border border-danger/30" },
+  UNDER_REVIEW: { label: "در حال بازبینی عملکرد", colorClass: "bg-amber-600 text-white font-black shadow-sm" },
+  WARNING: { label: "دارای اخطار انضباطی", colorClass: "bg-amber-600 text-white font-black shadow-sm" },
+  TEMPORARILY_SUSPENDED: { label: "تعلیق موقت", colorClass: "bg-rose-600 text-white font-black shadow-sm" },
+  SUSPENDED: { label: "در انتظار تایید", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  BLOCKED: { label: "مسدود شده", colorClass: "bg-rose-700 text-white font-black shadow-sm" },
 
   // Danger / Terminated states
-  REJECTED: { label: "رد شده", colorClass: "bg-danger/10 text-danger dark:text-danger border border-danger/20" },
-  FAILED: { label: "ناموفق", colorClass: "bg-danger/10 text-danger dark:text-danger border border-danger/20" },
-  CANCELLED: { label: "لغو شده", colorClass: "bg-danger/10 text-danger dark:text-danger border border-danger/20" },
+  REJECTED: { label: "رد شده", colorClass: "bg-rose-600 text-white font-black shadow-sm" },
+  FAILED: { label: "ناموفق", colorClass: "bg-rose-600 text-white font-black shadow-sm" },
+  CANCELLED: { label: "لغو شده", colorClass: "bg-rose-600 text-white font-black shadow-sm" },
 
   // Processing states
-  PROCESSING: { label: "در حال پردازش", colorClass: "bg-surface0/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" },
-  PREPARING: { label: "در حال آماده‌سازی", colorClass: "bg-surface0/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" },
-  SHIPPED: { label: "تحویل به شرکت پست", colorClass: "bg-surface0/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" },
-  WAITING_FOR_PAYMENT: { label: "در انتظار پرداخت", colorClass: "bg-primary-default/10 text-primary-default dark:text-primary-default border border-primary-default/20" },
+  PROCESSING: { label: "در حال پردازش", colorClass: "bg-sky-600 text-white font-black shadow-sm" },
+  PREPARING: { label: "در حال آماده‌سازی", colorClass: "bg-sky-600 text-white font-black shadow-sm" },
+  SHIPPED: { label: "تحویل به شرکت پست", colorClass: "bg-sky-600 text-white font-black shadow-sm" },
+  WAITING_FOR_PAYMENT: { label: "در انتظار پرداخت", colorClass: "bg-indigo-600 text-white font-black shadow-sm" },
 };
 
 export function StatusBadge({ status, customLabel }: { status: string; customLabel?: string }) {
   const norm = String(status || "PENDING").trim().toUpperCase();
   const config = statusMapping[norm] || {
-    label: customLabel || status || "نامشخص",
-    colorClass: "bg-border-subtle text-text-muted border border-border-default",
+    label: customLabel || "نامشخص",
+    colorClass: "bg-slate-700 text-white font-bold",
   };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold select-none shrink-0 ${config.colorClass}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] select-none shrink-0 tracking-wide ${config.colorClass}`}>
       {customLabel || config.label}
     </span>
   );

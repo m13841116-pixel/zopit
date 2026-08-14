@@ -271,7 +271,7 @@ export class WalletService {
       return pr;
     });
 
-    // Make the actual call to Zibal Gateway outside of the DB transaction
+    // Try calling gateway automated payout, or fallback to PENDING for admin manual payout
     try {
       const paymentService = await PaymentServiceFactory.getService();
       const gatewayResponse = await paymentService.requestPayout(
@@ -280,43 +280,22 @@ export class WalletService {
         `Payout for wallet ${walletId}`
       );
 
-      // Update the payout request with the tracking ID from the gateway
       return await prisma.payoutRequest.update({
         where: { id: payoutRequest.id },
         data: {
           trackId: gatewayResponse.trackId,
-          // Let the status stay PROCESSING until a webhook or polling updates it to SUCCESS
+          status: PayoutStatus.PROCESSING,
         },
       });
     } catch (error: any) {
-      // If the gateway request fails immediately, we should revert the locked funds
-      console.error(`Gateway payout request failed: ${error.message}`);
+      console.warn(`Direct gateway payout unavailable (${error.message}). Saved request as PENDING for admin approval.`);
       
-      await prisma.$transaction(async  (tx: any) => {
-        // Mark payout as failed
-        await tx.payoutRequest.update({
-          where: { id: payoutRequest.id },
-          data: { status: PayoutStatus.FAILED },
-        });
-
-        // Mark ledger entry as failed
-        await tx.ledgerEntry.updateMany({
-          where: { referenceId: payoutRequest.id, type: LedgerType.WITHDRAWAL },
-          data: { status: LedgerStatus.FAILED },
-        });
-
-        // Return the funds to the wallet
-        await tx.wallet.update({
-          where: { id: walletId },
-          data: {
-            balance: {
-              increment: payoutAmount
-            }
-          }
-        });
+      return await prisma.payoutRequest.update({
+        where: { id: payoutRequest.id },
+        data: {
+          status: PayoutStatus.PENDING,
+        },
       });
-
-      throw new Error(`Payout request failed at gateway: ${error.message}`);
     }
   }
 

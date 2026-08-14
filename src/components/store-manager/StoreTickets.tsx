@@ -615,6 +615,7 @@ ${returnFileBase64 ? `${returnFileBase64}` : ""}`;
                     <option value="فنی">پشتیبانی فنی</option>
                     <option value="فروش">فروش و بازاریابی</option>
                     <option value="عمومی">عمومی و پیشنهادات</option>
+                    <option value="اکانت پرو">اکانت پرو (مدارک و فعال‌سازی)</option>
                   </select>
                 </div>
                 <div>

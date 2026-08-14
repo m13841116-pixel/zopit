@@ -13,7 +13,7 @@ export interface NotificationSettings {
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   enabled: true,
-  soundEnabled: true,
+  soundEnabled: false,
   soundType: 'chime',
   notifyOnNewOrder: true,
   notifyOnStatusChange: true,
@@ -123,85 +123,8 @@ function getAudioContext(): AudioContext | null {
 }
 
 export function playOrderChimeSound(type: SoundType = 'chime'): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  const now = ctx.currentTime;
-
-  try {
-    if (type === 'chime') {
-      // 3-tone ascending pleasant chord (D5 -> A5 -> D6)
-      const frequencies = [587.33, 880.0, 1174.66];
-      frequencies.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-
-        gain.gain.setValueAtTime(0, now + idx * 0.12);
-        gain.gain.linearRampToValueAtTime(0.25, now + idx * 0.12 + 0.03);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.6);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(now + idx * 0.12);
-        osc.stop(now + idx * 0.12 + 0.65);
-      });
-    } else if (type === 'cash') {
-      // Cash register dual "cha-ching" sound
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'triangle';
-      osc1.frequency.setValueAtTime(987.77, now); // B5
-      gain1.gain.setValueAtTime(0.2, now);
-      gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.2);
-
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(1567.98, now + 0.12); // G6
-      gain2.gain.setValueAtTime(0.3, now + 0.12);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.12 + 0.7);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.12);
-      osc2.stop(now + 0.12 + 0.75);
-    } else if (type === 'bell') {
-      // Classic shop door bell (E5 & B5 harmonics)
-      [659.25, 987.77].forEach((f) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(f, now);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.95);
-      });
-    } else {
-      // Subtle pulse
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, now);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.4);
-    }
-  } catch (err) {
-    console.warn('Error playing audio chime:', err);
-  }
+  // Notification sound removed per user request
+  return;
 }
 
 // Service worker helper

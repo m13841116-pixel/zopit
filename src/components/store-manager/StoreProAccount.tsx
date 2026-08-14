@@ -38,7 +38,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [proAccount, setProAccount] = useState<any>(null);
   const [settings, setSettings] = useState<any>({
     autoApprove: true,
-    proAccountPrice: 0,
+    proAccountPrice: 239500,
     hostRenewalPrice: 500000,
     hostDiscountedPrice: 198000,
     torobPrice: 150000,
@@ -51,12 +51,51 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [nationalCode, setNationalCode] = useState("");
   const [mobile, setMobile] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showProTicketModal, setShowProTicketModal] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState("ارسال مدارک برای اکانت پرو");
+  const [ticketMsg, setTicketMsg] = useState("");
+  const [ticketAttachment, setTicketAttachment] = useState("");
+  const [submittingTicket, setSubmittingTicket] = useState(false);
+  
+  const [hasEnamad, setHasEnamad] = useState(false);
+  const [hasGateway, setHasGateway] = useState(false);
+  const [hasTaxProfile, setHasTaxProfile] = useState(false);
+  const [hasCustomLogo, setHasCustomLogo] = useState(false);
+  const [logoDescription, setLogoDescription] = useState("");
+  const [domainProposals, setDomainProposals] = useState<string[]>(["", "", "", "", ""]);
+  const [promoCodeInput, setPromoCodeInput] = useState("");
   const [showTermsModal, setShowTermsModal] = useState(false);
+
+  // Discount code states
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
+  const [discountCodeText, setDiscountCodeText] = useState<string>("");
+  const [isDiscountApplied, setIsDiscountApplied] = useState<boolean>(false);
 
   // Captcha state
   const [num1, setNum1] = useState(7);
   const [num2, setNum2] = useState(4);
   const [captchaInput, setCaptchaInput] = useState("");
+
+  const handleApplyDiscountCode = () => {
+    const code = discountCodeText.trim().toUpperCase();
+    if (!code) {
+      const msg = "لطفاً کد تخفیف را وارد نمایید.";
+      if (showNotification) showNotification(msg, "error");
+      else toast(msg, "error");
+      return;
+    }
+    if (code === "ZOPIT-PRO" || code === "ZOPIT" || code === "OFF" || code === "PROMO" || code === "ZOPIT2025") {
+      setAppliedDiscount(39450);
+      setIsDiscountApplied(true);
+      const msg = "کد تخفیف ویژه با موفقیت اعمال گردید!";
+      if (showNotification) showNotification(msg, "success");
+      else toast(msg, "success");
+    } else {
+      const msg = "کد تخفیف وارد شده معتبر نمی‌باشد.";
+      if (showNotification) showNotification(msg, "error");
+      else toast(msg, "error");
+    }
+  };
 
   // Canvas Signature state
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -95,6 +134,49 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     setNum1(a);
     setNum2(b);
     setCaptchaInput("");
+  };
+
+  
+  const handleSendProTicket = async () => {
+    if (!ticketMsg) {
+      if (showNotification) showNotification("متن پیام الزامی است.", "error");
+      else toast("متن پیام الزامی است.", "error");
+      return;
+    }
+    setSubmittingTicket(true);
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/store-manager/tickets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          subject: ticketSubject,
+          department: "اکانت پرو",
+          priority: "HIGH",
+          message: ticketMsg,
+          attachmentUrl: ticketAttachment || null
+        }),
+      });
+      if (res.ok) {
+        if (showNotification) showNotification("مدارک با موفقیت به پشتیبانی اکانت پرو ارسال شد.", "success");
+        else toast("مدارک با موفقیت به پشتیبانی اکانت پرو ارسال شد.", "success");
+        setShowProTicketModal(false);
+        setTicketMsg("");
+        setTicketAttachment("");
+      } else {
+        const data = await res.json();
+        if (showNotification) showNotification(data.error || "خطا در ارسال تیکت", "error");
+        else toast(data.error || "خطا در ارسال تیکت", "error");
+      }
+    } catch (err) {
+      if (showNotification) showNotification("خطای شبکه", "error");
+      else toast("خطای شبکه", "error");
+    } finally {
+      setSubmittingTicket(false);
+    }
   };
 
   const fetchProStatus = async () => {
@@ -254,6 +336,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     const canvas = canvasRef.current;
     const signatureImage = canvas ? canvas.toDataURL("image/png") : "";
 
+    const calculatedAmount = Math.max(0, (parseInt(settings.proAccountPrice || '239500', 10) + (hasEnamad ? 50000 : 0) - appliedDiscount));
+
     setSubmitting(true);
     try {
       const token = localStorage.getItem("token") || "";
@@ -267,12 +351,23 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           fullName,
           nationalCode,
           mobile,
-          signatureImage
+          signatureImage,
+          hasEnamad,
+          hasGateway,
+          hasTaxProfile,
+          hasCustomLogo,
+          logoDescription,
+          domainProposals: domainProposals.map(d => d.trim()).filter(Boolean),
+          amount: calculatedAmount
         })
       });
 
       const data = await res.json();
       if (res.ok) {
+        if (data.payLink) {
+          window.location.href = data.payLink;
+          return;
+        }
         if (showNotification) showNotification(data.message, "success");
         else toast(data.message, "success");
         fetchProStatus();
@@ -354,8 +449,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     {
       id: 1,
       title: "دامنه رایگان اختصاصی (.ir)",
-      desc: "یک دامنه ملی رایگان جهت برندسازی و اعتبار وب‌سایت فروشگاه شما",
-      value: "100,000 تومان",
+      desc: "یک دامنه ملی اختصاصی جهت برندسازی و اعتبار وب‌سایت فروشگاه شما (از بین ۵ پیشنهاد شما)",
+      value: "۱۱۰,۰۰۰ تومان",
       icon: Globe,
       color: "from-blue-500/20 to-blue-600/5 text-blue-500"
     },
@@ -363,89 +458,103 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       id: 2,
       title: "قالب آماده حرفه‌ای وردپرس (وودمارت / WoodMart)",
       desc: "طراحی کاملا سفارشی‌سازی شده، آماده فروش و واکنش‌گرا (مخصوص فروشگاهی)",
-      value: "2,000,000 تومان",
-      icon: LayoutDashboardIcon,
+      value: "۲,۰۰۰,۰۰۰ تومان",
+      icon: Crown,
       color: "from-purple-500/20 to-purple-600/5 text-purple-500"
     },
     {
       id: 3,
-      title: "هاست رایگان ۱ ماهه ابری",
+      title: "هاست ابری اختصاصی زوپیت (۱ ماهه)",
       desc: "میزبانی پرسرعت اختصاصی برای بارگذاری اولیه بدون دغدغه فنی",
-      value: "500,000 تومان",
+      value: "۵۰۰,۰۰۰ تومان",
       icon: Server,
       color: "from-emerald-500/20 to-emerald-600/5 text-emerald-500"
     },
     {
       id: 4,
-      title: "پنل اختصاصی لجستیک و پست",
-      desc: "مدیریت خودکار ثبت سفارشات پستی، چاپ فاکتور و شناسه مرسولات",
-      value: "998,000 تومان",
-      icon: PackageCheck,
-      color: "from-amber-500/20 to-amber-600/5 text-amber-500"
+      title: "افزونه‌های ضروری و کاربردی وردپرس",
+      desc: "پکیج کامل افزونه‌های ضروری امنیت، سئو، پیامک و بهینه‌سازی سرعت",
+      value: "۱,۵۰۰,۰۰۰ تومان",
+      icon: Puzzle,
+      color: "from-cyan-500/20 to-cyan-600/5 text-cyan-500"
     },
     {
       id: 5,
-      title: "راه‌اندازی درگاه، پرونده مالیاتی و آموزش کامل",
-      desc: "قابلیت انجام کامل توسط تیم فنی زوپیت یا ارسال دوره‌های ویدئویی آموزشی (به انتخاب شما)",
-      value: "1,500,000 تومان",
+      title: "راه‌اندازی و کانفیگ کامل فروشگاه",
+      desc: "راه‌اندازی کامل توسط تیم فنی زوپیت یا ارسال دوره‌های آموزشی ویدئویی (به انتخاب شما)",
+      value: "۱,۷۵۰,۰۰۰ تومان",
       icon: CreditCard,
       color: "from-pink-500/20 to-pink-600/5 text-pink-500"
     },
     {
       id: 6,
-      title: "افزونه‌های ۱۰۰٪ رایگان و کاربردی وردپرس",
-      desc: "پکیج کامل افزونه‌های ضروری امنیت، سئو، پیامک و بهینه‌سازی سرعت",
-      value: "1,200,000 تومان",
-      icon: Puzzle,
-      color: "from-cyan-500/20 to-cyan-600/5 text-cyan-500"
+      title: "مشاوره و پشتیبانی اختصاصی",
+      desc: "پشتیبانی و مشاوره تخصصی در راه‌اندازی و رشد فروشگاه شما",
+      value: "۹۹۸,۰۰۰ تومان",
+      icon: PackageCheck,
+      color: "from-amber-500/20 to-amber-600/5 text-amber-500"
     },
     {
       id: 7,
       title: "اتصال به موتورهای جستجوی کالا (ترب و ایمالز)",
       desc: "اتصال به یکی از قوی‌ترین کانال‌های جذب مشتری و افزایش فوری فروش آنلاین",
-      value: "750,000 تومان",
+      value: "۵۰۰,۰۰۰ تومان",
       icon: TrendingUp,
       color: "from-indigo-500/20 to-indigo-600/5 text-indigo-500"
     },
     {
       id: 8,
-      title: "دسترسی رایگان به استارتاپ‌های آینده زوپیت",
+      title: "دسترسی به استارتاپ‌های آینده زوپیت (پچ طلایی)",
       desc: "عضویت ویژه و دسترسی بدون هزینه به تمامی سرویس‌ها و ابزارهای جدید آتی مجموعه",
-      value: "1,500,000 تومان",
+      value: "۲,۰۰۰,۰۰۰ تومان",
       icon: Sparkles,
       color: "from-violet-500/20 to-violet-600/5 text-violet-500"
+    },
+    {
+      id: 9,
+      title: "طراحی لوگوی اختصاصی برند",
+      desc: "طراحی اختصاصی هویت بصری و لوگوی فروشگاه توسط تیم گرافیست زوپیت",
+      value: "۵۰۰,۰۰۰ تومان",
+      icon: PenTool,
+      color: "from-rose-500/20 to-rose-600/5 text-rose-500"
     }
   ];
 
   return (
     <div className="space-y-8 animate-fade-in pb-12" dir="rtl">
       {/* Top Banner Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-emerald-500/30 p-6 md:p-8 text-white shadow-2xl">
-        <div className="absolute -top-12 -left-12 w-56 h-56 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/40 p-6 md:p-8 text-white shadow-2xl">
+        <div className="absolute -top-12 -left-12 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black">
-              <Crown className="w-4 h-4 text-emerald-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-black">
+              <Crown className="w-4 h-4 text-amber-400" />
               <span>اشتراک طلایی مدیران فروشگاه زوپیت</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white leading-tight">
               اکانت پرو زوپیت (Zopit Pro Account)
             </h1>
-            <p className="text-slate-300 text-xs md:text-sm max-w-2xl leading-relaxed">
-              مجموعه‌ای بی‌نظیر از ۸ خدمت و پکیج کلیدی جهت راه‌اندازی، توسعه و جهش فروش آنلاین فروشگاه شما
+            <p className="text-amber-100/90 text-xs md:text-sm max-w-2xl leading-relaxed">
+              مجموعه‌ای بی‌نظیر از ۹ خدمت و پکیج کلیدی جهت راه‌اندازی، توسعه و جهش فروش آنلاین فروشگاه شما
             </p>
           </div>
 
-          <div className="bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl border border-emerald-500/30 text-center shrink-0 w-full md:w-auto">
-            <span className="text-xs text-slate-400 block mb-1">ارزش کل خدمات پکیج پرو:</span>
-            <div className="text-sm text-slate-400 line-through font-mono decoration-rose-500 decoration-2">
-              ۸,۵۴۸,۰۰۰ تومان
-            </div>
-            <div className="text-xl md:text-2xl font-black text-emerald-400 mt-1 flex items-center justify-center gap-1.5">
-              <span>کاملاً رایگان!</span>
-              <span className="text-xs font-normal text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                (در حال حاضر)
-              </span>
+          <div className="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-amber-500/40 text-center shrink-0 w-full md:w-auto shadow-lg">
+            <span className="text-xs text-amber-200/80 block mb-2 font-bold">پکیج طلایی مدیران (ویژه)</span>
+            
+            <div className="flex flex-col items-center justify-center">
+              <div className="flex items-center gap-1.5 text-xs text-slate-300 mb-1">
+                <span className="text-slate-400">ارزش کل خدمات:</span>
+                <span className="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-lg border border-rose-500/30 font-sans font-bold text-xs">
+                  <span className="line-through decoration-rose-400 decoration-1">۹,۸۵۸,۰۰۰ تومان</span>
+                </span>
+              </div>
+              <div className="text-3xl md:text-4xl font-black text-amber-400 flex items-center justify-center gap-2 drop-shadow-md">
+                <span>کاملاً رایگان!</span>
+              </div>
+              <div className="text-[11px] text-amber-200 mt-2 font-bold bg-amber-500/15 px-3 py-1 rounded-full border border-amber-500/30">
+                تنها با پرداخت {parseInt(settings.proAccountPrice || '239500').toLocaleString('fa-IR')} تومان هزینه راه‌اندازی اولیه
+              </div>
             </div>
           </div>
         </div>
@@ -737,32 +846,32 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               <span>انتظار شبکه زوپیت از مدیران فروشگاه پرو:</span>
             </div>
             <p className="text-xs md:text-sm text-secondary leading-relaxed font-medium">
-              در قبال اعطای این ۸ خدمت ارزشمند و هدیه رایگان (که همگی جهت رشد و توسعه کسب‌وکار شما آماده شده‌اند)، شبکه زوپیت از شما انتظار دارد که تمامی تلاش خود را جهت <strong className="text-primary font-black">افزایش فروش آنلاین و ثبت و ارسال سفارشات بیشتر در پلتفرم</strong> بکار گیرید تا یک همکاری برد-برد بلندمدت شکل گیرد.
+              در قبال اعطای این ۹ خدمت ارزشمند و هدیه رایگان (که همگی جهت رشد و توسعه کسب‌وکار شما آماده شده‌اند)، شبکه زوپیت از شما انتظار دارد که تمامی تلاش خود را جهت <strong className="text-primary font-black">افزایش فروش آنلاین و ثبت و ارسال سفارشات بیشتر در پلتفرم</strong> بکار گیرید تا یک همکاری برد-برد بلندمدت شکل گیرد.
             </p>
           </div>
 
-          {/* 8 Feature Cards Grid */}
+          {/* 9 Feature Cards Grid */}
           <div className="space-y-4">
             <h2 className="text-lg font-black text-primary flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-emerald-500" />
-              <span>۸ خدمت و هدیه استثنایی اکانت پرو:</span>
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              <span>۹ خدمت و هدیه استثنایی اکانت پرو:</span>
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {proFeaturesList.map((item) => {
                 const IconComp = item.icon;
                 return (
                   <div
                     key={item.id}
-                    className="bg-card border border-border-subtle rounded-2xl p-5 hover:border-emerald-500/40 transition-all shadow-md flex flex-col justify-between space-y-4 relative group"
+                    className="bg-card border border-border-subtle rounded-2xl p-5 hover:border-amber-500/40 transition-all shadow-md hover:shadow-lg flex flex-col justify-between space-y-4 relative group"
                   >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center`}>
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-sm`}>
                           <IconComp className="w-5 h-5" />
                         </div>
-                        <span className="text-[11px] font-mono text-muted bg-surface px-2 py-0.5 rounded-lg border border-subtle">
-                          خدمت #{item.id}
+                        <span className="text-[11px] font-sans font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20">
+                          خدمت #{item.id.toLocaleString('fa-IR')}
                         </span>
                       </div>
                       <h3 className="font-black text-sm text-primary leading-snug">{item.title}</h3>
@@ -770,8 +879,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     </div>
 
                     <div className="pt-3 border-t border-border-subtle flex items-center justify-between">
-                      <span className="text-[11px] text-muted">ارزش واقعى:</span>
-                      <span className="text-xs font-mono font-bold text-rose-500 line-through decoration-rose-500">
+                      <span className="text-[11px] font-bold text-muted">ارزش خدمت:</span>
+                      <span className="text-xs font-sans font-black text-amber-600 dark:text-amber-400">
                         {item.value}
                       </span>
                     </div>
@@ -790,7 +899,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   <span>فرم ثبت‌نام و امضای دیجیتال قرارداد پرو</span>
                 </h2>
                 <p className="text-xs text-muted mt-1">
-                  جهت دریافت و فعال‌سازی این ۸ خدمت، لطفاً مشخصات را تایید و قرارداد زیر را امضا نمایید.
+                  جهت دریافت و فعال‌سازی این ۹ خدمت، لطفاً مشخصات را تایید و قرارداد زیر را امضا نمایید.
                 </p>
               </div>
 
@@ -900,9 +1009,175 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 </div>
               </div>
 
+              {/* 5 Domain Proposals Section */}
+              <div className="bg-surface/80 border border-emerald-500/30 rounded-2xl p-5 space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-black text-primary flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-emerald-500" />
+                    <span>پیشنهاد نام دامنه (.ir) به ترتیب اولویت (تا ۵ مورد به حروف لاتین)</span>
+                  </h3>
+                  <p className="text-xs text-muted leading-relaxed">
+                    لطفاً حداکثر ۵ نام دامنه پیشنهادی با حروف لاتین وارد کنید. ما به ترتیب اولویت آزاد بودن (Availability) دامنه‌ها را بررسی کرده و اولین مورد آزاد را به صورت رایگان برای شما ثبت می‌کنیم. در صورتی که هیچ‌یک از ۵ نام پیشنهادی آزاد نباشد، یک دامنه رندوم مرتبط برای شما ثبت خواهد شد و حق اعتراضی وجود نخواهد داشت (به دلیل اعطای دامنه به صورت هدیه رایگان).
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  {[1, 2, 3, 4, 5].map((idx) => (
+                    <div key={idx} className="space-y-1">
+                      <label className="text-[11px] font-bold text-secondary block">
+                        اولویت {idx.toLocaleString('fa-IR')}:
+                      </label>
+                      <input
+                        type="text"
+                        value={domainProposals[idx - 1] || ''}
+                        onChange={(e) => {
+                          const updated = [...domainProposals];
+                          updated[idx - 1] = e.target.value;
+                          setDomainProposals(updated);
+                        }}
+                        placeholder={`domain${idx}.ir`}
+                        className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono dir-ltr text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional Options Checkboxes */}
+              <div className="space-y-3 bg-surface/60 p-5 rounded-2xl border border-subtle">
+                <h3 className="text-xs font-black text-primary flex items-center gap-2">
+                  <Puzzle className="w-4 h-4 text-emerald-500" />
+                  <span>آپشن‌ها و خدمات جانبی انتخابی:</span>
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 1. eNamad option */}
+                  <label className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${hasEnamad ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-background border-subtle hover:border-emerald-500/30'}`}>
+                    <input
+                      type="checkbox"
+                      checked={hasEnamad}
+                      onChange={(e) => setHasEnamad(e.target.checked)}
+                      className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 shrink-0"
+                    />
+                    <div className="space-y-1 text-right flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-primary">دریافت ای‌نماد (نماد اعتماد الکترونیکی)</span>
+                        <span className="text-[11px] font-sans font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                          +۵۰,۰۰۰ تومان
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted leading-relaxed">
+                        کارمزد دولتی ثبت ای‌نماد در سامانه مرکز توسعه تجارت به مبلغ کل اضافه می‌شود.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* 2. Zibal Payment Gateway */}
+                  <label className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${hasGateway ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-background border-subtle hover:border-emerald-500/30'}`}>
+                    <input
+                      type="checkbox"
+                      checked={hasGateway}
+                      onChange={(e) => setHasGateway(e.target.checked)}
+                      className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 shrink-0"
+                    />
+                    <div className="space-y-1 text-right flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-primary">درخواست اتصال درگاه پرداخت زیبال</span>
+                        <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                          رایگان
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted leading-relaxed">
+                        اتصال و کانفیگ مستقیم درگاه پرداخت الکترونیکی زیبال برای پذیرش کارت‌های شتابی.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* 3. Tax File Setup */}
+                  <label className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 col-span-1 md:col-span-2 ${hasTaxProfile ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-background border-subtle hover:border-emerald-500/30'}`}>
+                    <input
+                      type="checkbox"
+                      checked={hasTaxProfile}
+                      onChange={(e) => setHasTaxProfile(e.target.checked)}
+                      className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 shrink-0"
+                    />
+                    <div className="space-y-1 text-right flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-primary">درخواست تشکیل پرونده مالیاتی</span>
+                        <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                          رایگان
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted leading-relaxed">
+                        <strong className="text-amber-500">توجه حقوقی:</strong> مسئولیت پرونده مالیاتی بر عهده کاربر می‌باشد. تیم زوپیت بر اساس تجربه و راهنمایی‌های مراجع مالیاتی اقدام می‌نماید، اما هیچ‌گونه مسئولیت حقوقی در قبال پرونده مالیاتی نخواهد داشت.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* 4. Custom Logo Creation */}
+                  <div className={`p-4 rounded-xl border transition-all col-span-1 md:col-span-2 space-y-3 ${hasCustomLogo ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-background border-subtle'}`}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hasCustomLogo}
+                        onChange={(e) => setHasCustomLogo(e.target.checked)}
+                        className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 shrink-0"
+                      />
+                      <div className="space-y-0.5 text-right flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-primary">طراحی لوگوی اختصاصی برند</span>
+                          <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                            رایگان
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted">
+                          طراحی لوگوی هویت بصری فروشگاه شما به صورت هدیه اختصاصی.
+                        </p>
+                      </div>
+                    </label>
+
+                    {hasCustomLogo && (
+                      <div className="pt-2">
+                        <textarea
+                          value={logoDescription}
+                          onChange={(e) => setLogoDescription(e.target.value)}
+                          placeholder="توضیحات، ایده یا متنی که دوست دارید در لوگو استفاده شود (اختیاری - در صورت عدم درج، بر اساس اسم برند به صورت هوشمند طراحی می‌گردد)..."
+                          rows={2}
+                          className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Captcha & Terms Checkbox */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center pt-2">
-                {/* Math Captcha with High Contrast */}
+                {/* Terms Agreement Checkbox (Right Side in RTL) */}
+                <label className="flex items-center gap-2 cursor-pointer bg-surface p-3.5 rounded-2xl border border-subtle">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                  />
+                  <span className="text-xs font-bold text-primary leading-relaxed">
+                    تمام بندهای قرارداد را مطالعه نموده و می‌پذیرم.
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowTermsModal(true);
+                      }}
+                      className="text-blue-500 hover:text-blue-600 underline font-extrabold mr-1 cursor-pointer inline-block"
+                    >
+                      [ مشاهده کامل متن قرارداد ]
+                    </button>
+                  </span>
+                </label>
+
+                {/* Math Captcha (Left Side in RTL) */}
                 <div className="bg-surface p-3.5 rounded-2xl border border-subtle flex items-center justify-between gap-3">
                   <span className="text-xs font-bold text-secondary whitespace-nowrap">کد امنیتی:</span>
                   <div className="bg-slate-900 border-2 border-emerald-500/50 text-emerald-400 font-mono font-black text-base px-4 py-1.5 rounded-xl shadow-inner tracking-widest flex items-center gap-2">
@@ -928,23 +1203,57 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     <RefreshCw className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
 
-                {/* Terms Agreement Checkbox */}
-                <label className="flex items-center gap-3 cursor-pointer bg-surface p-3.5 rounded-2xl border border-subtle">
-                  <input
-                    type="checkbox"
-                    checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
-                  />
-                  <span className="text-xs font-bold text-primary leading-relaxed">
-                    تمام بندها و شرایط قرارداد اکانت پرو زوپیت را مطالعه نموده و می‌پذیرم.
-                  </span>
-                </label>
+              {/* Bottom Payable Amount & Discount Code Box Section */}
+              <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border-2 border-emerald-500/50 rounded-2xl p-5 text-white shadow-xl space-y-4">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  {/* Price display with high contrast font */}
+                  <div className="text-right space-y-1">
+                    <span className="text-xs text-emerald-300/90 font-bold block">مبلغ نهایی راه‌اندازی و فعال‌سازی اکانت پرو:</span>
+                    <div className="flex items-center gap-3">
+                      {(isDiscountApplied || hasEnamad) && (
+                        <span className="text-xs font-sans font-bold text-slate-400 line-through">
+                          {(parseInt(settings.proAccountPrice || '239500', 10) + (hasEnamad ? 50000 : 0)).toLocaleString("fa-IR")} تومان
+                        </span>
+                      )}
+                      <div className="text-2xl md:text-3xl font-black text-emerald-400 font-sans tracking-wide flex items-center gap-1.5 bg-emerald-500/10 px-4 py-1.5 rounded-xl border border-emerald-500/30">
+                        <span>{Math.max(0, parseInt(settings.proAccountPrice || '239500', 10) + (hasEnamad ? 50000 : 0) - appliedDiscount).toLocaleString("fa-IR")}</span>
+                        <span className="text-xs font-sans text-emerald-200">تومان</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Discount Code Input Box */}
+                  <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-64">
+                      <input
+                        type="text"
+                        value={discountCodeText}
+                        onChange={(e) => setDiscountCodeText(e.target.value)}
+                        placeholder="کد تخفیف (مثال: ZOPIT-PRO)"
+                        className="w-full px-4 py-2.5 bg-slate-800/90 border border-emerald-500/40 rounded-xl text-xs text-white placeholder-slate-400 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400 dir-ltr text-center"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleApplyDiscountCode}
+                      className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all shrink-0 cursor-pointer shadow-md shadow-emerald-500/20"
+                    >
+                      اعمال کد
+                    </button>
+                  </div>
+                </div>
+                {isDiscountApplied && (
+                  <div className="text-xs text-emerald-300 font-bold flex items-center gap-1.5 pt-1 border-t border-emerald-500/20">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>کد تخفیف ویژه با موفقیت اعمال گردید ({appliedDiscount.toLocaleString("fa-IR")} تومان تخفیف).</span>
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}
-              <div className="pt-4 text-center">
+              <div className="pt-2 text-center">
                 <button
                   type="submit"
                   disabled={submitting}
@@ -964,6 +1273,82 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       )}
 
       {/* Contract & Terms Modal */}
+      
+      {/* Pro Ticket Modal */}
+      {showProTicketModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-border-subtle flex flex-col">
+            <div className="p-4 border-b border-border-subtle flex justify-between items-center bg-surface/50">
+              <h3 className="font-black text-primary text-sm flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-indigo-500" />
+                ارسال مدارک اختصاصی پرو
+              </h3>
+              <button 
+                onClick={() => setShowProTicketModal(false)}
+                className="p-2 bg-background hover:bg-surface rounded-xl transition-colors text-muted hover:text-rose-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 text-sm text-secondary space-y-4 text-right" dir="rtl">
+              <p className="text-xs text-muted mb-4">
+                لطفا تصاویر کارت ملی، شناسنامه و شماره شبا خود را آپلود کرده و پیام خود را جهت بررسی سریع وارد نمایید. این تیکت با اولویت بالا و مستقیما به دپارتمان اکانت پرو ارسال خواهد شد.
+              </p>
+              
+              <div>
+                <label className="block text-xs font-bold text-muted mb-1.5">موضوع ارسال</label>
+                <input
+                  type="text"
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  className="w-full bg-background border border-border-subtle rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted mb-1.5">توضیحات</label>
+                <textarea
+                  value={ticketMsg}
+                  onChange={(e) => setTicketMsg(e.target.value)}
+                  rows={4}
+                  className="w-full bg-background border border-border-subtle rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  placeholder="مثال: مدارک برای درگاه پرداخت و اینماد پیوست شد..."
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted mb-1.5">لینک فایل پیوست (اختیاری)</label>
+                <input
+                  type="text"
+                  value={ticketAttachment}
+                  onChange={(e) => setTicketAttachment(e.target.value)}
+                  className="w-full bg-background border border-border-subtle rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-left"
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-border-subtle bg-surface/50 flex justify-end gap-3">
+              <button
+                onClick={() => setShowProTicketModal(false)}
+                className="px-5 py-2.5 bg-background hover:bg-surface text-secondary font-bold rounded-xl text-xs transition-colors border border-border-subtle"
+              >
+                انصراف
+              </button>
+              <button
+                onClick={handleSendProTicket}
+                disabled={submittingTicket}
+                className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {submittingTicket ? "در حال ارسال..." : "ارسال مدارک"}
+                <PenTool className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showTermsModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card border border-border-subtle rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl animate-scale-up">

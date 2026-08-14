@@ -12,6 +12,13 @@ try {
   const viteCmd = hasViteBin ? `node "${viteBin}"` : 'npx vite';
   execSync(`${viteCmd} build`, { stdio: 'inherit' });
 
+  // Sync built files to prod_output for backward compatibility
+  const distDirLocation = path.join(__dirname, 'dist');
+  const prodOutputDir = path.join(__dirname, 'prod_output');
+  if (fs.existsSync(distDirLocation)) {
+    fs.cpSync(distDirLocation, prodOutputDir, { recursive: true, force: true });
+  }
+
   // 1.5 Database Setup for Vercel
   if (process.env.VERCEL && process.env.DATABASE_URL) {
     const isRealDb = process.env.DATABASE_URL.startsWith('postgres') || process.env.DATABASE_URL.startsWith('mysql');

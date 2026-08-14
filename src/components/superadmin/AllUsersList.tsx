@@ -583,19 +583,19 @@ export default function AllUsersList({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Zopit Supplier Special Postal Identity Box */}
                   {activeModalUser.role === "SUPPLIER" && (
-                    <div className="p-4 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-2xl space-y-2 md:col-span-2">
+                    <div className="p-5 bg-card border border-emerald-500/40 rounded-2xl space-y-2.5 md:col-span-2 shadow-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-emerald-700 dark:text-emerald-400 font-black flex items-center gap-1.5">
-                          <Building2 className="w-4 h-4" /> شناسه و نام پستی ثبت‌شده در پلتفرم زوپیت:
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-extrabold flex items-center gap-1.5">
+                          <Building2 className="w-4 h-4 text-emerald-500" /> شناسه و نام پستی ثبت‌شده در پلتفرم زوپیت:
                         </span>
-                        <span className="px-2.5 py-0.5 bg-emerald-600 text-white font-mono text-[11px] font-bold rounded-full">
+                        <span className="px-3 py-1 bg-emerald-600 text-white font-mono text-[11px] font-black rounded-full shadow-xs">
                           فرستنده مجاز زوپیت
                         </span>
                       </div>
-                      <p className="font-black text-base text-emerald-800 dark:text-emerald-200 font-mono">
-                        زوپیت تامین‌کننده {activeModalUser.id} {activeModalUser.brandName ? `(${activeModalUser.brandName})` : ""}
+                      <p className="font-black text-base text-text-primary font-mono">
+                        زوپیت تامین‌کننده #{activeModalUser.id} {activeModalUser.brandName ? `(${activeModalUser.brandName})` : ""}
                       </p>
-                      <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 leading-relaxed">
+                      <p className="text-xs text-text-secondary leading-relaxed bg-surface p-3 rounded-xl border border-subtle">
                         آدرس کامل انبار فرستنده جهت درج روی مرسوله پستی: {activeModalUser.province || "---"}، {activeModalUser.city || "---"}، {activeModalUser.address || "آدرس ثبت نشده"} (کد پستی: {activeModalUser.postalCode || "---"})
                       </p>
                     </div>

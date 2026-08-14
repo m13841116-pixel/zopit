@@ -88,6 +88,11 @@ model ProAccount {
   wpAdminUrl        String?
   wpUsername        String?
   wpPassword        String?
+  hasEnamad         Boolean  @default(false)
+  hasGateway        Boolean  @default(false)
+  hasTaxProfile     Boolean  @default(false)
+  hostExpiresAt     DateTime?
+  torobConnected    Boolean  @default(false)
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -154,6 +159,7 @@ model ProductVariant {
   supplierBasePrice Float
   stock             Int
   sku               String?
+  imageUrl          String?
   orderItems        OrderItem[]
   product           Product     @relation(fields: [productId], references: [id])
 }

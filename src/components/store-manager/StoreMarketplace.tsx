@@ -1,5 +1,8 @@
 import { toast } from "../GlobalToast";
 import React, { useState, useEffect } from "react";
+import { getValidProductImageUrl } from "../../utils/productUtils";
+import { formatSupplierCode, formatSupplierLocation, HighContrastStatusBadge } from "../../utils/statusUtils";
+import { DigikalaProductModal } from "../DigikalaProductModal";
 import {
   Search,
   Layers,
@@ -11,6 +14,9 @@ import {
   Calendar,
   Settings,
   Info,
+  Building2,
+  MapPin,
+  Eye,
 } from "lucide-react";
 export default function StoreMarketplace({
   globalSearchTerm,
@@ -145,347 +151,16 @@ export default function StoreMarketplace({
   return (
     <div className="space-y-6 animate-fade-in relative">
       
-      {/* Product Detail Modal */}
+      {/* Digikala Style Product Detail Modal */}
       {selectedProduct && (
-        <div
-          className="fixed inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setSelectedProduct(null)}
-        >
-          
-          <div
-            className="bg-card rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden my-4 flex flex-col max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            
-            <div className="flex justify-between items-center p-6 border-b border-subtle">
-              
-              <h3 className="text-xl font-bold text-primary">
-                جزئیات محصول
-              </h3>
-              <button
-                onClick={() => setSelectedProduct(null)}
-                className="p-2 hover:bg-surface rounded-full transition-colors text-muted"
-              >
-                
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                {/* Images */}
-                <div className="space-y-4">
-                  
-                  <div className="aspect-square bg-surface rounded-2xl flex items-center justify-center overflow-hidden border border-subtle">
-                    
-                    {selectedProduct.images?.length > 0 &&
-                    selectedProduct.images[0].url ? (
-                      <img
-                        src={selectedProduct.images[0].url}
-                        alt={selectedProduct.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Layers className="w-24 h-24 text-inverse" />
-                    )}
-                  </div>
-                  {selectedProduct.images?.length > 1 && (
-                    <div className="grid grid-cols-4 gap-2">
-                      
-                      {selectedProduct.images.slice(1).map((img: any) => (
-                        <div
-                          key={img.id}
-                          className="aspect-square bg-surface rounded-xl overflow-hidden border border-subtle"
-                        >
-                          
-                          <img
-                            src={img.url}
-                            className="w-full h-full object-cover"
-                            alt=""
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {/* Details */}
-                <div className="flex flex-col">
-                  
-                  <div className="flex items-center gap-2 mb-3">
-                    
-                    <span className="text-xs font-bold text-success bg-success/10 px-3 py-1 rounded-full border border-emerald-100">
-                      
-                      {selectedProduct.category?.name || "بدون دسته‌بندی"}
-                    </span>
-                    <span className="text-xs font-bold text-muted bg-surface px-3 py-1 rounded-full border border-subtle">
-                      
-                      وضعیت:
-                      {selectedProduct.status === "ACTIVE" ||
-                      selectedProduct.status === "PUBLISHED"
-                        ? "منتشر شده"
-                        : selectedProduct.status}
-                    </span>
-                  </div>
-                  <h2 className="text-2xl font-bold text-primary mb-2">
-                    {selectedProduct.name}
-                  </h2>
-                  {/* Technical Specifications & Description */}
-                  <div className="space-y-4 mb-6">
-                    <div>
-                      <span className="text-xs font-bold text-primary-default block mb-1">
-                        معرفی کالا
-                      </span>
-                      <p className="text-muted text-sm leading-relaxed bg-background/80 border border-subtle p-4 rounded-xl">
-                        {selectedProduct.shortDescription ||
-                          selectedProduct.longDescription ||
-                          "توضیحاتی برای این محصول ثبت نشده است."}
-                      </p>
-                    </div>
-                    {selectedProduct.longDescription && selectedProduct.shortDescription && (
-                      <div>
-                        <span className="text-xs font-bold text-secondary block mb-1">
-                          توضیحات تکمیلی
-                        </span>
-                        <p className="text-muted text-xs leading-relaxed bg-background/50 border border-subtle p-3 rounded-xl whitespace-pre-line">
-                          {selectedProduct.longDescription}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="bg-background rounded-2xl p-5 mb-6 border border-subtle space-y-4">
-                    
-                    <div className="flex justify-between items-center pb-4 border-b border-subtle">
-                      
-                      <span className="text-muted font-medium">
-                        قیمت نهایی فروش برای شما
-                      </span>
-                      <div className="text-left">
-                        
-                        <span className="text-2xl font-bold text-success">
-                          {selectedProduct.finalPrice?.toLocaleString()}
-                        </span>
-                        <span className="text-sm text-muted mr-1">
-                          تومان
-                        </span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      
-                      <div className="flex items-center gap-3">
-                        
-                        <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-blue-600">
-                          
-                          <Package className="w-5 h-5" />
-                        </div>
-                        <div>
-                          
-                          <p className="text-xs text-muted">موجودی فعلی</p>
-                          <p className="font-bold text-primary">
-                            {selectedProduct.inventory} عدد
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        
-                        <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                          
-                          <Layers className="w-5 h-5" />
-                        </div>
-                        <div>
-                          
-                          <p className="text-xs text-muted">
-                            حداقل سفارش (MOQ)
-                          </p>
-                          <p className="font-bold text-primary">
-                            {selectedProduct.minOrderQuantity} عدد
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-4 mb-6 flex-1">
-                    <h4 className="font-bold text-primary flex items-center gap-2 text-sm border-b border-subtle pb-2">
-                      <Info className="w-4 h-4 text-primary-default" /> مشخصات فنی و تخصصی کالا
-                    </h4>
-                    
-                    {/* General Specifications Grid */}
-                    <div className="grid grid-cols-2 gap-y-2.5 text-xs bg-background/60 p-3.5 rounded-xl border border-subtle">
-                      <div className="text-muted">تامین‌کننده / شهر:</div>
-                      <div className="font-bold text-primary">{selectedProduct.supplierName || selectedProduct.supplierCity || "تهران"}</div>
-                      <div className="text-muted">برند:</div>
-                      <div className="font-bold text-primary">{selectedProduct.brand || "ندارد"}</div>
-                      <div className="text-muted">کد کالا (SKU):</div>
-                      <div className="font-bold text-primary font-mono">{selectedProduct.sku || "ندارد"}</div>
-                      {selectedProduct.publishStartDate && (
-                        <>
-                          <div className="text-muted">تاریخ انتشار:</div>
-                          <div className="font-bold text-primary">
-                            {new Date(selectedProduct.publishStartDate).toLocaleDateString("fa-IR")}
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Detailed Technical Specifications */}
-                    {(() => {
-                      let specsList: Array<{ key: string; value: string }> = [];
-                      if (selectedProduct.technicalSpecs) {
-                        try {
-                          const parsed = typeof selectedProduct.technicalSpecs === "string"
-                            ? JSON.parse(selectedProduct.technicalSpecs)
-                            : selectedProduct.technicalSpecs;
-                          if (Array.isArray(parsed)) {
-                            specsList = parsed;
-                          } else if (typeof parsed === "object" && parsed !== null) {
-                            specsList = Object.entries(parsed).map(([k, v]) => ({ key: k, value: String(v) }));
-                          }
-                        } catch (e) {
-                          // Not valid JSON
-                        }
-                      }
-                      return (
-                        <div>
-                          {specsList.length > 0 ? (
-                            <div className="space-y-2">
-                              <span className="text-[11px] font-black text-secondary block">ویژگی‌های ساختاری و فنی:</span>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                {specsList.map((spec, idx) => (
-                                  <div key={idx} className="flex items-center justify-between bg-background p-2.5 rounded-xl border border-subtle/80">
-                                    <span className="text-muted font-medium">{spec.key}:</span>
-                                    <span className="font-bold text-primary">{spec.value}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : typeof selectedProduct.technicalSpecs === "string" && selectedProduct.technicalSpecs.trim() ? (
-                            <div className="space-y-1">
-                              <span className="text-[11px] font-black text-secondary block">ویژگی‌های تخصصی:</span>
-                              <p className="text-xs text-secondary leading-relaxed bg-background p-3 rounded-xl border border-subtle whitespace-pre-line">
-                                {selectedProduct.technicalSpecs}
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  <div className="mt-auto pt-4 border-t border-subtle flex gap-3">
-                    
-                    <button
-                      onClick={() => setSelectedProduct(null)}
-                      className="px-6 py-4 rounded-xl text-base font-bold text-muted bg-surface hover:bg-surface transition-colors"
-                    >
-                      
-                      بستن
-                    </button>
-                    <button
-                      onClick={() => handleAddToCatalog(selectedProduct)}
-                      disabled={
-                        myCatalogIds.has(selectedProduct.id) ||
-                        (isLimitReached &&
-                          !myCatalogIds.has(selectedProduct.id))
-                      }
-                      className={`flex-1 py-4 rounded-xl flex items-center justify-center gap-2 text-base font-bold transition-colors ${myCatalogIds.has(selectedProduct.id) ? "bg-surface text-success cursor-not-allowed" : isLimitReached ? "bg-surface text-muted cursor-not-allowed" : "bg-primary-default text-inverse hover:bg-primary-hover shadow-lg hover:shadow-indigo-200"}`}
-                    >
-                      
-                      {addingToCatalog === selectedProduct.id ? (
-                        <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      ) : myCatalogIds.has(selectedProduct.id) ? (
-                        <>
-                          
-                          <Check className="w-5 h-5" /> این محصول در زوپیتی
-                          شما موجود است
-                        </>
-                      ) : (
-                        <>
-                          
-                          <Plus className="w-5 h-5" /> افزودن به زوپیتی
-                          من
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {/* Variants Section */}
-              {selectedProduct.variants &&
-                selectedProduct.variants.length > 0 && (
-                  <div className="mt-8 pt-6 border-t border-subtle">
-                    
-                    <h4 className="text-base font-bold text-primary mb-4 flex items-center gap-2">
-                      
-                      <Layers className="w-5 h-5 text-primary-default" />
-                      متغیرهای کالا (اندازه، رنگ و مشخصات فرعی)
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      
-                      {selectedProduct.variants.map((v: any) => {
-                        let displayAttrs = "ساده / پیش‌فرض";
-                        try {
-                          const parsed =
-                            typeof v.attributes === "string"
-                              ? JSON.parse(v.attributes)
-                              : v.attributes;
-                          if (parsed && Object.keys(parsed).length > 0) {
-                            displayAttrs = Object.entries(parsed)
-                              .map(([key, val]) => `${key}: ${val}`)
-                              .join(" |");
-                          }
-                        } catch (e) {}
-                        return (
-                          <div
-                            key={v.id}
-                            className="bg-background border border-slate-150 rounded-2xl p-4 flex justify-between items-center hover:border-default transition-all"
-                          >
-                            
-                            <div>
-                              
-                              <span className="text-xs text-muted block mb-1 font-medium">
-                                ویژگی
-                              </span>
-                              <span className="font-bold text-primary text-sm">
-                                {displayAttrs}
-                              </span>
-                            </div>
-                            <div className="text-left">
-                              
-                              <span className="text-xs text-muted block mb-1 font-medium">
-                                کد SKU و موجودی
-                              </span>
-                              <span className="font-extrabold text-primary-default text-sm block">
-                                {v.stock} عدد
-                              </span>
-                              {v.sku && (
-                                <span
-                                  className="text-muted text-[10px] block font-mono"
-                                  dir="ltr"
-                                >
-                                  {v.sku}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              {/* Detailed description */}
-              <div className="mt-8 pt-6 border-t border-subtle">
-                
-                <h4 className="text-base font-bold text-primary mb-3">
-                  توضیحات تکمیلی کالا
-                </h4>
-                <div className="prose prose-slate max-w-none text-muted text-sm leading-loose bg-background/50 p-5 rounded-2xl border border-subtle">
-                  
-                  {selectedProduct.longDescription ||
-                    "توضیحات تکمیلی برای این محصول ثبت نشده است."}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <DigikalaProductModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          mode="store-marketplace"
+          isInCatalog={myCatalogIds.has(selectedProduct.id)}
+          isAddingToCatalog={addingToCatalog === selectedProduct.id}
+          onAddToCatalog={(prod) => handleAddToCatalog(prod)}
+        />
       )}
       {/* Header */}
       <div className="flex justify-between items-center bg-card p-5 rounded-2xl shadow-sm border border-subtle">
@@ -493,7 +168,7 @@ export default function StoreMarketplace({
         <div>
           
           <h2 className="text-xl font-bold text-primary">
-            پیشخوان زوپیت (Marketplace Catalog)
+            پیشخوان بانک زوپیت (Zopit Bank)
           </h2>
           <p className="text-muted text-sm mt-1">
             
@@ -669,48 +344,71 @@ export default function StoreMarketplace({
                   )}
                   <div className="h-48 bg-surface relative overflow-hidden flex items-center justify-center text-inverse">
                     
-                    {product.images?.length > 0 && product.images[0].url ? (
-                      <img
-                        src={product.images[0].url}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        alt={product.name}
-                      />
-                    ) : (
-                      <Layers className="w-16 h-16 group-hover:scale-110 transition-transform duration-300" />
-                    )}
+                    {(() => {
+                      const img = getValidProductImageUrl(product);
+                      if (img) {
+                        return (
+                          <img
+                            src={img}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            alt={product.name}
+                          />
+                        );
+                      }
+                      return (
+                        <div className="flex flex-col items-center justify-center gap-2 text-muted">
+                          <Layers className="w-10 h-10 opacity-40" />
+                          <span className="text-[11px] font-bold">تصویر ثبت نشده</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="p-5 flex-1 flex flex-col">
                     
-                    <div className="flex justify-between items-start mb-2">
-                      
-                      <p className="text-xs font-semibold text-success bg-success/10 px-2 py-1 rounded">
-                        {product.category?.name}
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <p className="text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded-lg border border-emerald-100">
+                        {product.category?.name || "عمومی"}
                       </p>
+                      {product.brand && (
+                        <span className="text-[10px] font-bold text-secondary bg-surface px-2 py-0.5 rounded-lg border border-subtle">
+                          {product.brand}
+                        </span>
+                      )}
                     </div>
-                    <h3 className="font-bold text-primary text-lg mb-2 leading-tight group-hover:text-primary-hover transition-colors">
-                      
+
+                    <h3 className="font-bold text-primary text-base mb-2 leading-tight group-hover:text-primary-hover transition-colors line-clamp-2">
                       {product.name}
                     </h3>
+
+                    {/* Supplier Summary Badge on Card (Strict Identification ID & Location) */}
+                    <div className="text-[11px] bg-surface/60 p-2.5 rounded-xl border border-subtle mb-3 flex items-center justify-between gap-1 flex-wrap">
+                      <span className="text-[11px] text-primary font-bold">
+                        {formatSupplierCode(product.supplierId || product.supplier?.id || product.id)}
+                      </span>
+                      <div className="text-[10px] text-muted flex items-center gap-1 font-medium">
+                        <MapPin className="w-3 h-3 text-secondary" />
+                        <span>{formatSupplierLocation(product.supplierProvince, product.supplierCity)}</span>
+                      </div>
+                    </div>
+
                     <p className="text-xs text-muted mb-3 line-clamp-2">
                       {product.description ||
                         product.shortDescription ||
                         "بدون توضیحات"}
                     </p>
+
                     <div className="space-y-1 mb-4 text-xs font-medium text-muted bg-background p-2 rounded-lg">
-                      
                       <div className="flex justify-between">
-                        
-                        <span>موجودی:</span>
+                        <span>موجودی انبار:</span>
                         <span
                           className={
                             product.inventory > 0
-                              ? "text-primary"
-                              : "text-danger"
+                              ? "text-primary font-bold"
+                              : "text-danger font-bold"
                           }
                         >
-                          
                           {product.inventory > 0
-                            ? product.inventory
+                            ? `${product.inventory} عدد`
                             : "ناموجود"}
                         </span>
                       </div>

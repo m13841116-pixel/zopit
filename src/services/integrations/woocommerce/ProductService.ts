@@ -28,7 +28,9 @@ export class ProductService {
           short_description: sel.product.shortDescription || '',
           manage_stock: true,
           stock_quantity: sel.product.inventory,
-          images: sel.product.images.map((img: any) => ({ src: img.url }))
+          images: Array.isArray(sel.product.images) 
+            ? sel.product.images.map((img: any) => ({ src: typeof img === 'string' ? img : img?.url })) 
+            : (sel.product.imageUrl ? [{ src: sel.product.imageUrl }] : [])
         };
 
         let wcId = sel.wc_product_id;

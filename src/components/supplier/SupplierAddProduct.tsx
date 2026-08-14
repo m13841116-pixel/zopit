@@ -1,5 +1,14 @@
 import { toast } from "../GlobalToast";
 import React, { useState } from "react";
+import { numberToWords } from "../../utils/numberToWords";
+
+export function toEnglishDigits(str: any): string {
+  if (str === undefined || str === null) return "";
+  return str.toString()
+    .replace(/[,،٬\s]/g, "")
+    .replace(/[۰-۹]/g, (d: string) => (d.charCodeAt(0) - 0x06f0).toString())
+    .replace(/[٠-٩]/g, (d: string) => (d.charCodeAt(0) - 0x0660).toString());
+}
 import {
   Package,
   Upload,
@@ -12,7 +21,12 @@ import {
   Sparkles,
   TrendingUp,
   HelpCircle,
-  Coins
+  Coins,
+  Info,
+  List,
+  X,
+  ImagePlus,
+  Eye
 } from "lucide-react";
 
 export function SupplierAddProduct({
@@ -23,7 +37,7 @@ export function SupplierAddProduct({
 }: any) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [categories, setCategories] = useState<{id: number, name: string}[]>([
+  const [categories, setCategories] = useState<any[]>([
     { id: 1, name: "موبایل" },
     { id: 2, name: "لپ‌تاپ" },
     { id: 3, name: "کالای دیجیتال" },
@@ -51,6 +65,7 @@ export function SupplierAddProduct({
           const list = Array.isArray(data) ? data : (data?.categories || []);
           if (list.length > 0) {
             setCategories(list);
+            setFormData(prev => ({ ...prev, categoryId: prev.categoryId || String(list[0].id) }));
             return;
           }
         }
@@ -82,9 +97,16 @@ export function SupplierAddProduct({
       ? initialData.variants.reduce((sum: number, v: any) => sum + (parseInt(v.stock.toString().replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))) || 0), 0).toString()
       : initialData?.inventory?.toString() || "",
     minStock: "",
-    images: initialData?.images?.map((img: any) => img.url) || ([] as string[]),
-    mainImage: initialData?.images?.[0]?.url || "",
-    variants: initialData?.variants || ([] as any[]),
+    images: Array.isArray(initialData?.images)
+      ? initialData.images.map((img: any) => typeof img === 'string' ? img : (img?.url || ''))
+      : (initialData?.imageUrl || initialData?.mainImage ? [initialData.imageUrl || initialData.mainImage] : []),
+    mainImage: Array.isArray(initialData?.images) && initialData.images.length > 0
+      ? (typeof initialData.images[0] === 'string' ? initialData.images[0] : initialData.images[0]?.url || '')
+      : (initialData?.imageUrl || initialData?.mainImage || ''),
+    variants: (initialData?.variants || []).map((v: any) => ({
+      ...v,
+      attributes: typeof v.attributes === 'string' ? JSON.parse(v.attributes) : (v.attributes || {})
+    })),
     videoUrl: initialData?.exploreContent?.customVideoUrl || "",
   });
 
@@ -99,17 +121,19 @@ export function SupplierAddProduct({
     }
     return [{ key: "", value: "" }];
   });
-  /* Variant Building */ const [attributes, setAttributes] = useState<
-    { name: string; values: string[] }[]
-  >([]);
+  /* Variant Building */
+  const [attributes, setAttributes] = useState<{ name: string; values: string[] }[]>([]);
   const [newAttrName, setNewAttrName] = useState("");
   const [newAttrValue, setNewAttrValue] = useState("");
+
   const isNextDisabled = () => {
     if (step === 1) {
       return !formData.name.trim() || !formData.categoryId;
     }
     if (step === 2) {
-      return !formData.supplierBasePrice.toString().trim() || !formData.stock.toString().trim();
+      const price = toEnglishDigits(formData.supplierBasePrice);
+      const stockVal = toEnglishDigits(formData.stock);
+      return !price || parseFloat(price) <= 0 || (!stockVal && formData.variants.length === 0);
     }
     return false;
   };
@@ -142,9 +166,8 @@ export function SupplierAddProduct({
       setFormData({ ...formData, variants: [] });
       return;
     }
-    /* Cartesian product of attribute values */ const cartesian = (
-      arrays: any[][],
-    ) => {
+    /* Cartesian product of attribute values */
+    const cartesian = (arrays: any[][]) => {
       return arrays.reduce(
         (a, b) =>
           a
@@ -156,10 +179,11 @@ export function SupplierAddProduct({
     const validAttrs = attrs.filter((a) => a.values.length > 0);
     if (validAttrs.length === 0) return;
     const valuesArrays = validAttrs.map((a) =>
-      a.values.map( (v: any) => ({ [a.name]: v })),
+      a.values.map((v: any) => ({ [a.name]: v })),
     );
     const combinations = cartesian(valuesArrays).map((combo) => {
-      /* flatten */ const attrObj = Object.assign({}, ...combo);
+      /* flatten */
+      const attrObj = Object.assign({}, ...combo);
       return {
         attributes: attrObj,
         supplierBasePrice: formData.supplierBasePrice || "",
@@ -180,25 +204,40 @@ export function SupplierAddProduct({
     
     let updatedStock = formData.stock;
     if (field === "stock") {
-      const sum = newVariants.reduce((total, v) => total + (parseInt(v.stock.toString().replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))) || 0), 0);
+      const sum = newVariants.reduce((total, v) => {
+        const parsed = parseInt(toEnglishDigits(v.stock), 10);
+        return total + (isNaN(parsed) ? 0 : parsed);
+      }, 0);
       updatedStock = sum.toString();
     }
     
     setFormData({ ...formData, variants: newVariants, stock: updatedStock });
   };
+
   const handleSubmit = async () => {
-    if (
-      !formData.name ||
-      !formData.categoryId ||
-      !formData.supplierBasePrice ||
-      !formData.stock
-    ) {
-      showNotification(
-        "لطفاً فیلدهای اجباری (نام، دسته‌بندی، قیمت پایه و موجودی کل) را پر کنید",
-        "error",
-      );
+    const cleanedName = formData.name ? formData.name.trim() : "";
+    const cleanedCategoryId = formData.categoryId ? String(formData.categoryId).trim() : "";
+    const cleanedBasePrice = toEnglishDigits(formData.supplierBasePrice);
+    const cleanedStock = toEnglishDigits(formData.stock);
+    const cleanedDiscount = toEnglishDigits(formData.discount) || "0";
+    const cleanedBrand = formData.brand ? formData.brand.trim() : "";
+    const cleanedSku = formData.sku ? formData.sku.trim() : "";
+
+    if (!cleanedName) {
+      showNotification("نام محصول الزامی است.", "error");
       return;
     }
+    if (!cleanedCategoryId) {
+      showNotification("لطفاً یک دسته‌بندی انتخاب فرمایید.", "error");
+      return;
+    }
+    if (!cleanedBasePrice || parseFloat(cleanedBasePrice) <= 0) {
+      showNotification("قیمت پایه تامین‌کننده باید عددی بزرگتر از صفر باشد.", "error");
+      return;
+    }
+    
+    const finalStock = cleanedStock || (formData.variants && formData.variants.length > 0 ? "0" : "10");
+
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("token") || "";
@@ -206,17 +245,42 @@ export function SupplierAddProduct({
         ? `/api/supplier/products/${initialData.id}`
         : "/api/supplier/products";
       const method = initialData?.id ? "PUT" : "POST";
-      const res = await fetch(url, { credentials: "include",
+
+      const cleanedVariants = (formData.variants || []).map((v: any) => ({
+        ...v,
+        supplierBasePrice: toEnglishDigits(v.supplierBasePrice || cleanedBasePrice),
+        stock: toEnglishDigits(v.stock || "10"),
+        sku: v.sku ? v.sku.trim() : "",
+        imageUrl: v.imageUrl || null
+      }));
+
+      const cleanedSpecs = techSpecs
+        .filter((s) => s.key && s.key.trim() && s.value && s.value.trim())
+        .map(s => ({ key: s.key.trim(), value: s.value.trim() }));
+
+      const payload = {
+        ...formData,
+        name: cleanedName,
+        categoryId: cleanedCategoryId,
+        supplierBasePrice: cleanedBasePrice,
+        stock: finalStock,
+        discount: cleanedDiscount,
+        brand: cleanedBrand,
+        sku: cleanedSku,
+        variants: cleanedVariants,
+        technicalSpecs: JSON.stringify(cleanedSpecs),
+      };
+
+      const res = await fetch(url, {
+        credentials: "include",
         method: method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...formData,
-          technicalSpecs: JSON.stringify(techSpecs.filter((s) => s.key.trim() && s.value.trim())),
-        }),
+        body: JSON.stringify(payload),
       });
+
       if (res.ok) {
         showNotification(
           initialData?.id
@@ -226,8 +290,10 @@ export function SupplierAddProduct({
         );
         onSuccess();
       } else {
-        const data = await res.json();
-        showNotification(data.error || "خطا در ثبت محصول", "error");
+        const data = await res.json().catch(() => ({}));
+        const detailMsg = data.details ? `: ${data.details}` : "";
+        const mainMsg = data.error || data.message || "خطا در ثبت محصول";
+        showNotification(`${mainMsg}${detailMsg}`, "error");
       }
     } catch (err) {
       showNotification("خطا در ارتباط با سرور", "error");
@@ -243,777 +309,974 @@ export function SupplierAddProduct({
     "بررسی و ثبت",
   ];
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in">
+    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in max-w-4xl mx-auto my-8">
       
-      {/* Stepper */}
       <div className="bg-background border-b border-subtle p-6">
-        
-        <div className="flex items-center justify-between max-w-3xl mx-auto">
-          
-          {steps.map((s, i) => (
-            <div key={i} className="flex flex-col items-center relative z-10">
-              
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm mb-2 transition-colors ${step > i + 1 ? "bg-success text-inverse" : step === i + 1 ? "bg-primary-default text-inverse shadow-md shadow-indigo-200" : "bg-surface text-muted"}`}
-              >
-                
-                {step > i + 1 ? (
-                  <CheckCircle className="w-5 h-5" />
-                ) : (
-                  i + 1
-                )}
-              </div>
-              <span
-                className={`text-xs font-semibold ${step === i + 1 ? "text-primary-hover" : "text-muted"}`}
-              >
-                
-                {s}
-              </span>
-            </div>
-          ))}
-        </div>
+        <h2 className="text-xl font-bold text-primary">
+          {initialData?.id ? "ویرایش محصول" : "افزودن محصول جدید"}
+        </h2>
+        <p className="text-sm text-secondary mt-1">
+          تمام اطلاعات محصول خود را در یک فرم یکپارچه وارد کنید
+        </p>
       </div>
-      <div className="p-8 max-w-3xl mx-auto min-h-[400px]">
+
+      <div className="p-8 space-y-12 min-h-[400px]">
         
         {/* Step 1: Basic Info */}
-        {step === 1 && (
-          <div className="space-y-5 animate-fade-in">
-            
-            <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2">
-              اطلاعات اصلی محصول
-            </h3>
+        <section className="space-y-5">
+          <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2 flex items-center gap-2">
+             <span className="w-8 h-8 rounded-full bg-primary-default/10 text-primary-default flex items-center justify-center font-bold">1</span>
+             اطلاعات اصلی محصول
+          </h3>
+
+          <div>
+            <label className="block text-sm font-semibold text-secondary mb-1.5">
+              نام محصول *
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-primary font-medium"
+              placeholder="مثال: لپ‌تاپ ایسوس مدل ZenBook"
+            />
+          </div>
+
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <label className="text-sm font-bold text-secondary">
+                دسته‌بندی محصول * (یکی از موارد زیر را انتخاب کنید)
+              </label>
+              <span className="text-xs text-muted font-normal">
+                {categories.length} دسته‌بندی در دسترس
+              </span>
+            </div>
+
+            {/* Category Select Dropdown */}
+            <div className="bg-surface p-3.5 rounded-2xl border border-subtle">
+              <select
+                value={formData.categoryId}
+                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                className="w-full px-4 py-3 bg-card text-primary border border-subtle rounded-xl font-medium outline-none focus:ring-2 focus:ring-primary-default text-sm cursor-pointer"
+              >
+                <option value="" className="text-slate-900 bg-white dark:bg-slate-800 dark:text-slate-100">
+                  -- انتخاب دسته‌بندی محصول از منوی کشویی --
+                </option>
+                {categories.map((cat) => {
+                  const cName = cat.name || cat.title || cat.categoryName || `دسته‌بندی ${cat.id}`;
+                  return (
+                    <option
+                      key={cat.id}
+                      value={String(cat.id)}
+                      className="text-slate-900 bg-white dark:bg-slate-800 dark:text-slate-100 py-1"
+                    >
+                      {cName}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Selected Category Record Banner */}
+            {formData.categoryId ? (
+              <div className="mt-2.5 p-3 bg-primary-default/10 border border-primary-default/30 text-primary-default rounded-xl text-xs font-bold flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-primary-default" />
+                  دسته‌بندی انتخاب‌شده: <strong className="text-sm font-black bg-primary-default text-inverse px-2 py-0.5 rounded-md">
+                    {(() => {
+                      const found = categories.find(c => String(c.id) === formData.categoryId);
+                      return found ? (found.name || found.title || found.categoryName || `دسته‌بندی ${found.id}`) : 'ثبت‌شده';
+                    })()}
+                  </strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, categoryId: "" })}
+                  className="text-xs text-danger hover:underline cursor-pointer"
+                >
+                  تغییر دسته‌بندی
+                </button>
+              </div>
+            ) : (
+              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                <Info className="w-3.5 h-3.5" />
+                جهت ادامه ثبت محصول، حتماً یکی از دسته‌بندی‌های فوق را انتخاب کنید.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-secondary mb-1.5">
+              برند کالا (اختیاری)
+            </label>
+            <input
+              type="text"
+              value={formData.brand}
+              onChange={(e) =>
+                setFormData({ ...formData, brand: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-primary"
+              placeholder="مثال: سامسونگ، شیائومی، ایسوس"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-secondary mb-1.5">
+              توضیحات و معرفی محصول *
+            </label>
+            <textarea
+              value={formData.longDescription || formData.shortDescription}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  shortDescription: e.target.value,
+                  longDescription: e.target.value,
+                })
+              }
+              className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none h-32 resize-none"
+              placeholder="توضیحات جامع، مشخصات اصلی و کاربردهای محصول..."
+            ></textarea>
+          </div>
+          
+          <div className="border-t border-subtle pt-4 space-y-3 mt-6">
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-bold text-secondary">
+                مشخصات و ویژگی‌های فنی
+              </label>
+              <button
+                type="button"
+                onClick={() => setTechSpecs([...techSpecs, { key: "", value: "" }])}
+                className="px-3 py-1 bg-primary-default/10 text-primary-default hover:bg-primary-default/20 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> افزودن ویژگی
+              </button>
+            </div>
+            <div className="space-y-2">
+              {techSpecs.map((spec, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="عنوان ویژگی (مثلاً: حافظه RAM)"
+                    value={spec.key}
+                    onChange={(e) => {
+                      const updated = [...techSpecs];
+                      updated[idx].key = e.target.value;
+                      setTechSpecs(updated);
+                    }}
+                    className="flex-1 px-3 py-2 bg-background border border-subtle rounded-lg text-xs outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="مقدار (مثلاً: 16 گیگابایت DDR5)"
+                    value={spec.value}
+                    onChange={(e) => {
+                      const updated = [...techSpecs];
+                      updated[idx].value = e.target.value;
+                      setTechSpecs(updated);
+                    }}
+                    className="flex-1 px-3 py-2 bg-background border border-subtle rounded-lg text-xs outline-none"
+                  />
+                  {techSpecs.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setTechSpecs(techSpecs.filter((_, i) => i !== idx))}
+                      className="p-2 text-danger hover:bg-danger/10 rounded-lg cursor-pointer transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Step 2: Price & Inventory */}
+        <section className="space-y-5">
+          <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2 flex items-center gap-2">
+             <span className="w-8 h-8 rounded-full bg-primary-default/10 text-primary-default flex items-center justify-center font-bold">2</span>
+             قیمت و موجودی
+          </h3>
+          <div className="bg-primary-default/10 p-4 rounded-xl border border-primary-default/20 mb-6">
+            <p className="text-sm text-primary-hover font-medium flex items-start gap-2">
+              <Info className="w-5 h-5 shrink-0" />
+              <span>
+                توجه: مبلغ وارد شده به عنوان "قیمت پایه تامین‌کننده" مبلغی است که با شما تسویه می‌شود. قیمت نهایی برای مشتری توسط پلتفرم محاسبه و تعیین می‌گردد.
+              </span>
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              
               <label className="block text-sm font-semibold text-secondary mb-1.5">
-                نام محصول *
+                قیمت پایه تامین‌کننده (تومان) *
               </label>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none"
-                placeholder="مثال: لپ‌تاپ ایسوس مدل ZenBook"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-5">
-              
-              <div>
-                
-                <label className="block text-sm font-semibold text-secondary mb-1.5">
-                  دسته‌بندی *
-                </label>
-                <select
-                  value={formData.categoryId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, categoryId: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-white border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-slate-900"
-                >
-                  <option value="">انتخاب کنید...</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={String(cat.id)}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                
-                <label className="block text-sm font-semibold text-secondary mb-1.5">
-                  برند
-                </label>
-                <input
-                  type="text"
-                  value={formData.brand}
-                  onChange={(e) =>
-                    setFormData({ ...formData, brand: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-secondary mb-1.5">
-                توضیحات و معرفی محصول *
-              </label>
-              <textarea
-                value={formData.longDescription || formData.shortDescription}
+                inputMode="numeric"
+                value={formData.supplierBasePrice}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    shortDescription: e.target.value,
-                    longDescription: e.target.value,
+                    supplierBasePrice: e.target.value,
                   })
                 }
-                className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none h-32 resize-none"
-                placeholder="توضیحات جامع، مشخصات اصلی و کاربردهای محصول..."
-              ></textarea>
-            </div>
-
-            {/* Dynamic Technical Specs (Prompt 7.3) */}
-            <div className="border-t border-subtle pt-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="block text-sm font-bold text-secondary">
-                  مشخصات و ویژگی‌های فنی (Dynamic Key-Value Specs)
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setTechSpecs([...techSpecs, { key: "", value: "" }])}
-                  className="px-3 py-1 bg-primary-default/10 text-primary-default hover:bg-primary-default/20 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> افزودن ویژگی
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {techSpecs.map((spec, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="عنوان ویژگی (مثلاً: حافظه RAM)"
-                      value={spec.key}
-                      onChange={(e) => {
-                        const updated = [...techSpecs];
-                        updated[idx].key = e.target.value;
-                        setTechSpecs(updated);
-                      }}
-                      className="flex-1 px-3 py-2 bg-background border border-subtle rounded-lg text-xs outline-none"
-                    />
-                    <input
-                      type="text"
-                      placeholder="مقدار (مثلاً: 16 گیگابایت DDR5)"
-                      value={spec.value}
-                      onChange={(e) => {
-                        const updated = [...techSpecs];
-                        updated[idx].value = e.target.value;
-                        setTechSpecs(updated);
-                      }}
-                      className="flex-1 px-3 py-2 bg-background border border-subtle rounded-lg text-xs outline-none"
-                    />
-                    {techSpecs.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setTechSpecs(techSpecs.filter((_, i) => i !== idx))}
-                        className="p-2 text-danger hover:bg-danger/10 rounded-lg cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-left font-mono font-bold text-primary"
+                dir="ltr"
+                placeholder="مثلاً: 1250000 یا ۱,۲۵۰,۰۰۰"
+              />
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-muted font-medium">
+                  {formData.supplierBasePrice ? `مبلغ به عدد: ${Number(toEnglishDigits(formData.supplierBasePrice) || 0).toLocaleString('fa-IR')} تومان` : 'مبلغ را به تومان وارد کنید'}
+                </p>
+                {formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0 && (
+                  <div className="p-3 bg-primary-default/10 border border-primary-default/25 rounded-xl text-xs space-y-1 shadow-sm">
+                    <span className="text-secondary block font-semibold">مبلغ به حروف:</span>
+                    <span className="text-primary-default font-black text-sm block">
+                      {numberToWords(formData.supplierBasePrice)} تومان
+                    </span>
                   </div>
-                ))}
+                )}
               </div>
             </div>
-          </div>
-        )}
-        {/* Step 2: Price & Inventory */}
-        {step === 2 && (
-          <div className="space-y-5 animate-fade-in">
-            
-            <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2">
-              قیمت و موجودی
-            </h3>
-            <div className="bg-primary-default/10 p-4 rounded-xl border border-primary-default/20 mb-6">
-              
-              <p className="text-sm text-primary-hover font-medium">
-                
-                توجه: مبلغ وارد شده به عنوان"قیمت پایه تامین‌کننده" مبلغی است که
-                با شما تسویه می‌شود. قیمت نهایی برای مشتری توسط پلتفرم محاسبه و
-                تعیین می‌گردد.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              
-              <div>
-                
-                <label className="block text-sm font-semibold text-secondary mb-1.5">
-                  قیمت پایه تامین‌کننده (تومان) *
-                </label>
-                <input
-                  type="number"
-                  value={formData.supplierBasePrice}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      supplierBasePrice: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-left"
-                  dir="ltr"
-                />
 
-                {/* Dynamic Price Suggestion Advisor (User Request) */}
-                {formData.supplierBasePrice && !isNaN(parseFloat(formData.supplierBasePrice.toString().replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d)))) && (() => {
-                  const price = parseFloat(formData.supplierBasePrice.toString().replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
-                  const benchmarkPrice = Math.round((price * 1.15) / 1000) * 1000;
-                  const discountPercent = Math.round(((benchmarkPrice - price) / benchmarkPrice) * 100);
-
-                  let status = "neutral";
-                  let multiplier = "۱.۵ برابر بیشتر";
-                  let message = "قیمت شما در محدوده عادی بازار است. با کاهش جزئی قیمت، شانس فروش خود را چند برابر کنید.";
-                  let colorClass = "text-warning border-warning/20 bg-warning/5";
-                  let progressColor = "bg-warning";
-                  let percentage = 50;
-
-                  if (discountPercent >= 12) {
-                    status = "excellent";
-                    multiplier = "۵ الی ۱۰ برابر بیشتر 🚀";
-                    message = "فوق‌العاده رقابتی! این قیمت شانس فروش شما را به شدت افزایش می‌دهد و در صدر اکسپلور قرار می‌گیرید.";
-                    colorClass = "text-success border-success/20 bg-success/5";
-                    progressColor = "bg-success";
-                    percentage = 90;
-                  } else if (discountPercent <= 2) {
-                    status = "danger";
-                    multiplier = "بدون تغییر (عادی)";
-                    message = "قیمت پیشنهادی شما به میانگین بازار نزدیک است. برای ترغیب بیشتر خریداران، قیمت رقابتی‌تری ثبت کنید.";
-                    colorClass = "text-danger border-danger/20 bg-danger/5";
-                    progressColor = "bg-danger";
-                    percentage = 20;
-                  }
-
-                  return (
-                    <div className={`mt-3 p-4 rounded-xl border ${colorClass} space-y-3 transition-all animate-fade-in`}>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold flex items-center gap-1.5">
-                          <Coins className="w-4 h-4" />
-                          پیشنهاد قیمت هوشمند و رقابتی:
-                        </span>
-                        <span className="text-[10px] bg-card px-2 py-0.5 rounded-full border border-subtle font-black font-mono">
-                          {discountPercent > 0 ? `${discountPercent}% سودمندتر` : "نیاز به بازنگری"}
-                        </span>
-                      </div>
-                      <p className="text-[11px] leading-relaxed font-medium">
-                        {message}
-                      </p>
-                      
-                      {/* Interactive meter */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] font-bold">
-                          <span>جذابیت قیمت برای خریدار</span>
-                          <span>تخمین افزایش میزان فروش: <strong className="text-sm font-black underline">{multiplier}</strong></span>
-                        </div>
-                        <div className="w-full bg-background h-2 rounded-full overflow-hidden border border-subtle">
-                          <div className={`h-full ${progressColor} transition-all duration-500`} style={{ width: `${percentage}%` }}></div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[9px] pt-1 border-t border-dashed border-subtle">
-                        <span>قیمت تخمینی رقبا: {benchmarkPrice.toLocaleString()} تومان</span>
-                        <span className="font-bold cursor-pointer hover:underline text-primary-default" onClick={() => {
-                          const suggestedPrice = Math.round((benchmarkPrice * 0.88) / 1000) * 1000;
-                          setFormData({ ...formData, supplierBasePrice: suggestedPrice.toString() });
-                          toast("✅ قیمت پیشنهادی سیستم اعمال شد.", "success");
-                        }}>
-                          اعمال قیمت طلایی ({(Math.round((benchmarkPrice * 0.88) / 1000) * 1000).toLocaleString()} تومان)
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-              <div>
-                
-                <label className="block text-sm font-semibold text-secondary mb-1.5">
-                  موجودی کل *
-                </label>
-                <input
-                  type="number"
-                  value={formData.stock}
-                  onChange={(e) =>
-                    setFormData({ ...formData, stock: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-left"
-                  dir="ltr"
-                  required
-                />
-              </div>
-              <div>
-                
-                <label className="block text-sm font-semibold text-secondary mb-1.5">
-                  هشدار حداقل موجودی
-                </label>
-                <input
-                  type="number"
-                  value={formData.minStock}
-                  onChange={(e) =>
-                    setFormData({ ...formData, minStock: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-left"
-                  dir="ltr"
-                  placeholder="مثال: 5"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Step 3: Variants */}
-        {step === 3 && (
-          <div className="space-y-6 animate-fade-in">
-            
-            <h3 className="text-lg font-bold text-primary mb-2">
-              ویژگی‌ها و متغیرها
-            </h3>
-            <p className="text-sm text-muted mb-6 pb-2 border-b">
-              اگر محصول شما دارای رنگ، سایز یا ویژگی‌های متغیر است، در این بخش
-              تعریف کنید.
-            </p>
-            {/* Add Attribute */}
-            <div className="flex gap-2">
-              
+            <div>
+              <label className="block text-sm font-semibold text-secondary mb-1.5">
+                موجودی اولیه (تعداد در انبار) *
+              </label>
               <input
                 type="text"
-                value={newAttrName}
-                onChange={(e) => setNewAttrName(e.target.value)}
-                placeholder="نام ویژگی جدید (مثال: رنگ)"
-                className="flex-1 px-4 py-2.5 bg-background border border-subtle rounded-xl text-sm"
+                inputMode="numeric"
+                value={formData.stock}
+                onChange={(e) =>
+                  setFormData({ ...formData, stock: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-left font-mono font-bold text-primary"
+                dir="ltr"
+                disabled={formData.variants.length > 0}
+                placeholder="مثلاً: 10"
               />
-              <button
-                onClick={addAttribute}
-                className="bg-primary-default text-inverse hover:bg-primary-hover px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-colors"
-              >
-                
-                افزودن ویژگی
-              </button>
+              {formData.variants.length > 0 && (
+                <p className="text-xs text-muted mt-1">
+                  موجودی کل از مجموع تعداد متغیرهای مرحله ۳ محاسبه می‌گردد.
+                </p>
+              )}
             </div>
-            {/* Attributes List */}
+          </div>
+
+          {/* Stock Availability Notification Card */}
+          <div className="bg-surface p-4 rounded-xl border border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-primary">
+                  اطلاع‌رسانی وضعیت موجودی کالا
+                </p>
+                <p className="text-[11px] text-muted">
+                  {Number(formData.stock || 0) > 0 || formData.variants.length > 0
+                    ? "وضعیت: «موجود در انبار و آماده ارسال» — در صورت اتمام موجودی، برچسب عدم موجودی به صورت خودکار فعال می‌شود."
+                    : "وضعیت: لطفا موجودی کالا را مشخص فرمایید تا برچسب موجود در انبار فعال شود."}
+                </p>
+              </div>
+            </div>
+            <span className={`px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 shadow-sm ${
+              Number(formData.stock || 0) > 0 || formData.variants.length > 0
+                ? "bg-emerald-600 text-white"
+                : "bg-danger text-white"
+            }`}>
+              {Number(formData.stock || 0) > 0 || formData.variants.length > 0 ? "کالا موجود است" : "در انتظار موجودی"}
+            </span>
+          </div>
+        </section>
+
+        {/* Step 3: Variants */}
+        <section className="space-y-5">
+          <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2 flex items-center gap-2">
+             <span className="w-8 h-8 rounded-full bg-primary-default/10 text-primary-default flex items-center justify-center font-bold">3</span>
+             ویژگی‌های متغیر (مانند رنگ، سایز)
+          </h3>
+          <div className="bg-surface p-5 rounded-xl border border-subtle mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h4 className="font-bold text-primary flex items-center gap-2">
+                <List className="w-5 h-5 text-secondary" />
+                تعریف ویژگی‌ها
+              </h4>
+              
+              {/* Quick Attribute Preset Templates */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted font-medium">الگوهای آماده:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newAttr = { name: "رنگ", values: ["مشکی", "سفید", "سرمه‌ای", "خاکستری"] };
+                    const updated = [...attributes, newAttr];
+                    setAttributes(updated);
+                    generateMatrix(updated);
+                    showNotification("الگوی «رنگ» با ۴ مقدار اضافه شد", "success");
+                  }}
+                  className="px-2.5 py-1 bg-primary-default/10 text-primary-default hover:bg-primary-default/20 border border-primary-default/30 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>🎨 رنگ‌های اصلی</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newAttr = { name: "سایز", values: ["S", "M", "L", "XL", "XXL"] };
+                    const updated = [...attributes, newAttr];
+                    setAttributes(updated);
+                    generateMatrix(updated);
+                    showNotification("الگوی «سایزبندی» اضافه شد", "success");
+                  }}
+                  className="px-2.5 py-1 bg-primary-default/10 text-primary-default hover:bg-primary-default/20 border border-primary-default/30 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>📐 سایزبندی پوشاک</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newAttr = { name: "گارانتی", values: ["ضمانت اصالت و سلامت فیزیکی", "گارانتی ۱۸ ماهه شرکتی"] };
+                    const updated = [...attributes, newAttr];
+                    setAttributes(updated);
+                    generateMatrix(updated);
+                    showNotification("الگوی «گارانتی» اضافه شد", "success");
+                  }}
+                  className="px-2.5 py-1 bg-primary-default/10 text-primary-default hover:bg-primary-default/20 border border-primary-default/30 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>🛡️ گارانتی</span>
+                </button>
+              </div>
+            </div>
+            
             {attributes.map((attr, idx) => (
               <div
                 key={idx}
-                className="bg-background p-4 rounded-xl border border-subtle"
+                className="mb-4 bg-background p-4 rounded-lg border border-subtle"
               >
-                
-                <div className="flex justify-between items-center mb-3">
-                  
-                  <h4 className="font-bold text-primary">{attr.name}</h4>
+                <div className="flex gap-4 items-start">
+                  <div className="flex-1 space-y-3">
+                    <input
+                      type="text"
+                      value={attr.name}
+                      onChange={(e) => {
+                        const newAttrs = [...attributes];
+                        newAttrs[idx].name = e.target.value;
+                        setAttributes(newAttrs);
+                      }}
+                      placeholder="نام ویژگی (مثلاً رنگ)"
+                      className="w-full px-3 py-2 bg-background border border-subtle rounded-lg text-sm outline-none"
+                    />
+                    <div className="flex gap-2">
+                       <input
+                          id={`attr-val-input-${idx}`}
+                          type="text"
+                          placeholder="مقدار جدید (مثلاً قرمز)"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const val = e.currentTarget.value.trim();
+                              if (val && !attr.values.includes(val)) {
+                                const newAttrs = [...attributes];
+                                newAttrs[idx].values.push(val);
+                                setAttributes(newAttrs);
+                                generateMatrix(newAttrs);
+                              }
+                              e.currentTarget.value = "";
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 bg-background border border-subtle rounded-lg text-sm outline-none text-primary"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => {
+                           const inputEl = document.getElementById(`attr-val-input-${idx}`) as HTMLInputElement;
+                           if (inputEl && inputEl.value.trim()) {
+                             const val = inputEl.value.trim();
+                             if (!attr.values.includes(val)) {
+                               const newAttrs = [...attributes];
+                               newAttrs[idx].values.push(val);
+                               setAttributes(newAttrs);
+                               generateMatrix(newAttrs);
+                             }
+                             inputEl.value = "";
+                           }
+                         }}
+                         className="px-3 py-2 bg-primary-default text-inverse hover:bg-primary-hover rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                       >
+                         <Plus className="w-4 h-4" /> افزودن مقدار
+                       </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {attr.values.map((v, vIdx) => (
+                        <div
+                          key={vIdx}
+                          className="px-3 py-1 bg-surface border border-subtle rounded-full text-xs font-semibold flex items-center gap-2"
+                        >
+                          {v}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newAttrs = [...attributes];
+                              newAttrs[idx].values = newAttrs[idx].values.filter(
+                                (_, i) => i !== vIdx,
+                              );
+                              setAttributes(newAttrs);
+                              generateMatrix(newAttrs);
+                            }}
+                            className="text-muted hover:text-danger cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <button
+                    type="button"
                     onClick={() => removeAttribute(idx)}
-                    className="text-danger hover:bg-danger/10 p-1.5 rounded-lg"
+                    className="p-2 text-danger hover:bg-danger/10 rounded-lg shrink-0 cursor-pointer transition-colors"
                   >
-                    
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  
-                  {attr.values.map((v, i) => (
-                    <span
-                      key={i}
-                      className="px-3 py-1 bg-card border border-subtle rounded-lg text-sm text-secondary flex items-center gap-2"
-                    >
-                      
-                      {v}
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  
-                  <input
-                    type="text"
-                    value={newAttrValue}
-                    onChange={(e) => setNewAttrValue(e.target.value)}
-                    placeholder="مقدار جدید (مثال: قرمز)"
-                    className="flex-1 px-4 py-2 bg-card border border-subtle rounded-lg text-sm"
-                  />
-                  <button
-                    onClick={() => addAttributeValue(idx)}
-                    className="bg-primary-default/20 text-primary-hover px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-200 transition-colors"
-                  >
-                    
-                    افزودن مقدار
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>
             ))}
-            {/* Variation Matrix */}
-            {formData.variants.length > 0 && (
-              <div className="mt-8 border-t pt-6">
-                
-                <h4 className="font-bold text-primary mb-4">
-                  لیست متغیرهای ایجاد شده
-                </h4>
-                <div className="overflow-x-auto">
-                  
-                  <table className="w-full text-right text-sm">
-                    
-                    <thead className="bg-surface text-muted">
-                      
-                      <tr>
-                        
-                        <th className="p-3 rounded-r-lg">
-                          ترکیب ویژگی‌ها
-                        </th>
-                        <th className="p-3">قیمت پایه (تومان)</th>
-                        <th className="p-3 rounded-l-lg">موجودی</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      
-                      {formData.variants.map( (v: any, idx: any) => (
-                        <tr key={idx} className="border-b border-subtle">
-                          
-                          <td className="p-3 font-medium text-primary">
-                            
-                            {Object.values(v.attributes).join(" -")}
-                          </td>
-                          <td className="p-3">
-                            
-                            <input
-                              type="number"
-                              value={v.supplierBasePrice}
-                              onChange={(e) =>
-                                handleVariantChange(
-                                  idx,
-                                  "supplierBasePrice",
-                                  e.target.value,
-                                )
-                              }
-                              className="w-32 px-3 py-1.5 bg-background border border-subtle rounded text-sm outline-none"
-                              dir="ltr"
-                            />
-                          </td>
-                          <td className="p-3">
-                            
-                            <input
-                              type="number"
-                              value={v.stock}
-                              onChange={(e) =>
-                                handleVariantChange(
-                                  idx,
-                                  "stock",
-                                  e.target.value,
-                                )
-                              }
-                              className="w-24 px-3 py-1.5 bg-background border border-subtle rounded text-sm outline-none"
-                              dir="ltr"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        {/* Step 4: Media */}
-        {step === 4 && (
-          <div className="space-y-6 animate-fade-in">
-            
-            <h3 className="text-lg font-bold text-primary mb-2">
-              رسانه محصول
-            </h3>
-            <p className="text-sm text-muted mb-6 pb-2 border-b">
-              تصویر اصلی و گالری تصاویر محصول را بارگذاری کنید.
-            </p>
-            <div>
-              
-              <label className="block text-sm font-semibold text-secondary mb-2">
-                تصویر اصلی محصول (شاخص)
-              </label>
-              <div className="border-2 border-dashed border-default rounded-2xl h-48 flex flex-col items-center justify-center text-muted hover:bg-background transition-colors cursor-pointer relative overflow-hidden">
-                
-                {formData.mainImage ? (
-                  <img
-                    src={formData.mainImage}
-                    className="w-full h-full object-cover"
-                    alt="Main preview"
-                  />
-                ) : (
-                  <>
-                    
-                    <Upload className="w-8 h-8 mb-2 text-muted" />
-                    <span className="text-sm font-medium">
-                      برای آپلود تصویر کلیک کنید
-                    </span>
-                    <span className="text-xs mt-1">
-                      فرمت‌های مجاز: JPG, PNG, WEBP
-                    </span>
-                  </>
-                )}
-                {/* Mock file input trigger for demo purposes */}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+              <div className="flex items-center gap-3 flex-1 min-w-[280px]">
                 <input
-                  type="file"
-                  accept="image/*"
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      if (file.size > 2 * 1024 * 1024) {
-                        toast("حجم تصویر نباید بیشتر از 2 مگابایت باشد.", "error");
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setFormData({
-                          ...formData,
-                          mainImage: reader.result as string,
-                        });
-                      };
-                      reader.readAsDataURL(file);
+                  type="text"
+                  value={newAttrName}
+                  onChange={(e) => setNewAttrName(e.target.value)}
+                  placeholder="نام ویژگی جدید (مثلاً جنس یا سایز)"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAttribute();
                     }
                   }}
+                  className="flex-1 px-3 py-2 bg-background border border-subtle rounded-lg text-sm outline-none text-primary"
                 />
+                <button
+                  type="button"
+                  onClick={addAttribute}
+                  className="px-4 py-2 bg-primary-default text-inverse hover:bg-primary-hover rounded-lg text-sm font-bold cursor-pointer transition-colors shrink-0 flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" /> افزودن ویژگی
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const newVariant = {
+                    attributes: { "تنوع": `تنوع سفارشی ${formData.variants.length + 1}` },
+                    supplierBasePrice: formData.supplierBasePrice || "",
+                    stock: "1",
+                    sku: "",
+                    imageUrl: "",
+                  };
+                  setFormData({ ...formData, variants: [...formData.variants, newVariant] });
+                  showNotification("تنوع جدید به جدول اضافه شد", "success");
+                }}
+                className="px-4 py-2 bg-primary-default text-inverse hover:bg-primary-hover rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1 shrink-0 shadow-sm"
+              >
+                <Plus className="w-4 h-4" /> افزودن دستی تنوع به جدول
+              </button>
+            </div>
+          </div>
+
+          {formData.variants.length > 0 && (
+            <div className="mt-8 border-t pt-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                <h4 className="font-bold text-primary text-base flex items-center gap-2">
+                  <List className="w-5 h-5 text-primary-default" />
+                  لیست متغیرهای ایجاد شده ({formData.variants.length} مورد)
+                </h4>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!formData.supplierBasePrice) {
+                        showNotification("لطفاً ابتدا قیمت پایه را در مرحله ۲ وارد کنید.", "error");
+                        return;
+                      }
+                      const updatedVariants = formData.variants.map((v: any) => ({
+                        ...v,
+                        supplierBasePrice: formData.supplierBasePrice,
+                      }));
+                      setFormData({ ...formData, variants: updatedVariants });
+                      showNotification("قیمت پایه روی تمامی متغیرها اعمال شد", "success");
+                    }}
+                    className="px-3 py-2 bg-primary-default/10 text-primary-default hover:bg-primary-default/20 border border-primary-default/30 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Coins className="w-4 h-4" />
+                    <span>اعمال قیمت پایه ({formData.supplierBasePrice ? Number(formData.supplierBasePrice).toLocaleString('fa-IR') + ' تومان' : 'نامشخص'}) به همه متغیرها</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-subtle">
+                <table className="w-full text-right text-sm">
+                  <thead className="bg-surface text-muted">
+                    <tr>
+                      <th className="p-3 rounded-tr-xl">ترکیب / نام ویژگی</th>
+                      <th className="p-3">قیمت پایه (تومان) *</th>
+                      <th className="p-3">موجودی</th>
+                      <th className="p-3">تصویر تنوع (فایل سیستم / لینک)</th>
+                      <th className="p-3 rounded-tl-xl w-12">حذف</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.variants.map((v, idx) => (
+                      <tr key={idx} className="border-t border-subtle bg-background hover:bg-surface/50">
+                        <td className="p-3 font-medium text-primary">
+                          {typeof v.attributes === 'object' && v.attributes !== null
+                            ? Object.values(v.attributes).join(" - ")
+                            : String(v.attributes || `تنوع ${idx + 1}`)}
+                        </td>
+                        <td className="p-3">
+                          <input
+                            type="number"
+                            value={v.supplierBasePrice}
+                            onChange={(e) => handleVariantChange(idx, "supplierBasePrice", e.target.value)}
+                            className="w-36 px-3 py-1.5 bg-card border border-primary-default/40 rounded text-sm font-semibold outline-none focus:ring-2 focus:ring-primary-default text-primary"
+                            placeholder="قیمت تومان"
+                            dir="ltr"
+                          />
+                        </td>
+                        <td className="p-3">
+                          <input
+                            type="number"
+                            value={v.stock}
+                            onChange={(e) => handleVariantChange(idx, "stock", e.target.value)}
+                            className="w-24 px-3 py-1.5 bg-background border border-subtle rounded text-sm outline-none text-primary"
+                            dir="ltr"
+                            placeholder="تعداد"
+                          />
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            {v.imageUrl ? (
+                              <div className="relative w-9 h-9 shrink-0 rounded-lg overflow-hidden border border-subtle group">
+                                <img src={v.imageUrl} alt="" className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleVariantChange(idx, "imageUrl", "")}
+                                  className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                  title="حذف تصویر"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : null}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+                              <label className="px-2.5 py-1.5 bg-primary-default/10 text-primary-default hover:bg-primary-default/20 border border-primary-default/30 rounded-lg text-xs font-bold cursor-pointer transition-colors inline-flex items-center gap-1 shrink-0">
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>انتخاب فایل</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onload = (e) => {
+                                        const img = new Image();
+                                        img.onload = () => {
+                                          const canvas = document.createElement("canvas");
+                                          let width = img.width;
+                                          let height = img.height;
+                                          const maxDim = 800;
+                                          if (width > maxDim || height > maxDim) {
+                                            if (width > height) {
+                                              height = Math.round((height * maxDim) / width);
+                                              width = maxDim;
+                                            } else {
+                                              width = Math.round((width * maxDim) / height);
+                                              height = maxDim;
+                                            }
+                                          }
+                                          canvas.width = width;
+                                          canvas.height = height;
+                                          const ctx = canvas.getContext("2d");
+                                          if (ctx) {
+                                            ctx.drawImage(img, 0, 0, width, height);
+                                            const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                                            handleVariantChange(idx, "imageUrl", compressedDataUrl);
+                                          }
+                                        };
+                                        img.src = e.target?.result as string;
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                              <input
+                                type="text"
+                                value={v.imageUrl || ""}
+                                onChange={(e) => handleVariantChange(idx, "imageUrl", e.target.value)}
+                                className="flex-1 px-2.5 py-1.5 bg-background border border-subtle rounded-lg text-xs outline-none text-primary"
+                                dir="ltr"
+                                placeholder="یا وارد کردن لینک تصویر"
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = formData.variants.filter((_: any, i: number) => i !== idx);
+                              setFormData({ ...formData, variants: updated });
+                            }}
+                            className="p-1.5 text-danger hover:bg-danger/10 rounded-lg transition-colors cursor-pointer"
+                            title="حذف این تنوع"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
+          )}
+        </section>
+
+        {/* Step 4: Media */}
+        <section className="space-y-5">
+          <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2 flex items-center gap-2">
+             <span className="w-8 h-8 rounded-full bg-primary-default/10 text-primary-default flex items-center justify-center font-bold">4</span>
+             تصاویر و ویدیو محصول
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              
-              <label className="block text-sm font-semibold text-secondary mb-2">
-                گالری تصاویر (انتخابی)
-              </label>
-              <div className="grid grid-cols-4 gap-4">
-                
-                {formData.images.map( (img: any, i: any) => (
-                  <div
-                    key={i}
-                    className="aspect-square bg-surface rounded-xl border border-subtle overflow-hidden relative group"
-                  >
-                    
-                    <img
-                      src={img}
-                      className="w-full h-full object-cover"
-                      alt={`gallery-${i}`}
-                    />
-                    <button
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          images: formData.images.filter( (_: any, idx: any) => idx !== i),
-                        })
-                      }
-                      className="absolute top-2 right-2 bg-card/90 p-1.5 rounded-lg text-danger opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+              <h4 className="font-bold text-sm text-secondary mb-3">تصویر اصلی محصول</h4>
+              <div className="aspect-square bg-surface border-2 border-dashed border-subtle rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-primary-default transition-colors">
+                {formData.mainImage ? (
+                  <>
+                    <img src={formData.mainImage} className="w-full h-full object-cover" alt="Main" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, mainImage: "" })}
+                        className="p-3 bg-danger text-white rounded-full hover:bg-red-600 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center p-6 space-y-3">
+                    <ImagePlus className="w-10 h-10 mx-auto text-muted" />
+                    <p className="text-sm font-semibold text-secondary">
+                      افزودن تصویر اصلی محصول
+                    </p>
+                    <div className="flex flex-col gap-2 items-center">
+                      <label className="px-4 py-2 bg-primary-default text-inverse hover:bg-primary-hover rounded-xl text-xs font-bold cursor-pointer transition-colors inline-flex items-center gap-1.5 shadow-sm">
+                        <Upload className="w-4 h-4" />
+                        <span>انتخاب فایل از سیستم</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (e) => {
+                                const img = new Image();
+                                img.onload = () => {
+                                  const canvas = document.createElement("canvas");
+                                  let width = img.width;
+                                  let height = img.height;
+                                  const maxDim = 800;
+                                  if (width > maxDim || height > maxDim) {
+                                    if (width > height) {
+                                      height = Math.round((height * maxDim) / width);
+                                      width = maxDim;
+                                    } else {
+                                      width = Math.round((width * maxDim) / height);
+                                      height = maxDim;
+                                    }
+                                  }
+                                  canvas.width = width;
+                                  canvas.height = height;
+                                  const ctx = canvas.getContext("2d");
+                                  if (ctx) {
+                                    ctx.drawImage(img, 0, 0, width, height);
+                                    const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                                    setFormData({ ...formData, mainImage: compressedDataUrl });
+                                  }
+                                };
+                                img.src = e.target?.result as string;
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = prompt("آدرس URL تصویر اصلی را وارد کنید:");
+                          if (url) setFormData({ ...formData, mainImage: url });
+                        }}
+                        className="text-xs text-primary-default hover:underline cursor-pointer"
+                      >
+                        یا وارد کردن آدرس اینترنتی (URL)
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-sm text-secondary mb-3">گالری تصاویر (حداکثر 4)</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {formData.images.map((img, idx) => (
+                  <div key={idx} className="aspect-square bg-surface rounded-xl relative overflow-hidden group">
+                    <img src={img} className="w-full h-full object-cover" alt={`Gallery ${idx}`} />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newImages = [...formData.images];
+                          newImages.splice(idx, 1);
+                          setFormData({ ...formData, images: newImages });
+                        }}
+                        className="p-2 bg-danger text-white rounded-full hover:bg-red-600 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
-                <div className="aspect-square border-2 border-dashed border-default rounded-xl flex items-center justify-center text-muted hover:bg-background cursor-pointer relative">
-                  
-                  <Plus className="w-8 h-8" />
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    onChange={async (e) => {
-                      if (e.target.files) {
-                        const files = Array.from(e.target.files);
-                        const validFiles = files.filter(
-                          (f: any) => f.size <= 2 * 1024 * 1024,
-                        );
-                        if (validFiles.length < files.length) {
-                          toast("حجم تصاویر نباید بیشتر از 2 مگابایت باشد.", "error");
-                        }
-                        const urls = await Promise.all(
-                          validFiles.map(
-                            (f: any) =>
-                              new Promise<string>((resolve) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () =>
-                                  resolve(reader.result as string);
-                                reader.readAsDataURL(f);
-                              }),
-                          ),
-                        );
-                        setFormData({
-                          ...formData,
-                          images: [...formData.images, ...urls],
-                        });
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Product Video Upload Component (User Request) */}
-            <div className="border-t border-subtle pt-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-secondary flex items-center gap-1.5">
-                  <Video className="w-4 h-4 text-primary-default" />
-                  ویدیو محصول (اختیاری)
-                </label>
-                <p className="text-[10px] text-muted mt-0.5">
-                  بارگذاری ویدیو معرفی یا آنباکسینگ محصول (فرمت MP4، حداکثر ۱۰ مگابایت) جهت نمایش در اکسپلور
-                </p>
-              </div>
-
-              {formData.videoUrl ? (
-                <div className="space-y-3 animate-fade-in">
-                  <div className="border border-subtle rounded-xl overflow-hidden bg-background aspect-video w-full max-w-md relative group">
-                    <video
-                      src={formData.videoUrl}
-                      controls
-                      className="w-full h-full object-contain"
-                    />
+                {formData.images.length < 4 && (
+                  <div className="aspect-square bg-surface border-2 border-dashed border-subtle rounded-xl flex flex-col items-center justify-center hover:border-primary-default transition-colors p-3 text-center">
+                    <Plus className="w-6 h-6 mb-1 text-muted" />
+                    <label className="text-xs font-bold text-primary-default cursor-pointer hover:underline mb-1">
+                      انتخاب از سیستم
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                              const img = new Image();
+                              img.onload = () => {
+                                const canvas = document.createElement("canvas");
+                                let width = img.width;
+                                let height = img.height;
+                                const maxDim = 800;
+                                if (width > maxDim || height > maxDim) {
+                                  if (width > height) {
+                                    height = Math.round((height * maxDim) / width);
+                                    width = maxDim;
+                                  } else {
+                                    width = Math.round((width * maxDim) / height);
+                                    height = maxDim;
+                                  }
+                                }
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext("2d");
+                                if (ctx) {
+                                  ctx.drawImage(img, 0, 0, width, height);
+                                  const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                                  setFormData({ ...formData, images: [...formData.images, compressedDataUrl] });
+                                }
+                              };
+                              img.src = e.target?.result as string;
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, videoUrl: "" })}
-                      className="absolute top-2 right-2 bg-card/90 p-1.5 rounded-lg text-danger opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-danger/10 cursor-pointer"
+                      onClick={() => {
+                        const url = prompt("آدرس URL تصویر گالری را وارد کنید:");
+                        if (url) setFormData({ ...formData, images: [...formData.images, url] });
+                      }}
+                      className="text-[10px] text-muted hover:underline cursor-pointer"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      یا لینک اینترنتی
                     </button>
                   </div>
-                  <p className="text-[10px] text-success font-medium flex items-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" /> ویدیو با موفقیت بارگذاری شد.
-                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 border-t border-subtle pt-6">
+            <h4 className="font-bold text-sm text-secondary mb-3 flex items-center gap-2">
+              <Video className="w-5 h-5 text-primary-default" />
+              ویدیو معرفی محصول (انتخاب از فایل‌های سیستم یا لینک اینترنتی)
+            </h4>
+            
+            <div className="bg-surface p-5 rounded-xl border border-subtle space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-subtle">
+                <div>
+                  <p className="text-xs font-bold text-primary">انتخاب و بارگذاری مستقیم ویدیو از کامپیوتر</p>
+                  <p className="text-[11px] text-muted">پشتیبانی از فرمت‌های ویدیویی MP4، WebM، MOV</p>
                 </div>
-              ) : (
-                <div className="border-2 border-dashed border-default rounded-2xl p-6 flex flex-col items-center justify-center text-muted hover:bg-background transition-colors cursor-pointer relative overflow-hidden">
-                  <Video className="w-10 h-10 mb-2 text-muted animate-pulse" />
-                  <span className="text-xs font-semibold text-text-primary">
-                    برای آپلود ویدیو کلیک کنید یا فایل را بکشید و رها کنید
-                  </span>
-                  <span className="text-[9px] mt-1 text-text-muted">
-                    فرمت‌های مجاز: MP4, MOV, WEBM (حداکثر 10 مگابایت)
-                  </span>
+                <label className="px-4 py-2 bg-primary-default text-inverse hover:bg-primary-hover rounded-xl text-xs font-bold cursor-pointer transition-colors inline-flex items-center gap-1.5 shadow-sm shrink-0">
+                  <Upload className="w-4 h-4" />
+                  <span>انتخاب فایل ویدیو</span>
                   <input
                     type="file"
                     accept="video/*"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        if (file.size > 10 * 1024 * 1024) {
-                          toast("حجم ویدیو نباید بیشتر از 10 مگابایت باشد.", "error");
+                        if (file.size > 15 * 1024 * 1024) {
+                          showNotification("حجم ویدیو نباید بیشتر از 15 مگابایت باشد. برای ویدیوهای بزرگتر از آدرس لینک استفاده کنید.", "error");
                           return;
                         }
                         const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setFormData({
-                            ...formData,
-                            videoUrl: reader.result as string,
-                          });
-                          toast("✅ ویدیو با موفقیت بارگذاری شد.", "success");
+                        reader.onload = (event) => {
+                          const result = event.target?.result as string;
+                          setFormData({ ...formData, videoUrl: result });
+                          showNotification("ویدیو با موفقیت از سیستم انتخاب شد", "success");
                         };
                         reader.readAsDataURL(file);
                       }
                     }}
                   />
+                </label>
+              </div>
+
+              <div className="flex flex-wrap gap-3 items-center pt-1">
+                <span className="text-xs font-medium text-secondary">یا وارد کردن آدرس اینترنتی (لینک مستقیم):</span>
+                <input
+                  type="text"
+                  placeholder="لینک مستقیم ویدیوی آپارات، یوتیوب یا فایل آنلاین"
+                  value={formData.videoUrl.startsWith("data:video") ? "فایل ویدیویی از سیستم بارگذاری شده است" : formData.videoUrl}
+                  onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+                  disabled={formData.videoUrl.startsWith("data:video")}
+                  className="flex-1 min-w-[240px] px-4 py-2.5 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-left text-xs font-mono text-primary disabled:opacity-75"
+                  dir="ltr"
+                />
+
+                {formData.videoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, videoUrl: "" })}
+                    className="px-3 py-2 bg-danger/10 text-danger hover:bg-danger/20 rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1"
+                    title="حذف ویدیو"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>حذف ویدیو</span>
+                  </button>
+                )}
+              </div>
+
+              {formData.videoUrl && (
+                <div className="mt-3 border-t border-subtle pt-3">
+                  <p className="text-xs font-bold text-primary-default mb-2 flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4 text-primary-default" />
+                    پیش‌نمایش ویدیو:
+                  </p>
+                  {formData.videoUrl.startsWith("data:video") || formData.videoUrl.endsWith(".mp4") || formData.videoUrl.endsWith(".webm") || formData.videoUrl.includes("blob:") ? (
+                    <video
+                      src={formData.videoUrl}
+                      controls
+                      className="w-full max-h-72 rounded-xl bg-black border border-subtle shadow-inner"
+                    />
+                  ) : (
+                    <div className="p-3 bg-background border border-subtle rounded-lg text-xs font-mono text-primary truncate" dir="ltr">
+                      {formData.videoUrl}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+            <p className="text-xs text-muted mt-2">
+              خریداران می‌توانند ویدیو محصول را به صورت مستقیم در صفحه جزئیات محصول یا بخش ویدیوها مشاهده نمایند.
+            </p>
+          </div>
+        </section>
+        {/* Live Marketplace Card Preview Section */}
+        <section className="mt-8 border-t border-subtle pt-8 bg-surface/50 p-6 rounded-2xl border">
+          <h4 className="font-bold text-base text-primary mb-2 flex items-center gap-2">
+            <Eye className="w-5 h-5 text-primary-default" />
+            پیش‌نمایش آنلاین کارت محصول در خروجی فروشگاه Zopit
+          </h4>
+          <p className="text-xs text-muted mb-6">
+            خریداران محصول شما را با این کادر، عنوان، قیمت و برچسب موجودی در ویترین فروشگاه مشاهده خواهند کرد:
+          </p>
 
-          </div>
-        )}
-        {/* Step 5: Review & Submit */}
-        {step === 5 && (
-          <div className="space-y-6 animate-fade-in">
-            
-            <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2">
-              بررسی و ثبت نهایی
-            </h3>
-            <div className="bg-background p-6 rounded-2xl border border-subtle flex gap-6">
-              
-              <div className="w-32 h-32 bg-surface rounded-xl overflow-hidden shrink-0">
-                
-                {formData.mainImage ? (
-                  <img
-                    src={formData.mainImage}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted">
-                    بدون تصویر
-                  </div>
-                )}
-              </div>
-              <div className="flex-1">
-                
-                <h4 className="text-xl font-bold text-primary">
-                  {formData.name || "بدون نام"}
-                </h4>
-                <div className="grid grid-cols-2 gap-y-2 mt-4 text-sm">
-                  
-                  <p className="text-muted">
-                    دسته‌بندی:
-                    <span className="font-semibold text-primary">
-                      {categories.find(c => c.id.toString() === formData.categoryId)?.name || "-"}
-                    </span>
-                  </p>
-                  <p className="text-muted">
-                    برند:
-                    <span className="font-semibold text-primary">
-                      {formData.brand || "-"}
-                    </span>
-                  </p>
-                  <p className="text-muted">
-                    قیمت پایه:
-                    <span className="font-bold text-primary-default">
-                      {Number(formData.supplierBasePrice).toLocaleString()}
-                      تومان
-                    </span>
-                  </p>
-                  <p className="text-muted">
-                    موجودی:
-                    <span className="font-semibold text-primary">
-                      {formData.stock}
-                    </span>
-                  </p>
-                  {formData.videoUrl && (
-                    <p className="text-muted col-span-2 mt-2 flex items-center gap-1">
-                      <span className="text-success font-semibold text-xs flex items-center gap-1 bg-success/10 px-2 py-0.5 rounded-full">
-                        <Video className="w-3 h-3" /> ویدیو محصول بارگذاری شده است
-                      </span>
-                    </p>
-                  )}
+          <div className="max-w-xs mx-auto bg-card rounded-2xl border border-subtle overflow-hidden shadow-lg transition-transform hover:-translate-y-1">
+            <div className="aspect-square bg-surface relative overflow-hidden flex items-center justify-center">
+              {formData.mainImage ? (
+                <img src={formData.mainImage} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-center p-4 text-muted">
+                  <ImagePlus className="w-10 h-10 mx-auto mb-1 opacity-50" />
+                  <span className="text-xs font-semibold">بدون تصویر اصلی</span>
                 </div>
+              )}
+              <div className="absolute top-3 right-3 bg-emerald-500/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                <CheckCircle className="w-3 h-3" />
+                موجود در انبار
               </div>
             </div>
-            <div className="bg-warning/10 p-4 rounded-xl border border-amber-100 text-sm text-amber-800 flex items-start gap-3">
+
+            <div className="p-4 space-y-2.5 text-right">
+              {formData.brand && (
+                <span className="text-[10px] font-bold text-primary-default bg-primary-default/10 px-2 py-0.5 rounded-md inline-block">
+                  {formData.brand}
+                </span>
+              )}
+              <h5 className="font-bold text-sm text-primary line-clamp-2">
+                {formData.name || "عنوان محصول وارد نشده است"}
+              </h5>
               
-              <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <p>
-                
-                با ثبت این محصول تایید می‌کنم که اطلاعات وارد شده صحیح است. پس
-                از تایید توسط مدیر سیستم، محصول در ویترین پلتفرم قرار خواهد
-                گرفت.
-              </p>
+              <div className="flex items-center justify-between border-t border-subtle pt-3 mt-2">
+                <span className="text-xs text-muted font-medium">قیمت پایه:</span>
+                <span className="font-mono font-bold text-sm text-primary">
+                  {formData.supplierBasePrice ? `${Number(formData.supplierBasePrice).toLocaleString('fa-IR')} تومان` : 'نامشخص'}
+                </span>
+              </div>
             </div>
           </div>
-        )}
+        </section>
+
       </div>
+
       {/* Footer Controls */}
-      <div className="p-6 border-t border-subtle flex justify-between items-center bg-card rounded-b-2xl">
-        
+      <div className="p-6 border-t border-subtle flex justify-between items-center bg-card rounded-b-2xl mt-4">
         <button
-          onClick={step === 1 ? onCancel : prevStep}
-          className="px-6 py-2.5 rounded-xl text-sm font-medium text-text-secondary bg-surface hover:bg-surface transition-colors flex items-center gap-2"
+          onClick={onCancel}
+          className="px-6 py-2.5 rounded-xl text-sm font-medium text-text-secondary bg-surface hover:bg-surface-hover transition-colors flex items-center gap-2 cursor-pointer"
         >
-          
-          {step === 1 ? (
-            "انصراف"
-          ) : (
-            <>
-              <ChevronRight className="w-4 h-4" /> مرحله قبل
-            </>
-          )}
+          انصراف
         </button>
-        {step < 5 ? (
-          <button
-            onClick={nextStep}
-            disabled={isNextDisabled()}
-            className={`px-6 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm flex items-center gap-2 cursor-pointer ${
-              isNextDisabled()
-                ? "bg-gray-300 dark:bg-slate-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50"
-                : "text-inverse bg-primary-default hover:bg-primary-hover"
-            }`}
-          >
-            
-            مرحله بعد <ChevronLeft className="w-4 h-4" />
-          </button>
-        ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="px-8 py-2.5 rounded-xl text-sm font-bold text-inverse bg-success hover:bg-emerald-700 transition-colors shadow-md disabled:opacity-50"
-          >
-            
-            {isSubmitting ? "در حال پردازش..." : "ثبت نهایی محصول"}
-          </button>
-        )}
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="px-8 py-3 rounded-xl text-sm font-extrabold text-inverse bg-primary-default hover:bg-primary-hover transition-all shadow-lg shadow-primary-default/20 disabled:opacity-50 cursor-pointer flex items-center gap-2"
+        >
+          {isSubmitting ? (
+            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : (
+             <CheckCircle className="w-4 h-4" />
+          )}
+          {initialData?.id ? "ویرایش نهایی" : "ثبت نهایی محصول"}
+        </button>
       </div>
     </div>
   );

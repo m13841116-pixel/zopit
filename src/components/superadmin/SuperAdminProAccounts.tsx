@@ -49,7 +49,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
 
   // Global Pro Settings states
   const [autoApprove, setAutoApprove] = useState(true);
-  const [proAccountPrice, setProAccountPrice] = useState("0");
+  const [proAccountPrice, setProAccountPrice] = useState("239500");
   const [hostRenewalPrice, setHostRenewalPrice] = useState("500000");
   const [hostDiscountedPrice, setHostDiscountedPrice] = useState("198000");
   const [torobPrice, setTorobPrice] = useState("150000");
@@ -89,7 +89,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
       if (res.ok) {
         const data = await res.json();
         setAutoApprove(data.autoApprove !== false);
-        setProAccountPrice(data.proAccountPrice || "0");
+        setProAccountPrice(data.proAccountPrice || "239500");
         setHostRenewalPrice(data.hostRenewalPrice || "500000");
         setHostDiscountedPrice(data.hostDiscountedPrice || "198000");
         setTorobPrice(data.torobPrice || "150000");
@@ -337,6 +337,10 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                           {acc.status === "APPROVED" || acc.status === "ACTIVE" ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20 text-[11px]">
                               <CheckCircle2 className="w-3.5 h-3.5" /> فعال (APPROVED)
+                            </span>
+                          ) : acc.status === "PENDING_PAYMENT" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20 text-[11px]">
+                              <Clock className="w-3.5 h-3.5" /> در انتظار پرداخت
                             </span>
                           ) : acc.status === "PENDING" ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[11px]">

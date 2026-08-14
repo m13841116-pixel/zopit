@@ -3,8 +3,9 @@ let prismaInstance: any = null;
 export function getPrisma(): any {
   if (!prismaInstance) {
     try {
-      const dbUrl = process.env.DATABASE_URL || 'postgresql://dummy:dummy@dummy_db/dummy';
-      if (dbUrl.includes('dummy_db') || !process.env.DATABASE_URL) {
+      const dbUrl = process.env.DATABASE_URL || '';
+      const isRealDb = dbUrl && (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) && !dbUrl.includes('dummy_db');
+      if (!isRealDb) {
         prismaInstance = createMemoryPrismaProxy();
       } else {
         let ClientClass: any = null;

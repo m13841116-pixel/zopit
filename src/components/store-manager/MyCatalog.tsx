@@ -1,19 +1,29 @@
 import { toast } from "../GlobalToast";
 import React, { useState, useEffect } from "react";
-import { Layers, Trash2, X, Package, Info, Check, Plus, Loader2 } from "lucide-react";
+import { getValidProductImageUrl } from "../../utils/productUtils";
+import { HighContrastStatusBadge } from "../../utils/statusUtils";
+import { DigikalaProductModal } from "../DigikalaProductModal";
+import { Layers, Trash2, X, Package, Info, Check, Plus, Loader2, ShoppingCart } from "lucide-react";
 export default function MyCatalog() {
   const [catalog, setCatalog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-  const [showConfirmDelete, setShowConfirmDelete] = useState<number | null>(
-    null,
-  );
+  const [showConfirmDelete, setShowConfirmDelete] = useState<number | null>(null);
+  
+  // Order state
+  const [orderingProduct, setOrderingProduct] = useState<any | null>(null);
+  const [orderQuantity, setOrderQuantity] = useState(1);
+  const [orderVariantId, setOrderVariantId] = useState<string>("");
+  const [orderNotes, setOrderNotes] = useState("");
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+
   const [customizingProduct, setCustomizingProduct] = useState<any | null>(null);
   const [customTitle, setCustomTitle] = useState("");
   const [customDescription, setCustomDescription] = useState("");
   const [customVideoUrl, setCustomVideoUrl] = useState("");
   const [customImageUrl, setCustomImageUrl] = useState("");
   const [submittingCustomization, setSubmittingCustomization] = useState(false);
+
   const fetchCatalog = async () => {
     try {
       const token = localStorage.getItem("token") || "";
@@ -32,6 +42,42 @@ export default function MyCatalog() {
   useEffect(() => {
     fetchCatalog();
   }, []);
+
+  const handleOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orderingProduct) return;
+    setSubmittingOrder(true);
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/store-manager/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          productId: orderingProduct.id,
+          variantId: orderVariantId ? parseInt(orderVariantId) : null,
+          quantity: orderQuantity,
+          notes: orderNotes
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast("سفارش با موفقیت ثبت شد و برای تایید به تامین‌کننده ارسال گردید.", "success");
+        setOrderingProduct(null);
+        setOrderQuantity(1);
+        setOrderVariantId("");
+        setOrderNotes("");
+      } else {
+        toast(data.error || "خطا در ثبت سفارش", "error");
+      }
+    } catch (err) {
+      toast("خطای شبکه در ثبت سفارش", "error");
+    } finally {
+      setSubmittingOrder(false);
+    }
+  };
   const handleRemove = async (productId: number) => {
     try {
       const token = localStorage.getItem("token") || "";
@@ -116,281 +162,14 @@ export default function MyCatalog() {
   return (
     <div className="space-y-6 animate-fade-in">
       
+      {/* Digikala Style Product Detail Modal */}
       {selectedProduct && (
-        <div
-          className="fixed inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setSelectedProduct(null)}
-        >
-          
-          <div
-            className="bg-card rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden my-8"
-            onClick={(e) => e.stopPropagation()}
-          >
-            
-            <div className="flex justify-between items-center p-6 border-b border-subtle">
-              
-              <h3 className="text-xl font-bold text-primary">
-                جزئیات محصول
-              </h3>
-              <button
-                onClick={() => setSelectedProduct(null)}
-                className="p-2 hover:bg-surface rounded-full transition-colors text-muted"
-              >
-                
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6">
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                {/* Images */}
-                <div className="space-y-4">
-                  
-                  <div className="aspect-square bg-surface rounded-2xl flex items-center justify-center overflow-hidden border border-subtle">
-                    
-                    {selectedProduct.images?.length > 0 ? (
-                      <img referrerPolicy="no-referrer"
-                        src={selectedProduct.images[0].url}
-                        alt={selectedProduct.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Layers className="w-24 h-24 text-inverse" />
-                    )}
-                  </div>
-                  {selectedProduct.images?.length > 1 && (
-                    <div className="grid grid-cols-4 gap-2">
-                      
-                      {selectedProduct.images.slice(1).map((img: any) => (
-                        <div
-                          key={img.id}
-                          className="aspect-square bg-surface rounded-xl overflow-hidden border border-subtle"
-                        >
-                          
-                          <img referrerPolicy="no-referrer"
-                            src={img.url}
-                            className="w-full h-full object-cover"
-                            alt=""
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {/* Details */}
-                <div className="flex flex-col">
-                  
-                  <div className="flex items-center gap-2 mb-3">
-                    
-                    <span className="text-xs font-bold text-success bg-success/10 px-3 py-1 rounded-full border border-emerald-100">
-                      
-                      {selectedProduct.category?.name || "بدون دسته‌بندی"}
-                    </span>
-                    <span className="text-xs font-bold text-muted bg-surface px-3 py-1 rounded-full border border-subtle">
-                      
-                      وضعیت:
-                      {selectedProduct.status === "ACTIVE" ||
-                      selectedProduct.status === "PUBLISHED"
-                        ? "منتشر شده"
-                        : selectedProduct.status}
-                    </span>
-                  </div>
-                  <h2 className="text-2xl font-bold text-primary mb-2">
-                    {selectedProduct.name}
-                  </h2>
-                  <p className="text-muted text-sm mb-6 leading-relaxed">
-                    
-                    {selectedProduct.shortDescription ||
-                      "بدون توضیحات کوتاه"}
-                  </p>
-                  <div className="bg-background rounded-2xl p-5 mb-6 border border-subtle space-y-4">
-                    
-                    <div className="flex justify-between items-center pb-4 border-b border-subtle">
-                      
-                      <span className="text-muted font-medium">
-                        قیمت نهایی فروش برای شما
-                      </span>
-                      <div className="text-left">
-                        
-                        <span className="text-2xl font-bold text-success">
-                          {selectedProduct.finalPrice?.toLocaleString()}
-                        </span>
-                        <span className="text-sm text-muted mr-1">
-                          تومان
-                        </span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      
-                      <div className="flex items-center gap-3">
-                        
-                        <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-blue-600">
-                          
-                          <Package className="w-5 h-5" />
-                        </div>
-                        <div>
-                          
-                          <p className="text-xs text-muted">موجودی فعلی</p>
-                          <p className="font-bold text-primary">
-                            {selectedProduct.inventory} عدد
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        
-                        <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                          
-                          <Layers className="w-5 h-5" />
-                        </div>
-                        <div>
-                          
-                          <p className="text-xs text-muted">
-                            حداقل سفارش (MOQ)
-                          </p>
-                          <p className="font-bold text-primary">
-                            {selectedProduct.minOrderQuantity} عدد
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-4 mb-6 flex-1">
-                    <h4 className="font-bold text-primary flex items-center gap-2 text-sm border-b border-subtle pb-2">
-                      <Info className="w-4 h-4 text-primary-default" /> مشخصات فنی و تخصصی کالا
-                    </h4>
-                    
-                    {/* General Specs */}
-                    <div className="grid grid-cols-2 gap-y-2.5 text-xs bg-background/60 p-3.5 rounded-xl border border-subtle">
-                      <div className="text-muted">تامین‌کننده:</div>
-                      <div className="font-bold text-primary">{selectedProduct.supplierName || "نامشخص"}</div>
-                      <div className="text-muted">برند:</div>
-                      <div className="font-bold text-primary">{selectedProduct.brand || "ندارد"}</div>
-                      <div className="text-muted">کد کالا (SKU):</div>
-                      <div className="font-bold text-primary font-mono">{selectedProduct.sku || "ندارد"}</div>
-                      {selectedProduct.publishStartDate && (
-                        <>
-                          <div className="text-muted">تاریخ انتشار:</div>
-                          <div className="font-bold text-primary">
-                            {new Date(selectedProduct.publishStartDate).toLocaleDateString("fa-IR")}
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Detailed Technical Specs */}
-                    {(() => {
-                      let specsList: Array<{ key: string; value: string }> = [];
-                      if (selectedProduct.technicalSpecs) {
-                        try {
-                          const parsed = typeof selectedProduct.technicalSpecs === "string"
-                            ? JSON.parse(selectedProduct.technicalSpecs)
-                            : selectedProduct.technicalSpecs;
-                          if (Array.isArray(parsed)) {
-                            specsList = parsed;
-                          } else if (typeof parsed === "object" && parsed !== null) {
-                            specsList = Object.entries(parsed).map(([k, v]) => ({ key: k, value: String(v) }));
-                          }
-                        } catch (e) {
-                          // Not valid JSON
-                        }
-                      }
-                      return (
-                        <div>
-                          {specsList.length > 0 ? (
-                            <div className="space-y-2">
-                              <span className="text-[11px] font-black text-secondary block">ویژگی‌های تخصصی و ساختاری:</span>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                {specsList.map((spec, idx) => (
-                                  <div key={idx} className="flex items-center justify-between bg-background p-2.5 rounded-xl border border-subtle/80">
-                                    <span className="text-muted font-medium">{spec.key}:</span>
-                                    <span className="font-bold text-primary">{spec.value}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : typeof selectedProduct.technicalSpecs === "string" && selectedProduct.technicalSpecs.trim() ? (
-                            <div className="space-y-1">
-                              <span className="text-[11px] font-black text-secondary block">ویژگی‌های تخصصی:</span>
-                              <p className="text-xs text-secondary leading-relaxed bg-background p-3 rounded-xl border border-subtle whitespace-pre-line">
-                                {selectedProduct.technicalSpecs}
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                    <div className="space-y-3 mb-6 flex-1">
-                      <h4 className="font-bold text-primary mb-3 flex items-center gap-2">
-                        <Layers className="w-5 h-5 text-muted" /> متغیرهای کالا و موجودی هر کدام
-                      </h4>
-                      <div className="space-y-2 border border-subtle p-4 rounded-xl bg-background/50">
-                        {selectedProduct.variants.map((v: any) => {
-                          let displayAttrs = "ساده / پیش‌فرض";
-                          try {
-                            const parsed = typeof v.attributes === "string" 
-                              ? JSON.parse(v.attributes) 
-                              : v.attributes;
-                            if (parsed && Object.keys(parsed).length > 0) {
-                              displayAttrs = Object.entries(parsed)
-                                .map(([k, val]) => `${k}: ${val}`)
-                                .join(" | ");
-                            }
-                          } catch (e) {}
-
-                          return (
-                            <div key={v.id} className="flex justify-between items-center text-xs py-2 border-b border-subtle last:border-none">
-                              <span className="font-bold text-primary">{displayAttrs}</span>
-                              <div className="flex items-center gap-4 font-sans">
-                                <span className="font-semibold text-secondary bg-surface px-2 py-0.5 rounded border border-subtle">
-                                  موجودی: {v.stock} عدد
-                                </span>
-                                <span className="font-bold text-success font-mono">{v.finalPrice?.toLocaleString()} تومان</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-auto pt-4 border-t border-subtle flex gap-3">
-                    
-                    <button
-                      onClick={() => setSelectedProduct(null)}
-                      className="px-6 py-4 rounded-xl text-base font-bold text-muted bg-surface hover:bg-surface transition-colors"
-                    >
-                      
-                      بستن
-                    </button>
-                    <button
-                      onClick={() => setShowConfirmDelete(selectedProduct.id)}
-                      className="flex-1 py-4 rounded-xl flex items-center justify-center gap-2 text-base font-bold bg-danger/10 text-danger hover:bg-danger/20 transition-colors"
-                    >
-                      
-                      <Trash2 className="w-5 h-5" /> حذف از زوپیتی من
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {selectedProduct.longDescription && (
-                <div className="mt-12 pt-8 border-t border-subtle">
-                  
-                  <h4 className="text-lg font-bold text-primary mb-4">
-                    توضیحات تکمیلی
-                  </h4>
-                  <div className="prose prose-slate max-w-none text-muted text-sm leading-loose">
-                    
-                    {selectedProduct.longDescription}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <DigikalaProductModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          mode="my-catalog"
+          onRemoveFromCatalog={(prod) => setShowConfirmDelete(prod.id)}
+        />
       )}
       <div className="flex justify-between items-center bg-card p-5 rounded-2xl shadow-sm border border-subtle">
         
@@ -421,15 +200,18 @@ export default function MyCatalog() {
                   setSelectedProduct(product);
                 }}
               >
-                <div className="h-48 bg-surface relative overflow-hidden flex items-center justify-center text-inverse">
-                  {product.images?.length > 0 ? (
+                <div className="h-48 bg-surface relative overflow-hidden flex flex-col items-center justify-center text-inverse">
+                  {getValidProductImageUrl(product) ? (
                     <img referrerPolicy="no-referrer"
-                      src={product.images[0].url}
+                      src={getValidProductImageUrl(product)}
                       className="w-full h-full object-cover"
                       alt={product.name}
                     />
                   ) : (
-                    <Layers className="w-16 h-16" />
+                    <div className="flex flex-col items-center justify-center gap-2 text-muted">
+                      <Layers className="w-10 h-10 opacity-40" />
+                      <span className="text-[11px] font-bold">بدون تصویر</span>
+                    </div>
                   )}
 
                   {product.customization && (
@@ -460,20 +242,35 @@ export default function MyCatalog() {
                         </span>
                       </p>
                     </div>
-                    <div className="flex justify-between items-center text-xs text-muted font-medium">
-                      <span>
-                        وضعیت:{" "}
-                        {item.status === "PENDING_SYNC"
-                          ? "در انتظار سینک"
-                          : "سینک شده"}
-                      </span>
-                      <span>
+                    <div className="flex justify-between items-center text-xs font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted text-[11px]">وضعیت:</span>
+                        <HighContrastStatusBadge status={item.status || "SYNCED"} size="sm" />
+                      </div>
+                      <span className="text-muted text-[11px]">
                         {new Date(item.selected_at).toLocaleDateString("fa-IR")}
                       </span>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 mt-2">
+                    <div className="grid grid-cols-2 gap-2 mt-2">
                       <button
-                        onClick={() => setShowConfirmDelete(product.id)}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOrderingProduct(product);
+                          setOrderQuantity(1);
+                          setOrderVariantId(product.variants?.[0]?.id?.toString() || "");
+                        }}
+                        className="py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-black bg-primary-default hover:bg-primary-hover text-white transition-all cursor-pointer shadow-sm"
+                      >
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                        ثبت سفارش
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowConfirmDelete(product.id);
+                        }}
                         className="py-2.5 px-1 rounded-xl flex items-center justify-center gap-1 text-xs font-black bg-danger/10 text-danger hover:bg-danger/20 transition-all cursor-pointer"
                       >
                         حذف کالا
@@ -654,6 +451,143 @@ export default function MyCatalog() {
                     )}
                   </button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Place Order Modal */}
+      {orderingProduct && (
+        <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl w-full max-w-lg shadow-2xl p-6 text-right border border-subtle animate-scale-up">
+            <div className="flex justify-between items-center border-b border-subtle pb-4 mb-4">
+              <div className="flex items-center gap-2 text-primary">
+                <ShoppingCart className="w-5 h-5 text-primary-default" />
+                <h3 className="text-lg font-bold">ثبت سفارش کالا</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrderingProduct(null)}
+                className="p-1 rounded-lg text-muted hover:text-primary hover:bg-surface transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleOrderSubmit} className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-surface rounded-xl border border-subtle">
+                <img
+                  referrerPolicy="no-referrer"
+                  src={getValidProductImageUrl(orderingProduct)}
+                  className="w-14 h-14 object-cover rounded-lg border border-subtle"
+                  alt={orderingProduct.name}
+                />
+                <div>
+                  <h4 className="font-bold text-sm text-primary">{orderingProduct.name}</h4>
+                  <p className="text-xs text-muted mt-0.5">
+                    تامین‌کننده: <span className="font-medium text-secondary">{orderingProduct.supplier?.brandName || orderingProduct.supplier?.username || "تامین‌کننده معتبر"}</span>
+                  </p>
+                  <p className="text-xs font-bold text-success mt-1">
+                    قیمت: {orderingProduct.finalPrice?.toLocaleString()} تومان
+                  </p>
+                </div>
+              </div>
+
+              {/* Variants Selector */}
+              {orderingProduct.variants && orderingProduct.variants.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-muted mb-1.5">تنوع / رنگ / سایز کالا</label>
+                  <select
+                    value={orderVariantId}
+                    onChange={(e) => setOrderVariantId(e.target.value)}
+                    className="w-full bg-surface border border-subtle rounded-xl px-3 py-2.5 text-xs text-primary outline-none focus:border-primary-default"
+                  >
+                    <option value="">انتخاب تنوع...</option>
+                    {orderingProduct.variants.map((v: any) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} {v.color ? `(${v.color})` : ''} {v.size ? `[${v.size}]` : ''} - {v.finalPrice?.toLocaleString() || orderingProduct.finalPrice?.toLocaleString()} تومان
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Quantity */}
+              <div>
+                <label className="block text-xs font-bold text-muted mb-1.5">تعداد سفارش</label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))}
+                    className="w-10 h-10 rounded-xl bg-surface hover:bg-subtle text-primary font-black flex items-center justify-center text-lg cursor-pointer border border-subtle"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    value={orderQuantity}
+                    onChange={(e) => setOrderQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20 text-center bg-surface border border-subtle rounded-xl py-2 text-sm font-bold text-primary outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setOrderQuantity(orderQuantity + 1)}
+                    className="w-10 h-10 rounded-xl bg-surface hover:bg-subtle text-primary font-black flex items-center justify-center text-lg cursor-pointer border border-subtle"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-bold text-muted mb-1.5">توضیحات یا یادداشت سفارش (اختیاری)</label>
+                <textarea
+                  rows={2}
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  placeholder="توضیحات برای تامین‌کننده..."
+                  className="w-full bg-surface border border-subtle rounded-xl p-3 text-xs text-primary outline-none focus:border-primary-default resize-none"
+                />
+              </div>
+
+              {/* Notice about supplier auto-approval workflow */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-700 dark:text-amber-400 leading-relaxed flex items-start gap-2">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  این سفارش مستقیماً برای تایید به تامین‌کننده مربوطه ارسال می‌شود. پس از تایید، هزینه ارسال محاسبه شده و جهت ارسال آماده می‌گردد.
+                </span>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex gap-2 pt-2 border-t border-subtle justify-end">
+                <button
+                  type="button"
+                  onClick={() => setOrderingProduct(null)}
+                  disabled={submittingOrder}
+                  className="px-4 py-2.5 bg-surface hover:bg-subtle text-muted rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingOrder}
+                  className="px-5 py-2.5 bg-primary-default hover:bg-primary-hover text-white rounded-xl text-xs font-black flex items-center gap-2 transition-colors cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  {submittingOrder ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>در حال ثبت سفارش...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>ارسال برای تایید تامین‌کننده</span>
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>

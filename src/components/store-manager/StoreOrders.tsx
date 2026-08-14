@@ -21,8 +21,6 @@ import {
   Printer, Clock,
 } from "lucide-react";
 import { printOrderInvoice } from "../../utils/printLabel";
-import { useStorePushNotifications } from "../../hooks/useStorePushNotifications";
-import { StorePushNotificationBanner } from "./StorePushNotificationBanner";
 import { Bell, BellRing, Volume2, Play } from "lucide-react";
 
 export default function StoreOrders({
@@ -35,23 +33,6 @@ export default function StoreOrders({
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const {
-    isSupported: isPushSupported,
-    permission: pushPermission,
-    isGranted: isPushGranted,
-    isDenied: isPushDenied,
-    settings: pushSettings,
-    requestPermission: requestPushPermission,
-    toggleNotifications: togglePushNotifications,
-    updateSettings: updatePushSettings,
-    testNotification: testPushNotification,
-    playTestChime
-  } = useStorePushNotifications({
-    userRole: 'STORE_MANAGER',
-    onNewOrderDetected: () => {
-      fetchOrders();
-    }
-  });
   const [myCatalog, setMyCatalog] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -362,20 +343,22 @@ export default function StoreOrders({
   const getStatusText = (status: string) => {
     const statusMap: any = {
       NEW: "جدید",
-      PENDING_PAYMENT: "در انتظار پرداخت",
-      WAITING_SUPPLIER_CONFIRMATION: "در انتظار تایید تامین‌کننده",
+      PENDING_PAYMENT: "۴. نیازمند پرداخت توسط مدیر فروشگاه",
+      WAITING_SUPPLIER_CONFIRMATION: "۱. در انتظار تایید تامین‌کننده",
+      WAITING_STORE_ADDRESS: "۲. در انتظار دریافت آدرس پستی",
       SUPPLIER_APPROVED: "تایید شده تامین‌کننده (آماده پرداخت)",
-      WAITING_SHIPPING_COST: "در انتظار محاسبه هزینه ارسال",
+      WAITING_SHIPPING_COST: "۳. در انتظار برآورد هزینه ارسال",
       WAITING_SHIPPING_PAYMENT: "در انتظار پرداخت هزینه ارسال",
       SHIPPING_PAID: "هزینه ارسال پرداخت شده",
+      PENDING_POSTAL_LABEL: "۵. نیازمند دریافت لیبل",
       READY_TO_SHIP: "آماده ارسال",
-      SHIPPED: "ارسال شده",
+      SHIPPED: "۶. در حال ارسال",
       DELIVERED: "تحویل داده شده",
       COMPLETED: "تکمیل شده",
       CANCELLED: "لغو شده",
       REJECTED: "رد شده",
       REQUESTED: "درخواست شده",
-      WAITING_FOR_PAYMENT: "در انتظار پرداخت",
+      WAITING_FOR_PAYMENT: "۴. نیازمند پرداخت توسط مدیر فروشگاه",
       PAID: "پرداخت شده",
       PROCESSING: "در حال پردازش"
     };
@@ -386,8 +369,10 @@ export default function StoreOrders({
       NEW: "text-muted bg-background",
       PENDING_PAYMENT: "text-warning bg-warning/10",
       WAITING_SUPPLIER_CONFIRMATION: "text-purple-600 bg-purple-50",
+      WAITING_STORE_ADDRESS: "text-blue-600 bg-surface",
       WAITING_SHIPPING_COST: "text-blue-600 bg-surface",
       WAITING_SHIPPING_PAYMENT: "text-warning bg-warning/10",
+      PENDING_POSTAL_LABEL: "text-indigo-600 bg-indigo-50",
       READY_TO_SHIP: "text-success bg-success/10",
       SHIPPED: "text-primary-default bg-primary-default/10",
       DELIVERED: "text-success bg-success/10",
@@ -409,42 +394,14 @@ export default function StoreOrders({
   );
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Push Notification Banner */}
-      <StorePushNotificationBanner
-        permission={pushPermission}
-        isGranted={isPushGranted}
-        isDenied={isPushDenied}
-        settings={pushSettings}
-        onRequestPermission={requestPushPermission}
-        onToggleNotifications={togglePushNotifications}
-        onUpdateSettings={updatePushSettings}
-        onTestNotification={testPushNotification}
-        onPlayChime={playTestChime}
-        compact
-      />
-
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-card p-5 rounded-2xl shadow-sm border border-subtle gap-4">
         <div>
           <h2 className="text-xl font-bold text-primary flex items-center gap-2">
             سفارشات
-            {isPushGranted && pushSettings.enabled && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                <BellRing className="w-3 h-3 text-emerald-600 animate-pulse" />
-                اعلان آنی فعال
-              </span>
-            )}
           </h2>
           <p className="text-sm text-muted mt-1">مدیریت، تسویه‌حساب و پیگیری لحظه‌ای سفارشات فروشگاه</p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-end">
-          <button
-            onClick={() => testPushNotification()}
-            className="p-2.5 bg-surface hover:bg-subtle text-primary border border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            title="تست صدای زنگ و اعلان سفارش"
-          >
-            <Play className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500" />
-            <span className="hidden md:inline-block">تست زنگ</span>
-          </button>
           <button
             onClick={handleExportCSV}
             className="bg-success/10 text-success hover:bg-success/20 px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 border border-emerald-200 cursor-pointer shadow-sm shadow-emerald-50"
@@ -1177,27 +1134,29 @@ export default function StoreOrders({
             {/* Footing Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 pt-6 border-t border-subtle text-sm">
               <div className="space-y-3">
-                <div className="bg-emerald-500/10 p-3.5 rounded-2xl border border-emerald-500/20 space-y-1 text-right">
-                  <span className="text-xs text-emerald-700 dark:text-emerald-400 font-black block">
-                    🚚 شناسه و نام فرستنده پستی (زوپیت تامین‌کننده):
+                <div className="bg-card p-4 rounded-2xl border border-emerald-500/30 space-y-1.5 text-right shadow-sm">
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-extrabold block">
+                    🚚 کد شناسه ارائه‌دهنده خدمت:
                   </span>
-                  <p className="font-mono font-black text-sm text-emerald-800 dark:text-emerald-200">
+                  <p className="font-mono font-black text-sm text-text-primary">
                     {(() => {
                       const supp = selectedOrderForDetails.items?.[0]?.product?.supplier;
-                      if (!supp) return "زوپیت تامین‌کننده نامشخص";
-                      return `زوپیت تامین‌کننده ${supp.id}${supp.brandName ? ` (${supp.brandName})` : ''}`;
+                      if (!supp) return "کد ارائه‌دهنده نامشخص";
+                      return `کد شناسه ارائه‌دهنده: #${supp.id}`;
                     })()}
                   </p>
-                  {selectedOrderForDetails.items?.[0]?.product?.supplier?.address && (
-                    <p className="text-xs text-muted pt-1.5 border-t border-emerald-500/10 font-medium">
-                      نشانی انبار فرستنده: {selectedOrderForDetails.items?.[0]?.product?.supplier?.province || ''} {selectedOrderForDetails.items?.[0]?.product?.supplier?.city || ''} - {selectedOrderForDetails.items?.[0]?.product?.supplier?.address}
+                  {(selectedOrderForDetails.items?.[0]?.product?.supplier?.province || selectedOrderForDetails.items?.[0]?.product?.supplier?.city) && (
+                    <p className="text-xs text-text-muted pt-1.5 border-t border-border-subtle font-medium">
+                      موقعیت استان انبار: {selectedOrderForDetails.items?.[0]?.product?.supplier?.province || ''}، {selectedOrderForDetails.items?.[0]?.product?.supplier?.city || ''}
                     </p>
                   )}
                 </div>
-                {/* Shipping Section - Restricted to WAITING_SHIPPING_COST, PENDING_PAYMENT, PAID and later statuses */}
+                {/* Shipping Section - Restricted to WAITING_STORE_ADDRESS, WAITING_SHIPPING_COST, PENDING_PAYMENT, PAID and later statuses */}
                 {!(
+                  selectedOrderForDetails.status === "WAITING_STORE_ADDRESS" ||
                   selectedOrderForDetails.status === "WAITING_SHIPPING_COST" ||
                   selectedOrderForDetails.status === "PENDING_PAYMENT" ||
+                  selectedOrderForDetails.status === "PENDING_POSTAL_LABEL" ||
                   selectedOrderForDetails.status === "PAID" ||
                   selectedOrderForDetails.status === "PROCESSING" ||
                   selectedOrderForDetails.status === "PREPARING" ||
@@ -1224,7 +1183,7 @@ export default function StoreOrders({
                         اطلاعات لجستیک و مرسوله پستی
                       </h5>
                     </div>
-                    {selectedOrderForDetails.status === "WAITING_SHIPPING_COST" ? (
+                    {selectedOrderForDetails.status === "WAITING_STORE_ADDRESS" || selectedOrderForDetails.status === "WAITING_SHIPPING_COST" ? (
                       !selectedOrderForDetails.shippingAddress ? (
                         <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col items-center justify-center gap-3">
                           <p className="text-amber-700 text-xs font-bold text-center">
@@ -1582,14 +1541,22 @@ export default function StoreOrders({
                 <label className="block text-xs font-black text-secondary mb-1.5 flex items-center gap-1">
                   روش ارسال <span className="text-danger">*</span>
                 </label>
-                <div className="flex flex-wrap gap-4">
-                  <label className={`flex items-center gap-2 text-xs font-black px-4 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
-                    <input type="radio" name="shipMethod" value="POST" checked={shippingMethod === "POST"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
-                    پست پیشتاز ایران
+                <div className="flex flex-wrap gap-3">
+                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_PISHTAZ" || shippingMethod === "POST" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
+                    <input type="radio" name="shipMethod" value="POST_PISHTAZ" checked={shippingMethod === "POST_PISHTAZ" || shippingMethod === "POST"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                    پست پیشتاز
                   </label>
-                  <label className={`flex items-center gap-2 text-xs font-black px-4 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "TIPAX" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
+                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_VIZHE" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
+                    <input type="radio" name="shipMethod" value="POST_VIZHE" checked={shippingMethod === "POST_VIZHE"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                    پست ویژه
+                  </label>
+                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_EXPRESS" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
+                    <input type="radio" name="shipMethod" value="POST_EXPRESS" checked={shippingMethod === "POST_EXPRESS"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                    پست اکسپرس
+                  </label>
+                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "TIPAX" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
                     <input type="radio" name="shipMethod" value="TIPAX" checked={shippingMethod === "TIPAX"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
-                    تیپاکس (اکسپرس)
+                    تیپاکس
                   </label>
                 </div>
               </div>
@@ -1770,8 +1737,8 @@ export default function StoreOrders({
                 <button
                   onClick={async () => {
                     // Strict manual validations for accuracy
-                    if (shippingMethod !== "POST" && shippingMethod !== "TIPAX") {
-                      toast("لطفاً یکی از روش‌های ارسال (پست پیشتاز یا تیپاکس) را انتخاب نمایید.", "error");
+                    if (!["POST", "POST_PISHTAZ", "POST_VIZHE", "POST_EXPRESS", "TIPAX"].includes(shippingMethod)) {
+                      toast("لطفاً یکی از روش‌های ارسال معتبر را انتخاب نمایید.", "error");
                       return;
                     }
                     if (!shippingRecipientName || shippingRecipientName.trim().length < 2) {

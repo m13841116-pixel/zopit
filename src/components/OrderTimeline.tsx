@@ -98,14 +98,17 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
       REQUESTED: 'ثبت سفارش جدید',
       NEW: 'ثبت سفارش جدید',
       PENDING_APPROVAL: 'در انتظار تایید',
-      WAITING_SUPPLIER_CONFIRMATION: 'در انتظار تایید تامین‌کننده',
+      WAITING_SUPPLIER_CONFIRMATION: '۱. در انتظار تایید تامین‌کننده',
+      WAITING_STORE_ADDRESS: '۲. در انتظار دریافت آدرس پستی',
       APPROVED: 'تایید شده',
       SUPPLIER_APPROVED: 'تایید تامین‌کننده',
-      WAITING_SHIPPING_COST: 'در انتظار محاسبه هزینه ارسال',
-      PENDING_PAYMENT: 'در انتظار پرداخت',
+      WAITING_SHIPPING_COST: '۳. در انتظار برآورد هزینه ارسال',
+      PENDING_PAYMENT: '۴. نیازمند پرداخت توسط مدیر فروشگاه',
+      WAITING_FOR_PAYMENT: '۴. نیازمند پرداخت توسط مدیر فروشگاه',
       PAID: 'پرداخت شده',
       PREPARING: 'در حال آماده‌سازی',
-      SHIPPED: 'ارسال شده',
+      PENDING_POSTAL_LABEL: '۵. نیازمند دریافت لیبل',
+      SHIPPED: '۶. در حال ارسال',
       PROCESSING: 'در حال پردازش',
       DELIVERED: 'تحویل شده',
       COMPLETED: 'تکمیل شده',
@@ -126,35 +129,41 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
     return mapping[role] || role;
   };
 
-  // Define 5 key milestone steps for the horizontal timeline in chronological order
+  // Define 6 key milestone steps for the horizontal timeline in chronological order
   const steps = [
     { 
-      label: 'ثبت سفارش', 
-      activeStatuses: ['REQUESTED', 'NEW', 'PENDING_APPROVAL'], 
-      completedStatuses: ['WAITING_SUPPLIER_CONFIRMATION', 'SUPPLIER_APPROVED', 'WAITING_SHIPPING_COST', 'APPROVED', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
-      icon: FileText 
-    },
-    { 
-      label: 'تایید تامین‌کننده', 
-      activeStatuses: ['WAITING_SUPPLIER_CONFIRMATION'], 
-      completedStatuses: ['SUPPLIER_APPROVED', 'WAITING_SHIPPING_COST', 'APPROVED', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      label: '۱. تایید تامین‌کننده', 
+      activeStatuses: ['WAITING_SUPPLIER_CONFIRMATION', 'REQUESTED', 'NEW'], 
+      completedStatuses: ['WAITING_STORE_ADDRESS', 'SUPPLIER_APPROVED', 'WAITING_SHIPPING_COST', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: CheckSquare 
     },
     { 
-      label: 'بسته‌بندی و کرایه', 
-      activeStatuses: ['SUPPLIER_APPROVED', 'WAITING_SHIPPING_COST'], 
-      completedStatuses: ['APPROVED', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      label: '۲. دریافت آدرس پستی', 
+      activeStatuses: ['WAITING_STORE_ADDRESS', 'SUPPLIER_APPROVED'], 
+      completedStatuses: ['WAITING_SHIPPING_COST', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      icon: FileText 
+    },
+    { 
+      label: '۳. برآورد هزینه ارسال', 
+      activeStatuses: ['WAITING_SHIPPING_COST'], 
+      completedStatuses: ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: Package 
     },
     { 
-      label: 'پرداخت', 
-      activeStatuses: ['APPROVED', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT'], 
-      completedStatuses: ['PAID', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      label: '۴. نیازمند پرداخت', 
+      activeStatuses: ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT'], 
+      completedStatuses: ['PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: CreditCard 
     },
     { 
-      label: 'ارسال', 
-      activeStatuses: ['PAID', 'PREPARING', 'SHIPPED', 'PROCESSING'], 
+      label: '۵. دریافت لیبل', 
+      activeStatuses: ['PENDING_POSTAL_LABEL', 'READY_TO_SHIP'], 
+      completedStatuses: ['SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      icon: FileText 
+    },
+    { 
+      label: '۶. در حال ارسال', 
+      activeStatuses: ['SHIPPED', 'PROCESSING'], 
       completedStatuses: ['DELIVERED', 'COMPLETED'], 
       icon: Truck 
     }
@@ -228,13 +237,10 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
             <div className="text-zinc-500 font-bold mb-1 text-[11px] uppercase tracking-wider">مشخصات تامین‌کننده:</div>
             {items?.[0]?.product?.supplier ? (
               <>
-                <div>برند: <span className="text-zinc-900 font-semibold">{items[0].product.supplier.brandName || 'نامشخص'}</span></div>
-                <div>تامین‌کننده: <span className="text-zinc-900 font-semibold">{items[0].product.supplier.firstName} {items[0].product.supplier.lastName}</span></div>
-                <div>تلفن همراه: <span className="text-zinc-900 font-semibold font-mono" dir="ltr">{items[0].product.supplier.mobile || 'نامشخص'}</span></div>
-                <div>تلفن ثابت: <span className="text-zinc-900 font-semibold font-mono" dir="ltr">{items[0].product.supplier.telephone || 'نامشخص'}</span></div>
+                {items[0].product.supplier.username && (
+                  <div>نام کاربری: <span className="text-zinc-900 font-semibold font-mono">@{items[0].product.supplier.username}</span></div>
+                )}
                 <div>استان و شهر: <span className="text-zinc-900 font-semibold">{items[0].product.supplier.province || 'نامشخص'} - {items[0].product.supplier.city || 'نامشخص'}</span></div>
-                <div>آدرس کامل: <span className="text-zinc-900 font-semibold">{items[0].product.supplier.address || 'نامشخص'}</span></div>
-                <div>کد پستی: <span className="text-zinc-900 font-semibold font-mono">{items[0].product.supplier.postalCode || 'نامشخص'}</span></div>
               </>
             ) : (
               <div className="text-zinc-400">مشخصات تامین‌کننده یافت نشد.</div>

@@ -332,24 +332,24 @@ export default function OrdersList() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "REQUESTED":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">درخواست شده</span>;
-      case "REGISTERED":
-      case "SUPPLIER_APPROVED":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-500/10 text-purple-600 border border-purple-500/20">ثبت شده</span>;
+      case "WAITING_SUPPLIER_CONFIRMATION":
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-500/10 text-purple-600 border border-purple-500/20">۱. در انتظار تایید تامین‌کننده</span>;
+      case "WAITING_STORE_ADDRESS":
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">۲. در انتظار دریافت آدرس پستی</span>;
       case "WAITING_SHIPPING_COST":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 border border-amber-500/20">در انتظار برآورد هزینه</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 border border-amber-500/20">۳. در انتظار برآورد هزینه</span>;
+      case "PENDING_PAYMENT":
       case "WAITING_FOR_PAYMENT":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-orange-500/10 text-orange-600 border border-orange-500/20">در انتظار پرداخت (محصول)</span>;
-      case "WAITING_SHIPPING_PAYMENT":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-orange-500/10 text-orange-600 border border-orange-500/20">در انتظار پرداخت (پستی)</span>;
-      case "PAID":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">پرداخت شده</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-orange-500/10 text-orange-600 border border-orange-500/20">۴. نیازمند پرداخت توسط مدیر فروشگاه</span>;
       case "PENDING_POSTAL_LABEL":
       case "READY_TO_SHIP":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">در انتظار لیبل پستی</span>;
-      case "COMPLETED":
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">۵. نیازمند دریافت لیبل</span>;
       case "SHIPPED":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-teal-500/10 text-teal-600 border border-teal-500/20">تکمیل شده</span>;
+      case "PROCESSING":
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-teal-500/10 text-teal-600 border border-teal-500/20">۶. در حال ارسال</span>;
+      case "COMPLETED":
+      case "DELIVERED":
+        return <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">تکمیل شده</span>;
       default:
         return <span className="px-3 py-1 rounded-full text-xs font-black bg-gray-500/10 text-gray-600">{status}</span>;
     }
@@ -403,8 +403,8 @@ export default function OrdersList() {
               {weeklyOrders.length.toLocaleString('fa-IR')} سفارش
             </span>
           </div>
-          <div className="text-xl lg:text-2xl font-black text-text-primary font-mono">
-            {weeklyOrdersTotal.toLocaleString('fa-IR')} <span className="text-xs font-sans text-muted">تومان</span>
+          <div className="text-xl lg:text-2xl font-black text-text-primary font-sans">
+            {weeklyOrdersTotal.toLocaleString('fa-IR')} <span className="text-xs text-muted font-sans font-medium">تومان</span>
           </div>
           <p className="text-[11px] text-muted">
             مجموع مبلغ کل تمام سفارشات ثبت شده در هفته اخیر
@@ -419,11 +419,11 @@ export default function OrdersList() {
               سقف مجاز کل سفارشات هفتگی
             </span>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${weeklyUsagePercent >= 90 ? 'bg-red-500/10 text-red-600' : 'bg-emerald-500/10 text-emerald-600'}`}>
-              {weeklyUsagePercent}% مصرف شده
+              {weeklyUsagePercent.toLocaleString('fa-IR')}% مصرف شده
             </span>
           </div>
-          <div className="text-xl lg:text-2xl font-black text-text-primary font-mono">
-            {weeklyMaxLimit.toLocaleString('fa-IR')} <span className="text-xs font-sans text-muted">تومان</span>
+          <div className="text-xl lg:text-2xl font-black text-text-primary font-sans">
+            {weeklyMaxLimit.toLocaleString('fa-IR')} <span className="text-xs text-muted font-sans font-medium">تومان</span>
           </div>
           {/* Progress Bar */}
           <div className="w-full bg-surface h-2 rounded-full overflow-hidden border border-border-subtle">
@@ -448,8 +448,8 @@ export default function OrdersList() {
               <Edit3 className="w-3 h-3" /> تغییر
             </button>
           </div>
-          <div className="text-xl lg:text-2xl font-black text-text-primary font-mono">
-            {maxProductPrice.toLocaleString('fa-IR')} <span className="text-xs font-sans text-muted">تومان</span>
+          <div className="text-xl lg:text-2xl font-black text-text-primary font-sans">
+            {maxProductPrice.toLocaleString('fa-IR')} <span className="text-xs text-muted font-sans font-medium">تومان</span>
           </div>
           <p className="text-[11px] text-muted">
             سقف مجاز قیمت تعیین‌شده توسط مدیرکل برای ثبت هر محصول

@@ -58,6 +58,9 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
   const [formSuccess, setFormSuccess] = useState("");
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [selectedOrderModal, setSelectedOrderModal] = useState<any>(null);
+  const [orderFilter, setOrderFilter] = useState<string>("ALL");
+  const [showProformaModal, setShowProformaModal] = useState<boolean>(false);
+  const [selectedReceiptImage, setSelectedReceiptImage] = useState<string | null>(null);
 
   useEffect(() => {
     const savedLayout = localStorage.getItem("superadmin_dashboard_layout");
@@ -121,7 +124,7 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
 
   const fetchPendingSettlements = async () => {
     const data = await safeFetchJson("/api/admin/settlements");
-    const list = Array.isArray(data) ? data : [];
+    const list = data?.settlements || (Array.isArray(data) ? data : []);
     setPendingSettlements(list.filter((s: any) => s.status === "PENDING"));
   };
 
@@ -281,11 +284,11 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
 
   const statCards = [
     {
-      label: "تامین کنندگان فعال",
+      label: "تامین‌کنندگان فعال",
       value: stats?.suppliers || 0,
       icon: Users,
-      color: "text-white",
-      bg: "bg-gradient-to-br from-blue-500 to-blue-600",
+      iconColor: "text-blue-600",
+      iconBg: "bg-blue-500/10 border border-blue-500/20",
       tab: "all-users",
       roleFilter: "SUPPLIER",
     },
@@ -293,8 +296,8 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
       label: "فروشگاه‌های همکار",
       value: stats?.stores || 0,
       icon: Store,
-      color: "text-white",
-      bg: "bg-gradient-to-br from-emerald-500 to-emerald-600",
+      iconColor: "text-emerald-600",
+      iconBg: "bg-emerald-500/10 border border-emerald-500/20",
       tab: "all-users",
       roleFilter: "STORE_MANAGER",
     },
@@ -302,24 +305,24 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
       label: "محصولات سامانه",
       value: stats?.activeProducts || 0,
       icon: Package,
-      color: "text-white",
-      bg: "bg-gradient-to-br from-orange-400 to-orange-500",
+      iconColor: "text-amber-600",
+      iconBg: "bg-amber-500/10 border border-amber-500/20",
       tab: "products",
     },
     {
-      label: "کل سفارشات ثبت‌شده",
+      label: "سفارشات ثبت‌شده",
       value: stats?.orders || 0,
       icon: ShoppingCart,
-      color: "text-white",
-      bg: "bg-gradient-to-br from-purple-500 to-purple-600",
+      iconColor: "text-primary-default",
+      iconBg: "bg-primary-default/10 border border-primary-default/20",
       tab: "orders",
     },
     {
       label: "درآمد کل پلتفرم",
       value: (stats?.totalRevenue || 0).toLocaleString() + " تومان",
       icon: Wallet,
-      color: "text-white",
-      bg: "bg-gradient-to-br from-rose-500 to-rose-600",
+      iconColor: "text-purple-600",
+      iconBg: "bg-purple-500/10 border border-purple-500/20",
       tab: "financial",
     },
   ];
@@ -345,64 +348,77 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
 
   if (loading) {
     return (
-      <div className="p-8 flex justify-center items-center h-64">
-        <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="p-8 flex justify-center items-center h-64 text-text-muted">
+        <div className="w-8 h-8 border-2 border-primary-default border-t-transparent rounded-full animate-spin ml-3"></div>
+        در حال بارگذاری اطلاعات پیشخوان...
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 animate-fade-in" dir="rtl">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto pb-12 animate-fadeIn" dir="rtl">
       {/* Header Banner */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 bg-gradient-to-r from-slate-800 to-slate-900 rounded-3xl text-white shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl"></div>
-        <div className="relative z-10">
-          <h2 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white !text-white">به مرکز فرماندهی خوش آمدید 👋</h2>
-          <p className="text-slate-200 mt-1.5 text-sm lg:text-base font-medium !text-slate-200">نمای یکپارچه، ابزارهای کنترلی پیشرفته و مدیریت کل زنجیره تامین</p>
-        </div>
-        <div className="flex flex-wrap gap-3 relative z-10">
-          <button
-            onClick={() => setShowCustomizeModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold backdrop-blur-sm border border-white/20 transition-all text-white cursor-pointer"
-          >
-            <Sliders className="w-4 h-4 text-emerald-400" />
-            شخصی‌سازی پیشخوان
-          </button>
-          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all text-white">
-            <ShieldCheck className="w-4 h-4 text-emerald-200" /> دسترسی: مدیر کل
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 border border-teal-500/30 p-6 md:p-8 text-white shadow-xl">
+        <div className="absolute -top-12 -left-12 w-64 h-64 bg-teal-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300 text-xs font-black">
+              <Activity className="w-4 h-4 text-teal-400" />
+              <span>مرکز فرماندهی و نظارت سراسری پلتفرم زوپیت</span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black text-white flex items-center gap-2 drop-shadow-sm">
+              به مرکز فرماندهی خوش آمدید 👋
+            </h2>
+            <p className="text-slate-300 text-xs md:text-sm max-w-2xl leading-relaxed font-medium">
+              نمای یکپارچه، ابزارهای کنترلی پیشرفته و پایش لحظه‌ای زنجیره تامین، سفارشات و درخواست‌های فیش و پیش‌فاکتور.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShowCustomizeModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-white rounded-xl text-xs font-bold border border-teal-500/30 transition-all cursor-pointer shadow-sm backdrop-blur-md"
+            >
+              <Sliders className="w-4 h-4 text-teal-400" />
+              شخصی‌سازی پیشخوان
+            </button>
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold backdrop-blur-md">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" /> دسترسی: مدیر ارشد کل
+            </div>
           </div>
         </div>
       </div>
 
-      {/* PROMPT 1 Item 3: Prominent Operational Priority Section */}
+      {/* Prominent Operational Priority Section */}
       {layoutSettings.operational && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-black text-primary flex items-center gap-2">
-              <Activity className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="text-sm md:text-base font-black text-text-primary flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary-default" />
               اقدامات فورس‌ماژور و فوریت‌های عملیاتی
             </h3>
-            <span className="text-xs font-bold text-muted">اولویت بالایی مدیریت روزانه</span>
+            <span className="text-xs font-bold text-text-muted">اولویت بالای مدیریت روزانه</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 1. Support Tickets Status */}
             <div
               onClick={() => onNavigateTab && onNavigateTab("tickets")}
-              className="bg-card p-5 rounded-3xl border-2 border-amber-500/30 hover:border-amber-500 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-h-[140px] relative overflow-hidden"
+              className="bg-card p-5 rounded-2xl border border-border hover:border-amber-500/50 shadow-xs hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[135px]"
             >
-              <div className="flex items-center justify-between relative z-10">
-                <span className="text-xs font-extrabold text-muted">تیکت‌های پشتیبانی در انتظار</span>
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
-                  <MessageSquare className="w-5 h-5" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-text-muted">تیکت‌های در انتظار پاسخ</span>
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                  <MessageSquare className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="relative z-10 mt-2">
+              <div className="mt-2">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-primary font-mono">{ticketsCount}</span>
-                  <span className="text-xs font-bold text-amber-600">تیکت نیازمند پاسخ</span>
+                  <span className="text-2xl md:text-3xl font-black text-text-primary font-sans">{(ticketsCount || 0).toLocaleString('fa-IR')}</span>
+                  <span className="text-xs font-bold text-amber-600">تیکت باز</span>
                 </div>
-                <p className="text-[11px] text-muted mt-1 font-medium group-hover:text-primary transition-colors flex items-center gap-1">
+                <p className="text-[11px] text-text-muted mt-1 font-medium group-hover:text-primary-default transition-colors flex items-center gap-1">
                   مشاهده و پاسخ‌دهی سریع <ArrowRight className="w-3 h-3 rotate-180" />
                 </p>
               </div>
@@ -411,20 +427,20 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
             {/* 2. Supplier Settlements Status */}
             <div
               onClick={() => onNavigateTab && onNavigateTab("settlements")}
-              className="bg-card p-5 rounded-3xl border-2 border-emerald-500/30 hover:border-emerald-500 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-h-[140px] relative overflow-hidden"
+              className="bg-card p-5 rounded-2xl border border-border hover:border-emerald-500/50 shadow-xs hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[135px]"
             >
-              <div className="flex items-center justify-between relative z-10">
-                <span className="text-xs font-extrabold text-muted">درخواست‌های تسویه‌حساب</span>
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
-                  <Wallet className="w-5 h-5" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-text-muted">درخواست‌های تسویه‌حساب</span>
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
+                  <Wallet className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="relative z-10 mt-2">
+              <div className="mt-2">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-primary font-mono">{pendingSettlements.length}</span>
-                  <span className="text-xs font-bold text-emerald-600">درخواست آماده واریز</span>
+                  <span className="text-2xl md:text-3xl font-black text-text-primary font-sans">{(pendingSettlements.length || 0).toLocaleString('fa-IR')}</span>
+                  <span className="text-xs font-bold text-emerald-600">آماده واریز</span>
                 </div>
-                <p className="text-[11px] text-muted mt-1 font-medium group-hover:text-primary transition-colors flex items-center gap-1">
+                <p className="text-[11px] text-text-muted mt-1 font-medium group-hover:text-primary-default transition-colors flex items-center gap-1">
                   تایید و تسویه‌حساب کیف‌پول‌ها <ArrowRight className="w-3 h-3 rotate-180" />
                 </p>
               </div>
@@ -433,20 +449,20 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
             {/* 3. Orders Overview */}
             <div
               onClick={() => onNavigateTab && onNavigateTab("orders")}
-              className="bg-card p-5 rounded-3xl border-2 border-blue-500/30 hover:border-blue-500 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-h-[140px] relative overflow-hidden"
+              className="bg-card p-5 rounded-2xl border border-border hover:border-blue-500/50 shadow-xs hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[135px]"
             >
-              <div className="flex items-center justify-between relative z-10">
-                <span className="text-xs font-extrabold text-muted">نمای کلی سفارشات جدید</span>
-                <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center font-bold">
-                  <ShoppingCart className="w-5 h-5" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-text-muted">سفارشات ثبت‌شده پلتفرم</span>
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center font-bold">
+                  <ShoppingCart className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="relative z-10 mt-2">
+              <div className="mt-2">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-primary font-mono">{stats?.orders || 0}</span>
-                  <span className="text-xs font-bold text-blue-600">سفارش ثبت‌شده</span>
+                  <span className="text-2xl md:text-3xl font-black text-text-primary font-sans">{Number(stats?.orders || 0).toLocaleString('fa-IR')}</span>
+                  <span className="text-xs font-bold text-blue-600">سفارش فعال</span>
                 </div>
-                <p className="text-[11px] text-muted mt-1 font-medium group-hover:text-primary transition-colors flex items-center gap-1">
+                <p className="text-[11px] text-text-muted mt-1 font-medium group-hover:text-primary-default transition-colors flex items-center gap-1">
                   مدیریت زنجیره سفارشات <ArrowRight className="w-3 h-3 rotate-180" />
                 </p>
               </div>
@@ -455,20 +471,20 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
             {/* 4. Orders Needing Immediate Postal Label Printing */}
             <div
               onClick={() => onNavigateTab && onNavigateTab("orders")}
-              className="bg-card p-5 rounded-3xl border-2 border-rose-500/30 hover:border-rose-500 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-h-[140px] relative overflow-hidden"
+              className="bg-card p-5 rounded-2xl border border-border hover:border-rose-500/50 shadow-xs hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[135px]"
             >
-              <div className="flex items-center justify-between relative z-10">
-                <span className="text-xs font-extrabold text-muted">صدور فوری لیبل پستی</span>
-                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold">
-                  <Printer className="w-5 h-5" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-text-muted">صدور فوری لیبل پستی</span>
+                <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold">
+                  <Printer className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="relative z-10 mt-2">
+              <div className="mt-2">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-rose-600 font-mono">{shippingNeededCount}</span>
-                  <span className="text-xs font-bold text-rose-600">سفارش اماده چاپ لیبل</span>
+                  <span className="text-2xl md:text-3xl font-black text-rose-600 font-sans">{(shippingNeededCount || 0).toLocaleString('fa-IR')}</span>
+                  <span className="text-xs font-bold text-rose-600">نیازمند چاپ لیبل</span>
                 </div>
-                <p className="text-[11px] text-muted mt-1 font-medium group-hover:text-primary transition-colors flex items-center gap-1">
+                <p className="text-[11px] text-text-muted mt-1 font-medium group-hover:text-primary-default transition-colors flex items-center gap-1">
                   صدور و چاپ برچسب‌های پستی <ArrowRight className="w-3 h-3 rotate-180" />
                 </p>
               </div>
@@ -477,181 +493,321 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
         </div>
       )}
 
-      {/* PROMPT 1 Item 2: Clickable Stat Cards Row */}
+      {/* Clickable Stat Cards Row */}
       {layoutSettings.stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-          {statCards.map((stat, i) => (
-            <div
-              key={i}
-              onClick={() => {
-                if (onNavigateTab && stat.tab) {
-                  onNavigateTab(stat.tab, stat.roleFilter);
-                }
-              }}
-              className="bg-card p-6 rounded-3xl shadow-sm border border-subtle flex items-center justify-between hover:shadow-lg transition-all duration-300 group hover:-translate-y-1 relative overflow-hidden cursor-pointer"
-            >
-              <div className="space-y-1.5 relative z-10">
-                <p className="text-xs text-muted font-extrabold tracking-wide block">{stat.label}</p>
-                <p className="text-2xl font-black text-primary font-mono tracking-tight group-hover:text-emerald-600 transition-colors">{stat.value}</p>
-              </div>
-              <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center transition-all duration-300 shadow-md relative z-10`}>
-                <stat.icon className="w-5.5 h-5.5 text-white" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Stuck Orders Alert Widget */}
-      {layoutSettings.stuckOrders && stuckOrders.length > 0 && (
-        <div className="bg-card rounded-3xl p-6 shadow-sm border border-subtle">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-            <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-              <AlertTriangle className="w-6 h-6 text-amber-500" />
-              <span>سفارشات نیازمند پیگیری و لیبل پستی ({stuckOrders.length})</span>
-            </h3>
-            {onNavigateTab && (
-              <button
-                onClick={() => onNavigateTab("orders")}
-                className="text-xs font-extrabold text-primary-default hover:text-primary-hover flex items-center gap-1.5 bg-primary-default/10 px-3.5 py-2 rounded-xl border border-primary-default/20 transition-all cursor-pointer"
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {statCards.map((stat, i) => {
+            // Convert any Latin digits to Persian digits for stat.value
+            const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+            const formattedValue = String(stat.value).replace(/[0-9]/g, (w) => persianDigits[parseInt(w)]);
+            return (
+              <div
+                key={i}
+                onClick={() => {
+                  if (onNavigateTab && stat.tab) {
+                    onNavigateTab(stat.tab, stat.roleFilter);
+                  }
+                }}
+                className="bg-card p-5 rounded-2xl border border-border shadow-xs hover:border-primary-default/40 hover:shadow-sm transition-all duration-200 group cursor-pointer flex items-center justify-between"
               >
-                <span>مشاهده تمام سفارشات پلتفرم</span>
-                <ArrowRight className="w-4 h-4 rotate-180" />
-              </button>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-surface text-secondary">
-                <tr>
-                  <th className="p-3 font-bold rounded-r-xl">شماره سفارش</th>
-                  <th className="p-3 font-bold">فروشگاه</th>
-                  <th className="p-3 font-bold">تامین‌کننده</th>
-                  <th className="p-3 font-bold">تماس</th>
-                  <th className="p-3 font-bold">وضعیت فعلی</th>
-                  <th className="p-3 font-bold rounded-l-xl">مدت زمان در انتظار</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-subtle">
-                {stuckOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-surface/50 cursor-pointer transition-colors" onClick={() => setSelectedOrderModal(order)}>
-                    <td className="p-3 font-mono font-bold text-primary">{order.orderNumber}</td>
-                    <td className="p-3 font-medium">{order.storeName}</td>
-                    <td className="p-3 font-medium">{order.supplierName}</td>
-                    <td className="p-3 font-mono text-xs dir-ltr text-right">{order.supplierPhone}</td>
-                    <td className="p-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold ${order.statusBg}`}>{order.statusTitle || "در انتظار تایید"}</span></td>
-                    <td className="p-3 font-bold text-rose-600">{order.delay}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-text-muted font-bold block">{stat.label}</p>
+                  <p className="text-xl md:text-2xl font-black text-text-primary font-sans tracking-tight group-hover:text-primary-default transition-colors">
+                    {formattedValue}
+                  </p>
+                </div>
+                <div className={`w-11 h-11 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+                  <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Pending Invoices & Settlements Section */}
-      {layoutSettings.pendingActions && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Pending Invoices */}
-          <div className="bg-card rounded-3xl p-6 shadow-sm border border-subtle flex flex-col justify-between">
+      {/* Prominent Orders Section */}
+      {layoutSettings.stuckOrders && (
+        <div className="bg-card rounded-3xl p-6 shadow-md border border-border space-y-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-3 border-b border-border">
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-emerald-600" />
-                  پیش‌فاکتورها و فیش‌های در انتظار تایید
-                </h3>
-                <span className="text-xs font-bold text-muted bg-surface px-3 py-1 rounded-full">
-                  {pendingInvoices.length} مورد
+              <h3 className="text-base font-black text-text-primary flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-blue-600" />
+                <span>سفارشات جدید و درخواست‌های ثبت‌شده اخیر</span>
+                <span className="bg-blue-500/10 text-blue-600 px-2.5 py-0.5 rounded-full text-xs font-bold border border-blue-500/20">
+                  {stuckOrders.length} سفارش نیازمند اقدام
                 </span>
-              </div>
-              {pendingInvoices.length === 0 ? (
-                <p className="text-center text-muted font-bold py-8">هیچ فیشی در انتظار تایید نیست.</p>
-              ) : (
-                <div className="space-y-3">
-                  {pendingInvoices.slice(0, 3).map((inv) => (
-                    <div key={inv.id} className="p-4 bg-surface rounded-2xl border border-subtle flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-primary text-sm">{inv.storeManager?.storeName || 'فروشگاه'}</p>
-                        <p className="text-xs font-mono text-emerald-600 font-bold mt-0.5">
-                          {inv.amount ? inv.amount.toLocaleString() : 0} تومان
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleInvoiceAction(inv.id, "approve")}
-                          className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors"
-                        >
-                          تایید
-                        </button>
-                        <button
-                          onClick={() => handleInvoiceAction(inv.id, "reject")}
-                          className="px-3 py-1.5 bg-rose-500/10 text-rose-600 text-xs font-bold rounded-xl hover:bg-rose-500/20 transition-colors"
-                        >
-                          رد
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              </h3>
+              <p className="text-xs text-text-muted mt-1">
+                پایش مستقیم جدیدترین درخواست‌های سفارش و برچسب‌های پستی آماده چاپ
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: "ALL", label: "همه موارد" },
+                { id: "PENDING_LABEL", label: "نیازمند لیبل" },
+                { id: "PENDING_PAYMENT", label: "در انتظار پرداخت" },
+                { id: "PAID", label: "پرداخت شده" },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setOrderFilter(f.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    orderFilter === f.id
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-surface hover:bg-surface-hover text-text-secondary border border-subtle"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+
+              {onNavigateTab && (
+                <button
+                  onClick={() => onNavigateTab("orders")}
+                  className="text-xs font-bold text-primary-default hover:text-primary-hover flex items-center gap-1 bg-primary-default/10 px-3 py-1.5 rounded-xl border border-primary-default/20 transition-all cursor-pointer mr-auto md:mr-2"
+                >
+                  <span>جدول جامع سفارشات</span>
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                </button>
               )}
             </div>
-            <button
-              onClick={() => onNavigateTab && onNavigateTab("manual-invoices")}
-              className="mt-4 w-full py-2.5 bg-surface hover:bg-subtle text-primary rounded-xl font-bold text-xs transition-colors text-center"
-            >
-              مشاهده تمامی فیش‌ها
-            </button>
           </div>
 
-          {/* Pending Settlements */}
-          <div className="bg-card rounded-3xl p-6 shadow-sm border border-subtle flex flex-col justify-between">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-right">
+              <thead className="bg-surface text-text-secondary">
+                <tr>
+                  <th className="p-3 font-bold rounded-r-xl">شماره سفارش</th>
+                  <th className="p-3 font-bold">فروشگاه خریدار</th>
+                  <th className="p-3 font-bold">تامین‌کننده</th>
+                  <th className="p-3 font-bold">مبلغ کل</th>
+                  <th className="p-3 font-bold">وضعیت سفارش</th>
+                  <th className="p-3 font-bold">زمان در انتظار</th>
+                  <th className="p-3 font-bold text-center rounded-l-xl">اقدام سریع</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {stuckOrders
+                  .filter((order) => {
+                    if (orderFilter === "PENDING_LABEL") return order.status === "PENDING_POSTAL_LABEL";
+                    if (orderFilter === "PENDING_PAYMENT") return order.status === "PENDING_PAYMENT" || order.status === "WAITING_FOR_PAYMENT";
+                    if (orderFilter === "PAID") return order.status === "PAID";
+                    return true;
+                  })
+                  .slice(0, 6)
+                  .map((order) => (
+                    <tr
+                      key={order.id}
+                      className="hover:bg-surface/80 transition-colors group"
+                    >
+                      <td className="p-3 font-mono font-black text-text-primary">
+                        {order.orderNumber}
+                      </td>
+                      <td className="p-3 font-bold text-text-primary">{order.storeName}</td>
+                      <td className="p-3 font-medium text-text-secondary">
+                        {order.supplierName}
+                        <span className="block text-[10px] text-text-muted font-mono dir-ltr text-right">{order.supplierPhone}</span>
+                      </td>
+                      <td className="p-3 font-mono font-black text-emerald-600">
+                        {order.totalAmount ? `${parseInt(order.totalAmount).toLocaleString("fa-IR")} تومان` : "نامشخص"}
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-block ${order.statusBg}`}>
+                          {order.statusTitle || "در انتظار تایید"}
+                        </span>
+                      </td>
+                      <td className="p-3 font-bold text-amber-600">{order.delay}</td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => setSelectedOrderModal(order)}
+                          className="px-3 py-1.5 bg-primary-default hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                        >
+                          جزئیات و اقدام
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+            {stuckOrders.length === 0 && (
+              <div className="text-center py-8 text-text-muted font-bold text-xs">
+                هیچ سفارشی در این وضعیت وجود ندارد.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Prominent Invoices & Settlements Section */}
+      {layoutSettings.pendingActions && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Pending Invoices Card */}
+          <div className="bg-card rounded-3xl p-6 shadow-md border border-border flex flex-col justify-between space-y-4">
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-                  <Wallet className="w-5 h-5 text-emerald-600" />
-                  درخواست‌های تسویه‌حساب تامین‌کنندگان
-                </h3>
-                <span className="text-xs font-bold text-muted bg-surface px-3 py-1 rounded-full">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div>
+                  <h3 className="text-base font-black text-text-primary flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-emerald-600" />
+                    <span>پیش‌فاکتورها و فیش‌های در انتظار تایید</span>
+                  </h3>
+                  <p className="text-xs text-text-muted mt-0.5">درخواست‌های واریز فیش و صدور پیش‌فاکتور</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                    {pendingInvoices.length} فیش معوق
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                {pendingInvoices.length === 0 ? (
+                  <div className="text-center py-8 space-y-2">
+                    <p className="text-text-muted text-xs font-bold">هیچ فیشی در انتظار تایید نیست.</p>
+                    <button
+                      onClick={() => setShowProformaModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors cursor-pointer"
+                    >
+                      <DollarSign className="w-4 h-4" />
+                      صدور پیش‌فاکتور جدید برای فروشگاه
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingInvoices.slice(0, 4).map((inv) => (
+                      <div
+                        key={inv.id}
+                        className="p-4 bg-surface rounded-2xl border border-border hover:border-emerald-500/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-text-primary text-xs">
+                              {inv.storeManager?.storeName || inv.storeManager?.username || 'فروشگاه نامشخص'}
+                            </span>
+                            <span className="text-[10px] font-mono text-text-muted bg-background px-2 py-0.5 rounded-md border border-subtle">
+                              کد: #{inv.id}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-black">
+                              {inv.amount ? parseInt(inv.amount).toLocaleString("fa-IR") : 0} تومان
+                            </span>
+                            {inv.receiptImage && (
+                              <button
+                                onClick={() => setSelectedReceiptImage(inv.receiptImage)}
+                                className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                              >
+                                🖼️ تصویر فیش
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                          <button
+                            onClick={() => handleInvoiceAction(inv.id, "approve")}
+                            disabled={actioningId === `invoice-${inv.id}`}
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs"
+                          >
+                            تایید فیش
+                          </button>
+                          <button
+                            onClick={() => handleInvoiceAction(inv.id, "reject")}
+                            disabled={actioningId === `invoice-${inv.id}`}
+                            className="px-3.5 py-1.5 bg-rose-500/10 text-rose-600 text-xs font-bold rounded-xl hover:bg-rose-500/20 transition-all cursor-pointer"
+                          >
+                            رد فیش
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
+              <button
+                onClick={() => setShowProformaModal(true)}
+                className="px-4 py-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-xl font-bold text-xs hover:bg-emerald-500/20 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <DollarSign className="w-4 h-4" />
+                صدور پیش‌فاکتور جدید
+              </button>
+              <button
+                onClick={() => onNavigateTab && onNavigateTab("manual-invoices")}
+                className="px-4 py-2 bg-surface hover:bg-surface-hover border border-border text-text-primary rounded-xl font-bold text-xs transition-colors cursor-pointer"
+              >
+                مشاهده تمامی فیش‌ها
+              </button>
+            </div>
+          </div>
+
+          {/* Pending Settlements Card */}
+          <div className="bg-card rounded-3xl p-6 shadow-md border border-border flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div>
+                  <h3 className="text-base font-black text-text-primary flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-purple-600" />
+                    <span>درخواست‌های تسویه‌حساب تامین‌کنندگان</span>
+                  </h3>
+                  <p className="text-xs text-text-muted mt-0.5">درخواست‌های واریز وجه و تسویه‌حساب کیف‌پول</p>
+                </div>
+                <span className="text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
                   {pendingSettlements.length} درخواست
                 </span>
               </div>
-              {pendingSettlements.length === 0 ? (
-                <p className="text-center text-muted font-bold py-8">درخواست تسویه معوقه‌ای وجود ندارد.</p>
-              ) : (
-                <div className="space-y-3">
-                  {pendingSettlements.slice(0, 3).map((st) => (
-                    <div key={st.id} className="p-4 bg-surface rounded-2xl border border-subtle flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-primary text-sm">{st.user?.firstName} {st.user?.lastName}</p>
-                        <p className="text-xs font-mono text-emerald-600 font-bold mt-0.5">
-                          {st.amount ? st.amount.toLocaleString() : 0} تومان
-                        </p>
+
+              <div className="mt-4">
+                {pendingSettlements.length === 0 ? (
+                  <p className="text-center text-text-muted text-xs font-bold py-8">درخواست تسویه معوقه‌ای وجود ندارد.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingSettlements.slice(0, 4).map((st) => (
+                      <div
+                        key={st.id}
+                        className="p-4 bg-surface rounded-2xl border border-border flex items-center justify-between gap-3"
+                      >
+                        <div>
+                          <p className="font-bold text-text-primary text-xs">
+                            {st.user?.firstName} {st.user?.lastName} ({st.user?.brandName || 'تامین‌کننده'})
+                          </p>
+                          <p className="text-xs font-mono text-purple-600 dark:text-purple-400 font-black mt-0.5">
+                            {st.amount ? parseInt(st.amount).toLocaleString("fa-IR") : 0} تومان
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleSettlementAction(st.id, "approve")}
+                            disabled={actioningId === `settlement-${st.id}`}
+                            className="px-3.5 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors cursor-pointer shadow-xs"
+                          >
+                            تایید و واریز شد
+                          </button>
+                          <button
+                            onClick={() => handleSettlementAction(st.id, "reject")}
+                            disabled={actioningId === `settlement-${st.id}`}
+                            className="px-3.5 py-1.5 bg-rose-500/10 text-rose-600 text-xs font-bold rounded-xl hover:bg-rose-500/20 transition-colors cursor-pointer"
+                          >
+                            رد
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleSettlementAction(st.id, "approve")}
-                          className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors"
-                        >
-                          واریز شد
-                        </button>
-                        <button
-                          onClick={() => handleSettlementAction(st.id, "reject")}
-                          className="px-3 py-1.5 bg-rose-500/10 text-rose-600 text-xs font-bold rounded-xl hover:bg-rose-500/20 transition-colors"
-                        >
-                          رد
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <button
-              onClick={() => onNavigateTab && onNavigateTab("settlements")}
-              className="mt-4 w-full py-2.5 bg-surface hover:bg-subtle text-primary rounded-xl font-bold text-xs transition-colors text-center"
-            >
-              مشاهده تمامی تسویه‌ها
-            </button>
+
+            <div className="pt-3 border-t border-border flex items-center justify-end">
+              <button
+                onClick={() => onNavigateTab && onNavigateTab("settlements")}
+                className="w-full py-2 bg-surface hover:bg-surface-hover border border-border text-text-primary rounded-xl font-bold text-xs transition-colors text-center cursor-pointer"
+              >
+                مشاهده تمامی درخواست‌های تسویه
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -659,37 +815,51 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
       {/* Analytics Charts */}
       {layoutSettings.analytics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-card rounded-3xl p-6 shadow-sm border border-subtle">
-            <h3 className="text-lg font-bold text-primary mb-4">روند درآمد ماهانه پلتفرم</h3>
+          <div className="bg-card rounded-3xl p-6 shadow-xs border border-border">
+            <h3 className="text-sm font-bold text-text-primary mb-4">روند درآمد ماهانه پلتفرم</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueData}>
                   <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#7C3AED" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                  <XAxis dataKey="name" stroke="#888" fontSize={12} />
-                  <YAxis stroke="#888" fontSize={12} />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="درآمد" stroke="#10B981" fillOpacity={1} fill="url(#colorRev)" strokeWidth={3} />
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                  <XAxis dataKey="name" stroke="#64748B" fontSize={11} />
+                  <YAxis stroke="#64748B" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--card)",
+                      borderColor: "var(--border)",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Area type="monotone" dataKey="درآمد" stroke="#7C3AED" fillOpacity={1} fill="url(#colorRev)" strokeWidth={2.5} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="bg-card rounded-3xl p-6 shadow-sm border border-subtle">
-            <h3 className="text-lg font-bold text-primary mb-4">تعداد سفارشات روزانه هفته</h3>
+          <div className="bg-card rounded-3xl p-6 shadow-xs border border-border">
+            <h3 className="text-sm font-bold text-text-primary mb-4">تعداد سفارشات روزانه هفته</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={salesData}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                  <XAxis dataKey="name" stroke="#888" fontSize={12} />
-                  <YAxis stroke="#888" fontSize={12} />
-                  <Tooltip />
-                  <Bar dataKey="سفارشات" fill="#0242A6" radius={[8, 8, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                  <XAxis dataKey="name" stroke="#64748B" fontSize={11} />
+                  <YAxis stroke="#64748B" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--card)",
+                      borderColor: "var(--border)",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Bar dataKey="سفارشات" fill="#7C3AED" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -699,20 +869,20 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
 
       {/* Customize Dashboard Modal */}
       {showCustomizeModal && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-card w-full max-w-md rounded-3xl border border-subtle shadow-2xl overflow-hidden p-6 space-y-6 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-subtle pb-4">
-              <h3 className="text-lg font-black text-primary flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-emerald-600" />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-card w-full max-w-md rounded-3xl border border-border shadow-xl overflow-hidden p-6 space-y-6 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <h3 className="text-base font-black text-text-primary flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-primary-default" />
                 شخصی‌سازی چیدمان پیشخوان
               </h3>
-              <button onClick={() => setShowCustomizeModal(false)} className="p-2 text-muted hover:text-primary">
+              <button onClick={() => setShowCustomizeModal(false)} className="p-1.5 text-text-muted hover:text-text-primary rounded-lg transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-sm">
-              <p className="text-xs text-muted font-bold">بخش‌های مورد نظر را جهت نمایش روشن یا خاموش کنید:</p>
+            <div className="space-y-3 text-xs">
+              <p className="text-xs text-text-muted font-bold">بخش‌های مورد نظر را جهت نمایش روشن یا خاموش کنید:</p>
 
               {[
                 { key: "operational", label: "بخش فوریت‌های عملیاتی (تیکت، تسویه، سفارش)" },
@@ -723,9 +893,9 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
               ].map((item) => (
                 <label
                   key={item.key}
-                  className="flex items-center justify-between p-3 bg-surface hover:bg-subtle rounded-2xl cursor-pointer border border-subtle transition-colors"
+                  className="flex items-center justify-between p-3 bg-surface hover:bg-surface-hover rounded-xl cursor-pointer border border-border transition-colors"
                 >
-                  <span className="font-bold text-primary">{item.label}</span>
+                  <span className="font-bold text-text-primary">{item.label}</span>
                   <input
                     type="checkbox"
                     checked={(layoutSettings as any)[item.key]}
@@ -735,7 +905,7 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
                         [item.key]: e.target.checked,
                       })
                     }
-                    className="w-5 h-5 text-emerald-600 rounded border-subtle focus:ring-emerald-500"
+                    className="w-4 h-4 text-primary-default rounded border-border focus:ring-primary-default cursor-pointer"
                   />
                 </label>
               ))}
@@ -744,7 +914,7 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setShowCustomizeModal(false)}
-                className="w-full py-2.5 bg-primary-default text-white font-bold rounded-xl text-xs"
+                className="w-full py-2.5 bg-primary-default hover:bg-primary-hover text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition-all"
               >
                 ذخیره و بکارگیری
               </button>
@@ -752,33 +922,34 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
           </div>
         </div>
       )}
+
       {/* Order Details Quick Modal */}
       {selectedOrderModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn"
           onClick={() => setSelectedOrderModal(null)}
         >
           <div
-            className="bg-card w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border border-subtle p-6 text-right relative max-h-[90vh] overflow-y-auto"
+            className="bg-card w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border border-border p-6 text-right relative max-h-[90vh] overflow-y-auto space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-subtle pb-4 mb-4">
+            <div className="flex items-center justify-between border-b border-border pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2.5 bg-primary-default/10 text-primary-default rounded-xl">
                   <Package className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-primary">
+                  <h3 className="text-base font-black text-text-primary">
                     جزئیات سریع سفارش #{selectedOrderModal.id || selectedOrderModal.orderNumber}
                   </h3>
-                  <p className="text-[11px] text-muted font-mono mt-0.5">
+                  <p className="text-[11px] text-text-muted font-mono mt-0.5">
                     تاریخ: {selectedOrderModal.createdAt ? new Date(selectedOrderModal.createdAt).toLocaleDateString("fa-IR") : "نامشخص"}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedOrderModal(null)}
-                className="p-1.5 text-muted hover:bg-surface rounded-full transition-colors cursor-pointer"
+                className="p-1.5 text-text-muted hover:bg-surface rounded-full transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -786,20 +957,20 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
 
             <div className="space-y-4 text-xs">
               {/* Status and Payment Row */}
-              <div className="flex items-center justify-between p-3 bg-surface rounded-2xl border border-subtle">
+              <div className="flex items-center justify-between p-3 bg-surface rounded-2xl border border-border">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-secondary">وضعیت سفارش:</span>
-                  <span className={`px-2.5 py-1 rounded-full font-bold ${selectedOrderModal.statusBg || 'bg-amber-500/10 text-amber-600'}`}>
+                  <span className="font-bold text-text-secondary">وضعیت سفارش:</span>
+                  <span className={`px-2.5 py-1 rounded-full font-bold text-[11px] ${selectedOrderModal.statusBg || 'bg-amber-500/10 text-amber-600'}`}>
                     {selectedOrderModal.statusTitle || selectedOrderModal.status}
                   </span>
                 </div>
                 <div>
                   {selectedOrderModal.status === "PAID" || selectedOrderModal.status === "PROCESSING" || selectedOrderModal.status === "SHIPPED" || selectedOrderModal.status === "COMPLETED" ? (
-                    <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full font-extrabold text-[11px]">
+                    <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 rounded-full font-bold text-[11px]">
                       🟢 پرداخت شده
                     </span>
                   ) : (
-                    <span className="px-2.5 py-1 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-full font-extrabold text-[11px]">
+                    <span className="px-2.5 py-1 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-full font-bold text-[11px]">
                       🔴 پرداخت نشده
                     </span>
                   )}
@@ -807,28 +978,28 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
               </div>
 
               {/* Logistics & Recipient info */}
-              <div className="p-3.5 bg-indigo-500/5 rounded-2xl border border-indigo-500/20 space-y-2">
-                <h4 className="font-bold text-indigo-600 flex items-center gap-1">
-                  <Truck className="w-4 h-4" /> اطلاعات تحویل‌گیرنده و آدرس ارسال:
+              <div className="p-3.5 bg-surface rounded-2xl border border-border space-y-2">
+                <h4 className="font-bold text-text-primary flex items-center gap-1">
+                  <Truck className="w-4 h-4 text-primary-default" /> اطلاعات تحویل‌گیرنده و آدرس ارسال:
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-primary pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-text-primary pt-1">
                   <div>
-                    <span className="text-muted block text-[10px]">تحویل‌گیرنده / فروشگاه:</span>
+                    <span className="text-text-muted block text-[10px]">تحویل‌گیرنده / فروشگاه:</span>
                     <span className="font-bold">{selectedOrderModal.storeName}</span>
                   </div>
                   <div>
-                    <span className="text-muted block text-[10px]">شماره تماس:</span>
+                    <span className="text-text-muted block text-[10px]">شماره تماس:</span>
                     <span className="font-mono font-bold dir-ltr text-right">{selectedOrderModal.supplierPhone}</span>
                   </div>
                   <div className="md:col-span-2">
-                    <span className="text-muted block text-[10px]">نشانی پستی کامل:</span>
-                    <span className="font-bold leading-relaxed text-secondary block mt-0.5">
+                    <span className="text-text-muted block text-[10px]">نشانی پستی کامل:</span>
+                    <span className="font-bold leading-relaxed text-text-secondary block mt-0.5">
                       {selectedOrderModal.shippingAddress || selectedOrderModal.customerAddress || selectedOrderModal.store?.address || "نشانی ثبت نشده است"}
                     </span>
                   </div>
                   {(selectedOrderModal.postalCode || selectedOrderModal.store?.postalCode) && (
                     <div>
-                      <span className="text-muted block text-[10px]">کد پستی ۱۰ رقمی:</span>
+                      <span className="text-text-muted block text-[10px]">کد پستی ۱۰ رقمی:</span>
                       <span className="font-mono font-bold">{selectedOrderModal.postalCode || selectedOrderModal.store?.postalCode}</span>
                     </div>
                   )}
@@ -836,10 +1007,10 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
               </div>
 
               {/* Total & Action */}
-              <div className="flex items-center justify-between p-3 bg-surface rounded-2xl border border-subtle">
+              <div className="flex items-center justify-between p-3 bg-surface rounded-2xl border border-border">
                 <div>
-                  <span className="text-muted block text-[10px]">مبلغ کل سفارش:</span>
-                  <span className="font-mono font-black text-primary text-sm">
+                  <span className="text-text-muted block text-[10px]">مبلغ کل سفارش:</span>
+                  <span className="font-mono font-black text-text-primary text-sm">
                     {selectedOrderModal.totalAmount ? `${selectedOrderModal.totalAmount.toLocaleString()} تومان` : "۰ تومان"}
                   </span>
                 </div>
@@ -849,12 +1020,124 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
                       setSelectedOrderModal(null);
                       onNavigateTab("orders");
                     }}
-                    className="px-3.5 py-2 bg-primary-default hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    className="px-3.5 py-2 bg-primary-default hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
                   >
                     مدیریت کامل این سفارش در جدول سفارشات
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proforma Creation Modal */}
+      {showProformaModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-card w-full max-w-lg rounded-3xl border border-border shadow-2xl overflow-hidden p-6 space-y-5 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <h3 className="text-base font-black text-text-primary flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+                صدور پیش‌فاکتور جدید برای فروشگاه
+              </h3>
+              <button onClick={() => setShowProformaModal(false)} className="p-1.5 text-text-muted hover:text-text-primary rounded-lg transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {formSuccess && (
+              <div className="p-3 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl text-xs font-bold">
+                {formSuccess}
+              </div>
+            )}
+            {formError && (
+              <div className="p-3 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-xl text-xs font-bold">
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateProforma} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-text-secondary font-bold mb-1.5">انتخاب فروشگاه خریدار:</label>
+                <select
+                  value={selectedStore}
+                  onChange={(e) => setSelectedStore(e.target.value)}
+                  className="w-full bg-surface border border-border rounded-xl p-3 text-text-primary font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  required
+                >
+                  <option value="">-- انتخاب کنید --</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.storeName || s.username} ({s.mobile || 'بدون موبایل'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-text-secondary font-bold mb-1.5">مبلغ پیش‌فاکتور (تومان):</label>
+                <input
+                  type="number"
+                  value={invoiceAmount}
+                  onChange={(e) => setInvoiceAmount(e.target.value)}
+                  placeholder="مثال: ۲۵۰۰۰۰۰"
+                  className="w-full bg-surface border border-border rounded-xl p-3 text-text-primary font-mono font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-text-secondary font-bold mb-1.5">توضیحات / بابت:</label>
+                <textarea
+                  value={invoiceNotes}
+                  onChange={(e) => setInvoiceNotes(e.target.value)}
+                  placeholder="توضیحات و مشخصات اقلام پیش‌فاکتور..."
+                  rows={3}
+                  className="w-full bg-surface border border-border rounded-xl p-3 text-text-primary font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowProformaModal(false)}
+                  className="px-4 py-2.5 bg-surface hover:bg-surface-hover text-text-primary rounded-xl font-bold cursor-pointer transition-colors"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  disabled={formSubmitting}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold cursor-pointer transition-all shadow-sm"
+                >
+                  {formSubmitting ? "در حال ثبت..." : "ثبت و صدور پیش‌فاکتور"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Image Modal */}
+      {selectedReceiptImage && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card w-full max-w-2xl rounded-3xl border border-border shadow-2xl overflow-hidden p-6 space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-black text-text-primary">تصویر فیش واریزی</h3>
+              <button onClick={() => setSelectedReceiptImage(null)} className="p-1.5 text-text-muted hover:text-text-primary rounded-lg transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-2 bg-surface rounded-2xl border border-border flex items-center justify-center max-h-[70vh] overflow-auto">
+              <img src={selectedReceiptImage} alt="تصویر فیش" className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-md" />
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setSelectedReceiptImage(null)}
+                className="px-5 py-2 bg-primary-default text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                بستن
+              </button>
             </div>
           </div>
         </div>

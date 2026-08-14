@@ -9,84 +9,84 @@ export class ZibalService implements PaymentGateway {
   constructor(merchantId?: string) {
     this.zibalMerchant = (merchantId && merchantId !== 'zibal' && merchantId !== 'zibal_merchant_key') 
       ? merchantId 
-      : (process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
+      : (process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
   }
   
   /**
-   * Request a new payment from Zibal
+   * Request a new payment from Zibal (direct or via Proxy)
    */
   async createPayment(amount: number | string, description: string, callbackUrl: string): Promise<{ payLink: string; authority: string }> {
     try {
-      if (this.zibalMerchant === 'zibal' || process.env.NODE_ENV !== 'production') {
-        // Try calling real zibal with 3s timeout first, if fails or merchant is sandbox, return simulated gateway link
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        try {
-          const response = await fetch(`${ZIBAL_GATEWAY_URL}/request`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({
-              merchant: this.zibalMerchant,
-              amount: Number(amount),
-              callbackUrl,
-              description,
-            }),
-          });
-          clearTimeout(timeoutId);
-          const data = await response.json();
-          if (Number(data.result) === 100 && data.trackId) {
-            return {
-              payLink: `https://gateway.zibal.ir/start/${data.trackId}`,
-              authority: data.trackId.toString(),
-            };
-          }
-        } catch (e) {
-          clearTimeout(timeoutId);
+      const proxyUrl = process.env.PAYMENT_PROXY_URL;
+      const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY;
+
+      // 1. If Proxy settings are configured, route request through the Proxy server
+      if (proxyUrl && proxySecret) {
+        const endpoint = proxyUrl.endsWith('/request') ? proxyUrl : `${proxyUrl.replace(/\/$/, '')}/request`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': proxySecret,
+          },
+          body: JSON.stringify({
+            merchant: this.zibalMerchant,
+            amount: Number(amount),
+            callbackUrl,
+            description,
+          }),
+        });
+
+        const data = await response.json();
+        if ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId)) {
+          return {
+            payLink: data.payLink || `https://gateway.zibal.ir/start/${data.trackId}`,
+            authority: (data.trackId || data.authority)?.toString(),
+          };
+        } else {
+          console.error('Zibal Proxy Payment Error:', data);
         }
-        
-        // Fallback simulated gateway
-        const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-        const simulatedPayLink = `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`;
-        return {
-          payLink: simulatedPayLink,
-          authority: trackId,
-        };
       }
 
-      const response = await fetch(`${ZIBAL_GATEWAY_URL}/request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchant: this.zibalMerchant,
-          amount: Number(amount),
-          callbackUrl,
-          description,
-        }),
-      });
+      // 2. Direct Zibal gateway call if no proxy or proxy fallback
+      if (this.zibalMerchant && this.zibalMerchant !== 'zibal' && this.zibalMerchant !== 'zibal_merchant_key') {
+        const response = await fetch(`${ZIBAL_GATEWAY_URL}/request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchant: this.zibalMerchant,
+            amount: Number(amount),
+            callbackUrl,
+            description,
+          }),
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (Number(data.result) === 100 && data.trackId) {
-        return {
-          payLink: `https://gateway.zibal.ir/start/${data.trackId}`,
-          authority: data.trackId.toString(),
-        };
-      } else {
-        if (this.zibalMerchant !== 'zibal' && process.env.NODE_ENV === 'production') {
-          throw new Error(`Zibal Payment Failed: ${data.message || data.result}`);
+        if (Number(data.result) === 100 && data.trackId) {
+          return {
+            payLink: `https://gateway.zibal.ir/start/${data.trackId}`,
+            authority: data.trackId.toString(),
+          };
+        } else {
+          console.error('Zibal API error response:', data);
+          // Fallback to simulated gateway only if API returns error
+          const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+          return {
+            payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
+            authority: trackId,
+          };
         }
-        const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-        return {
-          payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
-          authority: trackId,
-        };
       }
+
+      // Fallback for test/sandbox mode
+      const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      return {
+        payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
+        authority: trackId,
+      };
     } catch (error: any) {
-      console.error('Zibal createPayment error, using fallback:', error);
-      if (this.zibalMerchant !== 'zibal' && process.env.NODE_ENV === 'production') {
-        throw error;
-      }
+      console.error('Zibal createPayment error:', error);
       const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       return {
         payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
@@ -96,7 +96,7 @@ export class ZibalService implements PaymentGateway {
   }
 
   /**
-   * Verify an existing payment with Zibal
+   * Verify an existing payment with Zibal (direct or via Proxy)
    */
   async verifyPayment(authority: string, amount: number | string): Promise<{ success: boolean; trackId: string; refId: string }> {
     try {
@@ -108,6 +108,37 @@ export class ZibalService implements PaymentGateway {
         };
       }
 
+      const proxyUrl = process.env.PAYMENT_PROXY_URL;
+      const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY;
+
+      // 1. Verify via Payment Proxy if configured
+      if (proxyUrl && proxySecret) {
+        const endpoint = proxyUrl.endsWith('/verify') ? proxyUrl : `${proxyUrl.replace(/\/$/, '')}/verify`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': proxySecret,
+          },
+          body: JSON.stringify({
+            merchant: this.zibalMerchant,
+            trackId: authority,
+            action: 'verify',
+          }),
+        });
+
+        const data = await response.json();
+        const resCode = Number(data.result);
+        if (data.success || resCode === 100 || resCode === 201) {
+          return {
+            success: true,
+            trackId: authority,
+            refId: data.refNumber?.toString() || data.refId?.toString() || authority,
+          };
+        }
+      }
+
+      // 2. Direct Zibal verify call
       const response = await fetch(`${ZIBAL_GATEWAY_URL}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,14 +159,6 @@ export class ZibalService implements PaymentGateway {
           refId: data.refNumber?.toString() || data.refId?.toString() || authority,
         };
       } else {
-        // Fallback for simulated authority
-        if (authority.startsWith('ZIBAL_') || this.zibalMerchant === 'zibal') {
-          return {
-            success: true,
-            trackId: authority,
-            refId: `REF_${authority}`,
-          };
-        }
         return { success: false, trackId: authority, refId: '' };
       }
     } catch (error: any) {

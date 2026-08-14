@@ -34,6 +34,7 @@ interface SettlementRequest {
   trackId: string | null;
   supplierMobile?: string;
   supplierEmail?: string;
+  role?: string;
 }
 export default function SettlementsList() {
   const [requests, setRequests] = useState<SettlementRequest[]>([]);

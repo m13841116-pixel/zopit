@@ -22,12 +22,14 @@ import {
   Plus,
   Check,
   CreditCard,
-  ArrowRight
+  ArrowRight,
+  Image as ImageIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "./GlobalToast";
 import { useCart } from "./CartContext";
 import { PROVINCES } from "../data/provinces";
+import { getValidProductImageUrl } from "../utils/productUtils";
 
 export default function Explore({ onBack }: { onBack?: () => void } = {}) {
   const [products, setProducts] = useState<any[]>([]);
@@ -530,20 +532,26 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
                     : "col-span-1 row-span-1 h-[140px] md:h-[220px]"
                 }`}
               >
-                {p.imageUrl || p.images?.[0]?.url ? (
-                  <img 
-                    src={p.imageUrl || p.images?.[0]?.url} 
-                    alt={p.name} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                    loading="lazy" 
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=500&auto=format&fit=crop&q=60";
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs font-semibold">بدون تصویر</div>
-                )}
+                {(() => {
+                  const img = getValidProductImageUrl(p);
+                  if (img) {
+                    return (
+                      <img 
+                        src={img} 
+                        alt={p.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                        loading="lazy" 
+                        referrerPolicy="no-referrer"
+                      />
+                    );
+                  }
+                  return (
+                    <div className="w-full h-full bg-zinc-900 flex flex-col items-center justify-center gap-1 text-zinc-500 p-2 text-center">
+                      <ImageIcon className="w-8 h-8 opacity-40" />
+                      <span className="text-[11px] font-bold">بدون تصویر</span>
+                    </div>
+                  );
+                })()}
                 
                 {/* Clean hover overlay with a high contrast like icon */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
@@ -584,7 +592,7 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
             {/* Background decorative blur */}
             <div 
               className="absolute inset-0 bg-cover bg-center opacity-25 blur-3xl pointer-events-none" 
-              style={{ backgroundImage: `url(${current.imageUrl || current.images?.[0]?.url})` }}
+              style={{ backgroundImage: `url(${getValidProductImageUrl(current)})` }}
             ></div>
 
             {/* Close button - Top Right */}
@@ -667,18 +675,18 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
                         playsInline
                       />
                     </div>
-                  ) : current.imageUrl || current.images?.[0]?.url ? (
+                  ) : getValidProductImageUrl(current) ? (
                     <img 
-                      src={current.imageUrl || current.images?.[0]?.url} 
+                      src={getValidProductImageUrl(current)} 
                       alt={current.name} 
                       className="w-full h-full object-contain pointer-events-none" 
                       referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=500&auto=format&fit=crop&q=60";
-                      }}
                     />
                   ) : (
-                    <div className="text-zinc-600 text-sm font-black">بدون تصویر محصول</div>
+                    <div className="flex flex-col items-center justify-center gap-2 text-zinc-500">
+                      <ImageIcon className="w-16 h-16 opacity-30" />
+                      <span className="text-xs font-bold">تصویر محصول ثبت نشده است</span>
+                    </div>
                   )}
 
                   {/* Left Vertical Interaction Column */}
@@ -782,7 +790,7 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
                                   id: current.id,
                                   name: current.name,
                                   price: current.price,
-                                  imageUrl: current.images?.[0]?.url || current.imageUrl,
+                                  imageUrl: getValidProductImageUrl(current),
                                   supplierId: current.supplierId,
                                   supplierName: current.supplier?.companyName || current.supplier?.storeName,
                                   storeId: current.storeId,

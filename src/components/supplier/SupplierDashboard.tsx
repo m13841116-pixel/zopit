@@ -34,6 +34,7 @@ import {
   HelpCircle,
   Sliders,
   Bell,
+  BellRing,
   Megaphone,
   Activity,
   ShieldCheck,
@@ -119,6 +120,12 @@ import { SupplierTickets } from "./SupplierTickets";
 import { SupplierProfile } from "./SupplierProfile";
 import SupplierPerformancePanel from "./SupplierPerformancePanel";
 import {
+  isBrowserNotificationSupported,
+  getNotificationPermission,
+  requestBrowserNotificationPermission,
+  showBrowserNotification
+} from "../../utils/browserNotifications";
+import {
   AreaChart,
   Area,
   XAxis,
@@ -144,6 +151,85 @@ export function SupplierDashboard({
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [customMenu, setCustomMenu] = useState<any[]>([]);
+  
+  // Supplier Push Notification States
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [prevPendingIds, setPrevPendingIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (isBrowserNotificationSupported()) {
+      setPushPermission(getNotificationPermission());
+    } else {
+      setPushPermission("unsupported");
+    }
+  }, []);
+
+  const handleRequestPushPermission = async () => {
+    if (!isBrowserNotificationSupported()) {
+      if (showNotification) {
+        showNotification("مرورگر شما از اعلان‌های سیستمی پشتیبانی نمی‌کند.", "error");
+      }
+      return;
+    }
+    const perm = await requestBrowserNotificationPermission();
+    setPushPermission(perm);
+    if (perm === "granted") {
+      if (showNotification) {
+        showNotification("اعلان‌های مرورگر فعال شدند. در زمان ثبت سفارشات منتظر تایید مطلع خواهید شد.", "success");
+      }
+      showBrowserNotification({
+        title: "اعلان‌های تامین‌کننده زوپیت فعال شد! 🎉",
+        body: "سیستم اطلاع‌رسانی سفارشات جدید آماده به کار است.",
+        sound: false,
+      });
+    } else if (perm === "denied") {
+      if (showNotification) {
+        showNotification("دسترسی به اعلان‌ها توسط مرورگر رد شد. لطفاً از تنظیمات مرورگر دسترسی را آزاد کنید.", "error");
+      }
+    }
+  };
+
+  const checkNewSupplierOrders = async () => {
+    try {
+      const token = localStorage.getItem("token") || "";
+      const headers = { Authorization: `Bearer ${token}` };
+      const ordRes = await fetch("/api/supplier/orders", { credentials: "include", headers });
+      if (ordRes.ok) {
+        const orderData = await ordRes.json();
+        setOrders(orderData);
+        
+        const pendingItems = orderData.filter((o: any) => o.status === "REQUESTED" || o.status === "PENDING");
+        const pendingIds = pendingItems.map((o: any) => o.id);
+        
+        if (prevPendingIds.length > 0) {
+          const newIds = pendingIds.filter((id: number) => !prevPendingIds.includes(id));
+          if (newIds.length > 0) {
+            const newItem = pendingItems.find((o: any) => o.id === newIds[0]);
+            if (newItem) {
+              showBrowserNotification({
+                title: "سفارش جدید برای تایید شما 🛒",
+                body: `سفارش جدید به شماره ${newItem.orderId} منتظر تایید موجودی توسط شماست.`,
+                sound: false,
+              });
+              if (showNotification) {
+                showNotification(`سفارش جدید شماره ${newItem.orderId} برای تایید دریافت شد`, "success");
+              }
+            }
+          }
+        }
+        setPrevPendingIds(pendingIds);
+      }
+    } catch (err) {
+      console.error("Error checking new supplier orders:", err);
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkNewSupplierOrders();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [prevPendingIds]);
   const [walletInfo, setWalletInfo] = useState<any>({
     balance: 0,
     pendingBalance: 0,
@@ -337,6 +423,11 @@ export function SupplierDashboard({
       if (ordRes.ok) {
         const orderData = await ordRes.json();
         setOrders(orderData);
+        
+        // Initialize pending order item IDs so we don't spam notifications on initial load
+        const pendingItems = orderData.filter((o: any) => o.status === "REQUESTED" || o.status === "PENDING");
+        setPrevPendingIds(pendingItems.map((o: any) => o.id));
+
         const hasNewDirect = orderData.some((o: any) => o.order?.orderSource === "direct" && o.status === "PAID");
         if (hasNewDirect && showNotification) {
           showNotification("شما سفارش پرداخت‌شده و مستقیم جدید از زوپیت دارید!", "success");
@@ -599,9 +690,9 @@ export function SupplierDashboard({
     >
       
       {/* Sidebar */}
-      <aside className="w-64 shrink-0 bg-card border-l border-border-subtle text-text-primary flex flex-col h-full shadow-xl z-10">
+      <aside className="w-64 shrink-0 bg-card border-l border-border-subtle text-text-primary flex flex-col h-screen sticky top-0 shadow-xl z-20">
         
-        <div className="p-6 border-b border-border-subtle bg-surface/30">
+        <div className="p-6 border-b border-border-subtle bg-surface/30 shrink-0">
           <div className="mb-3">
             <ZopitLogo size="md" />
           </div>
@@ -612,7 +703,7 @@ export function SupplierDashboard({
             {user?.firstName} {user?.lastName} ({user?.brandName})
           </p>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto min-h-0">
           
           {getDynamicNavItems().map((item) => (
             <button
@@ -626,7 +717,7 @@ export function SupplierDashboard({
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t border-border-subtle space-y-4">
+        <div className="p-4 border-t border-border-subtle space-y-4 shrink-0 bg-card">
           
           <div className="bg-surface/50 p-4 rounded-xl text-center border border-border-default">
             
@@ -700,36 +791,129 @@ export function SupplierDashboard({
               {activeTab === "overview" && (
                 <div className="space-y-8 animate-fade-in">
                   
+                  {/* Supplier Order / Request Announcement Alert */}
+                  {orders.length > 0 && (
+                    <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-2 border-amber-500/40 p-5 rounded-3xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-md animate-pulse">
+                          <Bell className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-extrabold text-base text-primary flex items-center gap-2">
+                            <span>اطلاعیه ثبت درخواست جدید برای تامین‌کننده</span>
+                            <span className="bg-amber-500 text-white text-xs px-2.5 py-0.5 rounded-full font-bold">
+                              {orders.filter(o => o.status === "REQUESTED" || o.status === "PAID" || o.status === "PENDING").length} درخواست جدید
+                            </span>
+                          </h3>
+                          <p className="text-xs text-secondary mt-1 leading-relaxed">
+                            همکار گرامی، درخواست‌ها و سفارش‌های جدیدی از طرف فروشگاه‌ها و معرفی‌کنندگان زوپیت برای مجموعه شما ثبت شده است. جهت پردازش و ارسال، لیست سفارشات را بررسی نمایید.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                        {pushPermission !== "granted" && (
+                          <button
+                            type="button"
+                            onClick={handleRequestPushPermission}
+                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow cursor-pointer flex items-center gap-1.5"
+                          >
+                            <BellRing className="w-4 h-4 animate-bounce" />
+                            <span>فعال‌سازی اعلان مرورگر</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("orders")}
+                          className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow cursor-pointer flex items-center gap-1.5"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          <span>مشاهده و بررسی سفارشات</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Welcome Banner */}
-                  <div className="bg-gradient-to-l from-indigo-900 to-indigo-700 rounded-3xl p-8 text-inverse shadow-xl relative overflow-hidden">
-                    
+                  <div className="bg-gradient-to-r from-primary-default via-indigo-600 to-primary-hover rounded-3xl p-8 text-white shadow-lg relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
                     <div className="relative z-10">
-                      
-                      <h2 className="text-3xl font-bold mb-2">
+                      <h2 className="text-2xl md:text-3xl font-extrabold mb-2 text-white">
                         سلام، {user?.firstName || "همکار"} عزیز! 👋
                       </h2>
-                      <p className="text-indigo-100 max-w-lg mb-6">
+                      <p className="text-white/90 text-sm md:text-base max-w-lg mb-6 leading-relaxed">
                         به پنل تامین‌کنندگان خوش آمدید. در اینجا می‌توانید
                         محصولات خود را مدیریت کنید و وضعیت سفارشات و
                         تسویه‌حساب‌ها را پیگیری نمایید.
                       </p>
                       <button
                         onClick={() => setActiveTab("add-product")}
-                        className="bg-white text-indigo-950 hover:bg-indigo-50 px-6 py-2.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 cursor-pointer"
+                        className="bg-white text-primary-default hover:bg-slate-100 px-6 py-2.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 cursor-pointer"
                       >
-                        
                         افزودن محصول جدید
                       </button>
                     </div>
-                    {/* Decorative Elements */}
-                    <div className="absolute left-0 top-0 w-64 h-full opacity-20 pointer-events-none">
-                      
-                      <div className="absolute right-10 top-10 w-32 h-32 bg-card rounded-full mix-blend-overlay filter blur-3xl"></div>
-                      <div className="absolute left-10 bottom-10 w-40 h-40 bg-primary-default rounded-full mix-blend-overlay filter blur-3xl"></div>
-                    </div>
                   </div>
-                  {/* Latest Announcements Widget */}
-                  <LatestAnnouncementsWidget /> {/* Stats Grid */}
+
+                  {/* Highly Visible Label Printing Box for Supplier */}
+                  {(() => {
+                    const pendingLabelOrders = orders.filter(
+                      (o) => (o.status === "PENDING_POSTAL_LABEL" || o.order?.status === "PENDING_POSTAL_LABEL" || o.status === "PAID" || o.status === "PREPARING") && o.order?.postalLabel
+                    );
+                    if (pendingLabelOrders.length === 0) return null;
+                    return (
+                      <div className="bg-gradient-to-r from-rose-50 to-amber-50 dark:from-rose-950/20 dark:to-amber-950/10 border-2 border-rose-500/30 p-6 rounded-3xl shadow-lg space-y-4">
+                        <div className="flex items-center justify-between border-b border-rose-200/50 dark:border-rose-800/30 pb-3">
+                          <div className="flex items-center gap-2.5 text-rose-800 dark:text-rose-400">
+                            <Printer className="w-6 h-6 animate-pulse" />
+                            <h3 className="text-base font-extrabold">
+                              📥 صدور فوری لیبل‌های پستی جدید (آماده چاپ)
+                            </h3>
+                          </div>
+                          <span className="bg-rose-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-md shadow-rose-600/20 animate-bounce">
+                            {pendingLabelOrders.length.toLocaleString('fa-IR')} سفارش نیازمند چاپ فوری
+                          </span>
+                        </div>
+                        <p className="text-xs text-rose-900/85 dark:text-rose-300/80 leading-relaxed font-bold">
+                          همکار گرامی، هزینه ارسال سفارشات زیر پرداخت شده و لیبل پستی آن‌ها توسط مدیریت بارگذاری گردیده است. طبق قوانین پلتفرم، جهت جلوگیری از جریمه دیرکرد، لطفاً سریعاً نسبت به دانلود، چاپ و الصاق برچسب پستی روی کارتن مرسوله اقدام کرده و بسته را تحویل پست/تیپاکس دهید:
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {pendingLabelOrders.map((o) => (
+                            <div key={o.id} className="bg-white/80 dark:bg-card/80 p-4 rounded-2xl border border-rose-500/20 flex flex-col justify-between gap-3 shadow-xs">
+                              <div className="space-y-1 text-right">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black text-rose-800 dark:text-rose-400">
+                                    سفارش شماره #{o.id.toLocaleString('fa-IR')}
+                                  </span>
+                                  <span className="text-[10px] bg-slate-100 dark:bg-surface text-secondary px-2 py-0.5 rounded-lg font-bold">
+                                    {o.order?.shippingMethod === "TIPAX" ? "ارسال با تیپاکس" : "ارسال با پست"}
+                                  </span>
+                                </div>
+                                <h4 className="text-xs font-extrabold text-primary pt-1">
+                                  {o.product?.name} <span className="text-muted">({o.quantity || 1} عدد)</span>
+                                </h4>
+                                <p className="text-[10px] text-muted font-medium">
+                                  خریدار: {o.order?.shippingRecipientName || "مشتری زوپیت"}
+                                </p>
+                              </div>
+                              
+                              <a
+                                href={o.order?.postalLabel}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full bg-rose-600 hover:bg-rose-700 text-white hover:text-white py-2.5 rounded-xl font-black text-xs text-center transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-rose-600/10 active:scale-95"
+                              >
+                                <Printer className="w-4 h-4" />
+                                چاپ لیبل پستی پلتفرم
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Stats Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     
                     <div
@@ -1181,27 +1365,20 @@ export function SupplierDashboard({
                                   
                                   <span
                                     className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                      product.status === "ACTIVE"
+                                      product.status === "ACTIVE" || product.status === "PUBLISHED"
                                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                        : product.status === "PENDING_APPROVAL"
+                                        : product.status === "PENDING_APPROVAL" || product.status === "SUSPENDED"
                                         ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                                         : product.status === "REJECTED"
                                         ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                                        : product.status === "SUSPENDED"
-                                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                        : "bg-slate-500/10 text-slate-600 dark:text-slate-400"
+                                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                                     }`}
                                   >
-                                    
-                                    {product.status === "ACTIVE"
+                                    {product.status === "ACTIVE" || product.status === "PUBLISHED"
                                       ? "فعال"
-                                      : product.status === "PENDING_APPROVAL"
-                                      ? "در انتظار تایید"
                                       : product.status === "REJECTED"
                                       ? "رد شده"
-                                      : product.status === "SUSPENDED"
-                                      ? "تعلیق شده"
-                                      : "غیرفعال"}
+                                      : "در انتظار تایید"}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4">

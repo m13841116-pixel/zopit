@@ -174,7 +174,7 @@ export const StoreManagerView: React.FC<StoreManagerViewProps> = ({ onAddToCart,
                   <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span className="font-medium text-indigo-600">{product.supplierName}</span>
+                        <span className="font-medium text-indigo-600">@{(product as any).supplierUsername || "supplier"}</span>
                         <span>Stock: {product.stock} {product.unit}</span>
                       </div>
                       <h3 className="font-bold text-slate-800 line-clamp-1">{product.name}</h3>
@@ -242,7 +242,7 @@ export const StoreManagerView: React.FC<StoreManagerViewProps> = ({ onAddToCart,
                 {orders.map(order => (
                   <tr key={order.id} className="hover:bg-slate-50/50 transition">
                     <td className="p-4 font-bold text-indigo-600">{order.id}</td>
-                    <td className="p-4 font-medium text-slate-800">{order.supplierName}</td>
+                    <td className="p-4 font-medium text-slate-800">@{(order as any).supplierUsername || "supplier"}</td>
                     <td className="p-4 text-slate-600">
                       <div className="font-medium text-slate-800">{order.storeName}</div>
                       <div className="text-xs text-slate-400">{order.storeManagerName}</div>

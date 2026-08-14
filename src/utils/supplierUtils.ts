@@ -1,17 +1,14 @@
 export function getSupplierZopitName(supplier: any): string {
-  if (!supplier) return "زوپیت تامین‌کننده نامشخص";
+  if (!supplier) return "تامین‌کننده زوپیت";
   const idStr = supplier.id ? `${supplier.id}` : "";
-  const namePart = supplier.brandName || supplier.companyName || supplier.storeName || supplier.firstName || supplier.username || "";
-  return `زوپیت تامین‌کننده ${idStr}${namePart ? ` (${namePart})` : ''}`;
+  const usernamePart = supplier.username || "";
+  return `تامین‌کننده زوپیت ${idStr}${usernamePart ? ` (@${usernamePart})` : ''}`;
 }
 
 export function getSupplierFullAddress(supplier: any): string {
-  if (!supplier) return "آدرس انبار ثبت نشده است";
+  if (!supplier) return "موقعیت تعیین نشده است";
   const parts = [];
   if (supplier.province) parts.push(`استان ${supplier.province}`);
   if (supplier.city) parts.push(`شهر ${supplier.city}`);
-  if (supplier.address) parts.push(supplier.address);
-  if (supplier.postalCode) parts.push(`کد پستی: ${supplier.postalCode}`);
-  if (supplier.mobile) parts.push(`تلفن انبار: ${supplier.mobile}`);
-  return parts.length > 0 ? parts.join(" - ") : "آدرس ثبت نشده است";
+  return parts.length > 0 ? parts.join(" - ") : "موقعیت ثبت نشده است";
 }

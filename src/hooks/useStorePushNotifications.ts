@@ -186,57 +186,8 @@ export function useStorePushNotifications({
           setUnreadNewOrdersCount((prev) => prev + newOrders.length);
           setLastNotifiedOrderId(latestOrderId);
 
-          const orderAmountText = order.totalAmount
-            ? `${Number(order.totalAmount).toLocaleString('fa-IR')} تومان`
-            : '';
-          const customerText = order.customerName ? `توسط ${order.customerName}` : '';
-          const bodyText = `سفارش #${order.id} ${orderAmountText} ${customerText} ثبت شد. برای مدیریت کلیک کنید.`;
-
-          // Fire Browser Push Notification
-          if (settings.enabled) {
-            showBrowserNotification({
-              title: `سفارش جدید دریافت شد! #${order.id} 🛍️`,
-              body: bodyText,
-              orderId: order.id,
-              sound: settings.soundEnabled,
-              soundType: settings.soundType,
-              vibrate: settings.vibrateEnabled,
-              onClick: () => {
-                if (onNavigateToOrder) {
-                  onNavigateToOrder(order.id);
-                }
-              }
-            });
-          }
-
-          // In-app Toast alert
-          toast(`🔔 سفارش جدید #${order.id} ثبت گردید! (${orderAmountText})`, 'success');
-
-          // Trigger blinking document title
-          if (typeof document !== 'undefined') {
-            const originalTitle = document.title;
-            let blink = true;
-            if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
-            titleIntervalRef.current = setInterval(() => {
-              document.title = blink ? `(۱) 🛍️ سفارش جدید! - زوپیت` : originalTitle;
-              blink = !blink;
-            }, 1000);
-
-            // Restore on click
-            const stopBlink = () => {
-              if (titleIntervalRef.current) {
-                clearInterval(titleIntervalRef.current);
-                titleIntervalRef.current = null;
-              }
-              document.title = originalTitle;
-              window.removeEventListener('focus', stopBlink);
-              window.removeEventListener('click', stopBlink);
-            };
-            window.addEventListener('focus', stopBlink);
-            window.addEventListener('click', stopBlink);
-          }
-
-          // Callback
+          // Store manager notifications, sounds, and title blinking removed per user request.
+          // Callback remains intact to support real-time data sync in UI
           if (onNewOrderDetected) {
             onNewOrderDetected(order);
           }

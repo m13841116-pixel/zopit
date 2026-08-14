@@ -11,8 +11,6 @@ import { toast } from "../GlobalToast";
 import React, { useState, useEffect } from "react";
 import Announcements from "../Announcements";
 import NotificationBell from "../NotificationBell";
-import { useStorePushNotifications } from "../../hooks/useStorePushNotifications";
-import { StorePushNotificationBanner } from "./StorePushNotificationBanner";
 import {
   Crown,
   Store,
@@ -147,28 +145,6 @@ export default function StoreManagerDashboard({
   const [customMenu, setCustomMenu] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [globalSearchTerm, setGlobalSearchTerm] = useState("");
-
-  const {
-    isSupported: isPushSupported,
-    permission: pushPermission,
-    isGranted: isPushGranted,
-    isDenied: isPushDenied,
-    settings: pushSettings,
-    unreadNewOrdersCount,
-    requestPermission: requestPushPermission,
-    toggleNotifications: togglePushNotifications,
-    updateSettings: updatePushSettings,
-    testNotification: testPushNotification,
-    playTestChime
-  } = useStorePushNotifications({
-    userRole: 'STORE_MANAGER',
-    onNavigateToOrder: (orderId) => {
-      setActiveTab('orders');
-    },
-    onNewOrderDetected: () => {
-      fetchData();
-    }
-  });
 
   /* Clipboard feedback states */
   const [copiedCard, setCopiedCard] = useState(false);
@@ -452,7 +428,7 @@ export default function StoreManagerDashboard({
     },
     {
       id: "marketplace",
-      label: "زوپیت (Marketplace)",
+      label: "بانک زوپیت (Zopit Bank)",
       icon: <Layers className="w-5 h-5" />,
     },
     {
@@ -657,36 +633,6 @@ export default function StoreManagerDashboard({
               <GraduationCap className="w-5 h-5 text-emerald-500" />
               <span className="text-[11px] font-bold text-emerald-600 hidden md:inline-block">آموزش</span>
             </button>
-            <button
-              onClick={() => {
-                if (!isPushGranted) {
-                  requestPushPermission();
-                } else {
-                  testPushNotification();
-                }
-              }}
-              className={`p-2 rounded-xl transition-all duration-200 border flex items-center justify-center gap-1.5 cursor-pointer ${
-                isPushGranted && pushSettings.enabled
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                  : isPushDenied
-                  ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
-                  : 'bg-surface text-secondary hover:bg-subtle border-subtle'
-              }`}
-              title={
-                isPushGranted
-                  ? 'اعلان‌های مرورگر فعال است (کلیک برای تست زنگ)'
-                  : 'فعال‌سازی اعلان‌های مرورگر برای سفارشات جدید'
-              }
-            >
-              {isPushGranted && pushSettings.enabled ? (
-                <BellRing className="w-5 h-5 text-emerald-600 dark:text-emerald-400 animate-pulse" />
-              ) : (
-                <Bell className="w-5 h-5 text-muted" />
-              )}
-              <span className="text-[11px] font-bold hidden md:inline-block">
-                {isPushGranted && pushSettings.enabled ? 'اعلان مرورگر فعال' : 'اعلان مرورگر'}
-              </span>
-            </button>
 
             <NotificationBell
               userRole="STORE_MANAGER"
@@ -708,48 +654,32 @@ export default function StoreManagerDashboard({
             <>
               {activeTab === "overview" && stats && (
                 <div className="space-y-8 animate-fade-in">
-                  {/* Browser Push Notification Banner */}
-                  <StorePushNotificationBanner
-                    permission={pushPermission}
-                    isGranted={isPushGranted}
-                    isDenied={isPushDenied}
-                    settings={pushSettings}
-                    onRequestPermission={requestPushPermission}
-                    onToggleNotifications={togglePushNotifications}
-                    onUpdateSettings={updatePushSettings}
-                    onTestNotification={testPushNotification}
-                    onPlayChime={playTestChime}
-                  />
-
                   {/* Beautiful Welcome Banner */}
-                  <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 p-8 rounded-3xl text-inverse shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-80 h-80 bg-card/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-                    <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-primary-default rounded-full blur-3xl opacity-30"></div>
+                  <div className="bg-gradient-to-r from-primary-default via-indigo-600 to-primary-hover p-8 rounded-3xl text-white shadow-lg relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
                     <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                       <div>
-                        <h1 className="text-2xl md:text-3xl font-extrabold mb-2">
-                          خوش آمدید،
+                        <h1 className="text-2xl md:text-3xl font-extrabold mb-2 text-white">
+                          سلام،{" "}
                           {user?.firstName
                             ? `${user.firstName} ${user.lastName || ""}`
                             : "مدیر فروشگاه گرامی"}
                           ! 👋
                         </h1>
-                        <p className="text-indigo-100 text-sm md:text-base opacity-90 max-w-xl leading-relaxed">
+                        <p className="text-white/90 text-sm md:text-base max-w-xl leading-relaxed">
                           به پیشخوان مدیریت فروشگاه خود خوش آمدید. امروز وضعیت
                           سفارشات، تراز مالی و محصولات جدید بازار را رصد کنید.
                         </p>
                       </div>
                       <button
                         onClick={() => setActiveTab("marketplace")}
-                        className="bg-white text-indigo-950 px-6 py-3 rounded-2xl text-sm font-extrabold shadow-md hover:bg-indigo-50 transition-all flex items-center gap-2 self-start md:self-auto shrink-0 group active:scale-95 cursor-pointer"
+                        className="bg-white text-primary-default px-6 py-3 rounded-2xl text-sm font-extrabold shadow-md hover:bg-slate-100 transition-all flex items-center gap-2 self-start md:self-auto shrink-0 group active:scale-95 cursor-pointer"
                       >
-                        <Layers className="w-4 h-4 transition-transform group-hover:scale-110 text-indigo-600" />
-                        مشاهده زوپیت (Marketplace)
+                        <Layers className="w-4 h-4 transition-transform group-hover:scale-110 text-primary-default" />
+                        مشاهده بانک زوپیت (Zopit Bank)
                       </button>
                     </div>
                   </div>
-                  {/* Latest Announcements Widget */}
-                  <LatestAnnouncementsWidget />
                   {/* 3 Stats Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-gradient-to-br from-card to-background p-7 rounded-3xl shadow-sm border border-subtle flex flex-col justify-between min-h-[140px] hover:shadow-lg hover:border-primary-default/20 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden cursor-pointer">
@@ -905,7 +835,7 @@ export default function StoreManagerDashboard({
                               </div>
                               <div>
                                 <h4 className="font-bold text-primary text-sm">
-                                  زوپیت (Marketplace)
+                                  بانک زوپیت (Zopit Bank)
                                 </h4>
                                 <p className="text-xs text-muted mt-1 leading-relaxed">
                                   افزودن محصولات تامین‌کنندگان به بانک اختصاصی

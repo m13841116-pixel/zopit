@@ -84,22 +84,15 @@ export default function SuperAdminDashboard({
 
   const menuItems = [
     { id: "overview", label: "پیشخوان", icon: LayoutDashboard },
-    { id: "pro-accounts", label: "اکانت‌های پرو (ویژه)", icon: Crown },
-    { id: "all-users", label: "کل کاربران (مدیریت یکپارچه)", icon: Users },
-    { id: "penalty-management", label: "اخطارها و قوانین تامین‌کنندگان", icon: Scale },
+    { id: "all-users", label: "کل کاربران", icon: Users },
     { id: "products", label: "محصولات", icon: Package },
     { id: "orders", label: "سفارشات", icon: ShoppingCart, badge: badges.orders },
-    { id: "financial", label: "امور مالی", icon: DollarSign },
-    { id: "manual-invoices", label: "تایید فیش‌ها", icon: DollarSign, badge: badges.invoices },
-    { id: "settlements", label: "درخواست‌های تسویه", icon: Wallet, badge: badges.settlements },
-    { id: "categories", label: "دسته‌بندی‌ها", icon: Tags },
-    { id: "notifications", label: "اعلان‌ها", icon: Bell },
-    { id: "announcements", label: "مدیریت اطلاعیه‌ها", icon: Megaphone },
+    { id: "settlements", label: "درخواست تسویه", icon: Wallet, badge: badges.settlements },
     { id: "tickets", label: "تیکت‌ها", icon: MessageSquare, badge: badges.tickets },
-    { id: "settings", label: "تنظیمات پایه و هسته سیستم", icon: Settings },
-    { id: "logs", label: "لاگ سیستم", icon: Activity },
-    { id: "health", label: "سلامت سیستم", icon: ShieldCheck },
-    { id: "dev-tools", label: "توسعه‌دهنده (کد)", icon: Activity },
+    { id: "pro-accounts", label: "اکانت‌های پرو", icon: Crown },
+    { id: "announcements", label: "مدیریت اعلانات", icon: Megaphone },
+    { id: "manual-invoices", label: "تایید فیش‌ها", icon: DollarSign, badge: badges.invoices },
+    { id: "settings", label: "تنظیمات کلی سیستم", icon: Settings },
   ];
 
   const handleNavigateTab = (tab: string, roleFilter?: string) => {
@@ -148,23 +141,25 @@ export default function SuperAdminDashboard({
                 if (item.id === "all-users") setActiveUserRoleFilter("ALL");
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                 activeTab === item.id
                   ? "bg-primary-default text-white shadow-lg shadow-primary-default/20"
                   : "text-text-secondary hover:bg-surface hover:text-text-primary"
               }`}
             >
-              {(item as any).badge && (
-                <span className="absolute left-4 bg-danger text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+              <div className="flex items-center gap-3">
+                <item.icon
+                  className={`w-5 h-5 ${
+                    activeTab === item.id ? "text-white" : "text-text-muted"
+                  }`}
+                />
+                <span>{item.label}</span>
+              </div>
+              {(item as any).badge ? (
+                <span className="bg-danger text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shrink-0 shadow-sm">
                   {(item as any).badge}
                 </span>
-              )}
-              <item.icon
-                className={`w-5 h-5 ${
-                  activeTab === item.id ? "text-white" : "text-text-muted"
-                }`}
-              />
-              {item.label}
+              ) : null}
             </button>
           ))}
         </nav>
@@ -229,7 +224,7 @@ export default function SuperAdminDashboard({
               onImpersonateUser={onImpersonateUser}
             />
           )}
-          {activeTab === "penalty-management" && <SupplierPenaltyManagement />}
+          {activeTab === "penalty-management" && <SystemSettings initialTab="supplier_rules" />}
           {activeTab === "products" && <ProductsList />}
           {activeTab === "orders" && <OrdersList />}
           {activeTab === "financial" && <Financial />}
@@ -242,7 +237,7 @@ export default function SuperAdminDashboard({
             <AdminBanners showNotification={showNotification} />
           )}
           {activeTab === "tickets" && <Tickets />}
-          {activeTab === "settings" && <SystemSettings />}
+          {activeTab === "settings" && <SystemSettings initialTab="core" />}
           {activeTab === "logs" && <SystemLogs />}
           {activeTab === "health" && <SystemHealth />}
           {activeTab === "dev-tools" && <CodeEditor />}
