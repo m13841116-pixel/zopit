@@ -14,181 +14,223 @@ function sanitizeMobileNumber(mobile: string): string {
 }
 
 /**
- * Core function to send an SMS pattern/template via the bankkalaha.ir proxy.
+ * Fetches MelliPayamak configuration directly from systemConfig in Prisma DB
+ */
+async function getMelliPayamakConfig() {
+  const prisma = getPrisma();
+  
+  const [dbUser, dbPass, dbFrom, dbPatternGeneral, dbPatternOtp, dbPatternSupplier, dbPatternLabel] = await Promise.all([
+    prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_USERNAME' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PASSWORD' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_FROM_NUMBER' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_ID' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_OTP' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_LABEL_ISSUED' } }),
+  ]);
+
+  const username = dbUser?.value?.trim() || process.env.MELLIPAYAMAK_USERNAME?.trim() || '';
+  const password = dbPass?.value?.trim() || process.env.MELLIPAYAMAK_PASSWORD?.trim() || '';
+  const fromNumber = dbFrom?.value?.trim() || process.env.MELLIPAYAMAK_FROM_NUMBER?.trim() || '50001';
+
+  return {
+    username,
+    password,
+    fromNumber,
+    patterns: {
+      MELLIPAYAMAK_PATTERN_ID: dbPatternGeneral?.value?.trim() || '',
+      MELLIPAYAMAK_PATTERN_OTP: dbPatternOtp?.value?.trim() || '',
+      MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT: dbPatternSupplier?.value?.trim() || '',
+      MELLIPAYAMAK_PATTERN_LABEL_ISSUED: dbPatternLabel?.value?.trim() || '',
+    }
+  };
+}
+
+/**
+ * Core function to send an SMS pattern/template directly via MelliPayamak REST API
+ * (https://rest.payamak-panel.com/api/SendSMS/BaseServiceNumber)
  */
 export async function sendPattern(mobile: string, patternKey: string, textValues: string[]) {
   try {
-    const prisma = getPrisma();
-    
-    // Read MelliPayamak configuration dynamically from Database
-    const [dbUser, dbPass, dbFrom, dbPattern, dbGeneralPattern] = await Promise.all([
-      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_USERNAME' } }),
-      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PASSWORD' } }),
-      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_FROM_NUMBER' } }),
-      prisma.systemConfig.findUnique({ where: { key: patternKey } }),
-      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_ID' } })
-    ]);
+    const config = await getMelliPayamakConfig();
 
-    const username = dbUser?.value?.trim() || '';
-    const password = dbPass?.value?.trim() || ''; // Token
-    const fromNumber = dbFrom?.value?.trim() || '50001'; // Sender line
-
-    if (!username || !password) {
-      console.error('[SMS Service] MelliPayamak credentials (username/password/token) are missing from Database.');
+    if (!config.username || !config.password) {
+      console.error('[SMS Service] MelliPayamak credentials (username/password) are missing from Database/SystemConfig.');
       return { 
         success: false, 
-        error: 'تنظیمات نام کاربری و کلمه عبور ملی‌پیامک در پایگاه‌داده یافت نشد.' 
+        error: 'تنظیمات نام کاربری و کلمه عبور ملی‌پیامک در پنل سوپرادمین پیکربندی نشده است.' 
       };
     }
 
-    // Extract body ID value
-    const rawBodyId = dbPattern?.value?.trim() || dbGeneralPattern?.value?.trim() || '';
-    let bodyId: string | number = rawBodyId;
-
-    // Map default pattern IDs if nothing is configured in DB
-    if (!bodyId) {
-      if (patternKey === 'MELLIPAYAMAK_PATTERN_OTP') {
-        bodyId = 223344; // standard fallback OTP pattern
-      } else if (patternKey === 'MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT') {
-        bodyId = 112233; // standard fallback supplier notification pattern
-      } else if (patternKey === 'MELLIPAYAMAK_PATTERN_LABEL_ISSUED') {
-        bodyId = 445566; // standard fallback label issued pattern
-      } else {
-        bodyId = 100000; // general fallback
-      }
-    }
-
-    const parsedBodyId = isNaN(Number(bodyId)) ? bodyId : Number(bodyId);
     const cleanMobile = sanitizeMobileNumber(mobile);
-    
     if (!cleanMobile || cleanMobile.length < 10) {
-      return { success: false, error: 'شماره موبایل نامعتبر است' };
+      return { success: false, error: 'شماره موبایل گیرنده نامعتبر است.' };
     }
 
-    // Ensure args is always an array of strings
-    const args = Array.isArray(textValues) ? textValues : [String(textValues)];
+    // Determine bodyId for the pattern
+    let rawBodyId = config.patterns[patternKey as keyof typeof config.patterns] || '';
+    
+    // If not found by exact key, try looking up patternKey in Prisma if it's a dynamic key
+    if (!rawBodyId) {
+      const prisma = getPrisma();
+      const customKeyConfig = await prisma.systemConfig.findUnique({ where: { key: patternKey } });
+      rawBodyId = customKeyConfig?.value?.trim() || config.patterns.MELLIPAYAMAK_PATTERN_ID || '';
+    }
 
-    // Build JSON payload with fields: to, bodyId, args, plus token/line config
+    // If patternKey is itself a numeric bodyId string (e.g., "223344"), use it
+    if (!rawBodyId && !isNaN(Number(patternKey)) && Number(patternKey) > 0) {
+      rawBodyId = patternKey;
+    }
+
+    const bodyIdNumber = parseInt(rawBodyId, 10);
+    if (!bodyIdNumber || isNaN(bodyIdNumber)) {
+      console.error(`[SMS Service] Pattern ID for key "${patternKey}" is not defined or invalid.`);
+      return {
+        success: false,
+        error: `شناسه پترن (Body ID) برای رویداد ${patternKey} در تنظیمات سیستم یافت نشد.`
+      };
+    }
+
+    // Format text values array into semicolon-separated string format for MelliPayamak
+    const argsArray = Array.isArray(textValues) ? textValues : [String(textValues)];
+    const textFormatted = argsArray.join(';');
+
     const payload = {
-      username,
-      password,
-      from: fromNumber,
+      username: config.username,
+      password: config.password,
       to: cleanMobile,
-      bodyId: parsedBodyId,
-      args: args,
-      text: args.join(';') // text field for older versions of proxy
+      bodyId: bodyIdNumber,
+      text: textFormatted
     };
 
-    console.log(`[SMS Service] Sending POST pattern request to bankkalaha proxy. Recipient: ${cleanMobile}, bodyId: ${parsedBodyId}`);
+    console.log(`[SMS Service] Sending pattern SMS via MelliPayamak API to ${cleanMobile} (bodyId: ${bodyIdNumber}, text: "${textFormatted}")...`);
 
-    const response = await fetch('https://bankkalaha.ir/sms-proxy.php', {
+    const endpoint = 'https://rest.payamak-panel.com/api/SendSMS/BaseServiceNumber';
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': 'ZopitSMS2026Key'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
     });
 
-    const data = await response.json().catch(() => ({}));
-    
-    if (response.ok) {
+    const data: any = await response.json().catch(() => ({}));
+
+    // MelliPayamak returns RetStatus (1 = Success, or numeric long Value > 100 as recId)
+    const isSuccess = response.ok && (
+      data.RetStatus === 1 || 
+      data.RetStatus === 0 || 
+      (data.Value && String(data.Value).length > 3 && Number(data.Value) > 0)
+    );
+
+    if (isSuccess) {
+      console.log(`[SMS Service] Pattern SMS sent successfully to ${cleanMobile}. Ref ID:`, data.Value || data.StrRetStatus);
       return {
         success: true,
-        message: 'پیامک با موفقیت از طریق پروکسی ارسال شد',
+        message: 'پیامک با موفقیت از طریق سامانه ملی‌پیامک ارسال شد.',
+        trackingCode: String(data.Value || ''),
         response: data
       };
     } else {
-      console.error('[SMS Service Proxy Error Response]', response.status, data);
+      const errMsg = data.StrRetStatus || data.message || `خطای سامانه ملی‌پیامک (کد ${data.RetStatus || response.status})`;
+      console.error(`[SMS Service] MelliPayamak pattern error:`, errMsg, data);
       return {
         success: false,
-        error: `خطا در سرور پروکسی پیامک (کد ${response.status})`,
+        error: `خطا در ارسال پیامک: ${errMsg}`,
         response: data
       };
     }
   } catch (err: any) {
-    console.error('[SMS Service Proxy Exception]', err);
-    return { success: false, error: err?.message || String(err) };
+    console.error('[SMS Service Exception]', err);
+    return { 
+      success: false, 
+      error: err?.message || 'خطای شبکه یا سرور در برقراری ارتباط با وب‌سرویس ملی‌پیامک' 
+    };
   }
 }
 
 /**
- * Sends a normal plain-text SMS message via the bankkalaha.ir proxy.
+ * Core function to send a standard plain-text SMS directly via MelliPayamak REST API
+ * (https://rest.payamak-panel.com/api/SendSMS/SendSMS)
  */
 export async function sendSms(mobile: string, message: string) {
   try {
-    const prisma = getPrisma();
-    
-    // Read MelliPayamak configuration dynamically from Database
-    const [dbUser, dbPass, dbFrom] = await Promise.all([
-      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_USERNAME' } }),
-      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PASSWORD' } }),
-      prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_FROM_NUMBER' } })
-    ]);
+    const config = await getMelliPayamakConfig();
 
-    const username = dbUser?.value?.trim() || '';
-    const password = dbPass?.value?.trim() || '';
-    const fromNumber = dbFrom?.value?.trim() || '50001';
-
-    if (!username || !password) {
-      console.error('[SMS Service] MelliPayamak credentials (username/password) are missing from Database.');
+    if (!config.username || !config.password) {
+      console.error('[SMS Service] MelliPayamak credentials (username/password) missing from Database/SystemConfig.');
       return { 
         success: false, 
-        error: 'تنظیمات نام کاربری و کلمه عبور ملی‌پیامک در پایگاه‌داده یافت نشد.' 
+        error: 'تنظیمات نام کاربری و کلمه عبور ملی‌پیامک در پنل سوپرادمین پیکربندی نشده است.' 
       };
     }
 
     const cleanMobile = sanitizeMobileNumber(mobile);
     if (!cleanMobile || cleanMobile.length < 10) {
-      return { success: false, error: 'شماره موبایل نامعتبر است' };
+      return { success: false, error: 'شماره موبایل گیرنده نامعتبر است.' };
     }
 
-    // Build standard MelliPayamak JSON payload for normal text message
+    if (!message || !message.trim()) {
+      return { success: false, error: 'متن پیامک خالی است.' };
+    }
+
     const payload = {
-      username,
-      password,
+      username: config.username,
+      password: config.password,
       to: cleanMobile,
-      from: fromNumber,
-      text: message
+      from: config.fromNumber,
+      text: message.trim()
     };
 
-    console.log(`[SMS Service] Sending POST normal message request to bankkalaha proxy. Recipient: ${cleanMobile}`);
+    console.log(`[SMS Service] Sending normal SMS via MelliPayamak API to ${cleanMobile}...`);
 
-    const response = await fetch('https://bankkalaha.ir/sms-proxy.php', {
+    const endpoint = 'https://rest.payamak-panel.com/api/SendSMS/SendSMS';
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': 'ZopitSMS2026Key'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
     });
 
-    const data = await response.json().catch(() => ({}));
-    
-    if (response.ok) {
+    const data: any = await response.json().catch(() => ({}));
+
+    const isSuccess = response.ok && (
+      data.RetStatus === 1 || 
+      data.RetStatus === 0 || 
+      (data.Value && String(data.Value).length > 3 && Number(data.Value) > 0)
+    );
+
+    if (isSuccess) {
+      console.log(`[SMS Service] Normal SMS sent successfully to ${cleanMobile}. Ref ID:`, data.Value || data.StrRetStatus);
       return {
         success: true,
-        message: 'پیامک با موفقیت از طریق پروکسی ارسال شد',
+        message: 'پیامک با موفقیت از طریق سامانه ملی‌پیامک ارسال شد.',
+        trackingCode: String(data.Value || ''),
         response: data
       };
     } else {
-      console.error('[SMS Service Proxy Normal SMS Error]', response.status, data);
+      const errMsg = data.StrRetStatus || data.message || `خطای سامانه ملی‌پیامک (کد ${data.RetStatus || response.status})`;
+      console.error(`[SMS Service] MelliPayamak normal SMS error:`, errMsg, data);
       return {
         success: false,
-        error: `خطا در سرور پروکسی پیامک (کد ${response.status})`,
+        error: `خطا در ارسال پیامک: ${errMsg}`,
         response: data
       };
     }
   } catch (err: any) {
-    console.error('[SMS Service Normal SMS Exception]', err);
-    return { success: false, error: err?.message || String(err) };
+    console.error('[SMS Service Exception]', err);
+    return { 
+      success: false, 
+      error: err?.message || 'خطای شبکه در برقراری ارتباط با وب‌سرویس ملی‌پیامک' 
+    };
   }
 }
 
 /**
- * Compatible export aliases
+ * Exported alias functions preserving identical signatures across the project
  */
-export async function sendSmsViaMelliPayamak(mobile: string, message: string, orderId?: number) {
+export async function sendSmsViaMelliPayamak(mobile: string, message: string, _orderId?: number) {
   return sendSms(mobile, message);
 }
 
@@ -200,7 +242,7 @@ export async function sendOtpSms(mobile: string, code: string) {
   return sendPattern(mobile, 'MELLIPAYAMAK_PATTERN_OTP', [code]);
 }
 
-export async function notifySupplierNewOrder(supplierMobile: string, orderId: number, supplierName?: string) {
+export async function notifySupplierNewOrder(supplierMobile: string, orderId: number, _supplierName?: string) {
   return sendPattern(supplierMobile, 'MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT', [String(orderId)]);
 }
 
@@ -214,7 +256,7 @@ export async function notifySupplierCommitment(orderId: number, storeMobile?: st
   return { success: true };
 }
 
-export async function notifyPostalLabelPrinted(orderId: number, recipientMobile?: string, trackingCode?: string) {
-  if (!recipientMobile) return { success: false };
+export async function notifyPostalLabelPrinted(orderId: number, recipientMobile?: string, _trackingCode?: string) {
+  if (!recipientMobile) return { success: false, error: 'شماره موبایل گیرنده موجود نیست.' };
   return sendPattern(recipientMobile, 'MELLIPAYAMAK_PATTERN_LABEL_ISSUED', [String(orderId)]);
 }
