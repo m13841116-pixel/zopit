@@ -996,10 +996,21 @@ let prisma: any = new Proxy({}, {
       };
     }
     if (prop === '$queryRaw' || prop === '$executeRaw' || prop === '$queryRawUnsafe' || prop === '$executeRawUnsafe') {
-      return async () => [];
+      return async (...args: any[]) => {
+        const active = getActivePrisma();
+        if (active && typeof active[prop] === 'function') {
+          return await active[prop](...args);
+        }
+        return [];
+      };
     }
     if (prop === '$connect' || prop === '$disconnect') {
-      return async () => {};
+      return async () => {
+        const active = getActivePrisma();
+        if (active && typeof active[prop] === 'function') {
+          return await active[prop]();
+        }
+      };
     }
 
     return new Proxy({}, {
@@ -1036,6 +1047,142 @@ let prisma: any = new Proxy({}, {
     });
   }
 });
+
+// ==========================================
+// Database Health & Ping Diagnostics
+// ==========================================
+interface DbPingResult {
+  ok: boolean;
+  status: 'connected' | 'disconnected' | 'local_fallback';
+  provider: string;
+  service: string;
+  isNeon: boolean;
+  sanitizedUrl: string;
+  latencyMs?: number;
+  message: string;
+  error?: string;
+  hint?: string;
+  timestamp: string;
+}
+
+async function pingDatabase(options: { isStartup?: boolean } = {}): Promise<DbPingResult> {
+  const currentDbUrl = process.env.DATABASE_URL || dbUrl || '';
+  const sanitizedUrl = currentDbUrl.replace(/:([^:@]+)@/, ':****@');
+  const isPostgres = currentDbUrl.startsWith('postgresql://') || currentDbUrl.startsWith('postgres://');
+  const isNeon = isPostgres && (currentDbUrl.includes('neon.tech') || currentDbUrl.includes('neon') || currentDbUrl.includes('aws.neon.tech'));
+  
+  let serviceName = 'SQLite (Local / In-Memory)';
+  if (isNeon) {
+    serviceName = 'Neon Serverless PostgreSQL';
+  } else if (isPostgres) {
+    serviceName = 'PostgreSQL Database';
+  } else if (currentDbUrl.startsWith('mysql://') || currentDbUrl.startsWith('mysqls://')) {
+    serviceName = 'MySQL Database';
+  }
+
+  const startTime = Date.now();
+
+  if (!isRealRemoteDb && (isAIStudio || isCloudRun)) {
+    const latencyMs = Date.now() - startTime;
+    if (options.isStartup) {
+      console.log(`\n┌────────────────────────────────────────────────────────────┐`);
+      console.log(`│ 🔌 [Database Connection] Status: ✅ LOCAL (SQLite / Dev)   │`);
+      console.log(`│ 📦 Storage: Local SQLite Database                          │`);
+      console.log(`│ ⏱️  Ping Latency: ${latencyMs}ms                                      │`);
+      console.log(`└────────────────────────────────────────────────────────────┘\n`);
+    }
+    return {
+      ok: true,
+      status: 'connected',
+      provider: 'sqlite',
+      service: 'SQLite (Local)',
+      isNeon: false,
+      sanitizedUrl: sanitizedUrl || 'file:prisma/dev.db',
+      latencyMs,
+      message: 'اتصال به دیتابیس لوکال با موفقیت برقرار است.',
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  try {
+    const active = getActivePrisma();
+    if (!active || isPrismaMock) {
+      throw new Error('Prisma Client آماده اتصال نیست یا متغیر DATABASE_URL معتبر یافت نشد.');
+    }
+
+    // Direct Ping Execution
+    if (typeof active.$queryRawUnsafe === 'function') {
+      await active.$queryRawUnsafe('SELECT 1 as ping');
+    } else {
+      await active.user.findFirst({ select: { id: true } });
+    }
+
+    const latencyMs = Date.now() - startTime;
+
+    if (options.isStartup) {
+      console.log(`\n┌────────────────────────────────────────────────────────────┐`);
+      console.log(`│ 🔌 [Database Connection] Status: ✅ CONNECTED (Ping OK)     │`);
+      console.log(`│ 🚀 Database: ${serviceName.padEnd(46)}│`);
+      console.log(`│ 📍 URL: ${sanitizedUrl.slice(0, 50).padEnd(51)}│`);
+      console.log(`│ ⏱️  Response Time: ${String(latencyMs + 'ms').padEnd(41)}│`);
+      console.log(`│ ✅ ارتباط امن و فعال با دیتابیس برقرار است.              │`);
+      console.log(`└────────────────────────────────────────────────────────────┘\n`);
+    }
+
+    return {
+      ok: true,
+      status: 'connected',
+      provider: provider || (isPostgres ? 'postgresql' : 'mysql'),
+      service: serviceName,
+      isNeon,
+      sanitizedUrl,
+      latencyMs,
+      message: `ارتباط با دیتابیس ${serviceName} با موفقیت برقرار است (زمان پاسخ: ${latencyMs} میلی‌ثانیه).`,
+      timestamp: new Date().toISOString()
+    };
+  } catch (err: any) {
+    const latencyMs = Date.now() - startTime;
+    const rawError = err?.message || String(err);
+    let hint = 'لطفاً متغیر DATABASE_URL را در تنظیمات محیطی سرور (Environment Variables) بررسی نمایید.';
+
+    if (isNeon || isPostgres) {
+      if (rawError.includes('sslmode') || !currentDbUrl.includes('sslmode=')) {
+        hint = 'دیتابیس Neon نیازمند ارتباط امن SSL است. اطمینان حاصل کنید عبارت ?sslmode=require در انتهای DATABASE_URL در داشبورد Vercel/سرور اضافه شده باشد.';
+      } else if (rawError.includes('Authentication failed') || rawError.includes('password authentication failed')) {
+        hint = 'نام کاربری یا کلمه عبور دیتابیس در DATABASE_URL نادرست است. لطفاً رشته اتصال (Connection String) را از داشبورد Neon مجدداً کپی کنید.';
+      } else if (rawError.includes("Can't reach database server") || rawError.includes('getaddrinfo') || rawError.includes('ETIMEDOUT')) {
+        hint = 'سرور توانایی اتصال به آدرس دیتابیس Neon را ندارد. بررسی کنید پروژه در داشبورد Neon فعال (Active) باشد یا فیلترینگ/فایروال مانع نباشد.';
+      } else if (rawError.includes('database') && rawError.includes('does not exist')) {
+        hint = 'نام دیتابیس در انتهای آدرس اتصال وجود ندارد یا نادرست است (پیش‌فرض Neon نام neondb است).';
+      }
+    }
+
+    if (options.isStartup) {
+      console.error(`\n┌────────────────────────────────────────────────────────────┐`);
+      console.error(`│ ❌ [Database Ping Test Failed] Status: DISCONNECTED / ERROR │`);
+      console.error(`│ 🚀 Target Service: ${serviceName.padEnd(41)}│`);
+      console.error(`│ 📍 Database URL: ${sanitizedUrl.slice(0, 43).padEnd(44)}│`);
+      console.error(`│ ⏱️  Latency: ${String(latencyMs + 'ms').padEnd(47)}│`);
+      console.error(`│ ⚠️ Error: ${rawError.slice(0, 49).padEnd(50)}│`);
+      console.error(`│ 💡 راهنما: ${hint.slice(0, 48).padEnd(48)}│`);
+      console.error(`└────────────────────────────────────────────────────────────┘\n`);
+    }
+
+    return {
+      ok: false,
+      status: 'disconnected',
+      provider: provider || (isPostgres ? 'postgresql' : 'mysql'),
+      service: serviceName,
+      isNeon,
+      sanitizedUrl,
+      latencyMs,
+      message: `خطا در برقراری اتصال به دیتابیس ${serviceName}.`,
+      error: rawError,
+      hint,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
 
 const app = express();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || 'dummy_client_id_for_build');
@@ -1731,6 +1878,47 @@ async function seedDatabase() {
 }
 
 // Routes
+// 0. System Health & Database Ping Diagnostic Endpoints
+
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbPing = await pingDatabase({ isStartup: false });
+    res.json({
+      status: dbPing.ok ? 'ok' : 'degraded',
+      server: 'Zopit B2B Engine',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      database: dbPing
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 'error',
+      server: 'Zopit B2B Engine',
+      timestamp: new Date().toISOString(),
+      error: err?.message || String(err)
+    });
+  }
+});
+
+app.get(['/api/ping', '/api/db/ping'], async (req, res) => {
+  const result = await pingDatabase({ isStartup: false });
+  res.status(result.ok ? 200 : 503).json(result);
+});
+
+app.get('/api/system/db-status', async (req, res) => {
+  const ping = await pingDatabase({ isStartup: false });
+  res.status(ping.ok ? 200 : 503).json({
+    status: ping.ok ? 'online' : 'error',
+    database: ping,
+    environment: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      isVercel: !!process.env.VERCEL,
+      isCloudRun: !!process.env.K_SERVICE,
+      isAIStudio: !!process.env.APPLET_ID
+    }
+  });
+});
+
 // 1. Register Supplier (تامین کننده)
 
 app.post('/api/auth/register', async (req, res) => {
@@ -9803,6 +9991,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     console.log("Running on Vercel, skipping app.listen()");
     setImmediate(async () => {
       try {
+        await pingDatabase({ isStartup: true });
         await seedDatabase();
         await syncAllPaidOrdersSupplierWallets();
       } catch (err: any) {
@@ -9822,6 +10011,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       console.log(`🚀 Backend Express server running on Unix Socket ${portToListen}`);
       setImmediate(async () => {
         try {
+          await pingDatabase({ isStartup: true });
           if (isRealRemoteDb) {
             console.log('[Server Startup] Real remote database detected. Pushing schema...');
             try {
@@ -9844,6 +10034,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       console.log(`🚀 Backend Express server running on port ${portToListen}`);
       setImmediate(async () => {
         try {
+          await pingDatabase({ isStartup: true });
           if (isRealRemoteDb) {
             console.log('[Server Startup] Real remote database detected. Pushing schema...');
             try {
