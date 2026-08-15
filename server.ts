@@ -5639,8 +5639,9 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
           where: { userId },
           data: { payLink }
         });
-      } catch (paymentErr) {
-        payLink = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=PRO_REGISTER&success=true`;
+      } catch (paymentErr: any) {
+        console.error('Zibal error for pro register:', paymentErr);
+        throw new Error(`خطا در ایجاد درگاه پرداخت: ${paymentErr.message}`);
       }
     }
 
@@ -5651,7 +5652,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
     });
   } catch (err: any) {
     console.error('Error in /api/store-manager/pro/register:', err);
-    res.status(500).json({ error: 'خطا در ثبت نام اکانت پرو', details: err.message });
+    res.status(500).json({ error: 'خطا در ثبت نام اکانت پرو: ' + err.message });
   }
 });
 
@@ -5666,23 +5667,16 @@ app.post('/api/store-manager/pro/renew-host', authenticateToken, requireStoreMan
     const baseUrl = getPublicUrl(req);
     const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=HOST_RENEWAL`;
 
-    let payLink = '';
-    try {
-      const zibalResult = await paymentGateway.createPayment(
-        amount * 10,
-        `تمدید هاست ۱ ماهه اکانت پرو زوپیت کاربر #${userId}`,
-        callbackUrl
-      );
-      payLink = zibalResult.payLink;
-    } catch (paymentErr) {
-      console.error('Zibal error for host renewal, using callback fallback:', paymentErr);
-      payLink = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=HOST_RENEWAL&success=true`;
-    }
+    const zibalResult = await paymentGateway.createPayment(
+      amount * 10,
+      `تمدید هاست ۱ ماهه اکانت پرو زوپیت کاربر #${userId}`,
+      callbackUrl
+    );
 
-    res.json({ payLink, amount });
+    res.json({ payLink: zibalResult.payLink, amount });
   } catch (err: any) {
     console.error('Error in renew-host:', err);
-    res.status(500).json({ error: 'خطا در ایجاد درگاه پرداخت تمدید هاست' });
+    res.status(500).json({ error: 'خطا در ایجاد درگاه پرداخت تمدید هاست: ' + err.message });
   }
 });
 
@@ -5697,22 +5691,16 @@ app.post('/api/store-manager/pro/pay-torob', authenticateToken, requireStoreMana
     const baseUrl = getPublicUrl(req);
     const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=TOROB_SETUP`;
 
-    let payLink = '';
-    try {
-      const zibalResult = await paymentGateway.createPayment(
-        amount * 10,
-        `اتصال به ترب - اکانت پرو زوپیت کاربر #${userId}`,
-        callbackUrl
-      );
-      payLink = zibalResult.payLink;
-    } catch (paymentErr) {
-      payLink = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=TOROB_SETUP&success=true`;
-    }
+    const zibalResult = await paymentGateway.createPayment(
+      amount * 10,
+      `اتصال به ترب - اکانت پرو زوپیت کاربر #${userId}`,
+      callbackUrl
+    );
 
-    res.json({ payLink, amount });
+    res.json({ payLink: zibalResult.payLink, amount });
   } catch (err: any) {
     console.error('Error in pay-torob:', err);
-    res.status(500).json({ error: 'خطا در ایجاد درگاه پرداخت اتصال به ترب' });
+    res.status(500).json({ error: 'خطا در ایجاد درگاه پرداخت اتصال به ترب: ' + err.message });
   }
 });
 

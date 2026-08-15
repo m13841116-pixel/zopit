@@ -48,7 +48,7 @@ export class ZibalService implements PaymentGateway {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
         const response = await fetch(proxyUrl, {
           method: 'POST',
@@ -66,7 +66,7 @@ export class ZibalService implements PaymentGateway {
 
         if (!response.ok) {
           const statusText = await response.text().catch(() => '');
-          throw new Error(`HTTP ${response.status}: ${statusText || response.statusText}`);
+          throw new Error(`پاسخ ناموفق از سرور واسط (کد ${response.status}): ${statusText || response.statusText}`);
         }
 
         const data = await response.json();
@@ -75,12 +75,12 @@ export class ZibalService implements PaymentGateway {
         lastError = err;
         console.warn(`[Zibal Proxy] Attempt ${attempt} failed:`, err.message);
         if (attempt < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 1000));
+          await new Promise((r) => setTimeout(r, 800));
         }
       }
     }
 
-    throw lastError || new Error('ارتباط با سرور واسط پرداخت برقرار نشد.');
+    throw lastError || new Error('ارتباط با سرور واسط ایران (bankkalaha.ir) برقرار نشد.');
   }
   
   /**
@@ -88,7 +88,6 @@ export class ZibalService implements PaymentGateway {
    */
   async createPayment(amount: number | string, description: string, callbackUrl: string): Promise<{ payLink: string; authority: string }> {
     try {
-      // Format callback URL to ensure it includes zopit.ir for proxy validation if needed
       let finalCallbackUrl = callbackUrl;
       if (!finalCallbackUrl.includes('zopit.ir')) {
         finalCallbackUrl += (finalCallbackUrl.includes('?') ? '&' : '?') + 'zopit_bypass=zopit.ir';
@@ -99,7 +98,10 @@ export class ZibalService implements PaymentGateway {
         throw new Error('مبلغ پرداختی نامعتبر است.');
       }
 
-      // 1. Try Iran Proxy first (bypasses Iranian IP restrictions)
+      // 1. اول از طریق سرور واسط ایران ارسال می‌شود
+      let proxySuccess = false;
+      let lastProxyError: any = null;
+
       try {
         const data = await this.sendProxyRequest({
           merchant: this.zibalMerchant,
@@ -120,50 +122,20 @@ export class ZibalService implements PaymentGateway {
           throw new Error(errMsg);
         }
       } catch (proxyErr: any) {
-        // If it's already a specific Zibal error message, re-throw it directly
+        lastProxyError = proxyErr;
+        // اگر خطای ساختاری زیبال بود مستقیم بازگردانده می‌شود
         if (proxyErr.message && (proxyErr.message.includes('کد خطا') || proxyErr.message.includes('زیبال'))) {
           throw proxyErr;
         }
-        console.warn('[ZibalService] Proxy request failed, attempting direct gateway connection:', proxyErr.message);
+        console.warn('[ZibalService] Proxy request failed:', proxyErr.message);
       }
 
-      // 2. Direct Zibal gateway call (works if server has Iranian IP or sandbox)
-      if (this.zibalMerchant && this.zibalMerchant !== 'zibal' && this.zibalMerchant !== 'zibal_merchant_key') {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-        const response = await fetch(`${ZIBAL_GATEWAY_URL}/request`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-          body: JSON.stringify({
-            merchant: this.zibalMerchant,
-            amount: numAmount,
-            callbackUrl,
-            description,
-          }),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        const data = await response.json();
-
-        if (Number(data.result) === 100 && data.trackId) {
-          return {
-            payLink: `https://gateway.zibal.ir/start/${data.trackId}`,
-            authority: data.trackId.toString(),
-          };
-        } else {
-          const errorMsg = getZibalErrorMessage(data.result, data.message);
-          throw new Error(`خطا در اتصال به درگاه پرداخت زیبال: ${errorMsg}`);
-        }
+      // 2. اگر سرور واسط در دسترس نبود، خطای دقیق سرور واسط را اعلام می‌کنیم تا با ارور گمراه‌کننده ۱۱۵ مواجه نشویم
+      if (lastProxyError) {
+        throw new Error(`خطا در ارتباط با سرور واسط ایران (bankkalaha.ir): ${lastProxyError.message || 'عدم پاسخگویی سرور'}`);
       }
 
-      throw new Error('کد مرچنت درگاه پرداخت زیبال تعریف نشده است.');
+      throw new Error('عدم دریافت پاسخ از درگاه پرداخت.');
     } catch (error: any) {
       console.error('Zibal createPayment error:', error);
       throw new Error(error.message || 'خطا در ارتباط با درگاه بانکی زیبال');
