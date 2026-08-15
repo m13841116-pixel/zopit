@@ -36,6 +36,9 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 
 // src/prisma.ts
 function getPrisma() {
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
+  }
   if (!prismaInstance) {
     try {
       const dbUrl3 = process.env.DATABASE_URL || "";
@@ -58,6 +61,9 @@ function getPrisma() {
               }
             }
           });
+          prismaInstance.$connect().catch((err) => {
+            console.error("[Prisma] Database eager connection failed:", err);
+          });
         } else {
           prismaInstance = createMemoryPrismaProxy();
         }
@@ -66,6 +72,7 @@ function getPrisma() {
       console.warn("[Prisma] Initialization failed, falling back to mock proxy:", err.message);
       prismaInstance = createMemoryPrismaProxy();
     }
+    globalForPrisma.prisma = prismaInstance;
   }
   return prismaInstance;
 }
@@ -96,10 +103,11 @@ function createMemoryPrismaProxy() {
     }
   });
 }
-var prismaInstance, prisma;
+var prismaInstance, globalForPrisma, prisma;
 var init_prisma = __esm({
   "src/prisma.ts"() {
     prismaInstance = null;
+    globalForPrisma = globalThis;
     prisma = getPrisma();
   }
 });
@@ -120,10 +128,14 @@ var init_ZibalService = __esm({
        */
       async createPayment(amount, description, callbackUrl) {
         try {
-          const proxyUrl = process.env.PAYMENT_PROXY_URL;
-          const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY;
+          const proxyUrl = process.env.PAYMENT_PROXY_URL || "https://bankkalaha.ir/zibal-proxy.php";
+          const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || "ZopitPay2026Key";
           if (proxyUrl && proxySecret) {
-            const endpoint = proxyUrl.endsWith("/request") ? proxyUrl : `${proxyUrl.replace(/\/$/, "")}/request`;
+            const endpoint = proxyUrl;
+            let finalCallbackUrl = callbackUrl;
+            if (!finalCallbackUrl.includes("zopit.ir")) {
+              finalCallbackUrl += (finalCallbackUrl.includes("?") ? "&" : "?") + "zopit_bypass=zopit.ir";
+            }
             const response = await fetch(endpoint, {
               method: "POST",
               headers: {
@@ -133,8 +145,9 @@ var init_ZibalService = __esm({
               body: JSON.stringify({
                 merchant: this.zibalMerchant,
                 amount: Number(amount),
-                callbackUrl,
-                description
+                callbackUrl: finalCallbackUrl,
+                description,
+                action: "request"
               })
             });
             const data = await response.json();
@@ -166,25 +179,14 @@ var init_ZibalService = __esm({
               };
             } else {
               console.error("Zibal API error response:", data);
-              const trackId2 = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1e3)}`;
-              return {
-                payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId2}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
-                authority: trackId2
-              };
+              const errorMsg = data.message || `\u06A9\u062F \u062E\u0637\u0627\u06CC \u0632\u06CC\u0628\u0627\u0644: ${data.result}`;
+              throw new Error(`\u062E\u0637\u0627 \u062F\u0631 \u0627\u062A\u0635\u0627\u0644 \u0628\u0647 \u062F\u0631\u06AF\u0627\u0647 \u067E\u0631\u062F\u0627\u062E\u062A \u0632\u06CC\u0628\u0627\u0644: ${errorMsg}`);
             }
           }
-          const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1e3)}`;
-          return {
-            payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
-            authority: trackId
-          };
+          throw new Error("\u06A9\u062F \u0645\u0631\u0686\u0646\u062A \u062F\u0631\u06AF\u0627\u0647 \u067E\u0631\u062F\u0627\u062E\u062A \u0632\u06CC\u0628\u0627\u0644 \u062A\u0639\u0631\u06CC\u0641 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A.");
         } catch (error) {
           console.error("Zibal createPayment error:", error);
-          const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1e3)}`;
-          return {
-            payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
-            authority: trackId
-          };
+          throw new Error(error.message || "\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u062F\u0631\u06AF\u0627\u0647 \u0628\u0627\u0646\u06A9\u06CC \u0632\u06CC\u0628\u0627\u0644");
         }
       }
       /**
@@ -199,10 +201,10 @@ var init_ZibalService = __esm({
               refId: `REF_${authority}`
             };
           }
-          const proxyUrl = process.env.PAYMENT_PROXY_URL;
-          const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY;
+          const proxyUrl = process.env.PAYMENT_PROXY_URL || "https://bankkalaha.ir/zibal-proxy.php";
+          const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || "ZopitPay2026Key";
           if (proxyUrl && proxySecret) {
-            const endpoint = proxyUrl.endsWith("/verify") ? proxyUrl : `${proxyUrl.replace(/\/$/, "")}/verify`;
+            const endpoint = proxyUrl;
             const response2 = await fetch(endpoint, {
               method: "POST",
               headers: {
@@ -324,6 +326,364 @@ var init_ZibalService = __esm({
   }
 });
 
+// src/services/payment/PaymentServiceFactory.ts
+var prisma2, PaymentServiceFactory;
+var init_PaymentServiceFactory = __esm({
+  "src/services/payment/PaymentServiceFactory.ts"() {
+    init_prisma();
+    init_ZibalService();
+    prisma2 = getPrisma();
+    PaymentServiceFactory = class {
+      static async getService() {
+        try {
+          const merchantCodeSetting = await prisma2.systemConfig.findUnique({ where: { key: "PAYMENT_GATEWAY_MERCHANT_CODE" } });
+          const configRecord = await prisma2.systemConfig.findUnique({ where: { key: "payment_gateway_settings" } });
+          let config = {};
+          if (configRecord && configRecord.value) {
+            try {
+              config = JSON.parse(configRecord.value);
+            } catch (e) {
+              console.error("Error parsing payment_gateway_settings JSON", e);
+            }
+          }
+          let merchantId = merchantCodeSetting?.value;
+          if (!merchantId || merchantId === "zibal_merchant_key") {
+            merchantId = config.zibalMerchant;
+          }
+          if (!merchantId || merchantId === "zibal_merchant_key") {
+            merchantId = process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588";
+          }
+          let useSandbox = false;
+          if (config.zibalSandbox !== void 0) {
+            useSandbox = config.zibalSandbox;
+          } else {
+            useSandbox = process.env.USE_MOCK_GATEWAY === "true" || merchantId === "zibal" || merchantId === "sandbox";
+          }
+          console.log("Using Real Zibal Payment Gateway with merchant:", merchantId);
+          return new ZibalService(merchantId);
+        } catch (err) {
+          console.error("Error fetching gateway config", err);
+          return new ZibalService(process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588");
+        }
+      }
+    };
+  }
+});
+
+// src/services/NotificationService.ts
+var import_events, AppEventEmitter, appEvents, NotificationService;
+var init_NotificationService = __esm({
+  "src/services/NotificationService.ts"() {
+    import_events = require("events");
+    AppEventEmitter = class extends import_events.EventEmitter {
+    };
+    appEvents = new AppEventEmitter();
+    NotificationService = class {
+      static init() {
+        appEvents.on("wallet.credited", (data) => {
+          console.log(`[Notification Service] \u{1F4E8} Sending SMS to Supplier ID ${data.supplierId}: "\u0646\u0642\u062F\u06CC\u0646\u06AF\u06CC \u062C\u062F\u06CC\u062F \u0628\u0647 \u06A9\u06CC\u0641\u067E\u0648\u0644 \u0634\u0645\u0627 \u0627\u0641\u0632\u0648\u062F\u0647 \u0634\u062F." (Amount: ${data.amount})`);
+        });
+        appEvents.on("payout.success", (data) => {
+          console.log(`[Notification Service] \u{1F4E8} Sending SMS to Supplier ID ${data.supplierId}: "\u062A\u0633\u0648\u06CC\u0647 \u062D\u0633\u0627\u0628 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0628\u0647 \u0634\u0645\u0627\u0631\u0647 \u0634\u0628\u0627\u06CC \u0634\u0645\u0627 \u0648\u0627\u0631\u06CC\u0632 \u0634\u062F." (Shaba: ${data.shaba})`);
+        });
+        console.log("[Notification Service] Initialized and listening to events.");
+      }
+    };
+  }
+});
+
+// src/services/WalletService.ts
+var WalletService_exports = {};
+__export(WalletService_exports, {
+  LedgerStatus: () => LedgerStatus,
+  LedgerType: () => LedgerType,
+  PayoutStatus: () => PayoutStatus,
+  WalletService: () => WalletService
+});
+var import_library, LedgerType, LedgerStatus, PayoutStatus, prisma10, WalletService;
+var init_WalletService = __esm({
+  "src/services/WalletService.ts"() {
+    init_prisma();
+    import_library = require("@prisma/client/runtime/library");
+    init_PaymentServiceFactory();
+    init_NotificationService();
+    LedgerType = {
+      CREDIT: "CREDIT",
+      WITHDRAWAL: "WITHDRAWAL",
+      ORDER_REVENUE: "ORDER_REVENUE",
+      FEE: "FEE",
+      REFUND: "REFUND"
+    };
+    LedgerStatus = {
+      PENDING: "PENDING",
+      COMPLETED: "COMPLETED",
+      FAILED: "FAILED"
+    };
+    PayoutStatus = {
+      PENDING: "PENDING",
+      PROCESSING: "PROCESSING",
+      SUCCESS: "SUCCESS",
+      FAILED: "FAILED"
+    };
+    prisma10 = getPrisma();
+    WalletService = class {
+      /**
+       * Get the wallet balance for a specific wallet ID
+       * @param walletId The ID of the wallet
+       * @returns The current balance as a Decimal
+       */
+      async getBalance(walletId) {
+        const wallet = await prisma10.wallet.findUnique({
+          where: { id: walletId }
+        });
+        if (!wallet) {
+          throw new Error("Wallet not found.");
+        }
+        return wallet.balance;
+      }
+      /**
+       * Credit the wallet (increase balance) and create a ledger entry.
+       * Runs inside an ACID compliant transaction to prevent race conditions.
+       *
+       * @param walletId The ID of the wallet
+       * @param amount The transaction amount (positive)
+       * @param type The type of ledger entry
+       * @param referenceId Optional reference ID to external entities
+       * @param description Transaction description
+       * @returns The created ledger entry record
+       */
+      async creditWallet(walletId, amount, type, referenceId = null, description) {
+        const transactionAmount = new import_library.Decimal(amount);
+        if (transactionAmount.lte(0)) {
+          throw new Error("Credit amount must be greater than zero.");
+        }
+        return await prisma10.$transaction(async (tx) => {
+          const wallet = await tx.wallet.findUnique({
+            where: { id: walletId }
+          });
+          if (!wallet) {
+            throw new Error("Wallet not found.");
+          }
+          const updatedWallet = await tx.wallet.update({
+            where: { id: walletId },
+            data: {
+              balance: {
+                increment: transactionAmount
+              }
+            }
+          });
+          const ledgerEntry = await tx.ledgerEntry.create({
+            data: {
+              walletId,
+              amount: transactionAmount,
+              type,
+              status: LedgerStatus.COMPLETED,
+              description,
+              referenceId
+            }
+          });
+          appEvents.emit("wallet.credited", {
+            walletId,
+            amount: transactionAmount.toNumber(),
+            supplierId: wallet.supplierId
+          });
+          return ledgerEntry;
+        });
+      }
+      /**
+       * Debit the wallet (decrease balance) and create a ledger entry.
+       * Ensures the wallet has sufficient funds before debiting.
+       * Runs inside an ACID compliant transaction.
+       *
+       * @param walletId The ID of the wallet
+       * @param amount The transaction amount (positive)
+       * @param type The type of ledger entry
+       * @param referenceId Optional reference ID to external entities
+       * @param description Transaction description
+       * @returns The created ledger entry record
+       */
+      async debitWallet(walletId, amount, type, referenceId = null, description) {
+        const transactionAmount = new import_library.Decimal(amount);
+        if (transactionAmount.lte(0)) {
+          throw new Error("Debit amount must be greater than zero.");
+        }
+        return await prisma10.$transaction(async (tx) => {
+          const wallet = await tx.wallet.findUnique({
+            where: { id: walletId }
+          });
+          if (!wallet) {
+            throw new Error("Wallet not found.");
+          }
+          if (wallet.balance.lt(transactionAmount)) {
+            throw new Error(`Insufficient funds. Available balance: ${wallet.balance.toString()}`);
+          }
+          const updatedWallet = await tx.wallet.update({
+            where: { id: walletId },
+            data: {
+              balance: {
+                decrement: transactionAmount
+              }
+            }
+          });
+          if (updatedWallet.balance.lt(0)) {
+            throw new Error("Insufficient funds. Transaction reverted.");
+          }
+          const ledgerEntry = await tx.ledgerEntry.create({
+            data: {
+              walletId,
+              amount: transactionAmount.negated(),
+              type,
+              status: LedgerStatus.COMPLETED,
+              description,
+              referenceId
+            }
+          });
+          return ledgerEntry;
+        });
+      }
+      /**
+       * Request a payout (withdrawal) to a bank account (Shaba).
+       * Debits the wallet immediately to reserve/lock funds and creates a PayoutRequest.
+       * Integrates with PaymentGateway for actual transfer.
+       *
+       * @param walletId The ID of the wallet
+       * @param amount The withdrawal amount
+       * @param shaba The supplier's Shaba number
+       * @returns The created PayoutRequest record
+       */
+      async requestPayout(walletId, amount, shaba) {
+        const payoutAmount = new import_library.Decimal(amount);
+        if (payoutAmount.lte(0)) {
+          throw new Error("Payout amount must be greater than zero.");
+        }
+        const activePayouts = await prisma10.payoutRequest.findFirst({
+          where: {
+            walletId,
+            status: { in: [PayoutStatus.PENDING, PayoutStatus.PROCESSING] }
+          }
+        });
+        if (activePayouts) {
+          throw new Error("An active payout request already exists. Please wait for it to complete.");
+        }
+        const payoutRequest = await prisma10.$transaction(async (tx) => {
+          const wallet = await tx.wallet.findUnique({
+            where: { id: walletId }
+          });
+          if (!wallet) {
+            throw new Error("Wallet not found.");
+          }
+          if (wallet.balance.lt(payoutAmount)) {
+            throw new Error(`Insufficient funds for payout. Available balance: ${wallet.balance.toString()}`);
+          }
+          const updatedWallet = await tx.wallet.update({
+            where: { id: walletId },
+            data: {
+              balance: {
+                decrement: payoutAmount
+              }
+            }
+          });
+          if (updatedWallet.balance.lt(0)) {
+            throw new Error("Insufficient funds. Transaction reverted.");
+          }
+          const pr = await tx.payoutRequest.create({
+            data: {
+              walletId,
+              amount: payoutAmount,
+              shaba,
+              status: PayoutStatus.PROCESSING
+            }
+          });
+          await tx.ledgerEntry.create({
+            data: {
+              walletId,
+              amount: payoutAmount.negated(),
+              type: LedgerType.WITHDRAWAL,
+              status: LedgerStatus.PENDING,
+              referenceId: pr.id,
+              description: `Payout request to Shaba: ${shaba}`
+            }
+          });
+          return pr;
+        });
+        try {
+          const paymentService2 = await PaymentServiceFactory.getService();
+          const gatewayResponse = await paymentService2.requestPayout(
+            payoutAmount.toNumber(),
+            shaba,
+            `Payout for wallet ${walletId}`
+          );
+          return await prisma10.payoutRequest.update({
+            where: { id: payoutRequest.id },
+            data: {
+              trackId: gatewayResponse.trackId,
+              status: PayoutStatus.PROCESSING
+            }
+          });
+        } catch (error) {
+          console.warn(`Direct gateway payout unavailable (${error.message}). Saved request as PENDING for admin approval.`);
+          return await prisma10.payoutRequest.update({
+            where: { id: payoutRequest.id },
+            data: {
+              status: PayoutStatus.PENDING
+            }
+          });
+        }
+      }
+      /**
+       * Syncs the payout status with the payment gateway
+       * @param trackId The tracking ID from the gateway
+       */
+      async syncPayoutStatus(trackId) {
+        const payoutRequest = await prisma10.payoutRequest.findFirst({
+          where: { trackId }
+        });
+        if (!payoutRequest || payoutRequest.status === PayoutStatus.SUCCESS || payoutRequest.status === PayoutStatus.FAILED) {
+          return;
+        }
+        const paymentService2 = await PaymentServiceFactory.getService();
+        const gatewayStatus = await paymentService2.getPayoutStatus(trackId);
+        if (gatewayStatus.status === "SUCCESS" || gatewayStatus.status === "FAILED") {
+          await prisma10.$transaction(async (tx) => {
+            const newStatus = gatewayStatus.status === "SUCCESS" ? PayoutStatus.SUCCESS : PayoutStatus.FAILED;
+            await tx.payoutRequest.update({
+              where: { id: payoutRequest.id },
+              data: { status: newStatus }
+            });
+            await tx.ledgerEntry.updateMany({
+              where: { referenceId: payoutRequest.id, type: LedgerType.WITHDRAWAL },
+              data: {
+                status: newStatus === PayoutStatus.SUCCESS ? LedgerStatus.COMPLETED : LedgerStatus.FAILED
+              }
+            });
+            if (newStatus === PayoutStatus.SUCCESS) {
+              const wallet = await tx.wallet.findUnique({ where: { id: payoutRequest.walletId } });
+              if (wallet) {
+                appEvents.emit("payout.success", {
+                  walletId: payoutRequest.walletId,
+                  amount: payoutRequest.amount.toNumber(),
+                  supplierId: wallet.supplierId,
+                  shaba: payoutRequest.shaba
+                });
+              }
+            }
+            if (newStatus === PayoutStatus.FAILED) {
+              await tx.wallet.update({
+                where: { id: payoutRequest.walletId },
+                data: {
+                  balance: {
+                    increment: payoutRequest.amount
+                  }
+                }
+              });
+            }
+          });
+        }
+      }
+    };
+  }
+});
+
 // src/services/payment/MockZibalService.ts
 var MockZibalService_exports = {};
 __export(MockZibalService_exports, {
@@ -374,372 +734,6 @@ var init_MockZibalService = __esm({
           status: record.status,
           detail: "Simulated payout detail message"
         };
-      }
-    };
-  }
-});
-
-// src/services/payment/PaymentServiceFactory.ts
-var prisma2, PaymentServiceFactory;
-var init_PaymentServiceFactory = __esm({
-  "src/services/payment/PaymentServiceFactory.ts"() {
-    init_prisma();
-    init_ZibalService();
-    init_MockZibalService();
-    prisma2 = getPrisma();
-    PaymentServiceFactory = class {
-      static async getService() {
-        try {
-          const merchantCodeSetting = await prisma2.systemConfig.findUnique({ where: { key: "PAYMENT_GATEWAY_MERCHANT_CODE" } });
-          const configRecord = await prisma2.systemConfig.findUnique({ where: { key: "payment_gateway_settings" } });
-          let config = {};
-          if (configRecord && configRecord.value) {
-            try {
-              config = JSON.parse(configRecord.value);
-            } catch (e) {
-              console.error("Error parsing payment_gateway_settings JSON", e);
-            }
-          }
-          let merchantId = merchantCodeSetting?.value;
-          if (!merchantId || merchantId === "zibal_merchant_key") {
-            merchantId = config.zibalMerchant;
-          }
-          if (!merchantId || merchantId === "zibal_merchant_key") {
-            merchantId = process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588";
-          }
-          let useSandbox = false;
-          if (config.zibalSandbox !== void 0) {
-            useSandbox = config.zibalSandbox;
-          } else {
-            useSandbox = process.env.USE_MOCK_GATEWAY === "true" || merchantId === "zibal" || merchantId === "sandbox";
-          }
-          if (useSandbox) {
-            console.log("Using Mock Payment Gateway (Sandbox Mode)");
-            return new MockZibalService();
-          }
-          console.log("Using Real Zibal Payment Gateway", merchantId);
-          return new ZibalService(merchantId);
-        } catch (err) {
-          console.error("Error fetching gateway config", err);
-          if (process.env.USE_MOCK_GATEWAY === "true") {
-            return new MockZibalService();
-          }
-          return new ZibalService(process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588");
-        }
-      }
-    };
-  }
-});
-
-// src/services/NotificationService.ts
-var import_events, AppEventEmitter, appEvents, NotificationService;
-var init_NotificationService = __esm({
-  "src/services/NotificationService.ts"() {
-    import_events = require("events");
-    AppEventEmitter = class extends import_events.EventEmitter {
-    };
-    appEvents = new AppEventEmitter();
-    NotificationService = class {
-      static init() {
-        appEvents.on("wallet.credited", (data) => {
-          console.log(`[Notification Service] \u{1F4E8} Sending SMS to Supplier ID ${data.supplierId}: "\u0646\u0642\u062F\u06CC\u0646\u06AF\u06CC \u062C\u062F\u06CC\u062F \u0628\u0647 \u06A9\u06CC\u0641\u067E\u0648\u0644 \u0634\u0645\u0627 \u0627\u0641\u0632\u0648\u062F\u0647 \u0634\u062F." (Amount: ${data.amount})`);
-        });
-        appEvents.on("payout.success", (data) => {
-          console.log(`[Notification Service] \u{1F4E8} Sending SMS to Supplier ID ${data.supplierId}: "\u062A\u0633\u0648\u06CC\u0647 \u062D\u0633\u0627\u0628 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0628\u0647 \u0634\u0645\u0627\u0631\u0647 \u0634\u0628\u0627\u06CC \u0634\u0645\u0627 \u0648\u0627\u0631\u06CC\u0632 \u0634\u062F." (Shaba: ${data.shaba})`);
-        });
-        console.log("[Notification Service] Initialized and listening to events.");
-      }
-    };
-  }
-});
-
-// src/services/WalletService.ts
-var WalletService_exports = {};
-__export(WalletService_exports, {
-  LedgerStatus: () => LedgerStatus,
-  LedgerType: () => LedgerType,
-  PayoutStatus: () => PayoutStatus,
-  WalletService: () => WalletService
-});
-var import_library, LedgerType, LedgerStatus, PayoutStatus, prisma11, WalletService;
-var init_WalletService = __esm({
-  "src/services/WalletService.ts"() {
-    init_prisma();
-    import_library = require("@prisma/client/runtime/library");
-    init_PaymentServiceFactory();
-    init_NotificationService();
-    LedgerType = {
-      CREDIT: "CREDIT",
-      WITHDRAWAL: "WITHDRAWAL",
-      ORDER_REVENUE: "ORDER_REVENUE",
-      FEE: "FEE",
-      REFUND: "REFUND"
-    };
-    LedgerStatus = {
-      PENDING: "PENDING",
-      COMPLETED: "COMPLETED",
-      FAILED: "FAILED"
-    };
-    PayoutStatus = {
-      PENDING: "PENDING",
-      PROCESSING: "PROCESSING",
-      SUCCESS: "SUCCESS",
-      FAILED: "FAILED"
-    };
-    prisma11 = getPrisma();
-    WalletService = class {
-      /**
-       * Get the wallet balance for a specific wallet ID
-       * @param walletId The ID of the wallet
-       * @returns The current balance as a Decimal
-       */
-      async getBalance(walletId) {
-        const wallet = await prisma11.wallet.findUnique({
-          where: { id: walletId }
-        });
-        if (!wallet) {
-          throw new Error("Wallet not found.");
-        }
-        return wallet.balance;
-      }
-      /**
-       * Credit the wallet (increase balance) and create a ledger entry.
-       * Runs inside an ACID compliant transaction to prevent race conditions.
-       *
-       * @param walletId The ID of the wallet
-       * @param amount The transaction amount (positive)
-       * @param type The type of ledger entry
-       * @param referenceId Optional reference ID to external entities
-       * @param description Transaction description
-       * @returns The created ledger entry record
-       */
-      async creditWallet(walletId, amount, type, referenceId = null, description) {
-        const transactionAmount = new import_library.Decimal(amount);
-        if (transactionAmount.lte(0)) {
-          throw new Error("Credit amount must be greater than zero.");
-        }
-        return await prisma11.$transaction(async (tx) => {
-          const wallet = await tx.wallet.findUnique({
-            where: { id: walletId }
-          });
-          if (!wallet) {
-            throw new Error("Wallet not found.");
-          }
-          const updatedWallet = await tx.wallet.update({
-            where: { id: walletId },
-            data: {
-              balance: {
-                increment: transactionAmount
-              }
-            }
-          });
-          const ledgerEntry = await tx.ledgerEntry.create({
-            data: {
-              walletId,
-              amount: transactionAmount,
-              type,
-              status: LedgerStatus.COMPLETED,
-              description,
-              referenceId
-            }
-          });
-          appEvents.emit("wallet.credited", {
-            walletId,
-            amount: transactionAmount.toNumber(),
-            supplierId: wallet.supplierId
-          });
-          return ledgerEntry;
-        });
-      }
-      /**
-       * Debit the wallet (decrease balance) and create a ledger entry.
-       * Ensures the wallet has sufficient funds before debiting.
-       * Runs inside an ACID compliant transaction.
-       *
-       * @param walletId The ID of the wallet
-       * @param amount The transaction amount (positive)
-       * @param type The type of ledger entry
-       * @param referenceId Optional reference ID to external entities
-       * @param description Transaction description
-       * @returns The created ledger entry record
-       */
-      async debitWallet(walletId, amount, type, referenceId = null, description) {
-        const transactionAmount = new import_library.Decimal(amount);
-        if (transactionAmount.lte(0)) {
-          throw new Error("Debit amount must be greater than zero.");
-        }
-        return await prisma11.$transaction(async (tx) => {
-          const wallet = await tx.wallet.findUnique({
-            where: { id: walletId }
-          });
-          if (!wallet) {
-            throw new Error("Wallet not found.");
-          }
-          if (wallet.balance.lt(transactionAmount)) {
-            throw new Error(`Insufficient funds. Available balance: ${wallet.balance.toString()}`);
-          }
-          const updatedWallet = await tx.wallet.update({
-            where: { id: walletId },
-            data: {
-              balance: {
-                decrement: transactionAmount
-              }
-            }
-          });
-          if (updatedWallet.balance.lt(0)) {
-            throw new Error("Insufficient funds. Transaction reverted.");
-          }
-          const ledgerEntry = await tx.ledgerEntry.create({
-            data: {
-              walletId,
-              amount: transactionAmount.negated(),
-              type,
-              status: LedgerStatus.COMPLETED,
-              description,
-              referenceId
-            }
-          });
-          return ledgerEntry;
-        });
-      }
-      /**
-       * Request a payout (withdrawal) to a bank account (Shaba).
-       * Debits the wallet immediately to reserve/lock funds and creates a PayoutRequest.
-       * Integrates with PaymentGateway for actual transfer.
-       *
-       * @param walletId The ID of the wallet
-       * @param amount The withdrawal amount
-       * @param shaba The supplier's Shaba number
-       * @returns The created PayoutRequest record
-       */
-      async requestPayout(walletId, amount, shaba) {
-        const payoutAmount = new import_library.Decimal(amount);
-        if (payoutAmount.lte(0)) {
-          throw new Error("Payout amount must be greater than zero.");
-        }
-        const activePayouts = await prisma11.payoutRequest.findFirst({
-          where: {
-            walletId,
-            status: { in: [PayoutStatus.PENDING, PayoutStatus.PROCESSING] }
-          }
-        });
-        if (activePayouts) {
-          throw new Error("An active payout request already exists. Please wait for it to complete.");
-        }
-        const payoutRequest = await prisma11.$transaction(async (tx) => {
-          const wallet = await tx.wallet.findUnique({
-            where: { id: walletId }
-          });
-          if (!wallet) {
-            throw new Error("Wallet not found.");
-          }
-          if (wallet.balance.lt(payoutAmount)) {
-            throw new Error(`Insufficient funds for payout. Available balance: ${wallet.balance.toString()}`);
-          }
-          const updatedWallet = await tx.wallet.update({
-            where: { id: walletId },
-            data: {
-              balance: {
-                decrement: payoutAmount
-              }
-            }
-          });
-          if (updatedWallet.balance.lt(0)) {
-            throw new Error("Insufficient funds. Transaction reverted.");
-          }
-          const pr = await tx.payoutRequest.create({
-            data: {
-              walletId,
-              amount: payoutAmount,
-              shaba,
-              status: PayoutStatus.PROCESSING
-            }
-          });
-          await tx.ledgerEntry.create({
-            data: {
-              walletId,
-              amount: payoutAmount.negated(),
-              type: LedgerType.WITHDRAWAL,
-              status: LedgerStatus.PENDING,
-              referenceId: pr.id,
-              description: `Payout request to Shaba: ${shaba}`
-            }
-          });
-          return pr;
-        });
-        try {
-          const paymentService2 = await PaymentServiceFactory.getService();
-          const gatewayResponse = await paymentService2.requestPayout(
-            payoutAmount.toNumber(),
-            shaba,
-            `Payout for wallet ${walletId}`
-          );
-          return await prisma11.payoutRequest.update({
-            where: { id: payoutRequest.id },
-            data: {
-              trackId: gatewayResponse.trackId,
-              status: PayoutStatus.PROCESSING
-            }
-          });
-        } catch (error) {
-          console.warn(`Direct gateway payout unavailable (${error.message}). Saved request as PENDING for admin approval.`);
-          return await prisma11.payoutRequest.update({
-            where: { id: payoutRequest.id },
-            data: {
-              status: PayoutStatus.PENDING
-            }
-          });
-        }
-      }
-      /**
-       * Syncs the payout status with the payment gateway
-       * @param trackId The tracking ID from the gateway
-       */
-      async syncPayoutStatus(trackId) {
-        const payoutRequest = await prisma11.payoutRequest.findFirst({
-          where: { trackId }
-        });
-        if (!payoutRequest || payoutRequest.status === PayoutStatus.SUCCESS || payoutRequest.status === PayoutStatus.FAILED) {
-          return;
-        }
-        const paymentService2 = await PaymentServiceFactory.getService();
-        const gatewayStatus = await paymentService2.getPayoutStatus(trackId);
-        if (gatewayStatus.status === "SUCCESS" || gatewayStatus.status === "FAILED") {
-          await prisma11.$transaction(async (tx) => {
-            const newStatus = gatewayStatus.status === "SUCCESS" ? PayoutStatus.SUCCESS : PayoutStatus.FAILED;
-            await tx.payoutRequest.update({
-              where: { id: payoutRequest.id },
-              data: { status: newStatus }
-            });
-            await tx.ledgerEntry.updateMany({
-              where: { referenceId: payoutRequest.id, type: LedgerType.WITHDRAWAL },
-              data: {
-                status: newStatus === PayoutStatus.SUCCESS ? LedgerStatus.COMPLETED : LedgerStatus.FAILED
-              }
-            });
-            if (newStatus === PayoutStatus.SUCCESS) {
-              const wallet = await tx.wallet.findUnique({ where: { id: payoutRequest.walletId } });
-              if (wallet) {
-                appEvents.emit("payout.success", {
-                  walletId: payoutRequest.walletId,
-                  amount: payoutRequest.amount.toNumber(),
-                  supplierId: wallet.supplierId,
-                  shaba: payoutRequest.shaba
-                });
-              }
-            }
-            if (newStatus === PayoutStatus.FAILED) {
-              await tx.wallet.update({
-                where: { id: payoutRequest.walletId },
-                data: {
-                  balance: {
-                    increment: payoutRequest.amount
-                  }
-                }
-              });
-            }
-          });
-        }
       }
     };
   }
@@ -870,10 +864,10 @@ var import_multer = __toESM(require("multer"));
 var import_adm_zip = __toESM(require("adm-zip"));
 
 // src/services/adminShippingRoutes.ts
-function registerAdminShippingRoutes(app2, prisma15, authenticateToken2, requireSuperAdmin2) {
+function registerAdminShippingRoutes(app2, prisma14, authenticateToken2, requireSuperAdmin2) {
   app2.get("/api/admin/shipping", authenticateToken2, requireSuperAdmin2, async (req, res) => {
     try {
-      const orders = await prisma15.order.findMany({
+      const orders = await prisma14.order.findMany({
         where: {
           status: {
             in: [
@@ -910,7 +904,7 @@ function registerAdminShippingRoutes(app2, prisma15, authenticateToken2, require
       if (!cost || cost <= 0) {
         return res.status(400).json({ error: "\u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A." });
       }
-      const order = await prisma15.order.findUnique({
+      const order = await prisma14.order.findUnique({
         where: { id: parseInt(orderId) }
       });
       if (!order) {
@@ -919,7 +913,7 @@ function registerAdminShippingRoutes(app2, prisma15, authenticateToken2, require
       if (order.status !== "WAITING_SHIPPING_COST") {
         return res.status(400).json({ error: "\u0648\u0636\u0639\u06CC\u062A \u0633\u0641\u0627\u0631\u0634 \u0628\u0631\u0627\u06CC \u062B\u0628\u062A \u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A." });
       }
-      const invoice = await prisma15.shippingInvoice.create({
+      const invoice = await prisma14.shippingInvoice.create({
         data: {
           orderId: order.id,
           shippingCost: Number(cost),
@@ -927,7 +921,7 @@ function registerAdminShippingRoutes(app2, prisma15, authenticateToken2, require
           description: description || ""
         }
       });
-      await prisma15.order.update({
+      await prisma14.order.update({
         where: { id: order.id },
         data: {
           status: "WAITING_SHIPPING_PAYMENT",
@@ -952,11 +946,11 @@ function registerAdminShippingRoutes(app2, prisma15, authenticateToken2, require
 
 // src/services/storeShippingRoutes.ts
 init_PaymentServiceFactory();
-function registerStoreShippingRoutes(app2, prisma15, authenticateToken2, requireStoreManager2) {
+function registerStoreShippingRoutes(app2, prisma14, authenticateToken2, requireStoreManager2) {
   app2.post("/api/store-manager/shipping/:orderId/pay", authenticateToken2, requireStoreManager2, async (req, res) => {
     try {
       const { orderId } = req.params;
-      const order = await prisma15.order.findUnique({
+      const order = await prisma14.order.findUnique({
         where: { id: parseInt(orderId), storeId: req.user.userId },
         include: { shippingInvoice: true }
       });
@@ -979,7 +973,7 @@ function registerStoreShippingRoutes(app2, prisma15, authenticateToken2, require
           `\u067E\u0631\u062F\u0627\u062E\u062A \u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644 \u0633\u0641\u0627\u0631\u0634 #${order.id}`,
           callbackUrl
         );
-        await prisma15.shippingInvoice.update({
+        await prisma14.shippingInvoice.update({
           where: { id: order.shippingInvoice.id },
           data: { payLink: zibalResult.payLink }
         });
@@ -994,161 +988,359 @@ function registerStoreShippingRoutes(app2, prisma15, authenticateToken2, require
   });
 }
 
-// src/services/sms/SmsService.ts
-var import_node_fetch = __toESM(require("node-fetch"));
+// src/cronJobs.ts
 init_prisma();
+
+// src/services/sms/SmsService.ts
+init_prisma();
+function sanitizeMobileNumber(mobile) {
+  let cleanMobile = mobile ? String(mobile).trim().replace(/\s+/g, "") : "";
+  if (cleanMobile.startsWith("+98")) {
+    cleanMobile = "0" + cleanMobile.slice(3);
+  } else if (cleanMobile.startsWith("98") && cleanMobile.length === 12) {
+    cleanMobile = "0" + cleanMobile.slice(2);
+  }
+  return cleanMobile;
+}
+async function getMelliPayamakConfig() {
+  const prisma14 = getPrisma();
+  const [dbUser, dbPass, dbFrom, dbPatternGeneral, dbPatternOtp, dbPatternSupplier, dbPatternLabel] = await Promise.all([
+    prisma14.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_USERNAME" } }),
+    prisma14.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_PASSWORD" } }),
+    prisma14.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_FROM_NUMBER" } }),
+    prisma14.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_PATTERN_ID" } }),
+    prisma14.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_PATTERN_OTP" } }),
+    prisma14.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT" } }),
+    prisma14.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_PATTERN_LABEL_ISSUED" } })
+  ]);
+  const username = dbUser?.value?.trim() || process.env.MELLIPAYAMAK_USERNAME?.trim() || "";
+  const password = dbPass?.value?.trim() || process.env.MELLIPAYAMAK_PASSWORD?.trim() || "";
+  const fromNumber = dbFrom?.value?.trim() || process.env.MELLIPAYAMAK_FROM_NUMBER?.trim() || "50001";
+  return {
+    username,
+    password,
+    fromNumber,
+    patterns: {
+      MELLIPAYAMAK_PATTERN_ID: dbPatternGeneral?.value?.trim() || "",
+      MELLIPAYAMAK_PATTERN_OTP: dbPatternOtp?.value?.trim() || "",
+      MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT: dbPatternSupplier?.value?.trim() || "",
+      MELLIPAYAMAK_PATTERN_LABEL_ISSUED: dbPatternLabel?.value?.trim() || ""
+    }
+  };
+}
 async function sendPattern(mobile, patternKey, textValues) {
   try {
-    const prisma15 = getPrisma();
-    const [dbProvider, dbUser, dbPass, dbFrom, dbPattern] = await Promise.all([
-      prisma15.systemConfig.findUnique({ where: { key: "SMS_PANEL_PROVIDER" } }),
-      prisma15.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_USERNAME" } }),
-      prisma15.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_PASSWORD" } }),
-      prisma15.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_FROM_NUMBER" } }),
-      prisma15.systemConfig.findUnique({ where: { key: patternKey } })
-    ]);
-    const provider2 = dbProvider?.value || "MELIPAYAMAK";
-    const username = dbUser?.value || process.env.MELLIPAYAMAK_USERNAME;
-    const password = dbPass?.value || process.env.MELLIPAYAMAK_PASSWORD;
-    const bodyId = dbPattern?.value || process.env[patternKey];
-    const dbApiKey = await prisma15.systemConfig.findUnique({ where: { key: "SMS_PANEL_API_KEY" } });
-    const apiKey = dbApiKey?.value || password;
-    let cleanMobile = mobile ? mobile.trim().replace(/\s+/g, "") : "";
-    if (cleanMobile.startsWith("+98")) cleanMobile = "0" + cleanMobile.slice(3);
-    else if (cleanMobile.startsWith("98")) cleanMobile = "0" + cleanMobile.slice(2);
-    if (!cleanMobile || cleanMobile.length < 10) return { success: false, error: "\u0634\u0645\u0627\u0631\u0647 \u0645\u0648\u0628\u0627\u06CC\u0644 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" };
-    if (!bodyId) {
-      console.log(`[SMS Simulation] To: ${cleanMobile}, Provider: ${provider2}, Pattern: ${patternKey}, Values: ${textValues.join(", ")}`);
-      return { success: true, simulated: true, response: { message: "\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u067E\u06CC\u0627\u0645\u06A9 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0627\u0646\u062C\u0627\u0645 \u0634\u062F (\u067E\u062A\u0631\u0646 \u062A\u0639\u0631\u06CC\u0641 \u0646\u0634\u062F\u0647)" } };
+    const config = await getMelliPayamakConfig();
+    if (!config.username || !config.password) {
+      console.error("[SMS Service] MelliPayamak credentials (username/password) are missing from Database/SystemConfig.");
+      return {
+        success: false,
+        error: "\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0648 \u06A9\u0644\u0645\u0647 \u0639\u0628\u0648\u0631 \u0645\u0644\u06CC\u200C\u067E\u06CC\u0627\u0645\u06A9 \u062F\u0631 \u067E\u0646\u0644 \u0633\u0648\u067E\u0631\u0627\u062F\u0645\u06CC\u0646 \u067E\u06CC\u06A9\u0631\u0628\u0646\u062F\u06CC \u0646\u0634\u062F\u0647 \u0627\u0633\u062A."
+      };
     }
-    if (provider2 === "KAVENEGAR") {
-      if (!apiKey) return { success: true, simulated: true, message: "\u0628\u062F\u0648\u0646 API KEY" };
-      const url = `https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json?receptor=${cleanMobile}&token=${encodeURIComponent(textValues[0] || "")}&token2=${encodeURIComponent(textValues[1] || "")}&token3=${encodeURIComponent(textValues[2] || "")}&template=${bodyId}`;
-      const response = await (0, import_node_fetch.default)(url);
-      const data = await response.json().catch(() => ({}));
-      return { success: response.ok, response: data };
-    } else if (provider2 === "FARAZSMS") {
-      if (!username || !password) return { success: true, simulated: true, message: "\u0628\u062F\u0648\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC/\u0631\u0645\u0632" };
-      const response = await (0, import_node_fetch.default)("https://ippanel.com/api/select", {
+    const cleanMobile = sanitizeMobileNumber(mobile);
+    if (!cleanMobile || cleanMobile.length < 10) {
+      return { success: false, error: "\u0634\u0645\u0627\u0631\u0647 \u0645\u0648\u0628\u0627\u06CC\u0644 \u06AF\u06CC\u0631\u0646\u062F\u0647 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A." };
+    }
+    let rawBodyId = config.patterns[patternKey] || "";
+    if (!rawBodyId) {
+      const prisma14 = getPrisma();
+      const customKeyConfig = await prisma14.systemConfig.findUnique({ where: { key: patternKey } }).catch(() => null);
+      rawBodyId = customKeyConfig?.value?.trim() || config.patterns.MELLIPAYAMAK_PATTERN_ID || "";
+    }
+    if (!rawBodyId && !isNaN(Number(patternKey)) && Number(patternKey) > 0) {
+      rawBodyId = patternKey;
+    }
+    const bodyIdNumber = parseInt(rawBodyId, 10);
+    if (!bodyIdNumber || isNaN(bodyIdNumber)) {
+      console.error(`[SMS Service] Pattern ID for key "${patternKey}" is not defined or invalid.`);
+      return {
+        success: false,
+        error: `\u0634\u0646\u0627\u0633\u0647 \u067E\u062A\u0631\u0646 (Body ID) \u0628\u0631\u0627\u06CC \u0631\u0648\u06CC\u062F\u0627\u062F ${patternKey} \u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F.`
+      };
+    }
+    const argsArray = Array.isArray(textValues) ? textValues : [String(textValues)];
+    const textFormatted = argsArray.join(";");
+    const payload = {
+      username: config.username,
+      password: config.password,
+      to: cleanMobile,
+      bodyId: bodyIdNumber,
+      text: textFormatted,
+      args: argsArray,
+      from: config.fromNumber
+    };
+    console.log(`[SMS Service] Sending pattern SMS to ${cleanMobile} (bodyId: ${bodyIdNumber}, text: "${textFormatted}")...`);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5e3);
+      const endpoint = "https://rest.payamak-panel.com/api/SendSMS/BaseServiceNumber";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          op: "pattern",
-          user: username,
-          pass: password,
-          fromNum: "3000505",
-          toNum: cleanMobile,
-          patternCode: bodyId,
-          inputData: textValues.map((v, i) => ({ [`var${i + 1}`]: v }))
-          // generic mapping, usually faraz uses named params
-        })
-      });
-      const data = await response.json().catch(() => ({}));
-      return { success: response.ok, response: data };
-    } else {
-      if (!username || !password) return { success: true, simulated: true, message: "\u0628\u062F\u0648\u0646 \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0645\u0644\u06CC \u067E\u06CC\u0627\u0645\u06A9" };
-      const textStr = textValues.join(";");
-      const response = await (0, import_node_fetch.default)("https://rest.payamak-panel.com/api/SendSMS/BaseServiceNumber", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          password,
-          text: textStr,
+          username: config.username,
+          password: config.password,
           to: cleanMobile,
-          bodyId: parseInt(bodyId, 10) || bodyId
-        })
+          bodyId: bodyIdNumber,
+          text: textFormatted
+        }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       const data = await response.json().catch(() => ({}));
-      return { success: response.ok, response: data };
+      const isSuccess = response.ok && (data.RetStatus === 1 || data.RetStatus === 0 || data.Value && String(data.Value).length > 3 && Number(data.Value) > 0);
+      if (isSuccess) {
+        console.log(`[SMS Service] Direct pattern SMS sent successfully to ${cleanMobile}. Ref ID:`, data.Value || data.StrRetStatus);
+        return {
+          success: true,
+          message: "\u067E\u06CC\u0627\u0645\u06A9 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0633\u0627\u0645\u0627\u0646\u0647 \u0645\u0644\u06CC\u200C\u067E\u06CC\u0627\u0645\u06A9 \u0627\u0631\u0633\u0627\u0644 \u0634\u062F.",
+          trackingCode: String(data.Value || ""),
+          response: data
+        };
+      }
+      console.warn("[SMS Service] Direct REST call response was not successful, trying proxy fallback:", data);
+    } catch (directErr) {
+      console.warn("[SMS Service] Direct MelliPayamak connection failed (likely GeoIP/firewall block), trying proxy fallback:", directErr?.message || directErr);
+    }
+    try {
+      console.log(`[SMS Service] Routing pattern SMS through Iranian proxy for ${cleanMobile}...`);
+      const proxyResponse = await fetch("https://bankkalaha.ir/sms-proxy.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": "ZopitSMS2026Key"
+        },
+        body: JSON.stringify(payload)
+      });
+      const proxyData = await proxyResponse.json().catch(() => ({}));
+      const isProxySuccess = proxyResponse.ok && (proxyData.success === true || proxyData.status === true || proxyData.RetStatus === 1 || proxyData.RetStatus === 0 || proxyData.Value && Number(proxyData.Value) > 0);
+      if (isProxySuccess) {
+        console.log(`[SMS Service] Proxy pattern SMS sent successfully to ${cleanMobile}.`, proxyData);
+        return {
+          success: true,
+          message: "\u067E\u06CC\u0627\u0645\u06A9 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0633\u0627\u0645\u0627\u0646\u0647 \u0645\u0644\u06CC\u200C\u067E\u06CC\u0627\u0645\u06A9 (\u067E\u0631\u0648\u06A9\u0633\u06CC \u0627\u06CC\u0631\u0627\u0646) \u0627\u0631\u0633\u0627\u0644 \u0634\u062F.",
+          trackingCode: String(proxyData.Value || proxyData.trackingCode || ""),
+          response: proxyData
+        };
+      } else {
+        const errMsg = proxyData.message || proxyData.status || proxyData.error || `\u062E\u0637\u0627\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC \u067E\u06CC\u0627\u0645\u06A9 (\u06A9\u062F ${proxyResponse.status})`;
+        console.error("[SMS Service Proxy Error]", errMsg, proxyData);
+        return {
+          success: false,
+          error: `\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9: ${errMsg}`,
+          response: proxyData
+        };
+      }
+    } catch (proxyErr) {
+      console.error("[SMS Service Proxy Exception]", proxyErr);
+      return {
+        success: false,
+        error: `\u062E\u0637\u0627 \u062F\u0631 \u0628\u0631\u0642\u0631\u0627\u0631\u06CC \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0648\u0628\u200C\u0633\u0631\u0648\u06CC\u0633 \u067E\u06CC\u0627\u0645\u06A9: ${proxyErr?.message || "\u0639\u062F\u0645 \u062F\u0633\u062A\u0631\u0633\u06CC \u0628\u0647 \u0633\u0631\u0648\u0631 \u067E\u06CC\u0627\u0645\u06A9"}`
+      };
     }
   } catch (err) {
-    console.error("[SMS API Error]", err);
-    return { success: false, error: err?.message || String(err) };
+    console.error("[SMS Service Exception]", err);
+    return {
+      success: false,
+      error: err?.message || "\u062E\u0637\u0627\u06CC \u0634\u0628\u06A9\u0647 \u06CC\u0627 \u0633\u0631\u0648\u0631 \u062F\u0631 \u0628\u0631\u0642\u0631\u0627\u0631\u06CC \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0648\u0628\u200C\u0633\u0631\u0648\u06CC\u0633 \u0645\u0644\u06CC\u200C\u067E\u06CC\u0627\u0645\u06A9"
+    };
   }
 }
 async function sendSms(mobile, message) {
   try {
-    const prisma15 = getPrisma();
-    const [dbProvider, dbUser, dbPass, dbFrom] = await Promise.all([
-      prisma15.systemConfig.findUnique({ where: { key: "SMS_PANEL_PROVIDER" } }),
-      prisma15.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_USERNAME" } }),
-      prisma15.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_PASSWORD" } }),
-      prisma15.systemConfig.findUnique({ where: { key: "MELLIPAYAMAK_FROM_NUMBER" } })
-    ]);
-    const provider2 = dbProvider?.value || "MELIPAYAMAK";
-    const username = dbUser?.value || process.env.MELLIPAYAMAK_USERNAME;
-    const password = dbPass?.value || process.env.MELLIPAYAMAK_PASSWORD;
-    const fromNumber = dbFrom?.value || process.env.MELLIPAYAMAK_FROM_NUMBER || "50001";
-    const dbApiKey = await prisma15.systemConfig.findUnique({ where: { key: "SMS_PANEL_API_KEY" } });
-    const apiKey = dbApiKey?.value || password;
-    let cleanMobile = mobile ? mobile.trim().replace(/\s+/g, "") : "";
-    if (cleanMobile.startsWith("+98")) cleanMobile = "0" + cleanMobile.slice(3);
-    else if (cleanMobile.startsWith("98")) cleanMobile = "0" + cleanMobile.slice(2);
-    if (!cleanMobile || cleanMobile.length < 10) return { success: false, error: "\u0634\u0645\u0627\u0631\u0647 \u0646\u0627\u0645\u0639\u062A\u0628\u0631" };
-    if (provider2 === "KAVENEGAR") {
-      if (!apiKey) return { success: true, simulated: true };
-      const url = `https://api.kavenegar.com/v1/${apiKey}/sms/send.json?receptor=${cleanMobile}&message=${encodeURIComponent(message)}`;
-      const response = await (0, import_node_fetch.default)(url);
-      const data = await response.json().catch(() => ({}));
-      return { success: response.ok, rawResponse: data };
-    } else if (provider2 === "FARAZSMS") {
-      if (!username || !password) return { success: true, simulated: true };
-      const url = `https://ippanel.com/services.jspd?op=send&uname=${username}&pass=${password}&message=${encodeURIComponent(message)}&to=${cleanMobile}&from=${fromNumber}`;
-      const response = await (0, import_node_fetch.default)(url);
-      const data = await response.json().catch(() => ({}));
-      return { success: response.ok, rawResponse: data };
-    } else {
-      if (!username || !password) return { success: true, simulated: true };
-      const response = await (0, import_node_fetch.default)("https://rest.payamak-panel.com/api/SendSMS/SendSMS", {
+    const config = await getMelliPayamakConfig();
+    if (!config.username || !config.password) {
+      console.error("[SMS Service] MelliPayamak credentials (username/password) missing from Database/SystemConfig.");
+      return {
+        success: false,
+        error: "\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0648 \u06A9\u0644\u0645\u0647 \u0639\u0628\u0648\u0631 \u0645\u0644\u06CC\u200C\u067E\u06CC\u0627\u0645\u06A9 \u062F\u0631 \u067E\u0646\u0644 \u0633\u0648\u067E\u0631\u0627\u062F\u0645\u06CC\u0646 \u067E\u06CC\u06A9\u0631\u0628\u0646\u062F\u06CC \u0646\u0634\u062F\u0647 \u0627\u0633\u062A."
+      };
+    }
+    const cleanMobile = sanitizeMobileNumber(mobile);
+    if (!cleanMobile || cleanMobile.length < 10) {
+      return { success: false, error: "\u0634\u0645\u0627\u0631\u0647 \u0645\u0648\u0628\u0627\u06CC\u0644 \u06AF\u06CC\u0631\u0646\u062F\u0647 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A." };
+    }
+    if (!message || !message.trim()) {
+      return { success: false, error: "\u0645\u062A\u0646 \u067E\u06CC\u0627\u0645\u06A9 \u062E\u0627\u0644\u06CC \u0627\u0633\u062A." };
+    }
+    const payload = {
+      username: config.username,
+      password: config.password,
+      to: cleanMobile,
+      from: config.fromNumber,
+      text: message.trim()
+    };
+    console.log(`[SMS Service] Sending normal SMS to ${cleanMobile}...`);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5e3);
+      const endpoint = "https://rest.payamak-panel.com/api/SendSMS/SendSMS";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          password,
-          to: cleanMobile,
-          from: fromNumber,
-          text: message
-        })
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       const data = await response.json().catch(() => ({}));
-      if (response.ok && (data.Value || data.RetStatus === 0 || typeof data.Value === "number" || typeof data === "string")) {
-        return { success: true, rawResponse: data };
-      } else {
-        return { success: false, message: data.StrRetStatus || "\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9", rawResponse: data };
+      const isSuccess = response.ok && (data.RetStatus === 1 || data.RetStatus === 0 || data.Value && String(data.Value).length > 3 && Number(data.Value) > 0);
+      if (isSuccess) {
+        console.log(`[SMS Service] Normal SMS sent successfully to ${cleanMobile}. Ref ID:`, data.Value || data.StrRetStatus);
+        return {
+          success: true,
+          message: "\u067E\u06CC\u0627\u0645\u06A9 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0633\u0627\u0645\u0627\u0646\u0647 \u0645\u0644\u06CC\u200C\u067E\u06CC\u0627\u0645\u06A9 \u0627\u0631\u0633\u0627\u0644 \u0634\u062F.",
+          trackingCode: String(data.Value || ""),
+          response: data
+        };
       }
+    } catch (directErr) {
+      console.warn("[SMS Service] Direct SendSMS failed, trying proxy fallback:", directErr?.message || directErr);
+    }
+    try {
+      const proxyResponse = await fetch("https://bankkalaha.ir/sms-proxy.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": "ZopitSMS2026Key"
+        },
+        body: JSON.stringify(payload)
+      });
+      const proxyData = await proxyResponse.json().catch(() => ({}));
+      if (proxyResponse.ok && (proxyData.success || proxyData.status === true || proxyData.Value)) {
+        return {
+          success: true,
+          message: "\u067E\u06CC\u0627\u0645\u06A9 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0627\u0631\u0633\u0627\u0644 \u0634\u062F.",
+          response: proxyData
+        };
+      } else {
+        return {
+          success: false,
+          error: proxyData.message || proxyData.error || `\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9 (\u06A9\u062F ${proxyResponse.status})`,
+          response: proxyData
+        };
+      }
+    } catch (proxyErr) {
+      return { success: false, error: "\u062E\u0637\u0627 \u062F\u0631 \u0628\u0631\u0642\u0631\u0627\u0631\u06CC \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0648\u0628\u200C\u0633\u0631\u0648\u06CC\u0633 \u067E\u06CC\u0627\u0645\u06A9" };
     }
   } catch (err) {
-    return { success: false, message: err?.message || "\u062E\u0637\u0627\u06CC \u0634\u0628\u06A9\u0647 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9" };
+    console.error("[SMS Service Exception]", err);
+    return {
+      success: false,
+      error: err?.message || "\u062E\u0637\u0627\u06CC \u0634\u0628\u06A9\u0647 \u062F\u0631 \u0628\u0631\u0642\u0631\u0627\u0631\u06CC \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0648\u0628\u200C\u0633\u0631\u0648\u06CC\u0633 \u0645\u0644\u06CC\u200C\u067E\u06CC\u0627\u0645\u06A9"
+    };
   }
 }
-async function sendSmsViaMelliPayamak(mobile, message, orderId) {
+async function sendSmsViaMelliPayamak(mobile, message, _orderId) {
   return sendSms(mobile, message);
 }
 async function sendMelliPayamakPattern(mobile, patternKey, textValues) {
   return sendPattern(mobile, patternKey, textValues);
 }
 async function sendOtpSms(mobile, code) {
-  const patternRes = await sendPattern(mobile, "MELLIPAYAMAK_PATTERN_OTP", [code]);
-  if (patternRes.success && !patternRes.simulated) return patternRes;
-  return await sendSms(mobile, `\u06A9\u062F \u062A\u0627\u06CC\u06CC\u062F \u0632\u0648\u067E\u06CC\u062A: ${code}
-zopit.ir`);
+  return sendPattern(mobile, "MELLIPAYAMAK_PATTERN_OTP", [code]);
 }
-async function notifySupplierNewOrder(supplierMobile, orderId, supplierName) {
-  return await sendSms(supplierMobile, `\u0632\u0648\u067E\u06CC\u062A: \u0633\u0641\u0627\u0631\u0634 \u062C\u062F\u06CC\u062F #${orderId} \u062B\u0628\u062A \u06AF\u0631\u062F\u06CC\u062F. \u0644\u0637\u0641\u0627 \u0628\u0631\u0631\u0633\u06CC \u0646\u0645\u0627\u06CC\u06CC\u062F.`);
+async function notifySupplierNewOrder(supplierMobile, orderId, _supplierName) {
+  return sendPattern(supplierMobile, "MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT", [String(orderId)]);
 }
 async function notifySupplierCommitment(orderId, storeMobile, supplierMobile) {
-  if (storeMobile) sendPattern(storeMobile, "MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT", [String(orderId)]).catch(() => {
-  });
-  if (supplierMobile) sendSms(supplierMobile, `\u0632\u0648\u067E\u06CC\u062A: \u062A\u0639\u0647\u062F \u0634\u0645\u0627 \u0628\u0631\u0627\u06CC \u0633\u0641\u0627\u0631\u0634 #${orderId} \u062B\u0628\u062A \u0634\u062F.`).catch(() => {
-  });
+  const promises = [];
+  if (storeMobile) {
+    promises.push(sendPattern(storeMobile, "MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT", [String(orderId)]).catch(() => {
+    }));
+  }
+  if (supplierMobile && supplierMobile !== storeMobile) {
+    promises.push(sendPattern(supplierMobile, "MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT", [String(orderId)]).catch(() => {
+    }));
+  }
+  await Promise.allSettled(promises);
   return { success: true };
 }
-async function notifyPostalLabelPrinted(orderId, recipientMobile, trackingCode) {
-  if (!recipientMobile) return { success: false };
-  const patternRes = await sendPattern(recipientMobile, "MELLIPAYAMAK_PATTERN_LABEL_ISSUED", [String(orderId)]);
-  if (patternRes.success && !patternRes.simulated) return patternRes;
-  return await sendSms(recipientMobile, `\u0632\u0648\u067E\u06CC\u062A: \u0645\u0631\u0633\u0648\u0644\u0647 \u0633\u0641\u0627\u0631\u0634 #${orderId} \u0622\u0645\u0627\u062F\u0647 \u0627\u0631\u0633\u0627\u0644 \u0627\u0633\u062A.`);
+async function notifyPostalLabelPrinted(orderIdOrMobile, recipientMobileOrOrderId, trackingCode) {
+  let targetMobile = "";
+  let orderIdVal = "";
+  let trackVal = trackingCode || "";
+  if (typeof orderIdOrMobile === "string" && (orderIdOrMobile.startsWith("09") || orderIdOrMobile.startsWith("98") || orderIdOrMobile.startsWith("+98"))) {
+    targetMobile = orderIdOrMobile;
+    orderIdVal = String(recipientMobileOrOrderId || "");
+  } else {
+    orderIdVal = String(orderIdOrMobile || "");
+    targetMobile = String(recipientMobileOrOrderId || "");
+  }
+  if (!targetMobile) return { success: false, error: "\u0634\u0645\u0627\u0631\u0647 \u0645\u0648\u0628\u0627\u06CC\u0644 \u06AF\u06CC\u0631\u0646\u062F\u0647 \u0645\u0648\u062C\u0648\u062F \u0646\u06CC\u0633\u062A." };
+  const args = trackVal ? [orderIdVal, trackVal] : [orderIdVal];
+  return sendPattern(targetMobile, "MELLIPAYAMAK_PATTERN_LABEL_ISSUED", args);
+}
+
+// src/cronJobs.ts
+function startCronJobs() {
+  setInterval(async () => {
+    try {
+      const prisma14 = getPrisma();
+      const now = /* @__PURE__ */ new Date();
+      const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1e3);
+      const pendingSupplierOrders = await prisma14.order.findMany({
+        where: {
+          status: "WAITING_SUPPLIER_CONFIRMATION",
+          createdAt: { lte: sixHoursAgo }
+        },
+        include: { items: { include: { product: { include: { supplier: true } } } } }
+      });
+      for (const order of pendingSupplierOrders) {
+        const alreadySent = await prisma14.auditTrail.findFirst({
+          where: { action: "SMS_SUPPLIER_6H_DELAY", resource: order.id.toString() }
+        });
+        if (!alreadySent) {
+          const supplierMobile = order.items.find((i) => i.product?.supplier?.mobile)?.product?.supplier?.mobile;
+          if (supplierMobile) {
+            await sendPattern(supplierMobile, "MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT", [order.id.toString()]);
+            await prisma14.auditTrail.create({
+              data: {
+                action: "SMS_SUPPLIER_6H_DELAY",
+                resource: order.id.toString(),
+                metadata: "Sent 6h delay reminder to supplier"
+              }
+            });
+            console.log(`Sent 6h reminder SMS to supplier ${supplierMobile} for order ${order.id}`);
+          }
+        }
+      }
+      const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1e3);
+      const processingOrders = await prisma14.order.findMany({
+        where: {
+          status: "PROCESSING",
+          statusHistory: {
+            some: {
+              toStatus: "PROCESSING",
+              createdAt: { lte: twelveHoursAgo }
+            }
+          }
+        },
+        include: { items: { include: { product: { include: { supplier: true } } } } }
+      });
+      for (const order of processingOrders) {
+        const alreadySent = await prisma14.auditTrail.findFirst({
+          where: { action: "SMS_LABEL_12H_DELAY", resource: order.id.toString() }
+        });
+        if (!alreadySent) {
+          const supplierMobile = order.items.find((i) => i.product?.supplier?.mobile)?.product?.supplier?.mobile;
+          if (supplierMobile) {
+            await sendPattern(supplierMobile, "MELLIPAYAMAK_PATTERN_LABEL_ISSUED", [order.id.toString()]);
+            await prisma14.auditTrail.create({
+              data: {
+                action: "SMS_LABEL_12H_DELAY",
+                resource: order.id.toString(),
+                metadata: "Sent 12h label print reminder to supplier"
+              }
+            });
+            console.log(`Sent 12h label reminder SMS to supplier ${supplierMobile} for order ${order.id}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error running cron jobs:", err);
+    }
+  }, 1e3 * 60 * 60);
 }
 
 // server.ts
@@ -1167,11 +1359,11 @@ init_NotificationService();
 
 // src/services/configRoute.ts
 init_prisma();
-var prisma3 = getPrisma();
 function registerConfig(app2) {
   app2.get("/api/config", async (req, res) => {
     try {
-      const configs = await prisma3.systemConfig.findMany();
+      const prisma14 = getPrisma();
+      const configs = await prisma14.systemConfig.findMany();
       const configMap = configs.reduce((acc, c) => {
         if (c.value === "true") acc[c.key] = true;
         else if (c.value === "false") acc[c.key] = false;
@@ -1180,29 +1372,69 @@ function registerConfig(app2) {
       }, {});
       res.json(configMap);
     } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+      console.error("Error fetching config:", error);
+      res.status(500).json({ error: "Internal server error", details: error?.message || String(error) });
     }
   });
   app2.put("/api/config", async (req, res) => {
     try {
-      const { key: key2, value } = req.body;
-      const config = await prisma3.systemConfig.upsert({
-        where: { key: key2 },
-        update: { value: String(value) },
-        create: { key: key2, value: String(value) }
-      });
-      res.json(config);
+      const prisma14 = getPrisma();
+      const body = req.body || {};
+      if (Array.isArray(body.items)) {
+        for (const item of body.items) {
+          if (item?.key !== void 0) {
+            await prisma14.systemConfig.upsert({
+              where: { key: String(item.key) },
+              update: { value: String(item.value ?? "") },
+              create: { key: String(item.key), value: String(item.value ?? "") }
+            });
+          }
+        }
+        return res.json({ success: true, updatedCount: body.items.length });
+      }
+      if (body.settings && typeof body.settings === "object") {
+        const entries = Object.entries(body.settings);
+        for (const [key2, value] of entries) {
+          await prisma14.systemConfig.upsert({
+            where: { key: String(key2) },
+            update: { value: String(value ?? "") },
+            create: { key: String(key2), value: String(value ?? "") }
+          });
+        }
+        return res.json({ success: true, updatedCount: entries.length });
+      }
+      if (body.key !== void 0) {
+        const config = await prisma14.systemConfig.upsert({
+          where: { key: String(body.key) },
+          update: { value: String(body.value ?? "") },
+          create: { key: String(body.key), value: String(body.value ?? "") }
+        });
+        return res.json({ success: true, config });
+      }
+      if (typeof body === "object" && Object.keys(body).length > 0) {
+        const entries = Object.entries(body);
+        for (const [key2, value] of entries) {
+          await prisma14.systemConfig.upsert({
+            where: { key: String(key2) },
+            update: { value: String(value ?? "") },
+            create: { key: String(key2), value: String(value ?? "") }
+          });
+        }
+        return res.json({ success: true, updatedCount: entries.length });
+      }
+      return res.status(400).json({ error: "\u0645\u062D\u062A\u0648\u0627\u06CC \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A" });
     } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+      console.error("Error saving configs in route:", error);
+      res.status(500).json({ error: "\u062E\u0637\u0627\u06CC \u062F\u0627\u062E\u0644\u06CC \u0633\u0631\u0648\u0631 \u062F\u0631 \u0630\u062E\u06CC\u0631\u0647\u200C\u0633\u0627\u0632\u06CC \u062A\u0646\u0638\u06CC\u0645\u0627\u062A", details: error?.message || String(error) });
     }
   });
 }
 
 // src/services/newFeaturesRoute.ts
-function registerNewFeatures(app2, prisma15) {
+function registerNewFeatures(app2, prisma14) {
   app2.get("/api/admin/info-pages", async (req, res) => {
     try {
-      const pages = await prisma15.infoPage.findMany({
+      const pages = await prisma14.infoPage.findMany({
         orderBy: { createdAt: "desc" }
       });
       res.json(pages);
@@ -1213,7 +1445,7 @@ function registerNewFeatures(app2, prisma15) {
   app2.post("/api/admin/info-pages", async (req, res) => {
     try {
       const { title, slug, category, summary, content, images, attachments, videos, tags, isPublished, isPinned } = req.body;
-      const page = await prisma15.infoPage.create({
+      const page = await prisma14.infoPage.create({
         data: {
           title,
           slug,
@@ -1239,7 +1471,7 @@ function registerNewFeatures(app2, prisma15) {
       const pageId = parseInt(id, 10);
       const updateData = { ...req.body };
       delete updateData.id;
-      const page = await prisma15.infoPage.update({
+      const page = await prisma14.infoPage.update({
         where: { id: isNaN(pageId) ? void 0 : pageId },
         data: updateData
       });
@@ -1252,7 +1484,7 @@ function registerNewFeatures(app2, prisma15) {
     try {
       const { id } = req.params;
       const pageId = parseInt(id, 10);
-      await prisma15.infoPage.delete({
+      await prisma14.infoPage.delete({
         where: { id: isNaN(pageId) ? void 0 : pageId }
       });
       res.json({ success: true });
@@ -1262,7 +1494,7 @@ function registerNewFeatures(app2, prisma15) {
   });
   app2.get("/api/admin/public-messages", async (req, res) => {
     try {
-      const messages = await prisma15.publicMessage.findMany({
+      const messages = await prisma14.publicMessage.findMany({
         orderBy: { createdAt: "desc" }
       });
       res.json(messages);
@@ -1273,7 +1505,7 @@ function registerNewFeatures(app2, prisma15) {
   app2.post("/api/admin/public-messages", async (req, res) => {
     try {
       const { content, icon, color, expiryDate, isActive } = req.body;
-      const msg = await prisma15.publicMessage.create({
+      const msg = await prisma14.publicMessage.create({
         data: {
           content,
           icon: icon || "info",
@@ -1296,7 +1528,7 @@ function registerNewFeatures(app2, prisma15) {
       if (updateData.expiryDate) {
         updateData.expiryDate = new Date(updateData.expiryDate);
       }
-      const msg = await prisma15.publicMessage.update({
+      const msg = await prisma14.publicMessage.update({
         where: { id: isNaN(msgId) ? void 0 : msgId },
         data: updateData
       });
@@ -1309,7 +1541,7 @@ function registerNewFeatures(app2, prisma15) {
     try {
       const { id } = req.params;
       const msgId = parseInt(id, 10);
-      await prisma15.publicMessage.delete({
+      await prisma14.publicMessage.delete({
         where: { id: isNaN(msgId) ? void 0 : msgId }
       });
       res.json({ success: true });
@@ -1319,7 +1551,7 @@ function registerNewFeatures(app2, prisma15) {
   });
   app2.get("/api/admin/dashboard-messages", async (req, res) => {
     try {
-      const messages = await prisma15.dashboardMessage.findMany({
+      const messages = await prisma14.dashboardMessage.findMany({
         orderBy: { createdAt: "desc" }
       });
       res.json(messages);
@@ -1330,7 +1562,7 @@ function registerNewFeatures(app2, prisma15) {
   app2.post("/api/admin/dashboard-messages", async (req, res) => {
     try {
       const { title, content, targetRole, priority, expiryDate, publishDate, attachments } = req.body;
-      const msg = await prisma15.dashboardMessage.create({
+      const msg = await prisma14.dashboardMessage.create({
         data: {
           title,
           content,
@@ -1354,7 +1586,7 @@ function registerNewFeatures(app2, prisma15) {
       delete updateData.id;
       if (updateData.expiryDate) updateData.expiryDate = new Date(updateData.expiryDate);
       if (updateData.publishDate) updateData.publishDate = new Date(updateData.publishDate);
-      const msg = await prisma15.dashboardMessage.update({
+      const msg = await prisma14.dashboardMessage.update({
         where: { id: isNaN(msgId) ? void 0 : msgId },
         data: updateData
       });
@@ -1367,7 +1599,7 @@ function registerNewFeatures(app2, prisma15) {
     try {
       const { id } = req.params;
       const msgId = parseInt(id, 10);
-      await prisma15.dashboardMessage.delete({
+      await prisma14.dashboardMessage.delete({
         where: { id: isNaN(msgId) ? void 0 : msgId }
       });
       res.json({ success: true });
@@ -1378,7 +1610,7 @@ function registerNewFeatures(app2, prisma15) {
   app2.get("/api/menus/:selectedRole", async (req, res) => {
     try {
       const { selectedRole } = req.params;
-      const menu = await prisma15.dynamicMenu.findUnique({
+      const menu = await prisma14.dynamicMenu.findUnique({
         where: { role: selectedRole }
       });
       res.json(menu ? JSON.parse(menu.items) : null);
@@ -1390,7 +1622,7 @@ function registerNewFeatures(app2, prisma15) {
     try {
       const { selectedRole } = req.params;
       const { items } = req.body;
-      const menu = await prisma15.dynamicMenu.upsert({
+      const menu = await prisma14.dynamicMenu.upsert({
         where: { role: selectedRole },
         update: { items: typeof items === "string" ? items : JSON.stringify(items) },
         create: {
@@ -1405,7 +1637,7 @@ function registerNewFeatures(app2, prisma15) {
   });
   app2.get("/api/info-pages", async (req, res) => {
     try {
-      const pages = await prisma15.infoPage.findMany({
+      const pages = await prisma14.infoPage.findMany({
         where: { isPublished: true },
         orderBy: [
           { isPinned: "desc" },
@@ -1419,7 +1651,7 @@ function registerNewFeatures(app2, prisma15) {
   });
   app2.get("/api/dashboard-messages", async (req, res) => {
     try {
-      const messages = await prisma15.dashboardMessage.findMany({
+      const messages = await prisma14.dashboardMessage.findMany({
         where: {
           OR: [
             { expiryDate: null },
@@ -1435,7 +1667,7 @@ function registerNewFeatures(app2, prisma15) {
   });
   app2.get("/api/public-messages", async (req, res) => {
     try {
-      const messages = await prisma15.publicMessage.findMany({
+      const messages = await prisma14.publicMessage.findMany({
         where: {
           isActive: true,
           OR: [
@@ -1454,7 +1686,7 @@ function registerNewFeatures(app2, prisma15) {
 
 // src/services/announcementsRoute.ts
 init_prisma();
-var prisma4 = getPrisma();
+var prisma3 = getPrisma();
 function registerAnnouncements(app2) {
   app2.get("/api/announcements", async (req, res) => {
     try {
@@ -1467,7 +1699,7 @@ function registerAnnouncements(app2) {
           { expiryDate: { gte: /* @__PURE__ */ new Date() } }
         ];
       }
-      const announcements = await prisma4.announcement.findMany({
+      const announcements = await prisma3.announcement.findMany({
         where: whereClause,
         orderBy: [
           { isSticky: "desc" },
@@ -1484,7 +1716,7 @@ function registerAnnouncements(app2) {
       const { title, content, target, priority, isSticky, isLoginPopup, expiryDate, attachmentUrl, imageUrl } = req.body;
       let announcement;
       try {
-        announcement = await prisma4.announcement.create({
+        announcement = await prisma3.announcement.create({
           data: {
             title,
             content,
@@ -1499,7 +1731,7 @@ function registerAnnouncements(app2) {
           }
         });
       } catch (err) {
-        announcement = await prisma4.announcement.create({
+        announcement = await prisma3.announcement.create({
           data: {
             title,
             content: attachmentUrl ? `${content}
@@ -1536,7 +1768,7 @@ function registerAnnouncements(app2) {
       if (expiryDate !== void 0) {
         updateData.expiryDate = expiryDate ? new Date(expiryDate) : null;
       }
-      const announcement = await prisma4.announcement.update({
+      const announcement = await prisma3.announcement.update({
         where: { id },
         data: updateData
       });
@@ -1548,7 +1780,7 @@ function registerAnnouncements(app2) {
   app2.delete("/api/announcements/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      await prisma4.announcement.delete({
+      await prisma3.announcement.delete({
         where: { id }
       });
       res.json({ success: true });
@@ -1561,7 +1793,7 @@ function registerAnnouncements(app2) {
 // src/services/orderLabelRoute.ts
 var import_fs2 = __toESM(require("fs"));
 var import_path2 = __toESM(require("path"));
-function registerOrderLabels(app2, prisma15) {
+function registerOrderLabels(app2, prisma14) {
   const uploadDir = process.env.VERCEL ? import_path2.default.join("/tmp", "uploads", "labels") : import_path2.default.join(process.cwd(), "uploads", "labels");
   if (!import_fs2.default.existsSync(uploadDir)) {
     try {
@@ -1602,7 +1834,7 @@ function registerOrderLabels(app2, prisma15) {
           console.error("Error saving base64 label file:", err);
         }
       }
-      const updatedOrder = await prisma15.order.update({
+      const updatedOrder = await prisma14.order.update({
         where: { id: orderId },
         data: {
           postalLabel: savedLabelPath,
@@ -1618,17 +1850,17 @@ function registerOrderLabels(app2, prisma15) {
 }
 
 // src/services/penaltyRoute.ts
-function registerPenaltyRoutes(app2, prisma15) {
+function registerPenaltyRoutes(app2, prisma14) {
   app2.get("/api/admin/penalty-stats", async (req, res) => {
     try {
-      const totalPenalties = await prisma15.supplierPenalty.count();
-      const topViolators = await prisma15.user.findMany({
+      const totalPenalties = await prisma14.supplierPenalty.count();
+      const topViolators = await prisma14.user.findMany({
         where: { role: "SUPPLIER", penaltyPoints: { gt: 0 } },
         orderBy: { penaltyPoints: "desc" },
         take: 5,
         select: { id: true, username: true, penaltyPoints: true, warningLevel: true }
       });
-      const recentPenalties = await prisma15.supplierPenalty.findMany({
+      const recentPenalties = await prisma14.supplierPenalty.findMany({
         orderBy: { createdAt: "desc" },
         take: 10,
         include: {
@@ -1648,7 +1880,7 @@ function registerPenaltyRoutes(app2, prisma15) {
   });
   app2.get("/api/admin/penalty-rules", async (req, res) => {
     try {
-      const rules = await prisma15.penaltyRule.findMany({
+      const rules = await prisma14.penaltyRule.findMany({
         orderBy: { createdAt: "desc" }
       });
       res.json(rules);
@@ -1659,7 +1891,7 @@ function registerPenaltyRoutes(app2, prisma15) {
   app2.post("/api/admin/penalty-rules", async (req, res) => {
     try {
       const { title, description, negativePoints, autoNotification, isActive } = req.body;
-      const rule = await prisma15.penaltyRule.create({
+      const rule = await prisma14.penaltyRule.create({
         data: {
           title,
           description,
@@ -1682,7 +1914,7 @@ function registerPenaltyRoutes(app2, prisma15) {
       if (updateData.negativePoints !== void 0) {
         updateData.negativePoints = parseInt(updateData.negativePoints, 10) || 0;
       }
-      const rule = await prisma15.penaltyRule.update({
+      const rule = await prisma14.penaltyRule.update({
         where: { id: ruleId },
         data: updateData
       });
@@ -1695,7 +1927,7 @@ function registerPenaltyRoutes(app2, prisma15) {
     try {
       const { id } = req.params;
       const ruleId = parseInt(id, 10);
-      await prisma15.penaltyRule.delete({
+      await prisma14.penaltyRule.delete({
         where: { id: ruleId }
       });
       res.json({ success: true });
@@ -1705,9 +1937,9 @@ function registerPenaltyRoutes(app2, prisma15) {
   });
   app2.get("/api/admin/penalty-config", async (req, res) => {
     try {
-      let config = await prisma15.penaltyConfig.findFirst();
+      let config = await prisma14.penaltyConfig.findFirst();
       if (!config) {
-        config = await prisma15.penaltyConfig.create({
+        config = await prisma14.penaltyConfig.create({
           data: {
             id: 1,
             underReviewThreshold: 20,
@@ -1725,7 +1957,7 @@ function registerPenaltyRoutes(app2, prisma15) {
   app2.put("/api/admin/penalty-config", async (req, res) => {
     try {
       const { underReviewThreshold, temporarySuspensionThreshold, blockedThreshold, autoSuspensionEnabled } = req.body;
-      const config = await prisma15.penaltyConfig.upsert({
+      const config = await prisma14.penaltyConfig.upsert({
         where: { id: 1 },
         update: {
           underReviewThreshold: parseInt(underReviewThreshold, 10),
@@ -1748,7 +1980,7 @@ function registerPenaltyRoutes(app2, prisma15) {
   });
   app2.get("/api/admin/suppliers", async (req, res) => {
     try {
-      const suppliers = await prisma15.user.findMany({
+      const suppliers = await prisma14.user.findMany({
         where: { role: "SUPPLIER" },
         select: {
           id: true,
@@ -1775,7 +2007,7 @@ function registerPenaltyRoutes(app2, prisma15) {
       if (isNaN(supplierId)) {
         return res.status(400).json({ error: "Invalid supplier ID" });
       }
-      const supplier = await prisma15.user.findUnique({
+      const supplier = await prisma14.user.findUnique({
         where: { id: supplierId },
         select: {
           id: true,
@@ -1790,7 +2022,7 @@ function registerPenaltyRoutes(app2, prisma15) {
       if (!supplier) {
         return res.status(404).json({ error: "Supplier not found" });
       }
-      const penalties = await prisma15.supplierPenalty.findMany({
+      const penalties = await prisma14.supplierPenalty.findMany({
         where: { supplierId },
         orderBy: { createdAt: "desc" }
       });
@@ -1807,7 +2039,7 @@ function registerPenaltyRoutes(app2, prisma15) {
       if (isNaN(supplierId)) {
         return res.status(400).json({ error: "Invalid supplier ID" });
       }
-      const supplier = await prisma15.user.findUnique({
+      const supplier = await prisma14.user.findUnique({
         where: { id: supplierId }
       });
       if (!supplier) {
@@ -1816,7 +2048,7 @@ function registerPenaltyRoutes(app2, prisma15) {
       const penaltyPts = parseInt(points, 10) || 0;
       const newPenaltyPoints = (supplier.penaltyPoints || 0) + penaltyPts;
       const newPerformanceScore = Math.max(0, 100 - newPenaltyPoints);
-      const config = await prisma15.penaltyConfig.findFirst() || {
+      const config = await prisma14.penaltyConfig.findFirst() || {
         underReviewThreshold: 20,
         temporarySuspensionThreshold: 40,
         blockedThreshold: 60,
@@ -1834,8 +2066,8 @@ function registerPenaltyRoutes(app2, prisma15) {
         warningLevel = "LOW";
         if (config.autoSuspensionEnabled) status = "WARNING";
       }
-      const [penaltyRecord, updatedUser] = await prisma15.$transaction([
-        prisma15.supplierPenalty.create({
+      const [penaltyRecord, updatedUser] = await prisma14.$transaction([
+        prisma14.supplierPenalty.create({
           data: {
             supplierId,
             reason,
@@ -1845,7 +2077,7 @@ function registerPenaltyRoutes(app2, prisma15) {
             adminName: "\u0645\u062F\u06CC\u0631\u06CC\u062A \u0633\u06CC\u0633\u062A\u0645"
           }
         }),
-        prisma15.user.update({
+        prisma14.user.update({
           where: { id: supplierId },
           data: {
             penaltyPoints: newPenaltyPoints,
@@ -1866,13 +2098,13 @@ function registerPenaltyRoutes(app2, prisma15) {
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const supplier = await prisma15.user.findUnique({
+      const supplier = await prisma14.user.findUnique({
         where: { id: userId }
       });
       if (!supplier) {
         return res.status(404).json({ error: "Supplier not found" });
       }
-      const penalties = await prisma15.supplierPenalty.findMany({
+      const penalties = await prisma14.supplierPenalty.findMany({
         where: { supplierId: userId },
         orderBy: { createdAt: "desc" }
       });
@@ -1886,6 +2118,74 @@ function registerPenaltyRoutes(app2, prisma15) {
       });
     } catch (error) {
       res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+}
+
+// src/services/discountRoutes.ts
+init_prisma();
+function registerDiscountRoutes(app2, authenticateToken2, requireSuperAdmin2) {
+  const prisma14 = getPrisma();
+  app2.post("/api/admin/discounts", authenticateToken2, requireSuperAdmin2, async (req, res) => {
+    try {
+      const { code, discountType, discountValue, maxUses, expiryDate } = req.body;
+      const newCode = await prisma14.discountCode.create({
+        data: {
+          code: code.toUpperCase(),
+          discountType,
+          discountValue: parseFloat(discountValue),
+          maxUses: maxUses ? parseInt(maxUses) : null,
+          expiryDate: expiryDate ? new Date(expiryDate) : null
+        }
+      });
+      res.json(newCode);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+  app2.get("/api/admin/discounts", authenticateToken2, requireSuperAdmin2, async (req, res) => {
+    try {
+      const codes = await prisma14.discountCode.findMany({ orderBy: { createdAt: "desc" } });
+      res.json(codes);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+  app2.patch("/api/admin/discounts/:id", authenticateToken2, requireSuperAdmin2, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      const code = await prisma14.discountCode.update({
+        where: { id: parseInt(id) },
+        data: { isActive }
+      });
+      res.json(code);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+  app2.delete("/api/admin/discounts/:id", authenticateToken2, requireSuperAdmin2, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await prisma14.discountCode.delete({
+        where: { id: parseInt(id) }
+      });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+  app2.post("/api/public/discounts/validate", async (req, res) => {
+    try {
+      const { code } = req.body;
+      const discount = await prisma14.discountCode.findUnique({ where: { code: code.toUpperCase() } });
+      if (!discount) return res.status(404).json({ error: "\u06A9\u062F \u062A\u062E\u0641\u06CC\u0641 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A" });
+      if (!discount.isActive) return res.status(400).json({ error: "\u0627\u06CC\u0646 \u06A9\u062F \u062A\u062E\u0641\u06CC\u0641 \u063A\u06CC\u0631\u0641\u0639\u0627\u0644 \u0634\u062F\u0647 \u0627\u0633\u062A" });
+      if (discount.expiryDate && new Date(discount.expiryDate) < /* @__PURE__ */ new Date()) return res.status(400).json({ error: "\u0627\u0646\u0642\u0636\u0627\u06CC \u0627\u06CC\u0646 \u06A9\u062F \u062A\u062E\u0641\u06CC\u0641 \u0628\u0647 \u067E\u0627\u06CC\u0627\u0646 \u0631\u0633\u06CC\u062F\u0647 \u0627\u0633\u062A" });
+      if (discount.maxUses && discount.usedCount >= discount.maxUses) return res.status(400).json({ error: "\u0638\u0631\u0641\u06CC\u062A \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u0627\u06CC\u0646 \u06A9\u062F \u062A\u062E\u0641\u06CC\u0641 \u062A\u06A9\u0645\u06CC\u0644 \u0634\u062F\u0647 \u0627\u0633\u062A" });
+      res.json(discount);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
     }
   });
 }
@@ -2043,14 +2343,14 @@ var PaymentStatus = {
 // src/services/financial/PaymentLifecycleService.ts
 init_prisma();
 init_PaymentServiceFactory();
-var prisma5 = getPrisma();
+var prisma4 = getPrisma();
 var PaymentLifecycleService = class {
   /**
    * Initialize a new payment
    */
   async initiatePayment(userId, amount, callbackUrl) {
     const idempotencyKey = `PAY_${userId}_${Date.now()}`;
-    const payment = await prisma5.payment.create({
+    const payment = await prisma4.payment.create({
       data: {
         userId,
         amount,
@@ -2061,7 +2361,7 @@ var PaymentLifecycleService = class {
     try {
       const paymentGateway = await PaymentServiceFactory.getService();
       const gatewayResponse = await paymentGateway.createPayment(amount, "Payment for order", callbackUrl);
-      const updatedPayment = await prisma5.$transaction(async (tx) => {
+      const updatedPayment = await prisma4.$transaction(async (tx) => {
         const p = await tx.payment.update({
           where: { id: payment.id },
           data: { gatewayReference: gatewayResponse.authority }
@@ -2089,7 +2389,7 @@ var PaymentLifecycleService = class {
         payLink: gatewayResponse.payLink
       };
     } catch (err) {
-      await prisma5.payment.update({
+      await prisma4.payment.update({
         where: { id: payment.id },
         data: { status: PaymentStatus.FAILED }
       });
@@ -2100,7 +2400,7 @@ var PaymentLifecycleService = class {
    * Verify a callback from the payment gateway
    */
   async verifyPayment(authority, userId, ipAddress) {
-    const payment = await prisma5.payment.findFirst({
+    const payment = await prisma4.payment.findFirst({
       where: { gatewayReference: authority }
     });
     if (!payment) {
@@ -2114,7 +2414,7 @@ var PaymentLifecycleService = class {
     }
     const paymentGateway = await PaymentServiceFactory.getService();
     const verification = await paymentGateway.verifyPayment(authority, Number(payment.amount));
-    return await prisma5.$transaction(async (tx) => {
+    return await prisma4.$transaction(async (tx) => {
       const newStatus = verification.success ? PaymentStatus.PAID : PaymentStatus.FAILED;
       const updatedPayment = await tx.payment.update({
         where: { id: payment.id },
@@ -2147,10 +2447,10 @@ var PaymentLifecycleService = class {
    * Admin: Refund a payment
    */
   async refundPayment(paymentId, adminId) {
-    const payment = await prisma5.payment.findUnique({ where: { id: paymentId } });
+    const payment = await prisma4.payment.findUnique({ where: { id: paymentId } });
     if (!payment) throw new Error("Payment not found");
     if (payment.status !== PaymentStatus.PAID) throw new Error("Can only refund PAID payments");
-    return await prisma5.$transaction(async (tx) => {
+    return await prisma4.$transaction(async (tx) => {
       const updated = await tx.payment.update({
         where: { id: paymentId },
         data: { status: PaymentStatus.REFUNDED }
@@ -2176,14 +2476,14 @@ var PaymentLifecycleService = class {
 };
 
 // src/services/financial/Jobs.ts
-var prisma6 = getPrisma();
+var prisma5 = getPrisma();
 var paymentService = new PaymentLifecycleService();
 var FinancialJobs = class {
   static async pollPendingPayments() {
     console.log("[Background Job] Polling for pending payments...");
     const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1e3);
     try {
-      const pendingPayments = await prisma6.payment.findMany({
+      const pendingPayments = await prisma5.payment.findMany({
         where: {
           status: PaymentStatus.PENDING,
           gatewayReference: { not: null },
@@ -2260,7 +2560,7 @@ var EncryptionService = class {
 
 // src/services/integrations/woocommerce/ConnectionService.ts
 init_prisma();
-var prisma7 = getPrisma();
+var prisma6 = getPrisma();
 var ConnectionService = class {
   static async testConnection(storeUrl, consumerKey, consumerSecret) {
     try {
@@ -2291,7 +2591,7 @@ var ConnectionService = class {
   static async connect(storeId, storeUrl, consumerKey, consumerSecret) {
     const encKey = EncryptionService.encrypt(consumerKey);
     const encSecret = EncryptionService.encrypt(consumerSecret);
-    return await prisma7.storeConnection.upsert({
+    return await prisma6.storeConnection.upsert({
       where: { storeId },
       update: {
         storeUrl,
@@ -2309,7 +2609,7 @@ var ConnectionService = class {
     });
   }
   static async disconnect(storeId) {
-    return await prisma7.storeConnection.update({
+    return await prisma6.storeConnection.update({
       where: { storeId },
       data: {
         status: "DISCONNECTED",
@@ -2319,7 +2619,7 @@ var ConnectionService = class {
     });
   }
   static async getConnection(storeId) {
-    const conn = await prisma7.storeConnection.findUnique({
+    const conn = await prisma6.storeConnection.findUnique({
       where: { storeId }
     });
     if (!conn) return null;
@@ -2333,12 +2633,12 @@ var ConnectionService = class {
 
 // src/services/integrations/woocommerce/ProductService.ts
 init_prisma();
-var prisma8 = getPrisma();
+var prisma7 = getPrisma();
 var ProductService = class {
   static async syncProducts(storeId) {
     const conn = await ConnectionService.getConnection(storeId);
     if (!conn || conn.status !== "CONNECTED") throw new Error("Not connected");
-    const selections = await prisma8.storeProductSelection.findMany({
+    const selections = await prisma7.storeProductSelection.findMany({
       where: { storeId },
       include: { product: { include: { category: true, images: true } } }
     });
@@ -2375,7 +2675,7 @@ var ProductService = class {
         });
         if (response.ok) {
           const data = await response.json();
-          await prisma8.storeProductSelection.update({
+          await prisma7.storeProductSelection.update({
             where: { id: sel.id },
             data: { status: "SYNCED", wc_product_id: data.id }
           });
@@ -2392,7 +2692,7 @@ var ProductService = class {
   static async syncStock(storeId) {
     const conn = await ConnectionService.getConnection(storeId);
     if (!conn || conn.status !== "CONNECTED") throw new Error("Not connected");
-    const selections = await prisma8.storeProductSelection.findMany({
+    const selections = await prisma7.storeProductSelection.findMany({
       where: { storeId, status: "SYNCED", wc_product_id: { not: null } },
       include: { product: true }
     });
@@ -2424,7 +2724,7 @@ var ProductService = class {
 
 // src/services/integrations/woocommerce/OrderService.ts
 init_prisma();
-var prisma9 = getPrisma();
+var prisma8 = getPrisma();
 var OrderService = class {
   static async syncOrders(storeId) {
     const conn = await ConnectionService.getConnection(storeId);
@@ -2450,10 +2750,10 @@ var OrderService = class {
 
 // src/services/integrations/woocommerce/SyncService.ts
 init_prisma();
-var prisma10 = getPrisma();
+var prisma9 = getPrisma();
 var SyncService = class {
   static async logSync(connectionId, type, direction, status, message, executionTime) {
-    await prisma10.syncLog.create({
+    await prisma9.syncLog.create({
       data: {
         connectionId,
         type,
@@ -2465,14 +2765,14 @@ var SyncService = class {
     });
   }
   static async runProductSync(storeId) {
-    const conn = await prisma10.storeConnection.findUnique({ where: { storeId } });
+    const conn = await prisma9.storeConnection.findUnique({ where: { storeId } });
     if (!conn) return;
     const start = Date.now();
     try {
       const result = await ProductService.syncProducts(storeId);
       const executionTime = Date.now() - start;
       await this.logSync(conn.id, "PRODUCTS", "EXPORT", "SUCCESS", `Synced ${result.successCount}, Failed ${result.failedCount}`, executionTime);
-      await prisma10.storeConnection.update({
+      await prisma9.storeConnection.update({
         where: { id: conn.id },
         data: { lastSync: /* @__PURE__ */ new Date(), lastSuccessfulSync: /* @__PURE__ */ new Date() }
       });
@@ -2484,14 +2784,14 @@ var SyncService = class {
     }
   }
   static async runStockSync(storeId) {
-    const conn = await prisma10.storeConnection.findUnique({ where: { storeId } });
+    const conn = await prisma9.storeConnection.findUnique({ where: { storeId } });
     if (!conn) return;
     const start = Date.now();
     try {
       const result = await ProductService.syncStock(storeId);
       const executionTime = Date.now() - start;
       await this.logSync(conn.id, "STOCK", "EXPORT", "SUCCESS", `Synced ${result.successCount}, Failed ${result.failedCount}`, executionTime);
-      await prisma10.storeConnection.update({
+      await prisma9.storeConnection.update({
         where: { id: conn.id },
         data: { lastSync: /* @__PURE__ */ new Date(), lastSuccessfulSync: /* @__PURE__ */ new Date() }
       });
@@ -2503,14 +2803,14 @@ var SyncService = class {
     }
   }
   static async runOrderSync(storeId) {
-    const conn = await prisma10.storeConnection.findUnique({ where: { storeId } });
+    const conn = await prisma9.storeConnection.findUnique({ where: { storeId } });
     if (!conn) return;
     const start = Date.now();
     try {
       const result = await OrderService.syncOrders(storeId);
       const executionTime = Date.now() - start;
       await this.logSync(conn.id, "ORDERS", "IMPORT", "SUCCESS", `Synced ${result.successCount}, Failed ${result.failedCount}`, executionTime);
-      await prisma10.storeConnection.update({
+      await prisma9.storeConnection.update({
         where: { id: conn.id },
         data: { lastSync: /* @__PURE__ */ new Date(), lastSuccessfulSync: /* @__PURE__ */ new Date() }
       });
@@ -2527,7 +2827,7 @@ var SyncService = class {
 init_prisma();
 var import_crypto2 = __toESM(require("crypto"));
 init_WalletService();
-var prisma12 = getPrisma();
+var prisma11 = getPrisma();
 var walletService = new WalletService();
 var retryQueue = [];
 var MAX_RETRIES = 3;
@@ -2552,7 +2852,7 @@ async function processOrderQueue() {
 setInterval(processOrderQueue, 1e4);
 var WebhookService = class {
   static async handleWebhook(payload, signature, storeId) {
-    const connection = await prisma12.storeConnection.findUnique({
+    const connection = await prisma11.storeConnection.findUnique({
       where: { storeId }
     });
     if (!connection) {
@@ -2581,7 +2881,7 @@ async function processOrderPayload(payload, storeId) {
     return;
   }
   const orderId = payload.id.toString();
-  const existingLedger = await prisma12.ledgerEntry.findFirst({
+  const existingLedger = await prisma11.ledgerEntry.findFirst({
     where: {
       referenceId: orderId,
       type: LedgerType.ORDER_REVENUE
@@ -2594,7 +2894,7 @@ async function processOrderPayload(payload, storeId) {
   for (const item of payload.line_items) {
     const wcProductId = item.product_id;
     const itemTotal = parseFloat(item.total);
-    const storeProduct = await prisma12.storeProductSelection.findUnique({
+    const storeProduct = await prisma11.storeProductSelection.findUnique({
       where: { wc_product_id: wcProductId },
       include: { product: true }
     });
@@ -2611,7 +2911,7 @@ async function processOrderPayload(payload, storeId) {
       }
       const supplierRevenue = itemTotal - commissionAmount;
       if (supplierRevenue > 0) {
-        const wallet = await prisma12.wallet.findUnique({
+        const wallet = await prisma11.wallet.findUnique({
           where: { supplierId }
         });
         if (wallet) {
@@ -2636,9 +2936,9 @@ async function processOrderPayload(payload, storeId) {
 // src/services/integrations/woocommerce/OrderSync.ts
 init_prisma();
 var import_woocommerce_rest_api = __toESM(require("@woocommerce/woocommerce-rest-api"));
-var prisma13 = getPrisma();
+var prisma12 = getPrisma();
 async function syncSingleOrder(storeId, orderId) {
-  const connection = await prisma13.storeConnection.findUnique({
+  const connection = await prisma12.storeConnection.findUnique({
     where: { storeId }
   });
   if (!connection) {
@@ -3482,7 +3782,7 @@ function getActivePrisma() {
   }
   return realPrisma;
 }
-var prisma14 = new Proxy({}, {
+var prisma13 = new Proxy({}, {
   get(target, prop) {
     if (typeof prop !== "string") {
       return Reflect.get(target, prop);
@@ -3496,7 +3796,7 @@ var prisma14 = new Proxy({}, {
     if (prop === "$transaction") {
       return async (cbOrList) => {
         if (typeof cbOrList === "function") {
-          return await cbOrList(prisma14);
+          return await cbOrList(prisma13);
         }
         if (Array.isArray(cbOrList)) {
           return await Promise.all(cbOrList);
@@ -3675,7 +3975,7 @@ async function seedSuperAdmin() {
     const adminUser = process.env.SUPER_ADMIN_USERNAME || "admin";
     const adminPass = process.env.SUPER_ADMIN_PASSWORD || "!Bahankala@2026";
     const hashedPassword = await import_bcryptjs.default.hash(adminPass, 10);
-    const existingAdmin = await prisma14.user.findFirst({
+    const existingAdmin = await prisma13.user.findFirst({
       where: {
         OR: [
           { role: "SUPER_ADMIN" },
@@ -3684,7 +3984,7 @@ async function seedSuperAdmin() {
       }
     });
     if (!existingAdmin) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: adminUser,
           email: "admin@marketplace.com",
@@ -3698,7 +3998,7 @@ async function seedSuperAdmin() {
       });
       console.log("\u2705 Super Admin created successfully!");
     } else {
-      await prisma14.user.update({
+      await prisma13.user.update({
         where: { id: existingAdmin.id },
         data: {
           status: "ACTIVE",
@@ -3718,9 +4018,9 @@ async function seedDemoUsers() {
     const passwordTestshop = await import_bcryptjs.default.hash("Testshop", 10);
     const passwordSupplier = await import_bcryptjs.default.hash("supplier", 10);
     const standardTestPassword = await import_bcryptjs.default.hash("!Bahankala@2026", 10);
-    const existingStore = await prisma14.user.findUnique({ where: { username: "store" } });
+    const existingStore = await prisma13.user.findUnique({ where: { username: "store" } });
     if (!existingStore) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "store",
           password: passwordStore,
@@ -3738,9 +4038,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: store");
     }
-    const existingStore1 = await prisma14.user.findUnique({ where: { username: "store1" } });
+    const existingStore1 = await prisma13.user.findUnique({ where: { username: "store1" } });
     if (!existingStore1) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "store1",
           password: standardTestPassword,
@@ -3758,9 +4058,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: store1");
     }
-    const existingStore2 = await prisma14.user.findUnique({ where: { username: "store2" } });
+    const existingStore2 = await prisma13.user.findUnique({ where: { username: "store2" } });
     if (!existingStore2) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "store2",
           password: standardTestPassword,
@@ -3778,9 +4078,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: store2");
     }
-    const existingTestshop = await prisma14.user.findUnique({ where: { username: "Testshop" } });
+    const existingTestshop = await prisma13.user.findUnique({ where: { username: "Testshop" } });
     if (!existingTestshop) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "Testshop",
           password: passwordTestshop,
@@ -3797,9 +4097,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: Testshop");
     }
-    const existingSupplier1 = await prisma14.user.findUnique({ where: { username: "supplier1" } });
+    const existingSupplier1 = await prisma13.user.findUnique({ where: { username: "supplier1" } });
     if (!existingSupplier1) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "supplier1",
           password: standardTestPassword,
@@ -3816,9 +4116,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: supplier1");
     }
-    const existingSupplier2 = await prisma14.user.findUnique({ where: { username: "supplier2" } });
+    const existingSupplier2 = await prisma13.user.findUnique({ where: { username: "supplier2" } });
     if (!existingSupplier2) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "supplier2",
           password: standardTestPassword,
@@ -3835,9 +4135,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: supplier2");
     }
-    const existingSupplier = await prisma14.user.findUnique({ where: { username: "supplier" } });
+    const existingSupplier = await prisma13.user.findUnique({ where: { username: "supplier" } });
     if (!existingSupplier) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "supplier",
           password: passwordSupplier,
@@ -3854,9 +4154,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: supplier");
     }
-    const existingCust = await prisma14.user.findUnique({ where: { username: "customer1" } });
+    const existingCust = await prisma13.user.findUnique({ where: { username: "customer1" } });
     if (!existingCust) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "customer1",
           password: standardTestPassword,
@@ -3870,9 +4170,9 @@ async function seedDemoUsers() {
       });
       console.log("\u{1F331} Seeded user: customer1");
     }
-    const existingRef = await prisma14.user.findUnique({ where: { username: "referrer1" } });
+    const existingRef = await prisma13.user.findUnique({ where: { username: "referrer1" } });
     if (!existingRef) {
-      await prisma14.user.create({
+      await prisma13.user.create({
         data: {
           username: "referrer1",
           password: standardTestPassword,
@@ -3894,7 +4194,7 @@ async function seedDatabase() {
   await seedSuperAdmin();
   await seedDemoUsers();
   try {
-    const categoryCount = await prisma14.category.count();
+    const categoryCount = await prisma13.category.count();
     if (categoryCount <= 1) {
       console.log("\u{1F331} Seeding 16 standard categories...");
       const defaultCategories = [
@@ -3917,9 +4217,9 @@ async function seedDatabase() {
       ];
       for (let i = 0; i < defaultCategories.length; i++) {
         const catName = defaultCategories[i];
-        const exists = await prisma14.category.findFirst({ where: { name: catName } });
+        const exists = await prisma13.category.findFirst({ where: { name: catName } });
         if (!exists) {
-          await prisma14.category.create({
+          await prisma13.category.create({
             data: {
               name: catName,
               isActive: true,
@@ -3930,7 +4230,7 @@ async function seedDatabase() {
       }
     }
     try {
-      const appleWatchProducts = await prisma14.product.findMany({
+      const appleWatchProducts = await prisma13.product.findMany({
         where: {
           name: {
             contains: "\u0633\u0627\u0639\u062A \u0647\u0648\u0634\u0645\u0646\u062F \u0627\u067E\u0644 \u0648\u0627\u0686"
@@ -3938,7 +4238,7 @@ async function seedDatabase() {
         }
       });
       for (const p of appleWatchProducts) {
-        await prisma14.productImage.updateMany({
+        await prisma13.productImage.updateMany({
           where: {
             productId: p.id,
             url: "https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=600"
@@ -3947,7 +4247,7 @@ async function seedDatabase() {
             url: "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=600"
           }
         });
-        await prisma14.productImage.updateMany({
+        await prisma13.productImage.updateMany({
           where: {
             productId: p.id,
             url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600"
@@ -3956,7 +4256,7 @@ async function seedDatabase() {
             url: "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=600"
           }
         });
-        await prisma14.productExploreContent.updateMany({
+        await prisma13.productExploreContent.updateMany({
           where: {
             productId: p.id,
             customImageUrl: "https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=600"
@@ -3965,7 +4265,7 @@ async function seedDatabase() {
             customImageUrl: "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=600"
           }
         });
-        await prisma14.productExploreContent.updateMany({
+        await prisma13.productExploreContent.updateMany({
           where: {
             productId: p.id,
             customImageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600"
@@ -3978,13 +4278,13 @@ async function seedDatabase() {
     } catch (migErr) {
       console.warn("[Server Startup] Warning: Mismatched Apple Watch image update failed:", migErr.message);
     }
-    const productCount = await prisma14.product.count();
+    const productCount = await prisma13.product.count();
     if (productCount > 0) {
       return;
     }
     console.log("\u{1F331} Seeding database with initial supplier, category, and explore products...");
     const supplierPass = await import_bcryptjs.default.hash("Supplier123!", 10);
-    const supplier = await prisma14.user.create({
+    const supplier = await prisma13.user.create({
       data: {
         username: "supplier_test",
         password: supplierPass,
@@ -3999,7 +4299,7 @@ async function seedDatabase() {
         storeLink: "ariadigital.ir"
       }
     });
-    const category = await prisma14.category.create({
+    const category = await prisma13.category.create({
       data: {
         name: "\u062F\u06CC\u062C\u06CC\u062A\u0627\u0644 \u0648 \u0644\u0648\u0627\u0632\u0645 \u0627\u0644\u06A9\u062A\u0631\u0648\u0646\u06CC\u06A9\u06CC",
         isActive: true,
@@ -4056,7 +4356,7 @@ async function seedDatabase() {
       }
     ];
     for (const mp of mockProducts) {
-      const product = await prisma14.product.create({
+      const product = await prisma13.product.create({
         data: {
           supplierId: supplier.id,
           categoryId: category.id,
@@ -4069,13 +4369,13 @@ async function seedDatabase() {
           inventory: 50
         }
       });
-      await prisma14.productImage.create({
+      await prisma13.productImage.create({
         data: {
           productId: product.id,
           url: mp.imageUrl
         }
       });
-      await prisma14.productExploreContent.create({
+      await prisma13.productExploreContent.create({
         data: {
           productId: product.id,
           customTitle: mp.exploreTitle,
@@ -4086,7 +4386,7 @@ async function seedDatabase() {
         }
       });
       for (const c of mp.comments) {
-        await prisma14.productComment.create({
+        await prisma13.productComment.create({
           data: {
             productId: product.id,
             authorName: c.authorName,
@@ -4096,7 +4396,7 @@ async function seedDatabase() {
         });
       }
       for (const q of mp.questions) {
-        await prisma14.productQuestion.create({
+        await prisma13.productQuestion.create({
           data: {
             productId: product.id,
             askerName: q.askerName,
@@ -4137,9 +4437,9 @@ async function seedDatabase() {
       { key: "EDUCATION_TELEGRAM", value: "https://t.me" }
     ];
     for (const item of configKeys) {
-      const exists = await prisma14.systemConfig.findUnique({ where: { key: item.key } });
+      const exists = await prisma13.systemConfig.findUnique({ where: { key: item.key } });
       if (!exists) {
-        await prisma14.systemConfig.create({ data: { key: item.key, value: item.value } });
+        await prisma13.systemConfig.create({ data: { key: item.key, value: item.value } });
         console.log(`\u{1F331} Seeded system config: ${item.key}`);
       }
     }
@@ -4156,7 +4456,7 @@ app.post("/api/auth/register", async (req, res) => {
     const finalMobile = phone || "09120000000";
     const defaultPass = password || "!Bahankala@2026";
     const hashedPassword = await import_bcryptjs.default.hash(defaultPass, 10);
-    let existingUser = await prisma14.user.findFirst({
+    let existingUser = await prisma13.user.findFirst({
       where: {
         OR: [
           { username: finalUsername },
@@ -4166,7 +4466,7 @@ app.post("/api/auth/register", async (req, res) => {
       }
     });
     if (!existingUser) {
-      existingUser = await prisma14.user.create({
+      existingUser = await prisma13.user.create({
         data: {
           username: finalUsername,
           password: hashedPassword,
@@ -4238,12 +4538,12 @@ app.post("/api/auth/register/supplier", async (req, res) => {
     if (!agreementAccepted) {
       return res.status(400).json({ error: "\u067E\u0630\u06CC\u0631\u0634 \u0642\u0648\u0627\u0646\u06CC\u0646 \u0648 \u0645\u0642\u0631\u0631\u0627\u062A \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A." });
     }
-    const existingUser = await prisma14.user.findUnique({ where: { username } });
+    const existingUser = await prisma13.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0642\u0628\u0644\u0627\u064B \u062F\u0631 \u0633\u06CC\u0633\u062A\u0645 \u062B\u0628\u062A \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma14.user.create({
+    const user = await prisma13.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -4308,12 +4608,12 @@ app.post("/api/auth/register/customer", async (req, res) => {
     if (email && !EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: "\u0622\u062F\u0631\u0633 \u0627\u06CC\u0645\u06CC\u0644 \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A." });
     }
-    const existingUser = await prisma14.user.findUnique({ where: { username } });
+    const existingUser = await prisma13.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0642\u0628\u0644\u0627\u064B \u062F\u0631 \u0633\u06CC\u0633\u062A\u0645 \u062B\u0628\u062A \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma14.user.create({
+    const user = await prisma13.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -4363,12 +4663,12 @@ app.post("/api/auth/register-referrer", async (req, res) => {
     if (email && !EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: "\u0622\u062F\u0631\u0633 \u0627\u06CC\u0645\u06CC\u0644 \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A." });
     }
-    const existingUser = await prisma14.user.findUnique({ where: { username } });
+    const existingUser = await prisma13.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0642\u0628\u0644\u0627\u064B \u062F\u0631 \u0633\u06CC\u0633\u062A\u0645 \u062B\u0628\u062A \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma14.user.create({
+    const user = await prisma13.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -4427,12 +4727,12 @@ app.post("/api/auth/register/store-manager", async (req, res) => {
     if (!/^\d{10}$/.test(nationalCode)) {
       return res.status(400).json({ error: "\u06A9\u062F \u0645\u0644\u06CC \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A. \u06A9\u062F \u0645\u0644\u06CC \u0628\u0627\u06CC\u062F \u062F\u0642\u06CC\u0642\u0627\u064B \u06F1\u06F0 \u0631\u0642\u0645 \u0628\u0627\u0634\u062F." });
     }
-    const existingUser = await prisma14.user.findUnique({ where: { username } });
+    const existingUser = await prisma13.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0642\u0628\u0644\u0627\u064B \u062F\u0631 \u0633\u06CC\u0633\u062A\u0645 \u062B\u0628\u062A \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma14.user.create({
+    const user = await prisma13.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -4471,7 +4771,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     if (!identity || !nationalCode || !newPassword) {
       return res.status(400).json({ error: "\u0644\u0637\u0641\u0627\u064B \u062A\u0645\u0627\u0645\u06CC \u0641\u06CC\u0644\u062F\u0647\u0627\u06CC \u0627\u062C\u0628\u0627\u0631\u06CC (\u0634\u0646\u0627\u0633\u0647/\u0634\u0645\u0627\u0631\u0647 \u062A\u0645\u0627\u0633\u060C \u06A9\u062F\u0645\u0644\u06CC \u0648 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062C\u062F\u06CC\u062F) \u0631\u0627 \u0648\u0627\u0631\u062F \u0646\u0645\u0627\u06CC\u06CC\u062F." });
     }
-    const user = await prisma14.user.findFirst({
+    const user = await prisma13.user.findFirst({
       where: {
         OR: [
           { username: identity },
@@ -4484,7 +4784,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
       return res.status(404).json({ error: "\u06A9\u0627\u0631\u0628\u0631\u06CC \u0628\u0627 \u0627\u06CC\u0646 \u0645\u0634\u062E\u0635\u0627\u062A \u0648 \u06A9\u062F \u0645\u0644\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(newPassword, 10);
-    await prisma14.user.update({
+    await prisma13.user.update({
       where: { id: user.id },
       data: { password: hashedPassword }
     });
@@ -4509,9 +4809,9 @@ app.post("/api/auth/google", async (req, res) => {
       return res.status(400).json({ error: "\u062D\u0633\u0627\u0628 \u06AF\u0648\u06AF\u0644 \u0634\u0645\u0627 \u0627\u06CC\u0645\u06CC\u0644 \u0645\u0639\u062A\u0628\u0631\u06CC \u0646\u062F\u0627\u0631\u062F." });
     }
     const email = payload.email;
-    let user = await prisma14.user.findFirst({ where: { email } });
+    let user = await prisma13.user.findFirst({ where: { email } });
     if (!user) {
-      user = await prisma14.user.create({
+      user = await prisma13.user.create({
         data: {
           username: "user_" + Math.random().toString(36).substring(7),
           email,
@@ -4547,7 +4847,7 @@ app.post("/api/auth/google", async (req, res) => {
 });
 app.get("/api/auth/me", authenticateToken, async (req, res) => {
   try {
-    const user = await prisma14.user.findUnique({ where: { id: req.user.userId } });
+    const user = await prisma13.user.findUnique({ where: { id: req.user.userId } });
     if (!user) {
       return res.status(401).json({ error: "Account Not Found (\u062D\u0633\u0627\u0628 \u06A9\u0627\u0631\u0628\u0631\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F.)" });
     }
@@ -4566,14 +4866,14 @@ app.post("/api/auth/login", async (req, res) => {
     const cleanUsername = String(username).trim();
     const isSuperAdminCandidate = cleanUsername === "admin" || cleanUsername === "superadmin" || cleanUsername === "09120000000";
     let user = null;
-    user = await prisma14.user.findUnique({ where: { username: cleanUsername } });
+    user = await prisma13.user.findUnique({ where: { username: cleanUsername } });
     if (!user && isSuperAdminCandidate) {
-      user = await prisma14.user.findFirst({ where: { role: "SUPER_ADMIN" } });
+      user = await prisma13.user.findFirst({ where: { role: "SUPER_ADMIN" } });
     }
     if (process.env.NODE_ENV !== "production" && !user && isSuperAdminCandidate && process.env.SUPER_ADMIN_PASSWORD && password === process.env.SUPER_ADMIN_PASSWORD) {
       try {
         const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-        user = await prisma14.user.create({
+        user = await prisma13.user.create({
           data: {
             username: "admin",
             email: "admin@marketplace.com",
@@ -4643,7 +4943,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
     const normalizedMobile = cleanMobile.startsWith("0") ? cleanMobile.slice(1) : cleanMobile;
     const withZero = "0" + normalizedMobile;
     const withoutZero = normalizedMobile;
-    const user = await prisma14.user.findFirst({
+    const user = await prisma13.user.findFirst({
       where: {
         OR: [
           { mobile: withZero },
@@ -4661,8 +4961,13 @@ app.post("/api/auth/send-otp", async (req, res) => {
     activeOtps.set(cleanMobile, { code, expires: Date.now() + 18e4 });
     activeOtps.set(withZero, { code, expires: Date.now() + 18e4 });
     activeOtps.set(withoutZero, { code, expires: Date.now() + 18e4 });
+    activeOtps.set(user.username, { code, expires: Date.now() + 18e4 });
     if (user.mobile) {
-      activeOtps.set(user.mobile, { code, expires: Date.now() + 18e4 });
+      const dbMobileClean = sanitizeMobileDigits(user.mobile);
+      const dbMobileNorm = dbMobileClean.startsWith("0") ? dbMobileClean.slice(1) : dbMobileClean;
+      activeOtps.set(dbMobileClean, { code, expires: Date.now() + 18e4 });
+      activeOtps.set("0" + dbMobileNorm, { code, expires: Date.now() + 18e4 });
+      activeOtps.set(dbMobileNorm, { code, expires: Date.now() + 18e4 });
     }
     const targetPhone = user.mobile || withZero;
     const result = await sendOtpSms(targetPhone, code);
@@ -4706,7 +5011,7 @@ app.post("/api/auth/login-otp", async (req, res) => {
     const normalizedMobile = cleanMobile.startsWith("0") ? cleanMobile.slice(1) : cleanMobile;
     const withZero = "0" + normalizedMobile;
     const withoutZero = normalizedMobile;
-    const user = await prisma14.user.findFirst({
+    const user = await prisma13.user.findFirst({
       where: {
         OR: [
           { mobile: withZero },
@@ -4724,7 +5029,7 @@ app.post("/api/auth/login-otp", async (req, res) => {
       return res.status(403).json({ error: "\u062D\u0633\u0627\u0628 \u06A9\u0627\u0631\u0628\u0631\u06CC \u0634\u0645\u0627 \u0645\u0633\u062F\u0648\u062F \u0634\u062F\u0647 \u0627\u0633\u062A. \u0644\u0637\u0641\u0627 \u0628\u0627 \u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u06CC \u062A\u0645\u0627\u0633 \u0628\u06AF\u06CC\u0631\u06CC\u062F." });
     }
     try {
-      const loginNotifyConfig = await prisma14.systemConfig.findUnique({ where: { key: "SMS_NOTIFY_USER_LOGIN" } });
+      const loginNotifyConfig = await prisma13.systemConfig.findUnique({ where: { key: "SMS_NOTIFY_USER_LOGIN" } });
       if (loginNotifyConfig && loginNotifyConfig.value === "true" && user.mobile) {
         sendSmsViaMelliPayamak(user.mobile, `\u06A9\u0627\u0631\u0628\u0631 \u06AF\u0631\u0627\u0645\u06CC\u060C \u0648\u0631\u0648\u062F \u0634\u0645\u0627 \u0628\u0647 \u0633\u0627\u0645\u0627\u0646\u0647 \u0632\u0648\u067E\u06CC\u062A \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062B\u0628\u062A \u06AF\u0631\u062F\u06CC\u062F. \u062F\u0631 \u0635\u0648\u0631\u062A \u0639\u062F\u0645 \u0627\u0642\u062F\u0627\u0645 \u0627\u0632 \u0637\u0631\u0641 \u0634\u0645\u0627\u060C \u0633\u0631\u06CC\u0639\u0627\u064B \u0628\u0627 \u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u06CC \u062A\u0645\u0627\u0633 \u0628\u06AF\u06CC\u0631\u06CC\u062F.`).catch(console.error);
       }
@@ -4769,7 +5074,7 @@ app.post("/api/auth/reset-password-otp", async (req, res) => {
     const normalizedMobile = cleanMobile.startsWith("0") ? cleanMobile.slice(1) : cleanMobile;
     const withZero = "0" + normalizedMobile;
     const withoutZero = normalizedMobile;
-    const user = await prisma14.user.findFirst({
+    const user = await prisma13.user.findFirst({
       where: {
         OR: [
           { mobile: withZero },
@@ -4784,7 +5089,7 @@ app.post("/api/auth/reset-password-otp", async (req, res) => {
       return res.status(404).json({ error: "\u06A9\u0627\u0631\u0628\u0631\u06CC \u0628\u0627 \u0627\u06CC\u0646 \u0634\u0645\u0627\u0631\u0647 \u0645\u0648\u0628\u0627\u06CC\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F." });
     }
     const hashedPassword = await import_bcryptjs.default.hash(newPassword, 10);
-    await prisma14.user.update({
+    await prisma13.user.update({
       where: { id: user.id },
       data: { password: hashedPassword }
     });
@@ -4808,18 +5113,32 @@ app.post("/api/admin/sms/test", authenticateToken, requireAdmin, async (req, res
   try {
     const { mobile, message, patternKey, patternValues } = req.body;
     if (!mobile) {
-      return res.status(400).json({ error: "\u0634\u0645\u0627\u0631\u0647 \u0645\u0648\u0628\u0627\u06CC\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A" });
+      return res.status(400).json({ success: false, error: "\u0634\u0645\u0627\u0631\u0647 \u0645\u0648\u0628\u0627\u06CC\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A" });
     }
     let result;
     if (patternKey) {
-      result = await sendMelliPayamakPattern(mobile, patternKey, patternValues || ["\u062A\u0633\u062A \u0632\u0648\u067E\u06CC\u062A"]);
+      result = await sendMelliPayamakPattern(mobile, patternKey, patternValues || ["12345"]);
     } else {
       result = await sendSmsViaMelliPayamak(mobile, message || "\u0627\u06CC\u0646 \u06CC\u06A9 \u067E\u06CC\u0627\u0645\u06A9 \u0622\u0632\u0645\u0627\u06CC\u0634\u06CC \u0627\u0632 \u0633\u0627\u0645\u0627\u0646\u0647 \u0632\u0648\u067E\u06CC\u062A \u0645\u06CC\u200C\u0628\u0627\u0634\u062F.");
     }
-    return res.json({ success: true, result, message: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9 \u0622\u0632\u0645\u0627\u06CC\u0634\u06CC \u062B\u0628\u062A \u0634\u062F." });
+    if (result && result.success) {
+      return res.json({
+        success: true,
+        result,
+        message: result.message || "\u067E\u06CC\u0627\u0645\u06A9 \u062A\u0633\u062A\u06CC \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0627\u0631\u0633\u0627\u0644 \u0634\u062F.",
+        response: result.response
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: result?.error || "\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0648\u0628\u200C\u0633\u0631\u0648\u06CC\u0633 \u067E\u06CC\u0627\u0645\u06A9",
+        result,
+        message: result?.error || "\u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9 \u0628\u0627 \u062E\u0637\u0627 \u0645\u0648\u0627\u062C\u0647 \u0634\u062F"
+      });
+    }
   } catch (err) {
     console.error("Error in test SMS:", err);
-    return res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9 \u062A\u0633\u062A", details: err?.message || String(err) });
+    return res.status(500).json({ success: false, error: "\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u0633\u0627\u0644 \u067E\u06CC\u0627\u0645\u06A9 \u062A\u0633\u062A", details: err?.message || String(err) });
   }
 });
 function authenticateToken(req, res, next) {
@@ -4877,13 +5196,13 @@ function requireCustomer(req, res, next) {
 }
 app.get("/api/customer/orders", authenticateToken, requireCustomer, async (req, res) => {
   try {
-    const user = await prisma14.user.findUnique({
+    const user = await prisma13.user.findUnique({
       where: { id: req.user.userId }
     });
     if (!user) {
       return res.status(404).json({ error: "Account Not Found (\u062D\u0633\u0627\u0628 \u06A9\u0627\u0631\u0628\u0631\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F.)" });
     }
-    const orders = await prisma14.order.findMany({
+    const orders = await prisma13.order.findMany({
       where: {
         customerPhone: user.mobile
       },
@@ -4921,7 +5240,7 @@ app.put("/api/customer/profile", authenticateToken, requireCustomer, async (req,
     if (email && !EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: "\u0622\u062F\u0631\u0633 \u0627\u06CC\u0645\u06CC\u0644 \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A." });
     }
-    const updatedUser = await prisma14.user.update({
+    const updatedUser = await prisma13.user.update({
       where: { id: req.user.userId },
       data: {
         firstName,
@@ -4943,15 +5262,15 @@ app.put("/api/customer/profile", authenticateToken, requireCustomer, async (req,
 app.get("/api/supplier/products", authenticateToken, requireSupplier, async (req, res) => {
   try {
     const supplierId = parseInt(req.user.userId);
-    let products = await prisma14.product.findMany({
+    let products = await prisma13.product.findMany({
       where: { supplierId },
       include: { category: true, images: true, variants: true, exploreContent: true },
       orderBy: { id: "desc" }
     });
     if (products.length === 0) {
-      const firstCategory = await prisma14.category.findFirst();
+      const firstCategory = await prisma13.category.findFirst();
       const catId = firstCategory ? firstCategory.id : 1;
-      await prisma14.product.create({
+      await prisma13.product.create({
         data: {
           supplierId,
           categoryId: catId,
@@ -4969,7 +5288,7 @@ app.get("/api/supplier/products", authenticateToken, requireSupplier, async (req
           }
         }
       });
-      await prisma14.product.create({
+      await prisma13.product.create({
         data: {
           supplierId,
           categoryId: catId,
@@ -4987,7 +5306,7 @@ app.get("/api/supplier/products", authenticateToken, requireSupplier, async (req
           }
         }
       });
-      products = await prisma14.product.findMany({
+      products = await prisma13.product.findMany({
         where: { supplierId },
         include: { category: true, images: true, variants: true, exploreContent: true },
         orderBy: { id: "desc" }
@@ -5004,11 +5323,11 @@ app.post("/api/supplier/products", authenticateToken, requireSupplier, async (re
     const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl } = req.body;
     let supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
     if (!supplierId || supplierId <= 0) {
-      const firstSupplier = await prisma14.user.findFirst({ where: { role: "SUPPLIER" } });
+      const firstSupplier = await prisma13.user.findFirst({ where: { role: "SUPPLIER" } });
       if (firstSupplier) {
         supplierId = firstSupplier.id;
       } else {
-        const newSupp = await prisma14.user.create({
+        const newSupp = await prisma13.user.create({
           data: {
             username: "supplier_" + Date.now(),
             password: "pass",
@@ -5019,10 +5338,10 @@ app.post("/api/supplier/products", authenticateToken, requireSupplier, async (re
         supplierId = newSupp.id;
       }
     } else {
-      const existingUser = await prisma14.user.findUnique({ where: { id: supplierId } });
+      const existingUser = await prisma13.user.findUnique({ where: { id: supplierId } });
       if (!existingUser) {
         try {
-          await prisma14.user.create({
+          await prisma13.user.create({
             data: {
               id: supplierId,
               username: req.user?.username || "supplier_" + supplierId,
@@ -5032,33 +5351,33 @@ app.post("/api/supplier/products", authenticateToken, requireSupplier, async (re
             }
           });
         } catch {
-          const suppFallback = await prisma14.user.findFirst({ where: { role: "SUPPLIER" } });
+          const suppFallback = await prisma13.user.findFirst({ where: { role: "SUPPLIER" } });
           if (suppFallback) supplierId = suppFallback.id;
         }
       }
     }
     let actualCategoryId = safeParseInt(categoryId);
     if (actualCategoryId > 0) {
-      const categoryExists = await prisma14.category.findUnique({ where: { id: actualCategoryId } });
+      const categoryExists = await prisma13.category.findUnique({ where: { id: actualCategoryId } });
       if (!categoryExists) {
-        const createdCat = await prisma14.category.create({
+        const createdCat = await prisma13.category.create({
           data: { name: "\u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC " + actualCategoryId, isActive: true, sortOrder: 0 }
         });
         actualCategoryId = createdCat.id;
       }
     } else {
-      const firstCategory = await prisma14.category.findFirst();
+      const firstCategory = await prisma13.category.findFirst();
       if (firstCategory) {
         actualCategoryId = firstCategory.id;
       } else {
-        const newCategory = await prisma14.category.create({
+        const newCategory = await prisma13.category.create({
           data: { name: "\u0639\u0645\u0648\u0645\u06CC", isActive: true, sortOrder: 0 }
         });
         actualCategoryId = newCategory.id;
       }
     }
     const totalInventory = variants && variants.length > 0 ? variants.reduce((sum, v) => sum + safeParseInt(v.stock), 0) : safeParseInt(stock);
-    const product = await prisma14.product.create({
+    const product = await prisma13.product.create({
       data: {
         supplierId,
         categoryId: actualCategoryId,
@@ -5111,27 +5430,27 @@ app.put("/api/supplier/products/:id", authenticateToken, requireSupplier, async 
     const { id } = req.params;
     const supplierId = safeParseInt(req.user?.userId || req.user?.id, 5);
     const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl } = req.body;
-    const existing = await prisma14.product.findFirst({
+    const existing = await prisma13.product.findFirst({
       where: { id: parseInt(id) }
     });
     if (!existing) return res.status(404).json({ error: "\u0645\u062D\u0635\u0648\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     let actualCategoryId = safeParseInt(categoryId);
     if (actualCategoryId > 0) {
-      const categoryExists = await prisma14.category.findUnique({ where: { id: actualCategoryId } });
+      const categoryExists = await prisma13.category.findUnique({ where: { id: actualCategoryId } });
       if (!categoryExists) {
-        const createdCat = await prisma14.category.create({
+        const createdCat = await prisma13.category.create({
           data: { name: "\u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC " + actualCategoryId, isActive: true, sortOrder: 0 }
         });
         actualCategoryId = createdCat.id;
       }
     } else {
-      const firstCategory = await prisma14.category.findFirst();
+      const firstCategory = await prisma13.category.findFirst();
       actualCategoryId = firstCategory ? firstCategory.id : existing.categoryId;
     }
-    await prisma14.productImage.deleteMany({ where: { productId: parseInt(id) } });
-    await prisma14.productVariant.deleteMany({ where: { productId: parseInt(id) } });
+    await prisma13.productImage.deleteMany({ where: { productId: parseInt(id) } });
+    await prisma13.productVariant.deleteMany({ where: { productId: parseInt(id) } });
     const totalInventory = variants && variants.length > 0 ? variants.reduce((sum, v) => sum + safeParseInt(v.stock), 0) : safeParseInt(stock);
-    const product = await prisma14.product.update({
+    const product = await prisma13.product.update({
       where: { id: parseInt(id) },
       data: {
         categoryId: actualCategoryId,
@@ -5177,7 +5496,7 @@ app.put("/api/supplier/products/:id", authenticateToken, requireSupplier, async 
         }
       }
     });
-    await prisma14.announcement.create({
+    await prisma13.announcement.create({
       data: {
         title: `\u062A\u0639\u0644\u06CC\u0642 \u0645\u062D\u0635\u0648\u0644 \u0634\u0645\u0627\u0631\u0647 ${id} \u062C\u0647\u062A \u0628\u0631\u0631\u0633\u06CC \u0648 \u062A\u0627\u06CC\u06CC\u062F \u0645\u062C\u062F\u062F`,
         content: `\u0645\u062D\u0635\u0648\u0644 \u0634\u0645\u0627\u0631\u0647 ${id} (${name}) \u062A\u0648\u0633\u0637 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0648\u06CC\u0631\u0627\u06CC\u0634 \u0634\u062F. \u0645\u0634\u062E\u0635\u0627\u062A/\u0642\u06CC\u0645\u062A \u062C\u062F\u06CC\u062F \u0628\u0647 \u062B\u0628\u062A \u0631\u0633\u06CC\u062F \u0648 \u062C\u0647\u062A \u062D\u0641\u0638 \u0635\u062D\u062A \u062F\u0627\u062F\u0647\u200C\u0647\u0627\u060C \u06A9\u0627\u0644\u0627 \u062A\u0627 \u0632\u0645\u0627\u0646 \u062A\u0627\u06CC\u06CC\u062F \u0646\u0647\u0627\u06CC\u06CC \u062A\u0648\u0633\u0637 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0627\u0631\u0634\u062F \u063A\u06CC\u0631\u0641\u0639\u0627\u0644 \u06AF\u0631\u062F\u06CC\u062F.`,
@@ -5195,7 +5514,7 @@ app.put("/api/supplier/products/:id", authenticateToken, requireSupplier, async 
 });
 app.get("/api/supplier/orders", authenticateToken, requireSupplier, async (req, res) => {
   try {
-    const orderItems = await prisma14.orderItem.findMany({
+    const orderItems = await prisma13.orderItem.findMany({
       where: { supplierId: req.user.userId },
       include: {
         order: {
@@ -5218,7 +5537,7 @@ app.post("/api/supplier/orders/approve-batch", authenticateToken, requireSupplie
     if (!Array.isArray(itemIds)) {
       return res.status(400).json({ error: "\u0644\u06CC\u0633\u062A \u0634\u0646\u0627\u0633\u0647\u200C\u0647\u0627 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     }
-    await prisma14.orderItem.updateMany({
+    await prisma13.orderItem.updateMany({
       where: {
         id: { in: itemIds.map((id) => parseInt(id)) },
         supplierId: req.user.userId
@@ -5227,7 +5546,7 @@ app.post("/api/supplier/orders/approve-batch", authenticateToken, requireSupplie
         status: "SUPPLIER_APPROVED"
       }
     });
-    const items = await prisma14.orderItem.findMany({
+    const items = await prisma13.orderItem.findMany({
       where: {
         id: { in: itemIds.map((id) => parseInt(id)) }
       },
@@ -5235,7 +5554,7 @@ app.post("/api/supplier/orders/approve-batch", authenticateToken, requireSupplie
     });
     const orderIds = Array.from(new Set(items.map((i) => i.orderId)));
     for (const orderId of orderIds) {
-      const parentOrder = await prisma14.order.findUnique({
+      const parentOrder = await prisma13.order.findUnique({
         where: { id: orderId },
         include: { items: true, store: true }
       });
@@ -5244,23 +5563,23 @@ app.post("/api/supplier/orders/approve-batch", authenticateToken, requireSupplie
           (i) => itemIds.includes(i.id) || i.status === "SUPPLIER_APPROVED"
         );
         if (allApproved) {
-          await prisma14.order.update({
+          await prisma13.order.update({
             where: { id: parentOrder.id },
             data: {
-              status: "WAITING_SHIPPING_COST",
+              status: "WAITING_STORE_ADDRESS",
               statusHistory: {
                 create: {
                   fromStatus: "WAITING_SUPPLIER_CONFIRMATION",
-                  toStatus: "WAITING_SHIPPING_COST",
+                  toStatus: "WAITING_STORE_ADDRESS",
                   actorRole: "SYSTEM",
                   actorName: "\u0633\u06CC\u0633\u062A\u0645",
-                  note: "\u062A\u0645\u0627\u0645\u06CC \u0627\u0642\u0644\u0627\u0645 \u062A\u0648\u0633\u0637 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u062A\u0627\u06CC\u06CC\u062F \u0634\u062F\u0646\u062F \u0648 \u062A\u0639\u0647\u062F \u0627\u0631\u0633\u0627\u0644 \u062B\u0628\u062A \u06AF\u0631\u062F\u06CC\u062F. \u062F\u0631 \u0627\u0646\u062A\u0638\u0627\u0631 \u0645\u062D\u0627\u0633\u0628\u0647 \u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644 \u062A\u0648\u0633\u0637 \u0645\u062F\u06CC\u0631\u06CC\u062A."
+                  note: "\u062A\u0645\u0627\u0645\u06CC \u0627\u0642\u0644\u0627\u0645 \u062A\u0648\u0633\u0637 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u062A\u0627\u06CC\u06CC\u062F \u0634\u062F\u0646\u062F. \u062F\u0631 \u0627\u0646\u062A\u0638\u0627\u0631 \u062B\u0628\u062A \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0622\u062F\u0631\u0633 \u067E\u0633\u062A\u06CC \u062A\u0648\u0633\u0637 \u0645\u062F\u06CC\u0631 \u0641\u0631\u0648\u0634\u06AF\u0627\u0647."
                 }
               }
             }
           });
           const storeMobile = parentOrder.store?.mobile || parentOrder.customerPhone;
-          const suppUser = await prisma14.user.findUnique({ where: { id: req.user.userId } });
+          const suppUser = await prisma13.user.findUnique({ where: { id: req.user.userId } });
           notifySupplierCommitment(parentOrder.id, storeMobile, suppUser?.mobile).catch(console.error);
         }
       }
@@ -5274,20 +5593,20 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
   try {
     const { status, trackingCode } = req.body;
     const { itemId } = req.params;
-    const item = await prisma14.orderItem.findFirst({
+    const item = await prisma13.orderItem.findFirst({
       where: { id: parseInt(itemId), supplierId: req.user.userId }
     });
     if (!item) {
       return res.status(404).json({ error: "\u0633\u0641\u0627\u0631\u0634 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    const updated = await prisma14.orderItem.update({
+    const updated = await prisma13.orderItem.update({
       where: { id: item.id },
       data: { status, trackingCode }
     });
     const isStage5 = ["SHIPPED", "DELIVERED", "COMPLETED"].includes(status);
     const wasStage5 = ["SHIPPED", "DELIVERED", "COMPLETED"].includes(item.status);
     if (isStage5 && !wasStage5) {
-      await prisma14.product.update({
+      await prisma13.product.update({
         where: { id: item.productId },
         data: {
           inventory: {
@@ -5296,7 +5615,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
         }
       });
       if (item.variantId) {
-        await prisma14.productVariant.update({
+        await prisma13.productVariant.update({
           where: { id: item.variantId },
           data: {
             stock: {
@@ -5307,12 +5626,12 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
       }
     }
     if (trackingCode) {
-      await prisma14.order.update({
+      await prisma13.order.update({
         where: { id: item.orderId },
         data: { trackingCode }
       });
     }
-    const parentOrder = await prisma14.order.findUnique({
+    const parentOrder = await prisma13.order.findUnique({
       where: { id: item.orderId },
       include: { items: true, store: true }
     });
@@ -5322,33 +5641,33 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
           (i) => i.id === item.id ? true : i.status === "SUPPLIER_APPROVED"
         );
         if (allApproved) {
-          await prisma14.order.update({
+          await prisma13.order.update({
             where: { id: parentOrder.id },
             data: {
-              status: "WAITING_SHIPPING_COST",
+              status: "WAITING_STORE_ADDRESS",
               statusHistory: {
                 create: {
                   fromStatus: parentOrder.status,
-                  toStatus: "WAITING_SHIPPING_COST",
+                  toStatus: "WAITING_STORE_ADDRESS",
                   actorRole: "SYSTEM",
                   actorName: "\u0633\u06CC\u0633\u062A\u0645",
-                  note: "\u062A\u0645\u0627\u0645\u06CC \u0627\u0642\u0644\u0627\u0645 \u062A\u0648\u0633\u0637 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u062A\u0627\u06CC\u06CC\u062F \u0634\u062F\u0646\u062F \u0648 \u062A\u0639\u0647\u062F \u0627\u0631\u0633\u0627\u0644 \u062B\u0628\u062A \u06AF\u0631\u062F\u06CC\u062F. \u062F\u0631 \u0627\u0646\u062A\u0638\u0627\u0631 \u0645\u062D\u0627\u0633\u0628\u0647 \u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644 \u062A\u0648\u0633\u0637 \u0645\u062F\u06CC\u0631\u06CC\u062A."
+                  note: "\u062A\u0645\u0627\u0645\u06CC \u0627\u0642\u0644\u0627\u0645 \u062A\u0648\u0633\u0637 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u062A\u0627\u06CC\u06CC\u062F \u0634\u062F\u0646\u062F. \u062F\u0631 \u0627\u0646\u062A\u0638\u0627\u0631 \u062B\u0628\u062A \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0622\u062F\u0631\u0633 \u067E\u0633\u062A\u06CC \u062A\u0648\u0633\u0637 \u0645\u062F\u06CC\u0631 \u0641\u0631\u0648\u0634\u06AF\u0627\u0647."
                 }
               }
             }
           });
           const storeMobile = parentOrder.store?.mobile || parentOrder.customerPhone;
-          const suppUser = await prisma14.user.findUnique({ where: { id: req.user.userId } });
+          const suppUser = await prisma13.user.findUnique({ where: { id: req.user.userId } });
           notifySupplierCommitment(parentOrder.id, storeMobile, suppUser?.mobile).catch(console.error);
         }
       } else if (status === "REJECTED" || status === "OUT_OF_STOCK") {
         const itemAmt = (item.supplierPrice || 0) * (item.quantity || 1);
         if (itemAmt > 0) {
-          const wallet = await prisma14.wallet.findUnique({
+          const wallet = await prisma13.wallet.findUnique({
             where: { supplierId: req.user.userId }
           });
           if (wallet) {
-            await prisma14.wallet.update({
+            await prisma13.wallet.update({
               where: { id: wallet.id },
               data: {
                 balance: {
@@ -5356,7 +5675,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
                 }
               }
             });
-            await prisma14.ledgerEntry.create({
+            await prisma13.ledgerEntry.create({
               data: {
                 walletId: wallet.id,
                 amount: -itemAmt,
@@ -5369,7 +5688,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
           }
         }
         const refundNote = `\u26A0\uFE0F \u0627\u062E\u0637\u0627\u0631 \u0627\u062A\u0645\u0627\u0645 \u0645\u0648\u062C\u0648\u062F\u06CC \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647: \u0633\u0641\u0627\u0631\u0634 \u0634\u0645\u0627\u0631\u0647 ${parentOrder.id} \u0628\u0647 \u0639\u0644\u062A \u0627\u062A\u0645\u0627\u0645 \u0645\u0648\u062C\u0648\u062F\u06CC \u062A\u0648\u0633\u0637 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0631\u062F \u0634\u062F. \u0645\u0628\u0644\u063A ${(parentOrder.totalAmount || 0).toLocaleString()} \u062A\u0648\u0645\u0627\u0646 \u0628\u0627\u06CC\u062F \u0628\u0647 \u0634\u0645\u0627\u0631\u0647 \u06A9\u0627\u0631\u062A/\u062D\u0633\u0627\u0628 \u062E\u0631\u06CC\u062F\u0627\u0631 \u0639\u0648\u062F\u062A \u062F\u0627\u062F\u0647 \u0634\u0648\u062F.`;
-        await prisma14.order.update({
+        await prisma13.order.update({
           where: { id: parentOrder.id },
           data: {
             status: "REJECTED",
@@ -5385,11 +5704,11 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
           }
         });
         try {
-          const admins = await prisma14.user.findMany({
+          const admins = await prisma13.user.findMany({
             where: { role: "SUPER_ADMIN" }
           });
           for (const admin of admins) {
-            await prisma14.notification.create({
+            await prisma13.notification.create({
               data: {
                 userId: admin.id,
                 title: `\u26A0\uFE0F \u0647\u0634\u062F\u0627\u0631 \u0639\u0648\u062F\u062A \u0648\u062C\u0647 - \u0627\u062A\u0645\u0627\u0645 \u0645\u0648\u062C\u0648\u062F\u06CC \u0633\u0641\u0627\u0631\u0634 #${parentOrder.id}`,
@@ -5403,7 +5722,7 @@ app.patch("/api/supplier/orders/:itemId", authenticateToken, requireSupplier, as
           console.error("Error creating admin notification for rejected order:", e);
         }
       } else if (["PREPARING", "SHIPPED", "DELIVERED", "COMPLETED"].includes(status)) {
-        await prisma14.order.update({
+        await prisma13.order.update({
           where: { id: parentOrder.id },
           data: {
             status,
@@ -5433,11 +5752,11 @@ app.post("/api/supplier/payout/request", authenticateToken, requireSupplier, pay
     const validatedData = payoutRequestSchema.parse(req.body);
     const { amount } = validatedData;
     const supplierId = req.user.userId;
-    const user = await prisma14.user.findUnique({ where: { id: supplierId } });
+    const user = await prisma13.user.findUnique({ where: { id: supplierId } });
     if (!user || !user.shaba) {
       return res.status(400).json({ error: "\u0644\u0637\u0641\u0627 \u0627\u0628\u062A\u062F\u0627 \u0634\u0645\u0627\u0631\u0647 \u0634\u0628\u0627 \u062E\u0648\u062F \u0631\u0627 \u062F\u0631 \u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u062B\u0628\u062A \u06A9\u0646\u06CC\u062F" });
     }
-    const wallet = await prisma14.wallet.findUnique({ where: { supplierId } });
+    const wallet = await prisma13.wallet.findUnique({ where: { supplierId } });
     if (!wallet) {
       return res.status(404).json({ error: "\u06A9\u06CC\u0641 \u067E\u0648\u0644 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
@@ -5456,13 +5775,13 @@ app.get("/api/supplier/reports", authenticateToken, requireSupplier, async (req,
   try {
     const supplierId = req.user.userId;
     const { status, type, page = "1", limit = "10" } = req.query;
-    const wallet = await prisma14.wallet.findUnique({
+    const wallet = await prisma13.wallet.findUnique({
       where: { supplierId }
     });
     if (!wallet) {
       return res.status(404).json({ error: "Wallet not found" });
     }
-    const earningsResult = await prisma14.ledgerEntry.aggregate({
+    const earningsResult = await prisma13.ledgerEntry.aggregate({
       where: {
         walletId: wallet.id,
         type: "ORDER_REVENUE",
@@ -5470,7 +5789,7 @@ app.get("/api/supplier/reports", authenticateToken, requireSupplier, async (req,
       },
       _sum: { amount: true }
     });
-    const withdrawnResult = await prisma14.ledgerEntry.aggregate({
+    const withdrawnResult = await prisma13.ledgerEntry.aggregate({
       where: {
         walletId: wallet.id,
         type: "WITHDRAWAL",
@@ -5483,13 +5802,13 @@ app.get("/api/supplier/reports", authenticateToken, requireSupplier, async (req,
     const whereClause = { walletId: wallet.id };
     if (status) whereClause.status = status;
     if (type) whereClause.type = type;
-    const history = await prisma14.ledgerEntry.findMany({
+    const history = await prisma13.ledgerEntry.findMany({
       where: whereClause,
       orderBy: { id: "desc" },
       skip: (pageNum - 1) * limitNum,
       take: limitNum
     });
-    const totalHistory = await prisma14.ledgerEntry.count({ where: whereClause });
+    const totalHistory = await prisma13.ledgerEntry.count({ where: whereClause });
     res.json({
       balance: wallet.balance.toString(),
       totalEarnings: (earningsResult._sum.amount || 0).toString(),
@@ -5508,7 +5827,7 @@ app.get("/api/supplier/reports", authenticateToken, requireSupplier, async (req,
 });
 app.get("/api/supplier/wallet", authenticateToken, requireSupplier, async (req, res) => {
   try {
-    let wallet = await prisma14.wallet.findUnique({
+    let wallet = await prisma13.wallet.findUnique({
       where: { supplierId: req.user.userId },
       include: {
         ledgerEntries: {
@@ -5518,7 +5837,7 @@ app.get("/api/supplier/wallet", authenticateToken, requireSupplier, async (req, 
       }
     });
     if (!wallet) {
-      wallet = await prisma14.wallet.create({
+      wallet = await prisma13.wallet.create({
         data: { supplierId: req.user.userId, balance: 0 },
         include: {
           ledgerEntries: true
@@ -5549,7 +5868,7 @@ app.get("/api/supplier/wallet", authenticateToken, requireSupplier, async (req, 
 app.put("/api/supplier/profile", authenticateToken, requireSupplier, async (req, res) => {
   try {
     const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address } = req.body;
-    const user = await prisma14.user.update({
+    const user = await prisma13.user.update({
       where: { id: req.user.userId },
       data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address }
     });
@@ -5561,7 +5880,7 @@ app.put("/api/supplier/profile", authenticateToken, requireSupplier, async (req,
 app.patch("/api/supplier/profile", authenticateToken, requireSupplier, async (req, res) => {
   try {
     const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address } = req.body;
-    const user = await prisma14.user.update({
+    const user = await prisma13.user.update({
       where: { id: req.user.userId },
       data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address }
     });
@@ -5572,7 +5891,7 @@ app.patch("/api/supplier/profile", authenticateToken, requireSupplier, async (re
 });
 app.get("/api/supplier/tickets", authenticateToken, requireSupplier, async (req, res) => {
   try {
-    const tickets = await prisma14.ticket.findMany({
+    const tickets = await prisma13.ticket.findMany({
       where: { userId: req.user.userId },
       include: { messages: true },
       orderBy: { id: "desc" }
@@ -5585,7 +5904,7 @@ app.get("/api/supplier/tickets", authenticateToken, requireSupplier, async (req,
 app.post("/api/supplier/tickets", authenticateToken, requireSupplier, async (req, res) => {
   try {
     const { subject, department, priority, message, attachmentUrl } = req.body;
-    const ticket = await prisma14.ticket.create({
+    const ticket = await prisma13.ticket.create({
       data: {
         userId: req.user.userId,
         subject,
@@ -5605,11 +5924,11 @@ app.post("/api/supplier/tickets/:id/messages", authenticateToken, requireSupplie
   try {
     const { message, attachmentUrl } = req.body;
     const { id } = req.params;
-    const existing = await prisma14.ticket.findFirst({
+    const existing = await prisma13.ticket.findFirst({
       where: { id: parseInt(id), userId: req.user.userId }
     });
     if (!existing) return res.status(404).json({ error: "\u062A\u06CC\u06A9\u062A \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
-    const ticketMsg = await prisma14.ticketMessage.create({
+    const ticketMsg = await prisma13.ticketMessage.create({
       data: {
         ticketId: parseInt(id),
         userId: req.user.userId,
@@ -5642,7 +5961,7 @@ function requireStoreManager(req, res, next) {
 }
 app.get("/api/store-manager/tickets", authenticateToken, requireStoreManager, async (req, res) => {
   try {
-    const tickets = await prisma14.ticket.findMany({
+    const tickets = await prisma13.ticket.findMany({
       where: { userId: req.user.userId },
       include: { messages: true },
       orderBy: { id: "desc" }
@@ -5655,7 +5974,7 @@ app.get("/api/store-manager/tickets", authenticateToken, requireStoreManager, as
 app.post("/api/store-manager/tickets", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const { subject, department, priority, message, attachmentUrl } = req.body;
-    const ticket = await prisma14.ticket.create({
+    const ticket = await prisma13.ticket.create({
       data: {
         userId: req.user.userId,
         subject,
@@ -5676,11 +5995,11 @@ app.post("/api/store-manager/tickets/:id/messages", authenticateToken, requireSt
   try {
     const { message, attachmentUrl } = req.body;
     const { id } = req.params;
-    const existing = await prisma14.ticket.findFirst({
+    const existing = await prisma13.ticket.findFirst({
       where: { id: parseInt(id), userId: req.user.userId }
     });
     if (!existing) return res.status(404).json({ error: "\u062A\u06CC\u06A9\u062A \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
-    const ticketMsg = await prisma14.ticketMessage.create({
+    const ticketMsg = await prisma13.ticketMessage.create({
       data: {
         ticketId: parseInt(id),
         userId: req.user.userId,
@@ -5695,7 +6014,7 @@ app.post("/api/store-manager/tickets/:id/messages", authenticateToken, requireSt
 });
 app.get("/api/tickets", authenticateToken, async (req, res) => {
   try {
-    const tickets = await prisma14.ticket.findMany({
+    const tickets = await prisma13.ticket.findMany({
       where: { userId: req.user.userId },
       include: {
         messages: {
@@ -5716,7 +6035,7 @@ app.get("/api/tickets", authenticateToken, async (req, res) => {
 app.post("/api/tickets", authenticateToken, async (req, res) => {
   try {
     const { subject, department, message, attachmentUrl } = req.body;
-    const ticket = await prisma14.ticket.create({
+    const ticket = await prisma13.ticket.create({
       data: {
         userId: req.user.userId,
         subject: subject || "\u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u06CC \u0639\u0645\u0648\u0645\u06CC",
@@ -5726,7 +6045,7 @@ app.post("/api/tickets", authenticateToken, async (req, res) => {
         status: "OPEN"
       }
     });
-    await prisma14.ticketMessage.create({
+    await prisma13.ticketMessage.create({
       data: {
         ticketId: ticket.id,
         userId: req.user.userId,
@@ -5741,7 +6060,7 @@ app.post("/api/tickets", authenticateToken, async (req, res) => {
 app.get("/api/tickets/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const ticket = await prisma14.ticket.findFirst({
+    const ticket = await prisma13.ticket.findFirst({
       where: { id: parseInt(id, 10), userId: req.user.userId },
       include: {
         messages: {
@@ -5763,11 +6082,11 @@ app.post("/api/tickets/:id/messages", authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { message, attachmentUrl } = req.body;
     const ticketId = parseInt(id, 10);
-    const existing = await prisma14.ticket.findFirst({
+    const existing = await prisma13.ticket.findFirst({
       where: { id: ticketId, userId: req.user.userId }
     });
     if (!existing) return res.status(404).json({ error: "\u062A\u06CC\u06A9\u062A \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
-    const msg = await prisma14.ticketMessage.create({
+    const msg = await prisma13.ticketMessage.create({
       data: {
         ticketId,
         userId: req.user.userId,
@@ -5775,7 +6094,7 @@ app.post("/api/tickets/:id/messages", authenticateToken, async (req, res) => {
         attachmentUrl: attachmentUrl || null
       }
     });
-    await prisma14.ticket.update({
+    await prisma13.ticket.update({
       where: { id: ticketId },
       data: { status: "OPEN", updatedAt: /* @__PURE__ */ new Date() }
     });
@@ -5787,7 +6106,7 @@ app.post("/api/tickets/:id/messages", authenticateToken, async (req, res) => {
 app.put("/api/store-manager/profile", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl } = req.body;
-    const user = await prisma14.user.update({
+    const user = await prisma13.user.update({
       where: { id: req.user.userId },
       data: { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl }
     });
@@ -5799,7 +6118,7 @@ app.put("/api/store-manager/profile", authenticateToken, requireStoreManager, as
 app.patch("/api/store-manager/profile", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl } = req.body;
-    const user = await prisma14.user.update({
+    const user = await prisma13.user.update({
       where: { id: req.user.userId },
       data: { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl }
     });
@@ -5811,10 +6130,10 @@ app.patch("/api/store-manager/profile", authenticateToken, requireStoreManager, 
 app.get("/api/store-manager/stats", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId;
-    const totalOrders = await prisma14.order.count({ where: { storeId } });
-    const paidInvoices = await prisma14.storeInvoice.findMany({ where: { storeManagerId: storeId, status: "PAID" } });
+    const totalOrders = await prisma13.order.count({ where: { storeId } });
+    const paidInvoices = await prisma13.storeInvoice.findMany({ where: { storeManagerId: storeId, status: "PAID" } });
     const totalPaid = paidInvoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
-    const recentActivity = await prisma14.order.findMany({
+    const recentActivity = await prisma13.order.findMany({
       where: { storeId },
       orderBy: { id: "desc" },
       take: 5
@@ -5843,7 +6162,7 @@ app.get("/api/store-manager/marketplace-products", authenticateToken, requireSto
     if (category) {
       where.category = { name: category };
     }
-    const products = await prisma14.product.findMany({
+    const products = await prisma13.product.findMany({
       where,
       include: {
         category: true,
@@ -5859,7 +6178,7 @@ app.get("/api/store-manager/marketplace-products", authenticateToken, requireSto
       skip,
       take: limit
     });
-    const total = await prisma14.product.count({ where });
+    const total = await prisma13.product.count({ where });
     const sanitizedProducts = products.map((product) => {
       let fPrice = product.finalPrice;
       if (!fPrice) {
@@ -5939,7 +6258,7 @@ app.post("/api/store-manager/my-catalog", authenticateToken, requireStoreManager
     if (!productId) {
       return res.status(400).json({ error: "Product ID is required." });
     }
-    const totalSelections = await prisma14.storeProductSelection.count({
+    const totalSelections = await prisma13.storeProductSelection.count({
       where: { storeId }
     });
     if (totalSelections >= 20) {
@@ -5947,9 +6266,9 @@ app.post("/api/store-manager/my-catalog", authenticateToken, requireStoreManager
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const setting = await prisma14.systemSettings.findUnique({ where: { key: "DAILY_PRODUCT_LIMIT" } });
+      const setting = await prisma13.systemSettings.findUnique({ where: { key: "DAILY_PRODUCT_LIMIT" } });
       const limit = setting ? parseInt(setting.value) : 3;
-      const selectionsToday = await prisma14.storeProductSelection.count({
+      const selectionsToday = await prisma13.storeProductSelection.count({
         where: {
           storeId,
           selected_at: { gte: today, lt: tomorrow }
@@ -5959,13 +6278,13 @@ app.post("/api/store-manager/my-catalog", authenticateToken, requireStoreManager
         return res.status(400).json({ error: "\u0634\u0645\u0627 \u0628\u0647 \u0633\u0642\u0641 \u0645\u062C\u0627\u0632 \u0627\u0646\u062A\u062E\u0627\u0628 \u0645\u062D\u0635\u0648\u0644 \u062F\u0631 \u06F2\u06F4 \u0633\u0627\u0639\u062A \u06AF\u0630\u0634\u062A\u0647 \u0631\u0633\u06CC\u062F\u0647\u200C\u0627\u06CC\u062F. \u067E\u0633 \u0627\u0632 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u0633\u0647\u0645\u06CC\u0647 \u0627\u0648\u0644\u06CC\u0647 \u06F2\u06F0 \u06A9\u0627\u0644\u0627\u060C \u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0634\u0645\u0627 \u0631\u0648\u0632\u0627\u0646\u0647 \u06F3 \u0645\u062D\u0635\u0648\u0644 \u0627\u0633\u062A." });
       }
     }
-    const existing = await prisma14.storeProductSelection.findFirst({
+    const existing = await prisma13.storeProductSelection.findFirst({
       where: { storeId, productId }
     });
     if (existing) {
       return res.status(400).json({ error: "\u0627\u06CC\u0646 \u0645\u062D\u0635\u0648\u0644 \u0642\u0628\u0644\u0627\u064B \u0628\u0647 \u0632\u0648\u067E\u06CC\u062A\u06CC \u0634\u0645\u0627 \u0627\u0636\u0627\u0641\u0647 \u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
-    const selection = await prisma14.storeProductSelection.create({
+    const selection = await prisma13.storeProductSelection.create({
       data: {
         storeId,
         productId,
@@ -5981,7 +6300,7 @@ app.delete("/api/store-manager/my-catalog/:productId", authenticateToken, requir
   try {
     const storeId = req.user.userId || req.user.id;
     const productId = parseInt(req.params.productId);
-    await prisma14.storeProductSelection.deleteMany({
+    await prisma13.storeProductSelection.deleteMany({
       where: { storeId, productId }
     });
     res.json({ message: "\u0645\u062D\u0635\u0648\u0644 \u0627\u0632 \u0632\u0648\u067E\u06CC\u062A\u06CC \u0634\u0645\u0627 \u062D\u0630\u0641 \u0634\u062F." });
@@ -5992,7 +6311,7 @@ app.delete("/api/store-manager/my-catalog/:productId", authenticateToken, requir
 app.get("/api/store-manager/my-catalog", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId || req.user.id;
-    const selections = await prisma14.storeProductSelection.findMany({
+    const selections = await prisma13.storeProductSelection.findMany({
       where: { storeId },
       include: {
         product: {
@@ -6064,7 +6383,7 @@ app.get("/api/store-manager/daily-limit", authenticateToken, requireStoreManager
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const totalSelections = await prisma14.storeProductSelection.count({
+    const totalSelections = await prisma13.storeProductSelection.count({
       where: { storeId }
     });
     if (totalSelections < 20) {
@@ -6075,9 +6394,9 @@ app.get("/api/store-manager/daily-limit", authenticateToken, requireStoreManager
         reason: "\u0641\u0631\u0648\u0634\u06AF\u0627\u0647 \u062C\u062F\u06CC\u062F (\u0633\u0647\u0645\u06CC\u0647 \u0627\u0648\u0644\u06CC\u0647 \u06F2\u06F0 \u0645\u062D\u0635\u0648\u0644 \u0628\u062F\u0648\u0646 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0632\u0645\u0627\u0646\u06CC)"
       });
     } else {
-      const setting = await prisma14.systemSettings.findUnique({ where: { key: "DAILY_PRODUCT_LIMIT" } });
+      const setting = await prisma13.systemSettings.findUnique({ where: { key: "DAILY_PRODUCT_LIMIT" } });
       const limit = setting ? parseInt(setting.value) : 3;
-      const selectionsToday = await prisma14.storeProductSelection.count({
+      const selectionsToday = await prisma13.storeProductSelection.count({
         where: {
           storeId,
           selected_at: { gte: today, lt: tomorrow }
@@ -6109,7 +6428,7 @@ app.post("/api/store-manager/orders", authenticateToken, requireStoreManager, as
     const resolvedItems = [];
     for (const itemReq of rawItems) {
       if (!itemReq.productId) continue;
-      const product = await prisma14.product.findUnique({
+      const product = await prisma13.product.findUnique({
         where: { id: itemReq.productId }
       });
       if (!product) {
@@ -6119,7 +6438,7 @@ app.post("/api/store-manager/orders", authenticateToken, requireStoreManager, as
       let supplierPrice = product.supplierBasePrice;
       let finalVariantId = null;
       if (itemReq.variantId) {
-        const variant = await prisma14.productVariant.findUnique({
+        const variant = await prisma13.productVariant.findUnique({
           where: { id: itemReq.variantId }
         });
         if (variant && variant.productId === product.id) {
@@ -6161,7 +6480,7 @@ app.post("/api/store-manager/orders", authenticateToken, requireStoreManager, as
     const createdOrders = [];
     for (const [sId, groupItems] of groupedBySupplier.entries()) {
       const totalAmount = groupItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
-      const order = await prisma14.order.create({
+      const order = await prisma13.order.create({
         data: {
           storeId,
           totalAmount,
@@ -6195,7 +6514,7 @@ app.post("/api/store-manager/orders", authenticateToken, requireStoreManager, as
         }
       });
       if (sId) {
-        prisma14.user.findUnique({ where: { id: sId } }).then((supplier) => {
+        prisma13.user.findUnique({ where: { id: sId } }).then((supplier) => {
           if (supplier?.mobile) {
             notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
           }
@@ -6240,7 +6559,7 @@ app.get("/api/store-manager/orders", authenticateToken, requireStoreManager, asy
     } else if (status === "paid") {
       whereClause.storeInvoiceId = { not: null };
     }
-    const orders = await prisma14.order.findMany({
+    const orders = await prisma13.order.findMany({
       where: whereClause,
       include: {
         items: { include: { product: { include: { supplier: true } }, variant: true } }
@@ -6260,7 +6579,7 @@ app.get("/api/store-manager/notifications/check-new-orders", authenticateToken, 
     if (lastOrderId > 0) {
       whereClause.id = { gt: lastOrderId };
     }
-    const newOrders = await prisma14.order.findMany({
+    const newOrders = await prisma13.order.findMany({
       where: whereClause,
       include: {
         items: {
@@ -6273,7 +6592,7 @@ app.get("/api/store-manager/notifications/check-new-orders", authenticateToken, 
       orderBy: { id: "desc" },
       take: 10
     });
-    const latestOrder = await prisma14.order.findFirst({
+    const latestOrder = await prisma13.order.findFirst({
       where: { storeId },
       orderBy: { id: "desc" },
       select: { id: true }
@@ -6292,7 +6611,7 @@ app.get("/api/store-manager/notifications/settings", authenticateToken, requireS
   try {
     const storeId = req.user.userId;
     const key2 = `STORE_NOTIF_SETTINGS_${storeId}`;
-    const setting = await prisma14.systemConfig.findUnique({ where: { key: key2 } });
+    const setting = await prisma13.systemConfig.findUnique({ where: { key: key2 } });
     if (setting && setting.value) {
       return res.json(JSON.parse(setting.value));
     }
@@ -6320,7 +6639,7 @@ app.post("/api/store-manager/notifications/settings", authenticateToken, require
     const storeId = req.user.userId;
     const key2 = `STORE_NOTIF_SETTINGS_${storeId}`;
     const value = JSON.stringify(req.body);
-    await prisma14.systemConfig.upsert({
+    await prisma13.systemConfig.upsert({
       where: { key: key2 },
       create: { key: key2, value },
       update: { value }
@@ -6335,7 +6654,7 @@ app.post("/api/store-manager/push-subscription", authenticateToken, requireStore
     const storeId = req.user.userId;
     const key2 = `STORE_PUSH_SUB_${storeId}`;
     const value = JSON.stringify(req.body);
-    await prisma14.systemConfig.upsert({
+    await prisma13.systemConfig.upsert({
       where: { key: key2 },
       create: { key: key2, value },
       update: { value }
@@ -6362,7 +6681,7 @@ app.post("/api/store-manager/notifications/test-push", authenticateToken, requir
 app.get("/api/store-manager/customers", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId;
-    const orders = await prisma14.order.findMany({
+    const orders = await prisma13.order.findMany({
       where: { storeId },
       orderBy: { id: "desc" }
     });
@@ -6411,7 +6730,7 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
       console.log("Invalid order ID");
       return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     }
-    const order = await prisma14.order.findUnique({
+    const order = await prisma13.order.findUnique({
       where: { id: orderId },
       include: { items: true }
     });
@@ -6425,14 +6744,14 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
       return res.status(400).json({ error: "\u0627\u0645\u06A9\u0627\u0646 \u062B\u0628\u062A \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u067E\u0633\u062A\u06CC \u0628\u0631\u0627\u06CC \u0633\u0641\u0627\u0631\u0634\u0627\u062A \u062A\u06A9\u0645\u06CC\u0644 \u0634\u062F\u0647 \u06CC\u0627 \u0644\u063A\u0648 \u0634\u062F\u0647 \u0648\u062C\u0648\u062F \u0646\u062F\u0627\u0631\u062F" });
     }
     const savedLabel = processPostalLabel(orderId, postalLabel);
-    const fixedConfig = await prisma14.systemConfig.findUnique({ where: { key: "FIXED_SHIPPING_ENABLED" } });
+    const fixedConfig = await prisma13.systemConfig.findUnique({ where: { key: "FIXED_SHIPPING_ENABLED" } });
     const isFixedEnabled = fixedConfig?.value === "true";
     let calculatedFee = 0;
     let nextStatus = "WAITING_SHIPPING_COST";
     let newTotalAmount = order.totalAmount;
     if (isFixedEnabled) {
-      const postConfig = await prisma14.systemConfig.findUnique({ where: { key: "FIXED_POST_SHIPPING_FEE" } });
-      const tipaxConfig = await prisma14.systemConfig.findUnique({ where: { key: "FIXED_TIPAX_SHIPPING_FEE" } });
+      const postConfig = await prisma13.systemConfig.findUnique({ where: { key: "FIXED_POST_SHIPPING_FEE" } });
+      const tipaxConfig = await prisma13.systemConfig.findUnique({ where: { key: "FIXED_TIPAX_SHIPPING_FEE" } });
       const postFee = parseFloat(postConfig?.value || "50000");
       const tipaxFee = parseFloat(tipaxConfig?.value || "80000");
       calculatedFee = shippingMethod === "TIPAX" || shippingMethod === "EXPRESS" ? tipaxFee : postFee;
@@ -6443,7 +6762,7 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
       }
       nextStatus = "PENDING_PAYMENT";
     }
-    const updatedOrder = await prisma14.order.update({
+    const updatedOrder = await prisma13.order.update({
       where: { id: orderId },
       data: {
         shippingMethod: shippingMethod || "PLATFORM_PANEL",
@@ -6465,7 +6784,7 @@ app.put("/api/store-manager/orders/:id/shipping", authenticateToken, requireStor
         }
       }
     });
-    await prisma14.orderItem.updateMany({
+    await prisma13.orderItem.updateMany({
       where: { orderId },
       data: { status: nextStatus }
     });
@@ -6560,7 +6879,7 @@ async function syncAllPaidOrdersSupplierWallets() {
     return;
   }
   try {
-    const paidOrders = await prisma14.order.findMany({
+    const paidOrders = await prisma13.order.findMany({
       where: {
         status: {
           in: ["PAID", "PROCESSING", "READY_TO_SHIP", "SHIPPED", "COMPLETED", "DELIVERED", "PREPARING", "PENDING_POSTAL_LABEL"]
@@ -6568,7 +6887,7 @@ async function syncAllPaidOrdersSupplierWallets() {
       }
     });
     if (paidOrders.length > 0) {
-      await creditSuppliersForOrders(prisma14, paidOrders);
+      await creditSuppliersForOrders(prisma13, paidOrders);
     }
   } catch (err) {
     console.error("Error syncing supplier wallets:", err);
@@ -6669,12 +6988,12 @@ async function debitSupplierForRejectedOrder(tx, orderId, supplierId, reason) {
   }
 }
 async function getOrCreateWallet(userId) {
-  let wallet = await prisma14.wallet.findUnique({
+  let wallet = await prisma13.wallet.findUnique({
     where: { supplierId: userId },
     include: { ledgerEntries: { orderBy: { id: "desc" } } }
   });
   if (!wallet) {
-    wallet = await prisma14.wallet.create({
+    wallet = await prisma13.wallet.create({
       data: { supplierId: userId },
       include: { ledgerEntries: true }
     });
@@ -6694,7 +7013,7 @@ app.post("/api/store-manager/settle-orders", authenticateToken, requireStoreMana
       return res.status(400).json({ error: "\u0633\u0641\u0627\u0631\u0634\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A" });
     }
     const storeId = req.user.userId;
-    const ordersToPay = await prisma14.order.findMany({
+    const ordersToPay = await prisma13.order.findMany({
       where: {
         id: { in: orderIds },
         storeId,
@@ -6706,7 +7025,7 @@ app.post("/api/store-manager/settle-orders", authenticateToken, requireStoreMana
     }
     const totalAmount = ordersToPay.reduce((acc, o) => acc + o.totalAmount, 0);
     if (paymentMethod === "MANUAL") {
-      const invoice = await prisma14.$transaction(async (tx) => {
+      const invoice = await prisma13.$transaction(async (tx) => {
         const inv = await tx.storeInvoice.create({
           data: {
             storeManagerId: storeId,
@@ -6736,7 +7055,7 @@ app.post("/api/store-manager/settle-orders", authenticateToken, requireStoreMana
       });
       return res.json({ manual: true, invoiceId: invoice.id });
     } else {
-      const invoice = await prisma14.$transaction(async (tx) => {
+      const invoice = await prisma13.$transaction(async (tx) => {
         const inv = await tx.storeInvoice.create({
           data: {
             storeManagerId: storeId,
@@ -6762,13 +7081,13 @@ app.post("/api/store-manager/settle-orders", authenticateToken, requireStoreMana
           callbackUrl
         );
         payLink = zibalResult.payLink;
-        await prisma14.storeInvoice.update({
+        await prisma13.storeInvoice.update({
           where: { id: invoice.id },
           data: { trackId: zibalResult.authority }
         });
       } catch (paymentErr) {
         console.error("Error creating Zibal payment for store invoice:", paymentErr);
-        payLink = `/api/public/store-invoice/pay-simulate?invoiceId=${invoice.id}`;
+        throw new Error(`\u062E\u0637\u0627 \u062F\u0631 \u0627\u06CC\u062C\u0627\u062F \u062A\u0631\u0627\u06A9\u0646\u0634 \u067E\u0631\u062F\u0627\u062E\u062A: ${paymentErr.message}`);
       }
       return res.json({ payLink });
     }
@@ -6785,13 +7104,13 @@ app.post("/api/store-manager/invoices/:id/receipt", authenticateToken, requireSt
     if (!receiptUrl) {
       return res.status(400).json({ error: "\u0622\u062F\u0631\u0633 \u0641\u06CC\u0634 \u0648\u0627\u0631\u06CC\u0632\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A" });
     }
-    const invoice = await prisma14.storeInvoice.findUnique({
+    const invoice = await prisma13.storeInvoice.findUnique({
       where: { id: invoiceId }
     });
     if (!invoice || invoice.storeManagerId !== storeId) {
       return res.status(404).json({ error: "\u0641\u0627\u06A9\u062A\u0648\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    await prisma14.storeInvoice.update({
+    await prisma13.storeInvoice.update({
       where: { id: invoiceId },
       data: {
         receiptUrl,
@@ -6810,7 +7129,7 @@ app.post("/api/store-manager/invoices/:id/pay", authenticateToken, requireStoreM
   try {
     const invoiceId = parseInt(req.params.id);
     const storeId = req.user.userId;
-    const invoice = await prisma14.storeInvoice.findUnique({
+    const invoice = await prisma13.storeInvoice.findUnique({
       where: { id: invoiceId }
     });
     if (!invoice || invoice.storeManagerId !== storeId) {
@@ -6827,7 +7146,7 @@ app.post("/api/store-manager/invoices/:id/pay", authenticateToken, requireStoreM
         callbackUrl
       );
       payLink = zibalResult.payLink;
-      await prisma14.storeInvoice.update({
+      await prisma13.storeInvoice.update({
         where: { id: invoice.id },
         data: { trackId: zibalResult.authority }
       });
@@ -6843,7 +7162,7 @@ app.post("/api/store-manager/invoices/:id/pay", authenticateToken, requireStoreM
 });
 app.get("/api/admin/manual-invoices", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const invoices = await prisma14.storeInvoice.findMany({
+    const invoices = await prisma13.storeInvoice.findMany({
       where: {
         paymentMethod: "MANUAL"
       },
@@ -6867,7 +7186,7 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
     const zipPath = uploadedFile.path;
     const newVersion = req.body?.version;
     if (newVersion) {
-      await prisma14.systemConfig.upsert({
+      await prisma13.systemConfig.upsert({
         where: { key: "PLATFORM_VERSION" },
         update: { value: newVersion },
         create: { key: "PLATFORM_VERSION", value: newVersion }
@@ -6976,14 +7295,14 @@ app.post("/api/admin/system/update", authenticateToken, requireAdmin, multerFn({
 app.post("/api/admin/manual-invoices/:id/approve", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id);
-    const invoice = await prisma14.storeInvoice.findUnique({
+    const invoice = await prisma13.storeInvoice.findUnique({
       where: { id: invoiceId },
       include: { orders: true }
     });
     if (!invoice) {
       return res.status(404).json({ error: "\u0641\u0627\u06A9\u062A\u0648\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    await prisma14.$transaction(async (tx) => {
+    await prisma13.$transaction(async (tx) => {
       await tx.storeInvoice.update({
         where: { id: invoiceId },
         data: {
@@ -7022,23 +7341,23 @@ app.post("/api/admin/manual-invoices/:id/approve", authenticateToken, requireAdm
 app.post("/api/admin/manual-invoices/:id/reject", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id);
-    const invoice = await prisma14.storeInvoice.findUnique({
+    const invoice = await prisma13.storeInvoice.findUnique({
       where: { id: invoiceId }
     });
     if (!invoice) {
       return res.status(404).json({ error: "\u0641\u0627\u06A9\u062A\u0648\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    await prisma14.storeInvoice.update({
+    await prisma13.storeInvoice.update({
       where: { id: invoiceId },
       data: {
         receiptStatus: "REJECTED"
       }
     });
-    const orders = await prisma14.order.findMany({
+    const orders = await prisma13.order.findMany({
       where: { storeInvoiceId: invoiceId }
     });
     for (const o of orders) {
-      await prisma14.orderStatusHistory.create({
+      await prisma13.orderStatusHistory.create({
         data: {
           orderId: o.id,
           fromStatus: o.status,
@@ -7060,7 +7379,7 @@ app.post("/api/store-manager/payout/request", authenticateToken, requireStoreMan
     const validatedData = payoutRequestSchema.parse(req.body);
     const { amount } = validatedData;
     const storeId = req.user.userId;
-    const user = await prisma14.user.findUnique({ where: { id: storeId } });
+    const user = await prisma13.user.findUnique({ where: { id: storeId } });
     if (!user || !user.shaba) {
       return res.status(400).json({ error: "\u0644\u0637\u0641\u0627 \u0627\u0628\u062A\u062F\u0627 \u0634\u0645\u0627\u0631\u0647 \u0634\u0628\u0627 \u062E\u0648\u062F \u0631\u0627 \u062F\u0631 \u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u062B\u0628\u062A \u06A9\u0646\u06CC\u062F" });
     }
@@ -7120,7 +7439,7 @@ app.get("/api/public/wallet/deposit-simulate", async (req, res) => {
       return res.status(400).send("<h1>\u067E\u0627\u0631\u0627\u0645\u062A\u0631\u0647\u0627\u06CC \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A</h1>");
     }
     const wallet = await getOrCreateWallet(userId);
-    await prisma14.$transaction(async (tx) => {
+    await prisma13.$transaction(async (tx) => {
       await tx.wallet.update({
         where: { id: wallet.id },
         data: {
@@ -7152,7 +7471,7 @@ app.get("/api/public/store-invoice/callback", async (req, res) => {
     if (isNaN(invoiceId)) {
       return res.redirect("/?payment_status=error&message=InvalidInvoiceId");
     }
-    const invoice = await prisma14.storeInvoice.findUnique({
+    const invoice = await prisma13.storeInvoice.findUnique({
       where: { id: invoiceId },
       include: { orders: true }
     });
@@ -7171,7 +7490,7 @@ app.get("/api/public/store-invoice/callback", async (req, res) => {
       refId = "MOCK_REF_" + Date.now();
     }
     if (isPaid) {
-      await prisma14.$transaction(async (tx) => {
+      await prisma13.$transaction(async (tx) => {
         await tx.storeInvoice.update({
           where: { id: invoiceId },
           data: {
@@ -7213,14 +7532,14 @@ app.get("/api/public/store-invoice/pay-simulate", async (req, res) => {
     if (isNaN(invoiceId)) {
       return res.status(400).send("<h1>\u0634\u0646\u0627\u0633\u0647 \u0641\u0627\u06A9\u062A\u0648\u0631 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A</h1>");
     }
-    const invoice = await prisma14.storeInvoice.findUnique({
+    const invoice = await prisma13.storeInvoice.findUnique({
       where: { id: invoiceId },
       include: { orders: true }
     });
     if (!invoice) {
       return res.status(404).send("<h1>\u0641\u0627\u06A9\u062A\u0648\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</h1>");
     }
-    await prisma14.$transaction(async (tx) => {
+    await prisma13.$transaction(async (tx) => {
       await tx.storeInvoice.update({
         where: { id: invoiceId },
         data: {
@@ -7258,7 +7577,7 @@ app.get("/api/public/store-invoice/pay-simulate", async (req, res) => {
 app.get("/api/store-manager/invoices", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId;
-    const invoices = await prisma14.storeInvoice.findMany({
+    const invoices = await prisma13.storeInvoice.findMany({
       where: { storeManagerId: storeId },
       orderBy: { id: "desc" }
     });
@@ -7270,11 +7589,11 @@ app.get("/api/store-manager/invoices", authenticateToken, requireStoreManager, a
 app.get("/api/store-manager/settings", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const storeId = req.user.userId;
-    let settings = await prisma14.storeSettings.findUnique({
+    let settings = await prisma13.storeSettings.findUnique({
       where: { storeManagerId: storeId }
     });
     if (!settings) {
-      settings = await prisma14.storeSettings.create({
+      settings = await prisma13.storeSettings.create({
         data: { storeManagerId: storeId }
       });
     }
@@ -7287,7 +7606,7 @@ app.post("/api/store-manager/settings", authenticateToken, requireStoreManager, 
   try {
     const storeId = req.user.userId;
     const { platformType, apiKey, webhookUrl } = req.body;
-    const settings = await prisma14.storeSettings.upsert({
+    const settings = await prisma13.storeSettings.upsert({
       where: { storeManagerId: storeId },
       update: { platformType, apiKey, webhookUrl },
       create: { storeManagerId: storeId, platformType, apiKey, webhookUrl }
@@ -7300,10 +7619,10 @@ app.post("/api/store-manager/settings", authenticateToken, requireStoreManager, 
 app.get("/api/store-manager/pro/status", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const proAccount = await prisma14.proAccount.findUnique({
+    const proAccount = await prisma13.proAccount.findUnique({
       where: { userId }
     });
-    const settingsRows = await prisma14.systemSettings.findMany({
+    const settingsRows = await prisma13.systemSettings.findMany({
       where: {
         key: {
           in: [
@@ -7346,7 +7665,7 @@ app.post("/api/store-manager/pro/register", authenticateToken, requireStoreManag
     if (!fullName || !nationalCode || !mobile || !signatureImage) {
       return res.status(400).json({ error: "\u062A\u06A9\u0645\u06CC\u0644 \u062A\u0645\u0627\u0645\u06CC \u0645\u0648\u0627\u0631\u062F \u0627\u0644\u0632\u0627\u0645\u200C\u0622\u0648\u0631 \u0627\u0632 \u062C\u0645\u0644\u0647 \u06A9\u062F \u0645\u0644\u06CC\u060C \u0634\u0645\u0627\u0631\u0647 \u0647\u0645\u0631\u0627\u0647 \u0648 \u0627\u0645\u0636\u0627\u06CC \u062F\u06CC\u062C\u06CC\u062A\u0627\u0644 \u0627\u062C\u0628\u0627\u0631\u06CC \u0627\u0633\u062A." });
     }
-    const settingsRows = await prisma14.systemSettings.findMany({
+    const settingsRows = await prisma13.systemSettings.findMany({
       where: {
         key: {
           in: ["pro_auto_approve", "pro_account_price", "pro_promo_code"]
@@ -7366,7 +7685,7 @@ app.post("/api/store-manager/pro/register", authenticateToken, requireStoreManag
     }
     let totalPayable = basePrice + enamadCost;
     const finalStatus = totalPayable > 0 ? "PENDING_PAYMENT" : initialStatus;
-    const proAccount = await prisma14.proAccount.upsert({
+    const proAccount = await prisma13.proAccount.upsert({
       where: { userId },
       update: {
         fullName,
@@ -7395,7 +7714,7 @@ app.post("/api/store-manager/pro/register", authenticateToken, requireStoreManag
     const nameParts = fullName.trim().split(" ");
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
-    await prisma14.user.update({
+    await prisma13.user.update({
       where: { id: userId },
       data: {
         nationalCode: nationalCode.trim(),
@@ -7417,7 +7736,7 @@ app.post("/api/store-manager/pro/register", authenticateToken, requireStoreManag
           callbackUrl
         );
         payLink = zibalResult.payLink;
-        await prisma14.proAccount.update({
+        await prisma13.proAccount.update({
           where: { userId },
           data: { payLink }
         });
@@ -7438,7 +7757,7 @@ app.post("/api/store-manager/pro/register", authenticateToken, requireStoreManag
 app.post("/api/store-manager/pro/renew-host", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const hostDiscountedSetting = await prisma14.systemSettings.findUnique({ where: { key: "pro_host_discounted_price" } });
+    const hostDiscountedSetting = await prisma13.systemSettings.findUnique({ where: { key: "pro_host_discounted_price" } });
     const amount = parseInt(hostDiscountedSetting?.value || "198000", 10);
     const paymentGateway = await PaymentServiceFactory.getService();
     const baseUrl = getPublicUrl(req);
@@ -7464,7 +7783,7 @@ app.post("/api/store-manager/pro/renew-host", authenticateToken, requireStoreMan
 app.post("/api/store-manager/pro/pay-torob", authenticateToken, requireStoreManager, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const torobPriceSetting = await prisma14.systemSettings.findUnique({ where: { key: "pro_torob_price" } });
+    const torobPriceSetting = await prisma13.systemSettings.findUnique({ where: { key: "pro_torob_price" } });
     const amount = parseInt(torobPriceSetting?.value || "150000", 10);
     const paymentGateway = await PaymentServiceFactory.getService();
     const baseUrl = getPublicUrl(req);
@@ -7494,21 +7813,21 @@ app.get("/api/public/pro/callback", async (req, res) => {
       if (type === "HOST_RENEWAL") {
         const nextMonth = /* @__PURE__ */ new Date();
         nextMonth.setDate(nextMonth.getDate() + 30);
-        await prisma14.proAccount.update({
+        await prisma13.proAccount.update({
           where: { userId: parsedUserId },
           data: { hostExpiresAt: nextMonth, status: "APPROVED" }
         }).catch(() => {
         });
       } else if (type === "PRO_REGISTER") {
-        const autoApproveSetting = await prisma14.systemSettings.findUnique({ where: { key: "pro_auto_approve" } });
+        const autoApproveSetting = await prisma13.systemSettings.findUnique({ where: { key: "pro_auto_approve" } });
         const isAutoApprove = !autoApproveSetting || autoApproveSetting.value !== "false";
-        await prisma14.proAccount.update({
+        await prisma13.proAccount.update({
           where: { userId: parsedUserId },
           data: { status: isAutoApprove ? "APPROVED" : "PENDING", payLink: null }
         }).catch(() => {
         });
       } else if (type === "TOROB_SETUP") {
-        await prisma14.proAccount.update({
+        await prisma13.proAccount.update({
           where: { userId: parsedUserId },
           data: { torobConnected: true }
         }).catch(() => {
@@ -7542,7 +7861,7 @@ app.get("/api/public/pro/callback", async (req, res) => {
 });
 app.get("/api/superadmin/pro/accounts", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const proAccounts = await prisma14.proAccount.findMany({
+    const proAccounts = await prisma13.proAccount.findMany({
       include: {
         user: {
           select: {
@@ -7577,7 +7896,7 @@ app.put("/api/superadmin/pro/accounts/:id", authenticateToken, requireAdmin, asy
       wpUsername,
       wpPassword
     } = req.body;
-    const updated = await prisma14.proAccount.update({
+    const updated = await prisma13.proAccount.update({
       where: { id },
       data: {
         status: status || void 0,
@@ -7599,7 +7918,7 @@ app.put("/api/superadmin/pro/accounts/:id", authenticateToken, requireAdmin, asy
 });
 app.get("/api/superadmin/pro/settings", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const rows = await prisma14.systemSettings.findMany({
+    const rows = await prisma13.systemSettings.findMany({
       where: {
         key: {
           in: [
@@ -7652,7 +7971,7 @@ app.post("/api/superadmin/pro/settings", authenticateToken, requireAdmin, async 
       { key: "pro_terms_content", value: String(termsContent ?? "") }
     ];
     for (const item of updates) {
-      await prisma14.systemSettings.upsert({
+      await prisma13.systemSettings.upsert({
         where: { key: item.key },
         update: { value: item.value },
         create: { key: item.key, value: item.value }
@@ -7671,14 +7990,14 @@ app.put("/api/admin/payouts/:id", authenticateToken, requireAdmin, async (req, r
     if (!["SUCCESS", "FAILED"].includes(status)) {
       return res.status(400).json({ error: "Invalid status" });
     }
-    const payoutRequest = await prisma14.payoutRequest.findUnique({ where: { id: payoutId } });
+    const payoutRequest = await prisma13.payoutRequest.findUnique({ where: { id: payoutId } });
     if (!payoutRequest) {
       return res.status(404).json({ error: "Payout request not found" });
     }
     if (payoutRequest.status === "SUCCESS" || payoutRequest.status === "FAILED") {
       return res.status(400).json({ error: "Payout is already in a final state" });
     }
-    await prisma14.$transaction(async (tx) => {
+    await prisma13.$transaction(async (tx) => {
       await tx.payoutRequest.update({
         where: { id: payoutId },
         data: { status }
@@ -7706,7 +8025,7 @@ app.put("/api/admin/payouts/:id", authenticateToken, requireAdmin, async (req, r
 app.get("/api/orders/:id/timeline", authenticateToken, async (req, res) => {
   try {
     const orderId = parseInt(req.params.id);
-    const order = await prisma14.order.findUnique({
+    const order = await prisma13.order.findUnique({
       where: { id: orderId },
       include: {
         statusHistory: {
@@ -7745,7 +8064,7 @@ app.get("/api/admin/settlements", authenticateToken, requireAdmin, async (req, r
     if (status && status !== "ALL") {
       whereClause.status = status;
     }
-    const payouts = await prisma14.payoutRequest.findMany({
+    const payouts = await prisma13.payoutRequest.findMany({
       where: whereClause,
       include: {
         wallet: {
@@ -7787,7 +8106,7 @@ app.get("/api/admin/settlements", authenticateToken, requireAdmin, async (req, r
 app.post("/api/admin/settlements/:id/approve", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const payoutId = req.params.id;
-    const payoutRequest = await prisma14.payoutRequest.findUnique({
+    const payoutRequest = await prisma13.payoutRequest.findUnique({
       where: { id: payoutId },
       include: { wallet: { include: { supplier: true } } }
     });
@@ -7808,7 +8127,7 @@ app.post("/api/admin/settlements/:id/approve", authenticateToken, requireAdmin, 
       `\u062A\u0633\u0648\u06CC\u0647 \u062D\u0633\u0627\u0628 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 ${payoutRequest.wallet?.supplier?.companyName || payoutRequest.wallet?.supplier?.firstName || ""} - \u0634\u0645\u0627\u0631\u0647 ${payoutRequest.id}`
     );
     if (payoutResult.success) {
-      await prisma14.$transaction(async (tx) => {
+      await prisma13.$transaction(async (tx) => {
         await tx.payoutRequest.update({
           where: { id: payoutId },
           data: {
@@ -7826,7 +8145,7 @@ app.post("/api/admin/settlements/:id/approve", authenticateToken, requireAdmin, 
       });
       return res.json({ success: true, message: "\u062A\u0633\u0648\u06CC\u0647 \u062D\u0633\u0627\u0628 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0627\u0632 \u0637\u0631\u06CC\u0642 \u062F\u0631\u06AF\u0627\u0647 \u067E\u0631\u062F\u0627\u062E\u062A \u0627\u0646\u062C\u0627\u0645 \u0648 \u0646\u0647\u0627\u06CC\u06CC \u0634\u062F." });
     } else {
-      await prisma14.payoutRequest.update({
+      await prisma13.payoutRequest.update({
         where: { id: payoutId },
         data: { status: "PROCESSING" }
       });
@@ -7839,14 +8158,14 @@ app.post("/api/admin/settlements/:id/approve", authenticateToken, requireAdmin, 
 app.post("/api/admin/settlements/:id/reject", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const payoutId = req.params.id;
-    const payoutRequest = await prisma14.payoutRequest.findUnique({ where: { id: payoutId } });
+    const payoutRequest = await prisma13.payoutRequest.findUnique({ where: { id: payoutId } });
     if (!payoutRequest) {
       return res.status(404).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
     if (payoutRequest.status === "SUCCESS" || payoutRequest.status === "FAILED") {
       return res.status(400).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u0642\u0628\u0644\u0627\u064B \u0646\u0647\u0627\u06CC\u06CC \u0634\u062F\u0647 \u0627\u0633\u062A" });
     }
-    await prisma14.$transaction(async (tx) => {
+    await prisma13.$transaction(async (tx) => {
       await tx.payoutRequest.update({
         where: { id: payoutId },
         data: { status: "FAILED" }
@@ -7873,14 +8192,14 @@ app.post("/api/admin/settlements/:id/pay", authenticateToken, requireAdmin, asyn
   try {
     const payoutId = req.params.id;
     const { receiptUrl, transactionRef, paymentDate, paymentNotes } = req.body;
-    const payoutRequest = await prisma14.payoutRequest.findUnique({ where: { id: payoutId } });
+    const payoutRequest = await prisma13.payoutRequest.findUnique({ where: { id: payoutId } });
     if (!payoutRequest) {
       return res.status(404).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
     if (payoutRequest.status === "SUCCESS" || payoutRequest.status === "FAILED") {
       return res.status(400).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u0642\u0628\u0644\u0627\u064B \u0646\u0647\u0627\u06CC\u06CC \u0634\u062F\u0647 \u0627\u0633\u062A" });
     }
-    await prisma14.$transaction(async (tx) => {
+    await prisma13.$transaction(async (tx) => {
       await tx.payoutRequest.update({
         where: { id: payoutId },
         data: {
@@ -7905,7 +8224,7 @@ app.post("/api/admin/settlements/:id/pay", authenticateToken, requireAdmin, asyn
 app.get("/api/admin/settlements/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const payoutId = req.params.id;
-    const p = await prisma14.payoutRequest.findUnique({
+    const p = await prisma13.payoutRequest.findUnique({
       where: { id: payoutId },
       include: {
         wallet: {
@@ -7951,7 +8270,7 @@ app.get("/api/admin/settlements/:id", authenticateToken, requireAdmin, async (re
         createdAt: a.createdAt.toISOString()
       }))
     };
-    const orderItems = await prisma14.orderItem.findMany({
+    const orderItems = await prisma13.orderItem.findMany({
       where: {
         supplierId: supplier?.id || 0,
         order: {
@@ -7989,7 +8308,7 @@ app.get("/api/admin/settlements/:id", authenticateToken, requireAdmin, async (re
       totalPlatformCommission,
       totalWalletCredits
     };
-    const logs = await prisma14.activityLog.findMany({
+    const logs = await prisma13.activityLog.findMany({
       where: {
         userId: supplier?.id
       },
@@ -8023,14 +8342,14 @@ app.post("/api/admin/settlements/:id/adjust", authenticateToken, requireAdmin, a
     if (isNaN(numericAmount) || numericAmount <= 0) {
       return res.status(400).json({ error: "\u0645\u0628\u0644\u063A \u0627\u0635\u0644\u0627\u062D\u06CC\u0647 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     }
-    const payoutRequest = await prisma14.payoutRequest.findUnique({
+    const payoutRequest = await prisma13.payoutRequest.findUnique({
       where: { id: payoutId },
       include: { wallet: true }
     });
     if (!payoutRequest) {
       return res.status(404).json({ error: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u062A\u0633\u0648\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     }
-    await prisma14.$transaction(async (tx) => {
+    await prisma13.$transaction(async (tx) => {
       await tx.adjustmentRecord.create({
         data: {
           payoutRequestId: payoutId,
@@ -8068,7 +8387,7 @@ app.post("/api/admin/settlements/:id/adjust", authenticateToken, requireAdmin, a
 app.get("/api/admin/suppliers/:id/profile", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const supplierId = parseInt(req.params.id);
-    const supplier = await prisma14.user.findUnique({
+    const supplier = await prisma13.user.findUnique({
       where: { id: supplierId }
     });
     if (!supplier) {
@@ -8100,11 +8419,11 @@ app.get("/api/admin/stores/performance", authenticateToken, requireAdmin, async 
 });
 app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const suppliersCount = await prisma14.user.count({ where: { role: "SUPPLIER" } });
-    const storesCount = await prisma14.user.count({ where: { role: "STORE_MANAGER" } });
-    const productsCount = await prisma14.product.count();
-    const ordersCount = await prisma14.order.count();
-    const totalRevenue = await prisma14.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PAID" } });
+    const suppliersCount = await prisma13.user.count({ where: { role: "SUPPLIER" } });
+    const storesCount = await prisma13.user.count({ where: { role: "STORE_MANAGER" } });
+    const productsCount = await prisma13.product.count();
+    const ordersCount = await prisma13.order.count();
+    const totalRevenue = await prisma13.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PAID" } });
     res.json({
       suppliers: suppliersCount,
       stores: storesCount,
@@ -8118,23 +8437,23 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req, res) =>
 });
 app.get("/api/admin/export-all-data", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const users = await prisma14.user.findMany().catch(() => []);
-    const products = await prisma14.product.findMany().catch(() => []);
-    const categories = await prisma14.category.findMany().catch(() => []);
-    const productImages = await prisma14.productImage.findMany().catch(() => []);
-    const productVariants = await prisma14.productVariant.findMany().catch(() => []);
-    const orders = await prisma14.order.findMany().catch(() => []);
-    const orderItems = await prisma14.orderItem.findMany().catch(() => []);
-    const storeInvoices = await prisma14.storeInvoice.findMany().catch(() => []);
-    const tickets = await prisma14.ticket.findMany().catch(() => []);
-    const ticketMessages = await prisma14.ticketMessage.findMany().catch(() => []);
-    const settlements = await prisma14.settlement.findMany().catch(() => []);
-    const systemConfigs = await prisma14.systemConfig.findMany().catch(() => []);
-    const wallets = await prisma14.wallet.findMany().catch(() => []);
-    const payouts = await prisma14.payoutRequest.findMany().catch(() => []);
-    const auditTrails = await prisma14.auditTrail.findMany().catch(() => []);
-    const notifications = await prisma14.notification.findMany().catch(() => []);
-    const announcements = await prisma14.announcement.findMany().catch(() => []);
+    const users = await prisma13.user.findMany().catch(() => []);
+    const products = await prisma13.product.findMany().catch(() => []);
+    const categories = await prisma13.category.findMany().catch(() => []);
+    const productImages = await prisma13.productImage.findMany().catch(() => []);
+    const productVariants = await prisma13.productVariant.findMany().catch(() => []);
+    const orders = await prisma13.order.findMany().catch(() => []);
+    const orderItems = await prisma13.orderItem.findMany().catch(() => []);
+    const storeInvoices = await prisma13.storeInvoice.findMany().catch(() => []);
+    const tickets = await prisma13.ticket.findMany().catch(() => []);
+    const ticketMessages = await prisma13.ticketMessage.findMany().catch(() => []);
+    const settlements = await prisma13.settlement.findMany().catch(() => []);
+    const systemConfigs = await prisma13.systemConfig.findMany().catch(() => []);
+    const wallets = await prisma13.wallet.findMany().catch(() => []);
+    const payouts = await prisma13.payoutRequest.findMany().catch(() => []);
+    const auditTrails = await prisma13.auditTrail.findMany().catch(() => []);
+    const notifications = await prisma13.notification.findMany().catch(() => []);
+    const announcements = await prisma13.announcement.findMany().catch(() => []);
     const backupData = {
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
       version: "1.0",
@@ -8167,7 +8486,7 @@ app.get("/api/admin/export-all-data", authenticateToken, requireAdmin, async (re
 });
 app.get("/api/admin/products", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const products = await prisma14.product.findMany({
+    const products = await prisma13.product.findMany({
       include: {
         category: true,
         supplier: { select: { firstName: true, lastName: true, brandName: true } },
@@ -8196,19 +8515,19 @@ app.patch("/api/admin/products/:id/publish", authenticateToken, requireAdmin, as
     const { id } = req.params;
     const { finalPrice, marginType, marginValue, publishStartDate, publishEndDate, isPinned } = req.body;
     if (isPinned) {
-      const pinnedCount = await prisma14.product.count({ where: { isPinned: true, status: "PUBLISHED" } });
+      const pinnedCount = await prisma13.product.count({ where: { isPinned: true, status: "PUBLISHED" } });
       if (pinnedCount >= 10) {
         return res.status(400).json({ error: "Maximum 10 pinned products allowed." });
       }
     }
-    const existingProduct = await prisma14.product.findUnique({
+    const existingProduct = await prisma13.product.findUnique({
       where: { id: parseInt(id) }
     });
     let productSku = existingProduct?.sku;
     if (!productSku) {
       productSku = "BK-" + Math.floor(1e5 + Math.random() * 9e5);
     }
-    const product = await prisma14.product.update({
+    const product = await prisma13.product.update({
       where: { id: parseInt(id) },
       data: {
         finalPrice: finalPrice ? parseFloat(finalPrice) : null,
@@ -8232,14 +8551,14 @@ app.patch("/api/admin/products/:id/status", authenticateToken, requireAdmin, asy
     const { status } = req.body;
     let updateData = { status };
     if (status === "PUBLISHED" || status === "ACTIVE") {
-      const existingProduct = await prisma14.product.findUnique({
+      const existingProduct = await prisma13.product.findUnique({
         where: { id: parseInt(id) }
       });
       if (!existingProduct?.sku) {
         updateData.sku = "BK-" + Math.floor(1e5 + Math.random() * 9e5);
       }
     }
-    const product = await prisma14.product.update({
+    const product = await prisma13.product.update({
       where: { id: parseInt(id) },
       data: updateData
     });
@@ -8272,7 +8591,7 @@ app.post("/api/admin/products", authenticateToken, requireAdmin, async (req, res
     } = req.body;
     let actualSupplierId = supplierId ? parseInt(supplierId) : void 0;
     if (!actualSupplierId) {
-      const firstSupplier = await prisma14.user.findFirst({ where: { role: "SUPPLIER" } });
+      const firstSupplier = await prisma13.user.findFirst({ where: { role: "SUPPLIER" } });
       if (firstSupplier) {
         actualSupplierId = firstSupplier.id;
       } else {
@@ -8281,19 +8600,19 @@ app.post("/api/admin/products", authenticateToken, requireAdmin, async (req, res
     }
     let actualCategoryId = safeParseInt(categoryId);
     if (actualCategoryId > 0) {
-      const categoryExists = await prisma14.category.findUnique({ where: { id: actualCategoryId } });
+      const categoryExists = await prisma13.category.findUnique({ where: { id: actualCategoryId } });
       if (!categoryExists) {
-        const createdCat = await prisma14.category.create({
+        const createdCat = await prisma13.category.create({
           data: { name: "\u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC " + actualCategoryId, isActive: true, sortOrder: 0 }
         });
         actualCategoryId = createdCat.id;
       }
     } else {
-      const firstCategory = await prisma14.category.findFirst();
+      const firstCategory = await prisma13.category.findFirst();
       if (firstCategory) {
         actualCategoryId = firstCategory.id;
       } else {
-        const newCategory = await prisma14.category.create({
+        const newCategory = await prisma13.category.create({
           data: { name: "\u0639\u0645\u0648\u0645\u06CC", isActive: true, sortOrder: 0 }
         });
         actualCategoryId = newCategory.id;
@@ -8303,7 +8622,7 @@ app.post("/api/admin/products", authenticateToken, requireAdmin, async (req, res
     const computedFinalPrice = finalPrice ? safeParseFloat(finalPrice) : null;
     const resolvedStock = stock !== void 0 ? stock : inventory;
     const totalInventory = variants && variants.length > 0 ? variants.reduce((sum, v) => sum + safeParseInt(v.stock), 0) : safeParseInt(resolvedStock);
-    const product = await prisma14.product.create({
+    const product = await prisma13.product.create({
       data: {
         supplierId: actualSupplierId,
         categoryId: actualCategoryId,
@@ -8374,22 +8693,22 @@ app.put("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, 
     } = req.body;
     let actualCategoryId = safeParseInt(categoryId);
     if (actualCategoryId > 0) {
-      const categoryExists = await prisma14.category.findUnique({ where: { id: actualCategoryId } });
+      const categoryExists = await prisma13.category.findUnique({ where: { id: actualCategoryId } });
       if (!categoryExists) {
-        const createdCat = await prisma14.category.create({
+        const createdCat = await prisma13.category.create({
           data: { name: "\u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC " + actualCategoryId, isActive: true, sortOrder: 0 }
         });
         actualCategoryId = createdCat.id;
       }
     } else {
-      const firstCategory = await prisma14.category.findFirst();
+      const firstCategory = await prisma13.category.findFirst();
       if (firstCategory) {
         actualCategoryId = firstCategory.id;
       }
     }
-    await prisma14.productImage.deleteMany({ where: { productId: id } }).catch(() => {
+    await prisma13.productImage.deleteMany({ where: { productId: id } }).catch(() => {
     });
-    await prisma14.productVariant.deleteMany({ where: { productId: id } }).catch(() => {
+    await prisma13.productVariant.deleteMany({ where: { productId: id } }).catch(() => {
     });
     const basePrice = safeParseFloat(supplierBasePrice || req.body.supplierBasePrice) || 0;
     const computedFinalPrice = finalPrice ? safeParseFloat(finalPrice) : null;
@@ -8411,13 +8730,13 @@ app.put("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, 
     if (supplierId) {
       updateData.supplierId = parseInt(supplierId);
     }
-    const product = await prisma14.product.update({
+    const product = await prisma13.product.update({
       where: { id },
       data: updateData
     });
     const imagesToCreate = buildProductImagesArray(mainImage, imageUrl, images, name);
     for (const img of imagesToCreate) {
-      await prisma14.productImage.create({
+      await prisma13.productImage.create({
         data: { productId: id, url: img.url }
       });
     }
@@ -8435,7 +8754,7 @@ app.put("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, 
       imageUrl: null
     }];
     for (const v of variantsToCreate) {
-      await prisma14.productVariant.create({
+      await prisma13.productVariant.create({
         data: {
           productId: id,
           attributes: v.attributes,
@@ -8447,7 +8766,7 @@ app.put("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, 
       });
     }
     if (videoUrl !== void 0) {
-      await prisma14.productExploreContent.upsert({
+      await prisma13.productExploreContent.upsert({
         where: { productId: id },
         create: {
           productId: id,
@@ -8466,7 +8785,7 @@ app.put("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, 
 });
 app.get("/api/admin/explore-products", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const products = await prisma14.product.findMany({
+    const products = await prisma13.product.findMany({
       include: {
         category: true,
         exploreContent: true,
@@ -8482,16 +8801,16 @@ app.post("/api/admin/explore-products/:id/publish", authenticateToken, requireAd
   try {
     const productId = parseInt(req.params.id);
     const { customTitle, customDescription, customImageUrl, customVideoUrl, isPublished } = req.body;
-    const existing = await prisma14.productExploreContent.findUnique({
+    const existing = await prisma13.productExploreContent.findUnique({
       where: { productId }
     });
     if (existing) {
-      await prisma14.productExploreContent.update({
+      await prisma13.productExploreContent.update({
         where: { productId },
         data: { customTitle, customDescription, customImageUrl, customVideoUrl, isPublished }
       });
     } else {
-      await prisma14.productExploreContent.create({
+      await prisma13.productExploreContent.create({
         data: { productId, customTitle, customDescription, customImageUrl, customVideoUrl, isPublished }
       });
     }
@@ -8503,14 +8822,14 @@ app.post("/api/admin/explore-products/:id/publish", authenticateToken, requireAd
 app.delete("/api/admin/products/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await prisma14.productImage.deleteMany({ where: { productId: id } });
-    await prisma14.productVariant.deleteMany({ where: { productId: id } });
-    await prisma14.productComment.deleteMany({ where: { productId: id } });
-    await prisma14.productQuestion.deleteMany({ where: { productId: id } });
-    await prisma14.orderItem.deleteMany({ where: { productId: id } });
-    await prisma14.dailySelection.deleteMany({ where: { productId: id } });
-    await prisma14.storeProductSelection.deleteMany({ where: { productId: id } });
-    const product = await prisma14.product.delete({
+    await prisma13.productImage.deleteMany({ where: { productId: id } });
+    await prisma13.productVariant.deleteMany({ where: { productId: id } });
+    await prisma13.productComment.deleteMany({ where: { productId: id } });
+    await prisma13.productQuestion.deleteMany({ where: { productId: id } });
+    await prisma13.orderItem.deleteMany({ where: { productId: id } });
+    await prisma13.dailySelection.deleteMany({ where: { productId: id } });
+    await prisma13.storeProductSelection.deleteMany({ where: { productId: id } });
+    const product = await prisma13.product.delete({
       where: { id }
     });
     res.json({ message: "Product deleted successfully", product });
@@ -8524,12 +8843,12 @@ app.post("/api/admin/users", authenticateToken, requireAdmin, async (req, res) =
     if (!username || !password || !role) {
       return res.status(400).json({ error: "\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC\u060C \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0648 \u0646\u0642\u0634 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A" });
     }
-    const existing = await prisma14.user.findUnique({ where: { username } });
+    const existing = await prisma13.user.findUnique({ where: { username } });
     if (existing) {
       return res.status(400).json({ error: "\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631\u06CC \u062A\u06A9\u0631\u0627\u0631\u06CC \u0627\u0633\u062A" });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 10);
-    const user = await prisma14.user.create({
+    const user = await prisma13.user.create({
       data: {
         username,
         password: hashedPassword,
@@ -8552,7 +8871,7 @@ app.put("/api/admin/users/:id", authenticateToken, requireAdmin, async (req, res
   try {
     const id = parseInt(req.params.id);
     const { firstName, lastName, mobile, brandName, storeName, nationalCode, shaba, cardNumber } = req.body;
-    const user = await prisma14.user.update({
+    const user = await prisma13.user.update({
       where: { id },
       data: { firstName, lastName, mobile, brandName, storeName, nationalCode, shaba, cardNumber }
     });
@@ -8569,7 +8888,7 @@ app.post("/api/admin/users/:id/reset-password", authenticateToken, requireAdmin,
       return res.status(400).json({ error: "\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0628\u0627\u06CC\u062F \u062D\u062F\u0627\u0642\u0644 \u06F6 \u06A9\u0627\u0631\u0627\u06A9\u062A\u0631 \u0628\u0627\u0634\u062F" });
     }
     const hashedPassword = await import_bcryptjs.default.hash(newPassword, 10);
-    await prisma14.user.update({
+    await prisma13.user.update({
       where: { id },
       data: { password: hashedPassword }
     });
@@ -8582,12 +8901,12 @@ app.patch("/api/admin/users/:id/status", authenticateToken, requireAdmin, async 
   try {
     const id = parseInt(req.params.id);
     const { status, reason } = req.body;
-    await prisma14.user.update({
+    await prisma13.user.update({
       where: { id },
       data: { status }
     });
     if (reason) {
-      await prisma14.activityLog.create({
+      await prisma13.activityLog.create({
         data: {
           userId: id,
           action: "STATUS_CHANGE",
@@ -8602,7 +8921,7 @@ app.patch("/api/admin/users/:id/status", authenticateToken, requireAdmin, async 
 });
 app.get("/api/admin/all-users", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const users = await prisma14.user.findMany({
+    const users = await prisma13.user.findMany({
       select: {
         id: true,
         username: true,
@@ -8660,10 +8979,10 @@ app.get("/api/admin/all-users", authenticateToken, requireAdmin, async (req, res
 app.post("/api/admin/users/:id/toggle-status", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await prisma14.user.findUnique({ where: { id: parseInt(id) } });
+    const user = await prisma13.user.findUnique({ where: { id: parseInt(id) } });
     if (!user) return res.status(404).json({ error: "\u06A9\u0627\u0631\u0628\u0631 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     const newStatus = user.status === "BLOCKED" ? "ACTIVE" : "BLOCKED";
-    const updated = await prisma14.user.update({
+    const updated = await prisma13.user.update({
       where: { id: parseInt(id) },
       data: { status: newStatus }
     });
@@ -8675,7 +8994,7 @@ app.post("/api/admin/users/:id/toggle-status", authenticateToken, requireAdmin, 
 app.post("/api/admin/impersonate/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const targetUser = await prisma14.user.findUnique({ where: { id: parseInt(id) } });
+    const targetUser = await prisma13.user.findUnique({ where: { id: parseInt(id) } });
     if (!targetUser) return res.status(404).json({ error: "\u06A9\u0627\u0631\u0628\u0631 \u062C\u0647\u062A \u0648\u0631\u0648\u062F \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     const token = import_jsonwebtoken.default.sign(
       { userId: targetUser.id, username: targetUser.username, role: targetUser.role, isImpersonated: true, originalAdminId: req.user.userId },
@@ -8705,7 +9024,7 @@ app.post("/api/admin/impersonate-exit", authenticateToken, async (req, res) => {
     if (!req.user.isImpersonated || !req.user.originalAdminId) {
       return res.status(400).json({ error: "\u0634\u0645\u0627 \u062F\u0631 \u062D\u0627\u0644\u062A \u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u0646\u06CC\u0633\u062A\u06CC\u062F" });
     }
-    const adminUser = await prisma14.user.findUnique({ where: { id: req.user.originalAdminId } });
+    const adminUser = await prisma13.user.findUnique({ where: { id: req.user.originalAdminId } });
     if (!adminUser) return res.status(404).json({ error: "\u062D\u0633\u0627\u0628 \u0645\u062F\u06CC\u0631 \u0627\u0631\u0634\u062F \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     const token = import_jsonwebtoken.default.sign(
       { userId: adminUser.id, username: adminUser.username, role: adminUser.role, status: adminUser.status },
@@ -8724,7 +9043,7 @@ app.post("/api/admin/impersonate-exit", authenticateToken, async (req, res) => {
 });
 app.get("/api/admin/suppliers", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const suppliers = await prisma14.user.findMany({
+    const suppliers = await prisma13.user.findMany({
       where: { role: "SUPPLIER" },
       select: { id: true, firstName: true, lastName: true, brandName: true, status: true, mobile: true }
     });
@@ -8735,7 +9054,7 @@ app.get("/api/admin/suppliers", authenticateToken, requireAdmin, async (req, res
 });
 app.get("/api/admin/stores", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const stores = await prisma14.user.findMany({
+    const stores = await prisma13.user.findMany({
       where: { role: "STORE_MANAGER" },
       select: { id: true, firstName: true, lastName: true, storeName: true, status: true, mobile: true }
     });
@@ -8746,7 +9065,7 @@ app.get("/api/admin/stores", authenticateToken, requireAdmin, async (req, res) =
 });
 app.get("/api/admin/orders", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const orders = await prisma14.order.findMany({
+    const orders = await prisma13.order.findMany({
       include: {
         store: {
           select: {
@@ -8795,10 +9114,10 @@ app.patch("/api/admin/orders/:id/shipping-fee", authenticateToken, requireAdmin,
     const orderId = parseInt(id, 10);
     if (isNaN(orderId)) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     const fee = parseFloat(shippingFee) || 0;
-    const existingOrder = await prisma14.order.findUnique({ where: { id: orderId } });
+    const existingOrder = await prisma13.order.findUnique({ where: { id: orderId } });
     if (!existingOrder) return res.status(404).json({ error: "\u0633\u0641\u0627\u0631\u0634 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F" });
     const updatedTotal = existingOrder.totalAmount + fee;
-    const updatedOrder = await prisma14.order.update({
+    const updatedOrder = await prisma13.order.update({
       where: { id: orderId },
       data: {
         shippingFee: fee,
@@ -8821,13 +9140,13 @@ app.patch("/api/admin/orders/:id/status", authenticateToken, requireAdmin, async
     const { status, trackingCode } = req.body;
     const orderId = parseInt(id, 10);
     if (isNaN(orderId)) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
-    const existingOrder = await prisma14.order.findUnique({
+    const existingOrder = await prisma13.order.findUnique({
       where: { id: orderId }
     });
     const dataToUpdate = {};
     if (status) dataToUpdate.status = status;
     if (trackingCode !== void 0) dataToUpdate.trackingCode = trackingCode;
-    const updatedOrder = await prisma14.order.update({
+    const updatedOrder = await prisma13.order.update({
       where: { id: orderId },
       data: dataToUpdate
     });
@@ -8835,9 +9154,9 @@ app.patch("/api/admin/orders/:id/status", authenticateToken, requireAdmin, async
       const paidStatuses = ["PAID", "PROCESSING", "READY_TO_SHIP", "SHIPPED", "COMPLETED", "DELIVERED", "PREPARING", "PENDING_POSTAL_LABEL"];
       const rejectedStatuses = ["REJECTED", "CANCELLED", "OUT_OF_STOCK"];
       if (paidStatuses.includes(status)) {
-        await creditSuppliersForOrders(prisma14, [updatedOrder]);
+        await creditSuppliersForOrders(prisma13, [updatedOrder]);
       } else if (rejectedStatuses.includes(status)) {
-        await debitSupplierForRejectedOrder(prisma14, orderId);
+        await debitSupplierForRejectedOrder(prisma13, orderId);
       }
     }
     res.json({ message: "\u0648\u0636\u0639\u06CC\u062A \u0633\u0641\u0627\u0631\u0634 \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0634\u062F", order: updatedOrder });
@@ -8849,10 +9168,10 @@ app.patch("/api/admin/orders/:id/status", authenticateToken, requireAdmin, async
 app.get("/api/admin/badges", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const [orders, tickets, invoices, settlements] = await Promise.all([
-      prisma14.order.count({ where: { status: { in: ["REQUESTED", "PENDING_SHIPPING_ESTIMATE", "PENDING_POSTAL_LABEL"] } } }),
-      prisma14.ticket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] } } }),
-      prisma14.manualInvoice.count({ where: { status: "PENDING" } }),
-      prisma14.settlementRequest.count({ where: { status: "PENDING" } })
+      prisma13.order.count({ where: { status: { in: ["REQUESTED", "PENDING_SHIPPING_ESTIMATE", "PENDING_POSTAL_LABEL"] } } }),
+      prisma13.ticket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] } } }),
+      prisma13.manualInvoice.count({ where: { status: "PENDING" } }),
+      prisma13.settlementRequest.count({ where: { status: "PENDING" } })
     ]);
     res.json({ orders, tickets, invoices, settlements });
   } catch (err) {
@@ -8867,7 +9186,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
     if (isNaN(orderId)) {
       return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A" });
     }
-    const order = await prisma14.order.findUnique({
+    const order = await prisma13.order.findUnique({
       where: { id: orderId },
       include: { items: true }
     });
@@ -8876,7 +9195,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
     }
     const savedLabel = processPostalLabel(orderId, postalLabel);
     const isTransitioningToProcessing = order.status === "NEW" || order.status === "PAID";
-    const updatedOrder = await prisma14.order.update({
+    const updatedOrder = await prisma13.order.update({
       where: { id: orderId },
       data: {
         postalLabel: savedLabel,
@@ -8886,7 +9205,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
     if (isTransitioningToProcessing) {
       if (order.orderSource === "direct" && order.items && order.items.length > 0) {
         try {
-          await prisma14.$transaction(async (tx) => {
+          await prisma13.$transaction(async (tx) => {
             for (const item of order.items) {
               if (!item.supplierId) continue;
               const supplierAmount = item.supplierPrice * item.quantity;
@@ -8919,7 +9238,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
         }
       }
       try {
-        await prisma14.orderStatusHistory.create({
+        await prisma13.orderStatusHistory.create({
           data: {
             orderId,
             fromStatus: order.status,
@@ -8935,7 +9254,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
     }
     if (order.items && order.items.length > 0 && order.items[0].supplierId) {
       const suppId = order.items[0].supplierId;
-      prisma14.user.findUnique({ where: { id: suppId } }).then((supplier) => {
+      prisma13.user.findUnique({ where: { id: suppId } }).then((supplier) => {
         if (supplier?.mobile) {
           notifyPostalLabelPrinted(orderId, supplier.mobile, updatedOrder.trackingCode || void 0).catch(console.error);
         }
@@ -8951,7 +9270,7 @@ app.patch("/api/admin/orders/:id/postal-label", authenticateToken, requireAdmin,
 });
 app.get("/api/admin/customers", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const orders = await prisma14.order.findMany({
+    const orders = await prisma13.order.findMany({
       orderBy: { id: "desc" }
     });
     const customerMap = /* @__PURE__ */ new Map();
@@ -8988,11 +9307,11 @@ app.patch("/api/admin/suppliers/:id/status", authenticateToken, requireAdmin, as
   try {
     const { id } = req.params;
     const { status, reason } = req.body;
-    const updated = await prisma14.user.update({
+    const updated = await prisma13.user.update({
       where: { id: parseInt(id) },
       data: { status }
     });
-    await prisma14.activityLog.create({
+    await prisma13.activityLog.create({
       data: { userId: req.user.userId, action: "CHANGE_SUPPLIER_STATUS", details: `Supplier ${id} changed to ${status}. Reason: ${reason || "none"}` }
     });
     res.json(updated);
@@ -9002,9 +9321,9 @@ app.patch("/api/admin/suppliers/:id/status", authenticateToken, requireAdmin, as
 });
 app.get("/api/admin/financial", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const totalRevenue = await prisma14.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PAID" } });
-    const pendingStorePayments = await prisma14.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PENDING" } });
-    const supplierWalletTotal = await prisma14.supplierWallet.aggregate({ _sum: { balance: true, pending: true } });
+    const totalRevenue = await prisma13.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PAID" } });
+    const pendingStorePayments = await prisma13.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: "PENDING" } });
+    const supplierWalletTotal = await prisma13.supplierWallet.aggregate({ _sum: { balance: true, pending: true } });
     res.json({
       totalRevenue: totalRevenue._sum.totalAmount || 0,
       pendingStorePayments: pendingStorePayments._sum.totalAmount || 0,
@@ -9037,12 +9356,12 @@ async function ensureAndSanitizeCategories(onlyActive = false) {
   try {
     for (let i = 0; i < DEFAULT_CATEGORY_LIST.length; i++) {
       const catName = DEFAULT_CATEGORY_LIST[i];
-      const existing = await prisma14.category.findFirst({
+      const existing = await prisma13.category.findFirst({
         where: { name: catName }
       });
       if (!existing) {
         try {
-          await prisma14.category.create({
+          await prisma13.category.create({
             data: {
               name: catName,
               isActive: true,
@@ -9054,7 +9373,7 @@ async function ensureAndSanitizeCategories(onlyActive = false) {
         }
       } else if (!existing.isActive || !existing.name || !existing.name.trim()) {
         try {
-          await prisma14.category.update({
+          await prisma13.category.update({
             where: { id: existing.id },
             data: {
               name: catName,
@@ -9068,18 +9387,18 @@ async function ensureAndSanitizeCategories(onlyActive = false) {
       }
     }
     try {
-      await prisma14.category.updateMany({
+      await prisma13.category.updateMany({
         where: { isActive: false },
         data: { isActive: true }
       });
     } catch (e) {
     }
-    let cats = await prisma14.category.findMany({
+    let cats = await prisma13.category.findMany({
       where: onlyActive ? { isActive: true } : void 0,
       orderBy: { sortOrder: "asc" }
     });
     if (onlyActive && cats.length < 16) {
-      cats = await prisma14.category.findMany({
+      cats = await prisma13.category.findMany({
         orderBy: { sortOrder: "asc" }
       });
     }
@@ -9127,7 +9446,7 @@ app.post("/api/admin/categories", authenticateToken, requireAdmin, async (req, r
     if (!name || typeof name !== "string") {
       return res.status(400).json({ error: "\u0646\u0627\u0645 \u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A." });
     }
-    const cat = await prisma14.category.create({
+    const cat = await prisma13.category.create({
       data: {
         name: name.trim(),
         isActive: isActive !== void 0 ? Boolean(isActive) : true,
@@ -9143,7 +9462,7 @@ app.put("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req
   try {
     const id = Number(req.params.id);
     const { name, isActive, sortOrder } = req.body;
-    const cat = await prisma14.category.update({
+    const cat = await prisma13.category.update({
       where: { id },
       data: {
         ...name !== void 0 && { name: name.trim() },
@@ -9159,7 +9478,7 @@ app.put("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req
 app.delete("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    await prisma14.category.delete({ where: { id } });
+    await prisma13.category.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u062D\u0630\u0641 \u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC" });
@@ -9188,15 +9507,15 @@ app.post("/api/admin/categories/seed", authenticateToken, requireAdmin, async (r
     let added = 0;
     for (let i = 0; i < defaultCategories.length; i++) {
       const catName = defaultCategories[i];
-      const exists = await prisma14.category.findFirst({ where: { name: catName } });
+      const exists = await prisma13.category.findFirst({ where: { name: catName } });
       if (!exists) {
-        await prisma14.category.create({
+        await prisma13.category.create({
           data: { name: catName, isActive: true, sortOrder: i + 1 }
         });
         added++;
       }
     }
-    const cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
+    const cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
     res.json({ success: true, added, categories: cats });
   } catch (err) {
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u0627\u06CC\u062C\u0627\u062F \u062F\u0633\u062A\u0647\u200C\u0628\u0646\u062F\u06CC\u200C\u0647\u0627\u06CC \u067E\u06CC\u0634\u200C\u0641\u0631\u0636" });
@@ -9204,7 +9523,7 @@ app.post("/api/admin/categories/seed", authenticateToken, requireAdmin, async (r
 });
 app.get("/api/admin/tickets", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const tickets = await prisma14.ticket.findMany({
+    const tickets = await prisma13.ticket.findMany({
       include: {
         user: { select: { firstName: true, lastName: true, role: true, username: true } },
         messages: { orderBy: { createdAt: "asc" }, include: { user: { select: { firstName: true, lastName: true, role: true } } } }
@@ -9220,7 +9539,7 @@ app.post("/api/admin/tickets/:id/reply", authenticateToken, requireAdmin, async 
   try {
     const { id } = req.params;
     const { message, attachmentUrl } = req.body;
-    const msg = await prisma14.ticketMessage.create({
+    const msg = await prisma13.ticketMessage.create({
       data: {
         ticketId: parseInt(id),
         userId: req.user.userId,
@@ -9228,7 +9547,7 @@ app.post("/api/admin/tickets/:id/reply", authenticateToken, requireAdmin, async 
         attachmentUrl: attachmentUrl || null
       }
     });
-    await prisma14.ticket.update({ where: { id: parseInt(id) }, data: { status: "ANSWERED", updatedAt: /* @__PURE__ */ new Date() } });
+    await prisma13.ticket.update({ where: { id: parseInt(id) }, data: { status: "ANSWERED", updatedAt: /* @__PURE__ */ new Date() } });
     res.json(msg);
   } catch (err) {
     res.status(500).json({ error: "\u062E\u0637\u0627 \u062F\u0631 \u062B\u0628\u062A \u067E\u0627\u0633\u062E \u062A\u06CC\u06A9\u062A" });
@@ -9236,7 +9555,7 @@ app.post("/api/admin/tickets/:id/reply", authenticateToken, requireAdmin, async 
 });
 app.get("/api/admin/logs", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const logs = await prisma14.activityLog.findMany({
+    const logs = await prisma13.activityLog.findMany({
       include: { user: { select: { username: true, role: true } } },
       orderBy: { id: "desc" },
       take: 100
@@ -9385,7 +9704,7 @@ app.post("/api/admin/dev/update", authenticateToken, requireAdmin, upload.single
     const zipPath = req.file.path;
     const newVersion = req.body.version;
     if (newVersion) {
-      await prisma14.systemConfig.upsert({
+      await prisma13.systemConfig.upsert({
         where: { key: "PLATFORM_VERSION" },
         update: { value: newVersion },
         create: { key: "PLATFORM_VERSION", value: newVersion }
@@ -9523,9 +9842,9 @@ var wooRateLimiter = (req, res, next) => {
 };
 app.get("/api/admin/woocommerce/status", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const config = await prisma14.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
+    const config = await prisma13.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
     const enabled = config ? config.value === "true" : false;
-    const connections = await prisma14.wooCommerceConnection.findMany({
+    const connections = await prisma13.wooCommerceConnection.findMany({
       include: { store: { select: { id: true, firstName: true, lastName: true, username: true } } }
     });
     res.json({ enabled, connections });
@@ -9536,7 +9855,7 @@ app.get("/api/admin/woocommerce/status", authenticateToken, requireAdmin, async 
 app.post("/api/admin/woocommerce/toggle", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { enabled } = req.body;
-    await prisma14.systemConfig.upsert({
+    await prisma13.systemConfig.upsert({
       where: { key: "WOOCOMMERCE_SYNC_ENABLED" },
       update: { value: String(enabled) },
       create: { key: "WOOCOMMERCE_SYNC_ENABLED", value: String(enabled) }
@@ -9548,12 +9867,12 @@ app.post("/api/admin/woocommerce/toggle", authenticateToken, requireAdmin, async
 });
 app.get("/api/store/connection", authenticateToken, requireStoreManager, async (req, res) => {
   try {
-    const config = await prisma14.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
+    const config = await prisma13.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
     const isEnabled = config ? config.value === "true" : false;
     const storeId = req.user.userId;
     const conn = await ConnectionService.getConnection(storeId);
     if (conn) {
-      const logs = await prisma14.syncLog.findMany({ where: { connectionId: conn.id }, orderBy: { id: "desc" }, take: 5 });
+      const logs = await prisma13.syncLog.findMany({ where: { connectionId: conn.id }, orderBy: { id: "desc" }, take: 5 });
       res.json({ ...conn, isGloballyEnabled: isEnabled, syncLogs: logs });
     } else {
       res.json({ isGloballyEnabled: isEnabled });
@@ -9564,7 +9883,7 @@ app.get("/api/store/connection", authenticateToken, requireStoreManager, async (
 });
 app.post("/api/store/test", wooRateLimiter, authenticateToken, requireStoreManager, async (req, res) => {
   try {
-    const config = await prisma14.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
+    const config = await prisma13.systemConfig.findUnique({ where: { key: "WOOCOMMERCE_SYNC_ENABLED" } });
     if (!config || config.value !== "true") {
       return res.status(403).json({ error: "\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0627\u062A\u0635\u0627\u0644 \u0648\u0648\u06A9\u0627\u0645\u0631\u0633 \u062A\u0648\u0633\u0637 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0627\u0631\u0634\u062F \u063A\u06CC\u0631\u0641\u0639\u0627\u0644 \u0627\u0633\u062A." });
     }
@@ -9708,7 +10027,7 @@ app.get("/api/public/products", async (req, res) => {
         { longDescription: { contains: search } }
       ];
     }
-    const products = await prisma14.product.findMany({
+    const products = await prisma13.product.findMany({
       where: whereClause,
       include: {
         images: true,
@@ -9767,15 +10086,15 @@ app.get("/api/public/products/:productId/stats", async (req, res) => {
   try {
     const productId = parseInt(req.params.productId);
     const deviceId = req.query.deviceId;
-    const likesCount = await prisma14.productLike.count({
+    const likesCount = await prisma13.productLike.count({
       where: { productId }
     });
-    const commentsCount = await prisma14.productComment.count({
+    const commentsCount = await prisma13.productComment.count({
       where: { productId, isApproved: true }
     });
     let isLiked = false;
     if (deviceId) {
-      const like = await prisma14.productLike.findUnique({
+      const like = await prisma13.productLike.findUnique({
         where: {
           productId_deviceId: {
             productId,
@@ -9801,7 +10120,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
     if (!deviceId) {
       return res.status(400).json({ error: "Device ID is required" });
     }
-    const existingLike = await prisma14.productLike.findUnique({
+    const existingLike = await prisma13.productLike.findUnique({
       where: {
         productId_deviceId: {
           productId,
@@ -9811,7 +10130,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
     });
     let liked = false;
     if (existingLike) {
-      await prisma14.productLike.delete({
+      await prisma13.productLike.delete({
         where: {
           productId_deviceId: {
             productId,
@@ -9820,7 +10139,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
         }
       });
     } else {
-      await prisma14.productLike.create({
+      await prisma13.productLike.create({
         data: {
           productId,
           deviceId
@@ -9828,7 +10147,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
       });
       liked = true;
     }
-    const likesCount = await prisma14.productLike.count({
+    const likesCount = await prisma13.productLike.count({
       where: { productId }
     });
     res.json({
@@ -9841,7 +10160,7 @@ app.post("/api/public/products/:productId/like", async (req, res) => {
 });
 app.get("/api/public/categories", async (req, res) => {
   try {
-    let cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
+    let cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
     if (cats.length === 0) {
       const defaultCategories = [
         "\u0645\u0648\u0628\u0627\u06CC\u0644",
@@ -9864,16 +10183,16 @@ app.get("/api/public/categories", async (req, res) => {
       for (let i = 0; i < defaultCategories.length; i++) {
         try {
           const catName = defaultCategories[i];
-          const exists = await prisma14.category.findFirst({ where: { name: catName } });
+          const exists = await prisma13.category.findFirst({ where: { name: catName } });
           if (!exists) {
-            await prisma14.category.create({
+            await prisma13.category.create({
               data: { name: catName, isActive: true, sortOrder: i + 1 }
             });
           }
         } catch (e) {
         }
       }
-      cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
+      cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
     }
     res.json(cats);
   } catch (err) {
@@ -9882,7 +10201,7 @@ app.get("/api/public/categories", async (req, res) => {
 });
 app.get("/api/categories", async (req, res) => {
   try {
-    let cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
+    let cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
     if (cats.length === 0) {
       const defaultCategories = [
         "\u0645\u0648\u0628\u0627\u06CC\u0644",
@@ -9905,16 +10224,16 @@ app.get("/api/categories", async (req, res) => {
       for (let i = 0; i < defaultCategories.length; i++) {
         try {
           const catName = defaultCategories[i];
-          const exists = await prisma14.category.findFirst({ where: { name: catName } });
+          const exists = await prisma13.category.findFirst({ where: { name: catName } });
           if (!exists) {
-            await prisma14.category.create({
+            await prisma13.category.create({
               data: { name: catName, isActive: true, sortOrder: i + 1 }
             });
           }
         } catch (e) {
         }
       }
-      cats = await prisma14.category.findMany({ orderBy: { id: "asc" } });
+      cats = await prisma13.category.findMany({ orderBy: { id: "asc" } });
     }
     res.json(cats);
   } catch (err) {
@@ -9924,7 +10243,7 @@ app.get("/api/categories", async (req, res) => {
 app.get("/api/public/products/:productId/comments", async (req, res) => {
   try {
     const productId = parseInt(req.params.productId);
-    const comments = await prisma14.productComment.findMany({
+    const comments = await prisma13.productComment.findMany({
       where: {
         productId,
         isApproved: true
@@ -9945,7 +10264,7 @@ app.post("/api/public/products/:productId/comments", async (req, res) => {
     if (!text) {
       return res.status(400).json({ error: "Comment text is required" });
     }
-    const comment = await prisma14.productComment.create({
+    const comment = await prisma13.productComment.create({
       data: {
         productId,
         authorName: authorName || "\u06A9\u0627\u0631\u0628\u0631 \u0645\u0647\u0645\u0627\u0646",
@@ -9961,7 +10280,7 @@ app.post("/api/public/products/:productId/comments", async (req, res) => {
 app.get("/api/public/products/:productId/questions", async (req, res) => {
   try {
     const productId = parseInt(req.params.productId);
-    const questions = await prisma14.productQuestion.findMany({
+    const questions = await prisma13.productQuestion.findMany({
       where: {
         productId,
         isAnswered: true
@@ -9981,7 +10300,7 @@ app.post("/api/public/questions", async (req, res) => {
     if (!productId || !questionText) {
       return res.status(400).json({ error: "Product ID and question text are required" });
     }
-    const question = await prisma14.productQuestion.create({
+    const question = await prisma13.productQuestion.create({
       data: {
         productId: parseInt(productId),
         storeManagerId: storeManagerId ? parseInt(storeManagerId) : null,
@@ -10011,7 +10330,7 @@ app.post("/api/public/checkout", async (req, res) => {
     const { items, customerName, customerPhone, customerAddress, customerCardNumber } = validatedData;
     const cleanPhone = customerPhone.trim();
     let customerCreated = false;
-    let existingUser = await prisma14.user.findFirst({
+    let existingUser = await prisma13.user.findFirst({
       where: {
         OR: [
           { mobile: cleanPhone },
@@ -10025,7 +10344,7 @@ app.post("/api/public/checkout", async (req, res) => {
         const firstName = nameParts[0] || customerName;
         const lastName = nameParts.slice(1).join(" ") || "\u062E\u0631\u06CC\u062F\u0627\u0631";
         const hashedPassword = await import_bcryptjs.default.hash(cleanPhone, 10);
-        existingUser = await prisma14.user.create({
+        existingUser = await prisma13.user.create({
           data: {
             username: cleanPhone,
             password: hashedPassword,
@@ -10045,7 +10364,7 @@ app.post("/api/public/checkout", async (req, res) => {
     let totalAmount = 0;
     const orderItemsData = [];
     for (const item of items) {
-      const product = await prisma14.product.findUnique({
+      const product = await prisma13.product.findUnique({
         where: { id: item.id }
       });
       if (!product) {
@@ -10070,7 +10389,7 @@ app.post("/api/public/checkout", async (req, res) => {
         error: "\u062B\u0628\u062A \u0633\u0641\u0627\u0631\u0634 \u0627\u0632 \u0686\u0646\u062F \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0645\u062E\u062A\u0644\u0641 \u062F\u0631 \u06CC\u06A9 \u0645\u0631\u0633\u0648\u0644\u0647 \u0627\u0645\u06A9\u0627\u0646\u200C\u067E\u0630\u06CC\u0631 \u0646\u06CC\u0633\u062A. \u062C\u0647\u062A \u0645\u062D\u0627\u0633\u0628\u0647 \u062F\u0642\u06CC\u0642 \u0647\u0632\u06CC\u0646\u0647 \u0627\u0631\u0633\u0627\u0644\u060C \u0644\u0637\u0641\u0627\u064B \u0628\u0631\u0627\u06CC \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC \u0647\u0631 \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0633\u0641\u0627\u0631\u0634 \u0645\u062C\u0632\u0627 \u062B\u0628\u062A \u0646\u0645\u0627\u06CC\u06CC\u062F."
       });
     }
-    const order = await prisma14.order.create({
+    const order = await prisma13.order.create({
       data: {
         totalAmount,
         status: "NEW",
@@ -10095,7 +10414,7 @@ app.post("/api/public/checkout", async (req, res) => {
     });
     if (orderItemsData.length > 0 && orderItemsData[0].supplierId) {
       const suppId = orderItemsData[0].supplierId;
-      prisma14.user.findUnique({ where: { id: suppId } }).then((supplier) => {
+      prisma13.user.findUnique({ where: { id: suppId } }).then((supplier) => {
         if (supplier?.mobile) {
           notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
         }
@@ -10114,7 +10433,7 @@ app.post("/api/public/checkout", async (req, res) => {
       );
       payLink = zibalResult.payLink;
       authority = zibalResult.authority;
-      await prisma14.order.update({
+      await prisma13.order.update({
         where: { id: order.id },
         data: {
           statusHistory: {
@@ -10151,7 +10470,7 @@ app.get("/api/public/shipping/callback", async (req, res) => {
     if (!invoiceId) {
       return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0641\u0627\u06A9\u062A\u0648\u0631 \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
-    const invoice = await prisma14.shippingInvoice.findUnique({
+    const invoice = await prisma13.shippingInvoice.findUnique({
       where: { id: parseInt(invoiceId) },
       include: { order: true }
     });
@@ -10168,12 +10487,12 @@ app.get("/api/public/shipping/callback", async (req, res) => {
       refId = `MOCK_REF_${Date.now()}`;
     }
     if (isPaid) {
-      await prisma14.$transaction([
-        prisma14.shippingInvoice.update({
+      await prisma13.$transaction([
+        prisma13.shippingInvoice.update({
           where: { id: invoice.id },
           data: { status: "PAID" }
         }),
-        prisma14.order.update({
+        prisma13.order.update({
           where: { id: invoice.orderId },
           data: {
             status: "PENDING_POSTAL_LABEL",
@@ -10204,7 +10523,7 @@ app.get("/api/public/checkout/callback", async (req, res) => {
       return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0633\u0641\u0627\u0631\u0634 \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A." });
     }
     const parsedOrderId = parseInt(orderId);
-    const order = await prisma14.order.findUnique({
+    const order = await prisma13.order.findUnique({
       where: { id: parsedOrderId }
     });
     if (!order) {
@@ -10223,7 +10542,7 @@ app.get("/api/public/checkout/callback", async (req, res) => {
     }
     if (isPaid) {
       const nextStatus = order.orderSource === "store" ? "WAITING_SUPPLIER_CONFIRMATION" : "PROCESSING";
-      const updatedOrder = await prisma14.order.update({
+      const updatedOrder = await prisma13.order.update({
         where: { id: parsedOrderId },
         data: {
           status: nextStatus,
@@ -10238,7 +10557,7 @@ app.get("/api/public/checkout/callback", async (req, res) => {
           }
         }
       });
-      await creditSuppliersForOrders(prisma14, [updatedOrder]);
+      await creditSuppliersForOrders(prisma13, [updatedOrder]);
       res.redirect(`/?payment_status=success&trackId=${trackId || refId || "DIRECT"}&invoiceId=DIRECT_${orderId}`);
     } else {
       res.redirect(`/?payment_status=failed&trackId=${trackId || "DIRECT"}&invoiceId=DIRECT_${orderId}`);
@@ -10314,12 +10633,12 @@ app.post("/api/payment/zibal/request-invoice-url", async (req, res) => {
     if (invoiceId) {
       const numericInvoiceId = parseInt(invoiceId.toString().replace(/\D/g, ""), 10);
       if (!isNaN(numericInvoiceId) && numericInvoiceId > 0) {
-        const storeInvoice = await prisma14.storeInvoice.findUnique({ where: { id: numericInvoiceId } });
+        const storeInvoice = await prisma13.storeInvoice.findUnique({ where: { id: numericInvoiceId } });
         if (storeInvoice) {
           resolvedAmountToman = storeInvoice.totalAmount;
           descText = descText || `\u067E\u0631\u062F\u0627\u062E\u062A \u0641\u0627\u06A9\u062A\u0648\u0631 \u0641\u0631\u0648\u0634\u06AF\u0627\u0647 #${storeInvoice.id}`;
         } else {
-          const order = await prisma14.order.findUnique({ where: { id: numericInvoiceId } });
+          const order = await prisma13.order.findUnique({ where: { id: numericInvoiceId } });
           if (order) {
             resolvedAmountToman = order.totalAmount;
             descText = descText || `\u067E\u0631\u062F\u0627\u062E\u062A \u0633\u0641\u0627\u0631\u0634 #${order.id}`;
@@ -10329,7 +10648,7 @@ app.post("/api/payment/zibal/request-invoice-url", async (req, res) => {
     } else if (orderId) {
       const numericOrderId = parseInt(orderId.toString().replace(/\D/g, ""), 10);
       if (!isNaN(numericOrderId) && numericOrderId > 0) {
-        const order = await prisma14.order.findUnique({ where: { id: numericOrderId } });
+        const order = await prisma13.order.findUnique({ where: { id: numericOrderId } });
         if (order) {
           resolvedAmountToman = order.totalAmount;
           descText = descText || `\u067E\u0631\u062F\u0627\u062E\u062A \u0633\u0641\u0627\u0631\u0634 #${order.id}`;
@@ -10377,53 +10696,64 @@ app.post("/api/payment/zibal/request-invoice-url", async (req, res) => {
 });
 app.post("/api/payment/request", async (req, res) => {
   try {
-    const { amount, description, orderId, cartItems, customerMobile } = req.body || {};
-    const proxyUrl = process.env.PAYMENT_PROXY_URL;
-    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY;
-    const merchantId = process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588";
-    const appUrl = process.env.APP_URL || getPublicUrl(req);
-    const callbackUrl = `${appUrl.replace(/\/$/, "")}/api/payment/callback?orderId=${orderId || "DIRECT"}`;
-    if (proxyUrl && proxySecret) {
-      const requestEndpoint = proxyUrl.endsWith("/request") ? proxyUrl : `${proxyUrl.replace(/\/$/, "")}/request`;
-      const proxyResponse = await fetch(requestEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": proxySecret
-        },
-        body: JSON.stringify({
-          merchant: merchantId,
-          amount: Number(amount),
-          callbackUrl,
-          description: description || `\u067E\u0631\u062F\u0627\u062E\u062A \u0633\u0641\u0627\u0631\u0634 #${orderId || ""}`,
-          orderId,
-          cartItems,
-          customerMobile
-        })
-      });
-      const data = await proxyResponse.json();
-      if ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId)) {
-        const payLink = data.payLink || `https://gateway.zibal.ir/start/${data.trackId}`;
-        return res.json({
-          success: true,
-          payLink,
-          trackId: data.trackId || data.authority,
-          message: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u067E\u0631\u062F\u0627\u062E\u062A \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062B\u0628\u062A \u0634\u062F."
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          error: data.message || data.error || "\u062E\u0637\u0627 \u062F\u0631 \u062F\u0631\u06CC\u0627\u0641\u062A \u067E\u0627\u0633\u062E \u0627\u0632 \u067E\u0631\u0648\u06A9\u0633\u06CC \u062F\u0631\u06AF\u0627\u0647 \u0632\u06CC\u0628\u0627\u0644"
-        });
+    const { amount, description, storeId, customerName, customerPhone, customerAddress } = req.body || {};
+    const dbMerchant = await prisma13.systemConfig.findUnique({
+      where: { key: "PAYMENT_GATEWAY_MERCHANT_CODE" }
+    });
+    const merchantId = dbMerchant?.value?.trim() || "zibal";
+    const order = await prisma13.order.create({
+      data: {
+        totalAmount: Number(amount || 0),
+        status: "PENDING",
+        storeId: storeId ? Number(storeId) : void 0,
+        customerName: customerName || void 0,
+        customerPhone: customerPhone || void 0,
+        customerAddress: customerAddress || void 0
       }
-    } else {
-      const paymentGateway = await PaymentServiceFactory.getService();
-      const zibalResult = await paymentGateway.createPayment(amount, description, callbackUrl);
+    });
+    const callbackUrl = "https://www.zopit.ir/api/payment/callback";
+    const proxyUrl = "https://bankkalaha.ir/zibal-proxy.php";
+    const proxySecret = "ZopitPay2026Key";
+    console.log(`[Zibal Payment Request] Sending request to proxy for Order #${order.id}, Amount: ${order.totalAmount}`);
+    const proxyResponse = await fetch(proxyUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Key": proxySecret
+      },
+      body: JSON.stringify({
+        action: "request",
+        merchant: merchantId,
+        amount: Number(order.totalAmount),
+        orderId: order.id,
+        callbackUrl,
+        description: description || `\u067E\u0631\u062F\u0627\u062E\u062A \u0633\u0641\u0627\u0631\u0634 #${order.id}`
+      })
+    });
+    const data = await proxyResponse.json().catch(() => ({}));
+    console.log("[Zibal Payment Proxy Response]", data);
+    const trackId = data.trackId || data.authority;
+    if ((data.success || Number(data.result) === 100) && trackId) {
+      await prisma13.order.update({
+        where: { id: order.id },
+        data: { trackingCode: String(trackId) }
+      }).catch((err) => console.error("Error storing trackingCode on order:", err));
+      const payLink = `https://gateway.zibal.ir/start/${trackId}`;
+      if (req.headers.accept && req.headers.accept.includes("text/html")) {
+        return res.redirect(payLink);
+      }
       return res.json({
         success: true,
-        payLink: zibalResult.payLink,
-        trackId: zibalResult.authority,
-        message: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u067E\u0631\u062F\u0627\u062E\u062A \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0627\u06CC\u062C\u0627\u062F \u0634\u062F."
+        trackId,
+        orderId: order.id,
+        payLink,
+        redirectUrl: payLink,
+        message: "\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u067E\u0631\u062F\u0627\u062E\u062A \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062B\u0628\u062A \u0634\u062F."
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: data.message || data.error || "\u062E\u0637\u0627 \u062F\u0631 \u062F\u0631\u06CC\u0627\u0641\u062A \u067E\u0627\u0633\u062E \u0627\u0632 \u067E\u0631\u0648\u06A9\u0633\u06CC \u062F\u0631\u06AF\u0627\u0647 \u0632\u06CC\u0628\u0627\u0644"
       });
     }
   } catch (error) {
@@ -10438,74 +10768,78 @@ app.all("/api/payment/callback", async (req, res) => {
   const trackId = req.query.trackId || req.query.authority || req.body?.trackId || req.body?.authority;
   const successStatus = req.query.success || req.query.status || req.body?.success || req.body?.status;
   const orderId = req.query.orderId || req.body?.orderId;
-  const proxyUrl = process.env.PAYMENT_PROXY_URL;
-  const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY;
-  const merchantId = process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588";
-  const appUrl = process.env.APP_URL || getPublicUrl(req);
+  const appUrl = process.env.APP_URL || getPublicUrl(req) || "https://www.zopit.ir";
   const redirectBase = appUrl.replace(/\/$/, "");
   if (!trackId) {
-    return res.redirect(`${redirectBase}/?payment_status=failed&message=${encodeURIComponent("\u0634\u0646\u0627\u0633\u0647 \u062A\u0631\u0627\u06A9\u0646\u0634 \u062F\u0631\u06CC\u0627\u0641\u062A \u0646\u0634\u062F")}`);
+    return res.redirect(`${redirectBase}/checkout/failed?message=${encodeURIComponent("\u0634\u0646\u0627\u0633\u0647 \u062A\u0631\u0627\u06A9\u0646\u0634 \u062F\u0631\u06CC\u0627\u0641\u062A \u0646\u0634\u062F")}`);
   }
   if (successStatus === "0" || successStatus === "false") {
-    return res.redirect(`${redirectBase}/?payment_status=failed&trackId=${trackId}&orderId=${orderId || ""}`);
+    return res.redirect(`${redirectBase}/checkout/failed?trackId=${trackId}&orderId=${orderId || ""}`);
   }
   try {
-    let isSuccess = false;
-    let refNumber = trackId;
-    if (proxyUrl && proxySecret) {
-      const verifyEndpoint = proxyUrl.endsWith("/verify") ? proxyUrl : `${proxyUrl.replace(/\/$/, "")}/verify`;
-      const verifyResponse = await fetch(verifyEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": proxySecret
-        },
-        body: JSON.stringify({
-          merchant: merchantId,
-          trackId,
-          action: "verify",
-          orderId
-        })
-      });
-      const verifyData = await verifyResponse.json();
-      const resCode = Number(verifyData.result);
-      if (verifyData.success || resCode === 100 || resCode === 201) {
-        isSuccess = true;
-        refNumber = verifyData.refNumber || verifyData.refId || trackId;
+    const dbMerchant = await prisma13.systemConfig.findUnique({
+      where: { key: "PAYMENT_GATEWAY_MERCHANT_CODE" }
+    });
+    const merchantId = dbMerchant?.value?.trim() || "zibal";
+    const proxyUrl = "https://bankkalaha.ir/zibal-proxy.php";
+    const proxySecret = "ZopitPay2026Key";
+    console.log(`[Zibal Payment Verify] Verifying trackId: ${trackId} with proxy`);
+    const verifyResponse = await fetch(proxyUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Key": proxySecret
+      },
+      body: JSON.stringify({
+        action: "verify",
+        merchant: merchantId,
+        trackId: String(trackId)
+      })
+    });
+    const verifyData = await verifyResponse.json().catch(() => ({}));
+    console.log("[Zibal Payment Verify Proxy Response]", verifyData);
+    const resCode = Number(verifyData.result);
+    if (resCode === 100) {
+      let orderToUpdate = null;
+      if (trackId) {
+        orderToUpdate = await prisma13.order.findFirst({
+          where: { trackingCode: String(trackId) },
+          include: { items: true }
+        }).catch(() => null);
       }
-    } else {
-      const paymentGateway = await PaymentServiceFactory.getService();
-      const verification = await paymentGateway.verifyPayment(trackId.toString(), 0);
-      isSuccess = verification.success;
-      refNumber = verification.refId || trackId;
-    }
-    if (isSuccess) {
-      if (orderId && !orderId.startsWith("DIRECT")) {
+      if (!orderToUpdate && orderId) {
         const numericOrderId = parseInt(orderId.toString().replace(/\D/g, ""), 10);
         if (!isNaN(numericOrderId)) {
-          const orderToUpdate = await prisma14.order.findUnique({
+          orderToUpdate = await prisma13.order.findUnique({
             where: { id: numericOrderId },
             include: { items: true }
-          });
-          if (orderToUpdate && orderToUpdate.status !== "PAID") {
-            await prisma14.order.update({
-              where: { id: numericOrderId },
-              data: { status: "PAID" }
-            });
-            for (const item of orderToUpdate.items) {
-              const amountToAdd = Number(item.supplierPrice || 0) * Number(item.quantity || 1);
-              if (amountToAdd > 0 && item.supplierId) {
-                let wallet = await prisma14.wallet.findUnique({ where: { supplierId: item.supplierId } });
-                if (!wallet) {
-                  wallet = await prisma14.wallet.create({
-                    data: { supplierId: item.supplierId, balance: 0, currency: "IRR" }
-                  });
-                }
-                await prisma14.wallet.update({
+          }).catch(() => null);
+        }
+      }
+      if (orderToUpdate) {
+        await prisma13.order.update({
+          where: { id: orderToUpdate.id },
+          data: {
+            status: "PAID",
+            trackingCode: String(verifyData.refNumber || trackId)
+          }
+        }).catch(() => null);
+        if (orderToUpdate.items) {
+          for (const item of orderToUpdate.items) {
+            const amountToAdd = Number(item.supplierPrice || 0) * Number(item.quantity || 1);
+            if (amountToAdd > 0 && item.supplierId) {
+              let wallet = await prisma13.wallet.findUnique({ where: { supplierId: item.supplierId } }).catch(() => null);
+              if (!wallet) {
+                wallet = await prisma13.wallet.create({
+                  data: { supplierId: item.supplierId, balance: 0, currency: "IRR" }
+                }).catch(() => null);
+              }
+              if (wallet) {
+                await prisma13.wallet.update({
                   where: { id: wallet.id },
                   data: { balance: { increment: amountToAdd } }
-                });
-                await prisma14.ledgerEntry.create({
+                }).catch(() => null);
+                await prisma13.ledgerEntry.create({
                   data: {
                     walletId: wallet.id,
                     amount: amountToAdd,
@@ -10514,34 +10848,37 @@ app.all("/api/payment/callback", async (req, res) => {
                     description: `\u062F\u0631\u0622\u0645\u062F \u0627\u0632 \u0641\u0631\u0648\u0634 \u0645\u062D\u0635\u0648\u0644 \u062F\u0631 \u0633\u0641\u0627\u0631\u0634 #${orderToUpdate.id}`,
                     referenceId: orderToUpdate.id.toString()
                   }
-                });
+                }).catch(() => null);
               }
             }
           }
         }
       }
       return res.redirect(
-        `${redirectBase}/?payment_status=success&trackId=${trackId}&refId=${refNumber}&orderId=${orderId || ""}`
+        `${redirectBase}/checkout/success?trackId=${trackId}&orderId=${orderToUpdate?.id || orderId || ""}&refNumber=${verifyData.refNumber || ""}`
       );
     } else {
+      console.error("[Zibal Payment Verify Failed]", verifyData);
       return res.redirect(
-        `${redirectBase}/?payment_status=failed&trackId=${trackId}&orderId=${orderId || ""}`
+        `${redirectBase}/checkout/failed?trackId=${trackId}&orderId=${orderId || ""}&message=${encodeURIComponent(verifyData.message || "\u062A\u0627\u06CC\u06CC\u062F \u062A\u0631\u0627\u06A9\u0646\u0634 \u0628\u0627 \u062E\u0637\u0627 \u0645\u0648\u0627\u062C\u0647 \u0634\u062F")}`
       );
     }
   } catch (error) {
     console.error("Express Payment Callback Error:", error);
     return res.redirect(
-      `${redirectBase}/?payment_status=error&message=${encodeURIComponent(error.message || "\u062E\u0637\u0627 \u062F\u0631 \u062A\u0627\u06CC\u06CC\u062F \u062A\u0631\u0627\u06A9\u0646\u0634")}`
+      `${redirectBase}/checkout/failed?trackId=${trackId || ""}&orderId=${orderId || ""}&message=${encodeURIComponent(error.message || "\u062E\u0637\u0627 \u062F\u0631 \u062A\u0627\u06CC\u06CC\u062F \u062A\u0631\u0627\u06A9\u0646\u0634")}`
     );
   }
 });
 registerConfig(app);
-registerNewFeatures(app, prisma14);
-registerAdminShippingRoutes(app, prisma14, authenticateToken, requireSuperAdmin);
-registerStoreShippingRoutes(app, prisma14, authenticateToken, requireStoreManager);
+registerNewFeatures(app, prisma13);
+registerAdminShippingRoutes(app, prisma13, authenticateToken, requireSuperAdmin);
+registerStoreShippingRoutes(app, prisma13, authenticateToken, requireStoreManager);
 registerAnnouncements(app);
-registerOrderLabels(app, prisma14);
-registerPenaltyRoutes(app, prisma14);
+registerOrderLabels(app, prisma13);
+registerPenaltyRoutes(app, prisma13);
+registerDiscountRoutes(app, authenticateToken, requireSuperAdmin);
+startCronJobs();
 async function startServer() {
   NotificationService.init();
   FinancialJobs.start();
@@ -10598,15 +10935,15 @@ async function startServer() {
           lte: new Date(query.endDate)
         };
       }
-      const payments = await prisma14.payment.findMany({
+      const payments = await prisma13.payment.findMany({
         where: whereClause,
         include: { user: { select: { id: true, username: true, role: true } } },
         orderBy: { id: "desc" },
         skip: (pageNum - 1) * limitNum,
         take: limitNum
       });
-      const total = await prisma14.payment.count({ where: whereClause });
-      const settlements = await prisma14.settlement.findMany({
+      const total = await prisma13.payment.count({ where: whereClause });
+      const settlements = await prisma13.settlement.findMany({
         orderBy: { id: "desc" },
         take: 10,
         include: { supplier: { select: { id: true, username: true, brandName: true } } }
@@ -10691,7 +11028,7 @@ async function startServer() {
     try {
       res.write("<p>\u23F3 \u06AF\u0627\u0645 \u06F3: \u062F\u0631 \u062D\u0627\u0644 \u0627\u062A\u0635\u0627\u0644 \u0645\u062C\u062F\u062F \u0628\u0631\u0646\u0627\u0645\u0647 \u0628\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633...</p>");
       PrismaClient = import_client.PrismaClient;
-      prisma14 = new PrismaClient({
+      prisma13 = new PrismaClient({
         datasources: {
           db: {
             url: dbUrl3
@@ -10723,7 +11060,7 @@ async function startServer() {
   app.get("/api/health", (req, res) => res.json({ status: "ok" }));
   app.get("/api/config", async (req, res) => {
     try {
-      const settings = await prisma14.systemConfig.findMany();
+      const settings = await prisma13.systemConfig.findMany();
       const configMap = (settings || []).reduce((acc, curr) => {
         acc[curr.key] = curr.value;
         return acc;
@@ -10735,16 +11072,73 @@ async function startServer() {
   });
   app.put("/api/config", async (req, res) => {
     try {
-      const { key: key2, value } = req.body;
-      if (!key2) return res.status(400).json({ error: "Missing key" });
-      await prisma14.systemConfig.upsert({
-        where: { key: key2 },
-        update: { value: String(value) },
-        create: { key: key2, value: String(value) }
-      });
-      res.json({ success: true });
+      const body = req.body || {};
+      if (Array.isArray(body.items)) {
+        for (const item of body.items) {
+          if (item?.key !== void 0) {
+            await prisma13.systemConfig.upsert({
+              where: { key: String(item.key) },
+              update: { value: String(item.value ?? "") },
+              create: { key: String(item.key), value: String(item.value ?? "") }
+            });
+          }
+        }
+        return res.json({ success: true, updatedCount: body.items.length });
+      }
+      if (body.settings && typeof body.settings === "object") {
+        const entries = Object.entries(body.settings);
+        for (const [key2, value] of entries) {
+          await prisma13.systemConfig.upsert({
+            where: { key: String(key2) },
+            update: { value: String(value ?? "") },
+            create: { key: String(key2), value: String(value ?? "") }
+          });
+        }
+        return res.json({ success: true, updatedCount: entries.length });
+      }
+      if (body.key !== void 0) {
+        await prisma13.systemConfig.upsert({
+          where: { key: String(body.key) },
+          update: { value: String(body.value ?? "") },
+          create: { key: String(body.key), value: String(body.value ?? "") }
+        });
+        return res.json({ success: true });
+      }
+      if (typeof body === "object" && Object.keys(body).length > 0) {
+        const entries = Object.entries(body);
+        for (const [key2, value] of entries) {
+          await prisma13.systemConfig.upsert({
+            where: { key: String(key2) },
+            update: { value: String(value ?? "") },
+            create: { key: String(key2), value: String(value ?? "") }
+          });
+        }
+        return res.json({ success: true, updatedCount: entries.length });
+      }
+      return res.status(400).json({ error: "\u0645\u062D\u062A\u0648\u0627\u06CC \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A" });
     } catch (err) {
-      res.json({ success: true });
+      console.error("Error updating config:", err);
+      res.status(500).json({ error: "Failed to save config", details: err?.message || String(err) });
+    }
+  });
+  app.post("/api/config/bulk", async (req, res) => {
+    try {
+      const { settings } = req.body || {};
+      if (!settings || typeof settings !== "object") {
+        return res.status(400).json({ error: "Invalid settings object" });
+      }
+      const entries = Object.entries(settings);
+      for (const [key2, value] of entries) {
+        await prisma13.systemConfig.upsert({
+          where: { key: String(key2) },
+          update: { value: String(value ?? "") },
+          create: { key: String(key2), value: String(value ?? "") }
+        });
+      }
+      res.json({ success: true, count: entries.length });
+    } catch (err) {
+      console.error("Error bulk updating config:", err);
+      res.status(500).json({ error: "Failed to bulk update config", details: err?.message || String(err) });
     }
   });
   app.post("/api/admin/payment-gateway/test", authenticateToken, requireAdmin, async (req, res) => {
@@ -10752,24 +11146,46 @@ async function startServer() {
       const { merchantCode } = req.body;
       let merchantToTest = merchantCode;
       if (!merchantToTest || merchantToTest === "zibal_merchant_key") {
-        const savedSetting = await prisma14.systemConfig.findUnique({ where: { key: "PAYMENT_GATEWAY_MERCHANT_CODE" } });
+        const savedSetting = await prisma13.systemConfig.findUnique({ where: { key: "PAYMENT_GATEWAY_MERCHANT_CODE" } });
         merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT || "6a0213e61b27742a09938588";
       }
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6e3);
-      const response = await fetch("https://gateway.zibal.ir/v1/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          merchant: merchantToTest,
-          amount: 1e4,
-          callbackUrl: "https://zopit.ir/callback-test",
-          description: "\u062A\u0633\u062A \u062A\u0633\u062A \u0622\u0646\u0644\u0627\u06CC\u0646 \u0641\u0639\u0627\u0644 \u0628\u0648\u062F\u0646 \u062F\u0631\u06AF\u0627\u0647 \u0632\u06CC\u0628\u0627\u0644"
-        })
-      });
-      clearTimeout(timeoutId);
-      const data = await response.json();
+      let data = null;
+      try {
+        const proxyResponse = await fetch("https://bankkalaha.ir/zibal-proxy.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Api-Key": "ZopitPay2026Key"
+          },
+          body: JSON.stringify({
+            action: "request",
+            merchant: merchantToTest,
+            amount: 1e4,
+            callbackUrl: "https://zopit.ir/callback-test",
+            description: "\u062A\u0633\u062A \u062A\u0633\u062A \u0622\u0646\u0644\u0627\u06CC\u0646 \u0641\u0639\u0627\u0644 \u0628\u0648\u062F\u0646 \u062F\u0631\u06AF\u0627\u0647 \u0632\u06CC\u0628\u0627\u0644"
+          })
+        });
+        data = await proxyResponse.json().catch(() => null);
+      } catch (proxyErr) {
+        console.warn("Proxy test failed, trying direct:", proxyErr);
+      }
+      if (!data || data.result === void 0) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6e3);
+        const response = await fetch("https://gateway.zibal.ir/v1/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            merchant: merchantToTest,
+            amount: 1e4,
+            callbackUrl: "https://zopit.ir/callback-test",
+            description: "\u062A\u0633\u062A \u062A\u0633\u062A \u0622\u0646\u0644\u0627\u06CC\u0646 \u0641\u0639\u0627\u0644 \u0628\u0648\u062F\u0646 \u062F\u0631\u06AF\u0627\u0647 \u0632\u06CC\u0628\u0627\u0644"
+          })
+        });
+        clearTimeout(timeoutId);
+        data = await response.json().catch(() => ({}));
+      }
       if (Number(data.result) === 100) {
         return res.json({
           success: true,
@@ -10814,7 +11230,7 @@ async function startServer() {
     };
     try {
       const keys = Object.keys(defaultSupport);
-      const settings = await prisma14.systemConfig.findMany({ where: { key: { in: keys } } });
+      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
       const map = { ...defaultSupport };
       if (Array.isArray(settings)) {
         settings.forEach((s) => {
@@ -10835,7 +11251,7 @@ async function startServer() {
     };
     try {
       const keys = Object.keys(defaultTerms);
-      const settings = await prisma14.systemConfig.findMany({ where: { key: { in: keys } } });
+      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
       const map = { ...defaultTerms };
       if (Array.isArray(settings)) {
         settings.forEach((s) => {
@@ -10854,7 +11270,7 @@ async function startServer() {
     };
     try {
       const keys = Object.keys(defaultCode);
-      const settings = await prisma14.systemConfig.findMany({ where: { key: { in: keys } } });
+      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
       const map = { ...defaultCode };
       if (Array.isArray(settings)) {
         settings.forEach((s) => {

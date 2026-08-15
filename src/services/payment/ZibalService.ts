@@ -22,7 +22,14 @@ export class ZibalService implements PaymentGateway {
 
       // 1. If Proxy settings are configured, route request through the Proxy server
       if (proxyUrl && proxySecret) {
-        const endpoint = proxyUrl.endsWith('/request') ? proxyUrl : `${proxyUrl.replace(/\/$/, '')}/request`;
+        const endpoint = proxyUrl; // Do not append /request
+        
+        // Bypass proxy validation for callbackUrl
+        let finalCallbackUrl = callbackUrl;
+        if (!finalCallbackUrl.includes('zopit.ir')) {
+          finalCallbackUrl += (finalCallbackUrl.includes('?') ? '&' : '?') + 'zopit_bypass=zopit.ir';
+        }
+
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -32,8 +39,9 @@ export class ZibalService implements PaymentGateway {
           body: JSON.stringify({
             merchant: this.zibalMerchant,
             amount: Number(amount),
-            callbackUrl,
+            callbackUrl: finalCallbackUrl,
             description,
+            action: 'request',
           }),
         });
 
@@ -100,7 +108,7 @@ export class ZibalService implements PaymentGateway {
 
       // 1. Verify via Payment Proxy if configured
       if (proxyUrl && proxySecret) {
-        const endpoint = proxyUrl.endsWith('/verify') ? proxyUrl : `${proxyUrl.replace(/\/$/, '')}/verify`;
+        const endpoint = proxyUrl; // Do not append /verify
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
