@@ -14,6 +14,7 @@ import {
   Smartphone,
   Printer,
   FileCheck,
+  MessageSquare,
 } from "lucide-react";
 
 export default function PaymentSmsSettings() {
@@ -432,8 +433,23 @@ export default function PaymentSmsSettings() {
                     className="w-full px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-default text-right"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Card 3: SMS Provider Settings */}
+          <div className="bg-card p-6 rounded-2xl border border-border shadow-xs space-y-6 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2.5 pb-3.5 border-b border-border">
+                <MessageSquare className="w-5 h-5 text-indigo-500" />
+                <div>
+                  <h3 className="text-sm font-bold text-text-primary">پنل پیامک (SMS)</h3>
+                  <p className="text-[11px] text-text-muted mt-0.5">تنظیمات درگاه پیامکی و وب‌سرویس</p>
+                </div>
+              </div>
 
-                <div className="pt-2 border-t border-border">
+              <div className="space-y-4">
+                <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1.5">پنل پیامک انتخابی</label>
                   <select
                     value={smsProvider}

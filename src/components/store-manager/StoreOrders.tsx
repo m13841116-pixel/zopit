@@ -600,7 +600,7 @@ export default function StoreOrders({
                                 onClick={() => handlePaymentClick(order.id)}
                                 className="bg-success/20 text-success hover:bg-emerald-200 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                               >
-                                <CreditCard className="w-4 h-4" /> پرداخت تک تکی
+                                <CreditCard className="w-4 h-4" /> پرداخت
                               </button>
                             )}
                           </div>

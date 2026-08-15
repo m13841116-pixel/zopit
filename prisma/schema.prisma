@@ -759,3 +759,15 @@ model ShippingInvoice {
   updatedAt      DateTime @updatedAt
   order          Order    @relation(fields: [orderId], references: [id])
 }
+
+model DiscountCode {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique
+  discountType  String   @default("PERCENTAGE") // PERCENTAGE or FIXED
+  discountValue Float
+  maxUses       Int?     // null means unlimited
+  usedCount     Int      @default(0)
+  expiryDate    DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}

@@ -23,13 +23,14 @@ import {
   X
 } from "lucide-react";
 import { toast } from "../GlobalToast";
+import SuperAdminDiscountCodes from "./SuperAdminDiscountCodes";
 
 interface SuperAdminProAccountsProps {
   showNotification?: (message: string, type: "success" | "error") => void;
 }
 
 export default function SuperAdminProAccounts({ showNotification }: SuperAdminProAccountsProps) {
-  const [activeTab, setActiveTab] = useState<"accounts" | "settings">("accounts");
+  const [activeTab, setActiveTab] = useState<"accounts" | "settings" | "discounts">("accounts");
   const [loading, setLoading] = useState(true);
   const [proAccounts, setProAccounts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");

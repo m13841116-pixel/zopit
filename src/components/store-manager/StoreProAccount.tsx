@@ -76,7 +76,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [num2, setNum2] = useState(4);
   const [captchaInput, setCaptchaInput] = useState("");
 
-  const handleApplyDiscountCode = () => {
+  const handleApplyDiscountCode = async () => {
     const code = discountCodeText.trim().toUpperCase();
     if (!code) {
       const msg = "لطفاً کد تخفیف را وارد نمایید.";
@@ -84,16 +84,44 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       else toast(msg, "error");
       return;
     }
-    if (code === "ZOPIT-PRO" || code === "ZOPIT" || code === "OFF" || code === "PROMO" || code === "ZOPIT2025") {
-      setAppliedDiscount(39450);
+
+    try {
+      const res = await fetch("/api/public/discounts/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "کد تخفیف وارد شده معتبر نمی‌باشد.");
+      }
+
+      // Calculate applied discount amount
+      const basePrice = parseInt(settings.proAccountPrice || '239500', 10);
+      const enamadCost = hasEnamad ? 50000 : 0;
+      const totalCost = basePrice + enamadCost;
+      
+      let discountAmount = 0;
+      if (data.discountType === 'PERCENTAGE') {
+        discountAmount = totalCost * (data.discountValue / 100);
+      } else {
+        discountAmount = data.discountValue;
+      }
+      
+      if (discountAmount > totalCost) discountAmount = totalCost;
+
+      setAppliedDiscount(discountAmount);
       setIsDiscountApplied(true);
       const msg = "کد تخفیف ویژه با موفقیت اعمال گردید!";
       if (showNotification) showNotification(msg, "success");
       else toast(msg, "success");
-    } else {
-      const msg = "کد تخفیف وارد شده معتبر نمی‌باشد.";
+    } catch (err: any) {
+      const msg = err.message || "کد تخفیف وارد شده معتبر نمی‌باشد.";
       if (showNotification) showNotification(msg, "error");
       else toast(msg, "error");
+      setIsDiscountApplied(false);
+      setAppliedDiscount(0);
     }
   };
 
@@ -358,7 +386,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           hasCustomLogo,
           logoDescription,
           domainProposals: domainProposals.map(d => d.trim()).filter(Boolean),
-          amount: calculatedAmount
+          amount: calculatedAmount,
+          discountCodeText: isDiscountApplied ? discountCodeText : undefined
         })
       });
 

@@ -29,6 +29,7 @@ console.error = function (...args) {
 
 import { registerAdminShippingRoutes } from './src/services/adminShippingRoutes.js';
 import { registerStoreShippingRoutes } from './src/services/storeShippingRoutes.js';
+import { startCronJobs } from './src/cronJobs.js';
 import { 
   sendSmsViaMelliPayamak, 
   notifySupplierNewOrder, 
@@ -134,6 +135,7 @@ import registerNewFeatures from './src/services/newFeaturesRoute.js';
 import registerAnnouncements from './src/services/announcementsRoute.js';
 import registerOrderLabel from './src/services/orderLabelRoute.js';
 import registerPenaltyRoutes from './src/services/penaltyRoute.js';
+import { registerDiscountRoutes } from './src/services/discountRoutes.js';
 import registerAIStudioRoute from './src/services/aiStudioRoute.js';
 
 import { z } from 'zod';
@@ -4862,10 +4864,10 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
           where: { id: invoice.id },
           data: { trackId: zibalResult.authority }
         });
-      } catch (paymentErr) {
+      } catch (paymentErr: any) {
         console.error('Error creating Zibal payment for store invoice:', paymentErr);
-        // Fallback for simulation if payment creation fails
-        payLink = `/api/public/store-invoice/pay-simulate?invoiceId=${invoice.id}`;
+        // Throw an error instead of automatically paying the invoice
+        throw new Error(`خطا در ایجاد تراکنش پرداخت: ${paymentErr.message}`);
       }
       return res.json({ payLink });
     }
@@ -9185,6 +9187,9 @@ registerStoreShippingRoutes(app, prisma, authenticateToken, requireStoreManager)
 registerAnnouncements(app);
 registerOrderLabel(app, prisma);
 registerPenaltyRoutes(app, prisma);
+registerDiscountRoutes(app, authenticateToken, requireSuperAdmin);
+
+startCronJobs();
 
 async function startServer() {
   NotificationService.init();
