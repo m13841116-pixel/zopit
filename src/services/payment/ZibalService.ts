@@ -84,9 +84,10 @@ export class ZibalService implements PaymentGateway {
   }
   
   /**
-   * Request a new payment from Zibal (via Proxy first, fallback to direct)
+   * Request a new payment from Zibal (via Proxy)
+   * Sends POST request with body: { action: 'request', merchant, amount, callbackUrl, description, orderId? }
    */
-  async createPayment(amount: number | string, description: string, callbackUrl: string): Promise<{ payLink: string; authority: string }> {
+  async createPayment(amount: number | string, description: string, callbackUrl: string, orderId?: string | number): Promise<{ payLink: string; authority: string }> {
     try {
       let finalCallbackUrl = callbackUrl;
       if (!finalCallbackUrl.includes('zopit.ir')) {
@@ -98,18 +99,23 @@ export class ZibalService implements PaymentGateway {
         throw new Error('مبلغ پرداختی نامعتبر است.');
       }
 
-      // 1. اول از طریق سرور واسط ایران ارسال می‌شود
-      let proxySuccess = false;
+      // Explicitly send action: 'request' and all required Zibal parameters
+      const requestPayload: Record<string, any> = {
+        action: 'request',
+        merchant: this.zibalMerchant,
+        amount: numAmount,
+        callbackUrl: finalCallbackUrl,
+        description: description || 'پرداخت سفارش زوپیت',
+      };
+
+      if (orderId) {
+        requestPayload.orderId = orderId;
+      }
+
       let lastProxyError: any = null;
 
       try {
-        const data = await this.sendProxyRequest({
-          merchant: this.zibalMerchant,
-          amount: numAmount,
-          callbackUrl: finalCallbackUrl,
-          description,
-          action: 'request',
-        });
+        const data = await this.sendProxyRequest(requestPayload);
 
         if ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId)) {
           const trackId = (data.trackId || data.authority)?.toString();
@@ -130,7 +136,6 @@ export class ZibalService implements PaymentGateway {
         console.warn('[ZibalService] Proxy request failed:', proxyErr.message);
       }
 
-      // 2. اگر سرور واسط در دسترس نبود، خطای دقیق سرور واسط را اعلام می‌کنیم تا با ارور گمراه‌کننده ۱۱۵ مواجه نشویم
       if (lastProxyError) {
         throw new Error(`خطا در ارتباط با سرور واسط ایران (bankkalaha.ir): ${lastProxyError.message || 'عدم پاسخگویی سرور'}`);
       }
@@ -143,7 +148,8 @@ export class ZibalService implements PaymentGateway {
   }
 
   /**
-   * Verify an existing payment with Zibal (via Proxy first, fallback to direct)
+   * Verify an existing payment with Zibal (via Proxy)
+   * Sends POST request with body: { action: 'verify', merchant, trackId }
    */
   async verifyPayment(authority: string, amount: number | string): Promise<{ success: boolean; trackId: string; refId: string }> {
     try {
@@ -155,13 +161,15 @@ export class ZibalService implements PaymentGateway {
         };
       }
 
-      // 1. Verify via Payment Proxy
+      // Explicitly send action: 'verify', merchant, and trackId
+      const verifyPayload = {
+        action: 'verify',
+        merchant: this.zibalMerchant,
+        trackId: authority,
+      };
+
       try {
-        const data = await this.sendProxyRequest({
-          merchant: this.zibalMerchant,
-          trackId: authority,
-          action: 'verify',
-        });
+        const data = await this.sendProxyRequest(verifyPayload);
 
         const resCode = Number(data.result);
         if (data.success || resCode === 100 || resCode === 201) {
@@ -172,10 +180,10 @@ export class ZibalService implements PaymentGateway {
           };
         }
       } catch (proxyErr: any) {
-        console.warn('[ZibalService] Proxy verify failed, attempting direct verify:', proxyErr.message);
+        console.warn('[ZibalService] Proxy verify failed:', proxyErr.message);
       }
 
-      // 2. Direct Zibal verify call
+      // Direct Zibal verify call as fallback
       const response = await fetch(`${ZIBAL_GATEWAY_URL}/verify`, {
         method: 'POST',
         headers: { 
@@ -191,7 +199,6 @@ export class ZibalService implements PaymentGateway {
 
       const data = await response.json();
 
-      // result == 100 means successful verification. result == 201 means already verified.
       const resCode = Number(data.result);
       if (resCode === 100 || resCode === 201) {
         return {
