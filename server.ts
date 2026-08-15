@@ -1,6 +1,7 @@
 import './src/env-loader.js';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
+import https from 'https';
 
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err);
@@ -8953,6 +8954,73 @@ app.post('/api/payment/zibal/request-invoice-url', async (req: any, res: any) =>
   }
 });
 
+function requestProxy(url: string, apiKey: string, body: any): Promise<{ ok: boolean; status: number; text: string }> {
+  return new Promise((resolve) => {
+    try {
+      const urlObj = new URL(url);
+      const postData = JSON.stringify(body);
+      
+      const options = {
+        hostname: urlObj.hostname,
+        port: 443,
+        path: urlObj.pathname + urlObj.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Api-Key': apiKey,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Content-Length': Buffer.byteLength(postData)
+        },
+        rejectUnauthorized: false, // Prevents "fetch failed" SSL errors completely!
+        timeout: 10000 // 10 seconds timeout
+      };
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          resolve({
+            ok: (res.statusCode || 200) >= 200 && (res.statusCode || 200) < 300,
+            status: res.statusCode || 200,
+            text: data
+          });
+        });
+      });
+      
+      req.on('error', (err: any) => {
+        console.error('[requestProxy] Socket Connection Error:', err);
+        resolve({
+          ok: false,
+          status: 500,
+          text: JSON.stringify({ error: `Connection failed: ${err.message || String(err)}` })
+        });
+      });
+      
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({
+          ok: false,
+          status: 504,
+          text: JSON.stringify({ error: 'Connection timeout to proxy server (bankkalaha.ir)' })
+        });
+      });
+      
+      req.write(postData);
+      req.end();
+    } catch (err: any) {
+      console.error('[requestProxy] Exception:', err);
+      resolve({
+        ok: false,
+        status: 500,
+        text: JSON.stringify({ error: `Exception: ${err.message || String(err)}` })
+      });
+    }
+  });
+}
+
 // Express Route 1: Payment Request via Proxy or Direct
 app.post('/api/payment/request', async (req: any, res: any) => {
   try {
@@ -8983,23 +9051,16 @@ app.post('/api/payment/request', async (req: any, res: any) => {
     console.log(`[Zibal Payment Request] Sending request to proxy for Order #${order.id}, Amount: ${order.totalAmount}`);
 
     // 3. Send real POST request to proxy
-    const proxyResponse = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': proxySecret,
-      },
-      body: JSON.stringify({
-        action: 'request',
-        merchant: merchantId,
-        amount: Number(order.totalAmount),
-        orderId: order.id,
-        callbackUrl,
-        description: description || `پرداخت سفارش #${order.id}`,
-      }),
+    const result = await requestProxy(proxyUrl, proxySecret, {
+      action: 'request',
+      merchant: merchantId,
+      amount: Number(order.totalAmount),
+      orderId: order.id,
+      callbackUrl,
+      description: description || `پرداخت سفارش #${order.id}`,
     });
 
-    const data = await proxyResponse.json().catch(() => ({}));
+    const data = JSON.parse(result.text || '{}');
     console.log('[Zibal Payment Proxy Response]', data);
 
     const trackId = data.trackId || data.authority;
@@ -9070,20 +9131,13 @@ app.all('/api/payment/callback', async (req: any, res: any) => {
     console.log(`[Zibal Payment Verify] Verifying trackId: ${trackId} with proxy`);
 
     // 2. Send real POST verification request to proxy
-    const verifyResponse = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': proxySecret,
-      },
-      body: JSON.stringify({
-        action: 'verify',
-        merchant: merchantId,
-        trackId: String(trackId),
-      }),
+    const resultVerify = await requestProxy(proxyUrl, proxySecret, {
+      action: 'verify',
+      merchant: merchantId,
+      trackId: String(trackId),
     });
 
-    const verifyData = await verifyResponse.json().catch(() => ({}));
+    const verifyData = JSON.parse(resultVerify.text || '{}');
     console.log('[Zibal Payment Verify Proxy Response]', verifyData);
 
     const resCode = Number(verifyData.result);
@@ -9504,32 +9558,22 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
 
       // 1. Try proxy first
       try {
-        const proxyResponse = await fetch('https://bankkalaha.ir/zibal-proxy.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-Api-Key': 'ZopitPay2026Key',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          },
-          body: JSON.stringify({
-            action: 'request',
-            merchant: merchantToTest,
-            amount: 10000,
-            callbackUrl: 'https://zopit.ir/callback-test',
-            description: 'تست آنلاین فعال بودن درگاه زیبال',
-          }),
+        const result = await requestProxy('https://bankkalaha.ir/zibal-proxy.php', 'ZopitPay2026Key', {
+          action: 'request',
+          merchant: merchantToTest,
+          amount: 50000, // 5,000 Tomans (50,000 IRR) as requested
+          callbackUrl: 'https://zopit.ir/callback-test',
+          description: 'تست آنلاین فعال بودن درگاه زیبال (۵ هزار تومان)',
         });
         
-        const textResponse = await proxyResponse.text().catch(() => '');
-        if (proxyResponse.ok && textResponse.trim()) {
+        if (result.ok && result.text.trim()) {
           try {
-            data = JSON.parse(textResponse);
+            data = JSON.parse(result.text);
           } catch (e) {
-            proxyErrorDetails = `پاسخ سرور واسط قالب JSON معتبر ندارد: ${textResponse.slice(0, 150)}`;
+            proxyErrorDetails = `پاسخ سرور واسط قالب JSON معتبر ندارد: ${result.text.slice(0, 150)}`;
           }
         } else {
-          proxyErrorDetails = `سرور واسط پاسخ خالی یا ناموفق با کد ${proxyResponse.status} فرستاد. متن پاسخ: ${textResponse.slice(0, 150) || 'پاسخ خالی (کد خطا یا تداخل وب‌سایت)'}`;
+          proxyErrorDetails = `سرور واسط پاسخ خالی یا ناموفق با کد ${result.status} فرستاد. متن پاسخ: ${result.text.slice(0, 150) || 'پاسخ خالی (کد خطا یا تداخل وب‌سایت)'}`;
         }
       } catch (proxyErr: any) {
         console.warn('Proxy test failed:', proxyErr);
