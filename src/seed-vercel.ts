@@ -50,7 +50,7 @@ async function seed() {
       for (const catName of defaultCategories) {
         const exists = await prisma.category.findFirst({ where: { name: catName } });
         if (!exists) {
-          await prisma.category.create({ data: { name: catName, slug: catName.replace(/\s+/g, '-') } });
+          await prisma.category.create({ data: { name: catName } });
         }
       }
     }

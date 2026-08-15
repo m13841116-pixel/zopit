@@ -32,7 +32,7 @@ export class ZibalService implements PaymentGateway {
   constructor(merchantId?: string) {
     this.zibalMerchant = (merchantId && merchantId !== 'zibal' && merchantId !== 'zibal_merchant_key') 
       ? merchantId 
-      : (process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
+      : (process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588');
   }
 
   /**

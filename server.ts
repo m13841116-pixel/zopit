@@ -1,7 +1,12 @@
 import './src/env-loader.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
 import https from 'https';
+
+const safeDirname = process.cwd();
 
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err);
@@ -124,9 +129,6 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 import { execSync } from 'child_process';
 
 let PrismaClient: any = StaticPrismaClient;
@@ -148,7 +150,7 @@ import { initiatePaymentSchema, refundPaymentSchema, reportQuerySchema } from '.
 
 
 function findTrueRootDir(): string {
-  const current = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
+  const current = typeof safeDirname !== 'undefined' ? safeDirname : process.cwd();
   if (fs.existsSync(path.join(current, 'package.json'))) {
     return current;
   }
@@ -9021,6 +9023,51 @@ function requestProxy(url: string, apiKey: string, body: any): Promise<{ ok: boo
   });
 }
 
+
+// TEST PAYMENT ROUTE
+app.get('/api/payment/test', async (req, res) => {
+  try {
+    const amount = 100000; // 10,000 Toman in Rials
+    const description = 'تراکنش تستی 10 هزار تومانی';
+    const callbackUrl = 'https://www.zopit.ir/api/payment/callback';
+
+    // 1. Read Merchant ID from Database
+    const dbMerchant = await prisma.systemConfig.findUnique({
+      where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
+    });
+    const merchantId = dbMerchant?.value?.trim() || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || 'zibal';
+
+    const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
+
+    console.log('[Test Payment] Sending request to proxy...', { amount, merchantId });
+
+    // 2. Send real POST request to proxy
+    const result = await requestProxy(proxyUrl, proxySecret, {
+      action: 'request',
+      merchant: merchantId,
+      amount: amount,
+      callbackUrl,
+      description
+    });
+
+    const data = JSON.parse(result.text || '{}');
+    console.log('[Test Payment] Proxy Response:', data);
+
+    const trackId = data.trackId || data.authority;
+
+    if ((data.success || Number(data.result) === 100) && trackId) {
+      const payLink = `https://gateway.zibal.ir/start/${trackId}`;
+      return res.redirect(payLink);
+    } else {
+      return res.status(400).send(`<h1>خطا در اتصال به درگاه زیبال</h1><p>${data.message || data.error || JSON.stringify(data)}</p>`);
+    }
+  } catch (err) {
+    console.error('Test Payment Route Error:', err);
+    return res.status(500).send(`<h1>Server Error</h1><p>${err.message}</p>`);
+  }
+});
+
 // Express Route 1: Payment Request via Proxy or Direct
 app.post('/api/payment/request', async (req: any, res: any) => {
   try {
@@ -9030,7 +9077,7 @@ app.post('/api/payment/request', async (req: any, res: any) => {
     const dbMerchant = await prisma.systemConfig.findUnique({
       where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
     });
-    const merchantId = dbMerchant?.value?.trim() || 'zibal';
+    const merchantId = dbMerchant?.value?.trim() || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || 'zibal';
 
     // 2. Create a new Order in Prisma DB with status PENDING as requested
     const order = await prisma.order.create({
@@ -9045,8 +9092,8 @@ app.post('/api/payment/request', async (req: any, res: any) => {
     });
 
     const callbackUrl = 'https://www.zopit.ir/api/payment/callback';
-    const proxyUrl = 'https://bankkalaha.ir/zibal-proxy.php';
-    const proxySecret = 'ZopitPay2026Key';
+    const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
 
     console.log(`[Zibal Payment Request] Sending request to proxy for Order #${order.id}, Amount: ${order.totalAmount}`);
 
@@ -9123,10 +9170,10 @@ app.all('/api/payment/callback', async (req: any, res: any) => {
     const dbMerchant = await prisma.systemConfig.findUnique({
       where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
     });
-    const merchantId = dbMerchant?.value?.trim() || 'zibal';
+    const merchantId = dbMerchant?.value?.trim() || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || 'zibal';
 
-    const proxyUrl = 'https://bankkalaha.ir/zibal-proxy.php';
-    const proxySecret = 'ZopitPay2026Key';
+    const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
 
     console.log(`[Zibal Payment Verify] Verifying trackId: ${trackId} with proxy`);
 
@@ -9558,7 +9605,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
 
       // 1. Try proxy first
       try {
-        const result = await requestProxy('https://bankkalaha.ir/zibal-proxy.php', 'ZopitPay2026Key', {
+        const result = await requestProxy(process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php', process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key', {
           action: 'request',
           merchant: merchantToTest,
           amount: 50000, // 5,000 Tomans (50,000 IRR) as requested
@@ -9711,8 +9758,8 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     const candidates = [
       path.join(rootDir, 'dist'),
       path.join(rootDir, 'prod_output'),
-      __dirname,
-      path.join(__dirname, '..', 'dist'),
+      safeDirname,
+      path.join(safeDirname, '..', 'dist'),
       path.join(process.cwd(), 'dist'),
       path.join(process.cwd(), 'prod_output'),
     ];
@@ -9726,7 +9773,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     return path.join(rootDir, 'dist');
   };
 
-  const isDev = process.env.NODE_ENV !== "production" && !__dirname.includes("dist") && !__dirname.includes("prod_output") && !process.env.K_SERVICE;
+  const isDev = process.env.NODE_ENV !== "production" && !safeDirname.includes("dist") && !safeDirname.includes("prod_output") && !process.env.K_SERVICE;
   if (isDev) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
