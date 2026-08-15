@@ -1,3 +1,4 @@
+import { EnamadBadge } from "./components/EnamadBadge";
 import heroImage from "./assets/images/zopit_b2b_hero_1785266004043.jpg";
 import { CartProvider } from "./components/CartContext";
 import { ToastProvider, useToast } from "./components/ToastContext";
@@ -3799,6 +3800,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
               </div>
             )}
           </div>
+          {/* Discreet Footer with Logo and subtle Enamad at bottom of dotted canvas */}
+          <EnamadBadge variant="subtle_footer" />
         </main>
         )}
       </div>

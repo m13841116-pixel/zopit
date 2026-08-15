@@ -578,6 +578,19 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
             <span className="text-zinc-400 text-xs font-semibold mr-2.5">در حال بارگذاری اکسپلور...</span>
           </div>
         )}
+
+        {/* Explore Footer */}
+        <footer className="mt-16 pt-8 pb-12 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6" dir="rtl">
+          <div className="flex flex-col gap-1 text-center md:text-right">
+            <div className="flex items-center justify-center md:justify-start gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-xs font-black text-white">سامانه هوشمند زنجیره تامین و فروش عمده کالا (زوپیت)</span>
+            </div>
+            <p className="text-[11px] text-zinc-500 font-medium">
+              تمامی حقوق مادی و معنوی این وبگاه محفوظ و متعلق به سامانه زوپیت می‌باشد.
+            </p>
+          </div>
+        </footer>
       </main>
 
       {/* Immersive Instagram Reels-like Fullscreen Viewer */}

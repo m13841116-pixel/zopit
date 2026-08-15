@@ -17,8 +17,8 @@ export class ZibalService implements PaymentGateway {
    */
   async createPayment(amount: number | string, description: string, callbackUrl: string): Promise<{ payLink: string; authority: string }> {
     try {
-      const proxyUrl = process.env.PAYMENT_PROXY_URL;
-      const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY;
+      const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+      const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
 
       // 1. If Proxy settings are configured, route request through the Proxy server
       if (proxyUrl && proxySecret) {
@@ -108,8 +108,8 @@ export class ZibalService implements PaymentGateway {
         };
       }
 
-      const proxyUrl = process.env.PAYMENT_PROXY_URL;
-      const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY;
+      const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+      const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
 
       // 1. Verify via Payment Proxy if configured
       if (proxyUrl && proxySecret) {

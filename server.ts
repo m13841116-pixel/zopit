@@ -9506,23 +9506,48 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588';
       }
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-      
-      const response = await fetch('https://gateway.zibal.ir/v1/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          merchant: merchantToTest,
-          amount: 10000,
-          callbackUrl: 'https://zopit.ir/callback-test',
-          description: 'تست تست آنلاین فعال بودن درگاه زیبال',
-        }),
-      });
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
+      let data: any = null;
+
+      // 1. Try proxy first
+      try {
+        const proxyResponse = await fetch('https://bankkalaha.ir/zibal-proxy.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': 'ZopitPay2026Key',
+          },
+          body: JSON.stringify({
+            action: 'request',
+            merchant: merchantToTest,
+            amount: 10000,
+            callbackUrl: 'https://zopit.ir/callback-test',
+            description: 'تست تست آنلاین فعال بودن درگاه زیبال',
+          }),
+        });
+        data = await proxyResponse.json().catch(() => null);
+      } catch (proxyErr) {
+        console.warn('Proxy test failed, trying direct:', proxyErr);
+      }
+
+      // 2. Direct gateway fallback if proxy did not return result
+      if (!data || data.result === undefined) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        
+        const response = await fetch('https://gateway.zibal.ir/v1/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            merchant: merchantToTest,
+            amount: 10000,
+            callbackUrl: 'https://zopit.ir/callback-test',
+            description: 'تست تست آنلاین فعال بودن درگاه زیبال',
+          }),
+        });
+        clearTimeout(timeoutId);
+        data = await response.json().catch(() => ({}));
+      }
       
       if (Number(data.result) === 100) {
         return res.json({
