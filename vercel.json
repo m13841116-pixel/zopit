@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.cjs"
+      "destination": "/api"
     },
     {
       "source": "/(.*)",
@@ -11,8 +11,8 @@
     }
   ],
   "functions": {
-    "api/index.cjs": {
-      "includeFiles": "dist/**/* node_modules/.prisma/client/**/* node_modules/@prisma/engines/**/* prisma/schema.prisma"
+    "api/index.ts": {
+      "includeFiles": "prisma/schema.prisma"
     }
   }
 }
