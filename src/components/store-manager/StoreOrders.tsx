@@ -85,6 +85,7 @@ export default function StoreOrders({
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [orderDetails, setOrderDetails] = useState<any>({});
+  const [enableCardToCard, setEnableCardToCard] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"ONLINE" | "MANUAL">(
     "ONLINE",
   );
@@ -186,6 +187,14 @@ export default function StoreOrders({
   useEffect(() => {
     fetchOrders();
     fetchCatalog();
+    fetch("/api/config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.ENABLE_CARD_TO_CARD !== undefined) {
+          setEnableCardToCard(data.ENABLE_CARD_TO_CARD === "true" || data.ENABLE_CARD_TO_CARD === true);
+        }
+      })
+      .catch(() => {});
   }, []);
   const fetchOrders = async () => {
     try {
@@ -531,10 +540,10 @@ export default function StoreOrders({
                             <span className="text-inverse text-xs">-</span>
                           )}
                         </td>
-                        <td className="py-4 px-6 font-medium text-primary">
-                          #{order.id}
+                        <td className="py-4 px-6 font-sans font-bold text-primary">
+                          #{Number(order.id).toLocaleString('fa-IR')}
                         </td>
-                        <td className="py-4 px-6 text-muted">
+                        <td className="py-4 px-6 text-muted font-sans">
                           {order.items?.map((item: any) => {
                             let variantLabel = "";
                             if (item.variant) {
@@ -552,7 +561,7 @@ export default function StoreOrders({
                             return (
                               <div key={item.id} className="flex flex-col gap-0.5 mb-1 last:mb-0">
                                 <div className="font-bold text-primary text-xs">
-                                  {item.product?.name} <span className="text-muted font-normal">x{item.quantity}</span>
+                                  {item.product?.name} <span className="text-muted font-normal">{(item.quantity || 1).toLocaleString('fa-IR')}×</span>
                                 </div>
                                 {variantLabel && (
                                   <div className="text-[10px] text-primary-default bg-primary-default/5 px-1.5 py-0.5 rounded-md inline-block w-fit font-semibold">
@@ -563,8 +572,8 @@ export default function StoreOrders({
                             );
                           })}
                         </td>
-                        <td className="py-4 px-6 font-bold text-primary">
-                          {order.totalAmount?.toLocaleString()}
+                        <td className="py-4 px-6 font-sans font-bold text-primary">
+                          {Number(order.totalAmount || 0).toLocaleString('fa-IR')}
                         </td>
                         <td className="py-4 px-6">
                           <span
@@ -955,30 +964,32 @@ export default function StoreOrders({
                           </div>
                         </div>
                       </label>
-                      <label
-                        className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === "MANUAL" ? "border-primary-default bg-primary-default/10" : "border-subtle hover:border-primary-default/30"} ${paymentSubmitting ? "pointer-events-none opacity-50" : ""}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="MANUAL"
-                            checked={paymentMethod === "MANUAL"}
-                            onChange={() => setPaymentMethod("MANUAL")}
-                            disabled={paymentSubmitting}
-                            className="text-primary-default focus:ring-primary-default w-4 h-4 cursor-pointer"
-                          />
-                          <div>
-                            <p className="font-bold text-primary">
-                              پرداخت کارت به کارت / بانکی
-                            </p>
-                            <p className="text-sm text-muted mt-1">
-                              ثبت فاکتور پرداخت دستی و بارگذاری فیش واریز بانکی
-                            </p>
+                      {enableCardToCard && (
+                        <label
+                          className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === "MANUAL" ? "border-primary-default bg-primary-default/10" : "border-subtle hover:border-primary-default/30"} ${paymentSubmitting ? "pointer-events-none opacity-50" : ""}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="paymentMethod"
+                              value="MANUAL"
+                              checked={paymentMethod === "MANUAL"}
+                              onChange={() => setPaymentMethod("MANUAL")}
+                              disabled={paymentSubmitting}
+                              className="text-primary-default focus:ring-primary-default w-4 h-4 cursor-pointer"
+                            />
+                            <div>
+                              <p className="font-bold text-primary">
+                                روش دوم: پرداخت کارت به کارت / واریز بانکی
+                              </p>
+                              <p className="text-sm text-muted mt-1">
+                                ثبت فاکتور پرداخت دستی و بارگذاری فیش واریز بانکی
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </label>
-                      {paymentMethod === "MANUAL" && (
+                        </label>
+                      )}
+                      {enableCardToCard && paymentMethod === "MANUAL" && (
                         <div className="bg-primary-default/10 text-primary-hover p-4 rounded-xl text-sm leading-relaxed border border-primary-default/30 animate-fade-in text-right">
                           <p className="font-bold mb-2 text-primary-hover">
                             مراحل پرداخت کارت به کارت / بانکی:

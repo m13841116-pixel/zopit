@@ -38,19 +38,10 @@ export class PaymentServiceFactory {
         useSandbox = (process.env.USE_MOCK_GATEWAY === 'true' || merchantId === 'zibal' || merchantId === 'sandbox');
       }
 
-      if (useSandbox) {
-        console.log('Using Mock Payment Gateway (Sandbox Mode)');
-        return new MockZibalService();
-      }
-      
-      console.log('Using Real Zibal Payment Gateway', merchantId);
+      console.log('Using Real Zibal Payment Gateway with merchant:', merchantId);
       return new ZibalService(merchantId);
     } catch (err) {
       console.error('Error fetching gateway config', err);
-      // Fallback
-      if (process.env.USE_MOCK_GATEWAY === 'true') {
-        return new MockZibalService();
-      }
       return new ZibalService(process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
     }
   }

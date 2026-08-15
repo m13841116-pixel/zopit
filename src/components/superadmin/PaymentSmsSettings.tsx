@@ -25,6 +25,7 @@ export default function PaymentSmsSettings() {
   const [gatewayType, setGatewayType] = useState("ZARINPAL");
   const [merchantCode, setMerchantCode] = useState("");
   const [gatewayKey, setGatewayKey] = useState("");
+  const [enableCardToCard, setEnableCardToCard] = useState(false);
   const [shabaNumber, setShabaNumber] = useState("330560611828006022464501");
   const [cardNumber, setCardNumber] = useState("6219-8618-1832-7263");
   const [accountOwner, setAccountOwner] = useState("مهدی مشرفی");
@@ -144,6 +145,11 @@ export default function PaymentSmsSettings() {
           if (data.CARD_TO_CARD_SHABA) setShabaNumber(data.CARD_TO_CARD_SHABA);
           if (data.CARD_TO_CARD_CARD) setCardNumber(data.CARD_TO_CARD_CARD);
           if (data.CARD_TO_CARD_OWNER) setAccountOwner(data.CARD_TO_CARD_OWNER);
+          if (data.ENABLE_CARD_TO_CARD !== undefined) {
+            setEnableCardToCard(data.ENABLE_CARD_TO_CARD === "true" || data.ENABLE_CARD_TO_CARD === true);
+          } else {
+            setEnableCardToCard(false); // Off by default as requested
+          }
           if (data.SMS_PANEL_PROVIDER) setSmsProvider(data.SMS_PANEL_PROVIDER);
           if (data.SMS_PANEL_API_KEY) setSmsApiKey(data.SMS_PANEL_API_KEY);
           if (data.MELLIPAYAMAK_USERNAME) setMelliUsername(data.MELLIPAYAMAK_USERNAME);
@@ -183,6 +189,7 @@ export default function PaymentSmsSettings() {
       PAYMENT_GATEWAY_TYPE: gatewayType,
       PAYMENT_GATEWAY_MERCHANT_CODE: merchantCode,
       PAYMENT_GATEWAY_KEY: gatewayKey,
+      ENABLE_CARD_TO_CARD: String(enableCardToCard),
       CARD_TO_CARD_SHABA: shabaNumber,
       CARD_TO_CARD_CARD: cardNumber,
       CARD_TO_CARD_OWNER: accountOwner,
@@ -297,7 +304,7 @@ export default function PaymentSmsSettings() {
                     type="text"
                     value={merchantCode}
                     onChange={(e) => setMerchantCode(e.target.value)}
-                    placeholder="مثال: zibal_merchant_key یا zibal"
+                    placeholder="مثال: 6a0213e61b27742a09938588"
                     className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default"
                   />
                   <button
@@ -306,9 +313,12 @@ export default function PaymentSmsSettings() {
                     disabled={testingGateway || !merchantCode}
                     className="px-3.5 py-2 bg-surface hover:bg-purple-100 dark:hover:bg-slate-800 border border-border text-text-primary text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    {testingGateway ? "در حال تست..." : "تست اتصال"}
+                    {testingGateway ? "در حال تست..." : "تست اتصال زنده"}
                   </button>
                 </div>
+                <span className="text-[11px] text-emerald-600 font-bold block mt-1.5">
+                  ✓ برای درگاه زیبال، تنها وارد کردن «کد مرچنت» کافی است و پرداخت‌ها مستقیماً از طریق زیبال انجام خواهند شد.
+                </span>
 
                 {gatewayTestResult && (
                   <div
@@ -331,19 +341,19 @@ export default function PaymentSmsSettings() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1.5">کلید درگاه پرداخت (Gateway Private Key)</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">کلید اختصاصی درگاه (Gateway Private Key - اختیاری)</label>
                 <div className="relative">
                   <input
                     type="password"
                     value={gatewayKey}
                     onChange={(e) => setGatewayKey(e.target.value)}
-                    placeholder="رمز یا کلید اختصاصی درگاه"
+                    placeholder="در صورت استفاده از زیبال، نیازی نیست و می‌توانید خالی بگذارید"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default"
                   />
                   <Key className="w-4 h-4 text-text-muted absolute left-3.5 top-3.5" />
                 </div>
                 <span className="text-[11px] text-text-muted leading-relaxed block mt-1.5">
-                  کلیدهای پرداخت به صورت کاملا ایمن و رمزگذاری‌شده در دیتابیس مرکزی نگهداری خواهند شد.
+                  برای زیبال فقط کد مرچنت بالا استفاده می‌شود. این فیلد برای سایر درگاه‌های خاص به صورت اختیاری تعبیه شده است.
                 </span>
               </div>
             </div>
@@ -352,12 +362,38 @@ export default function PaymentSmsSettings() {
           {/* Card 2: Shaba Card-to-Card & SMS Provider */}
           <div className="bg-card p-6 rounded-2xl border border-border shadow-xs space-y-6 flex flex-col justify-between">
             <div className="space-y-4">
-              <div className="flex items-center gap-2.5 pb-3.5 border-b border-border">
-                <ShieldAlert className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                <h3 className="text-sm font-bold text-text-primary">شماره شبا و پنل پیامک</h3>
+              <div className="flex items-center justify-between pb-3.5 border-b border-border">
+                <div className="flex items-center gap-2.5">
+                  <ShieldAlert className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <div>
+                    <h3 className="text-sm font-bold text-text-primary">روش دوم: پرداخت کارت به کارت / واریز بانکی</h3>
+                    <p className="text-[11px] text-text-muted mt-0.5">امکان فعال/غیرفعال‌سازی روش پرداخت دستی برای فروشگاه‌ها</p>
+                  </div>
+                </div>
+
+                {/* Toggle Switch */}
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={enableCardToCard}
+                    onChange={(e) => setEnableCardToCard(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  <span className={`ms-2 text-xs font-bold ${enableCardToCard ? "text-purple-600 dark:text-purple-400" : "text-text-muted"}`}>
+                    {enableCardToCard ? "فعال" : "غیرفعال"}
+                  </span>
+                </label>
               </div>
 
-              <div className="space-y-3.5">
+              {!enableCardToCard && (
+                <div className="p-3 bg-slate-500/10 border border-slate-500/20 rounded-xl text-xs text-text-muted leading-relaxed flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
+                  روش کارت به کارت در حال حاضر <strong>غیرفعال</strong> است و در صفحه تسویه سفارشات فروشگاه فقط درگاه آنلاین نمایش داده می‌شود.
+                </div>
+              )}
+
+              <div className={`space-y-3.5 transition-opacity ${enableCardToCard ? "opacity-100" : "opacity-60"}`}>
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1.5">شماره شبا بابت کارت به کارت پلتفرم</label>
                   <div className="relative">

@@ -334,27 +334,27 @@ export default function OrdersList() {
       case "REQUESTED":
       case "WAITING_SUPPLIER_CONFIRMATION":
       case "PENDING":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-500/10 text-purple-600 border border-purple-500/20">۱. در انتظار تایید تأمین‌کننده</span>;
+        return <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-purple-500/15 text-purple-700 border border-purple-500/30 inline-flex items-center gap-1">۱. در انتظار تایید تأمین‌کننده</span>;
       case "WAITING_STORE_ADDRESS":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">۲. در انتظار ثبت آدرس</span>;
+        return <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-blue-500/15 text-blue-700 border border-blue-500/30 inline-flex items-center gap-1">۲. در انتظار ثبت آدرس</span>;
       case "WAITING_SHIPPING_COST":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 border border-amber-500/20">۳. در انتظار برآورد هزینه پستی</span>;
+        return <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-600 text-white shadow-md shadow-rose-600/25 border border-rose-700 inline-flex items-center gap-1.5 animate-pulse"><AlertTriangle className="w-3.5 h-3.5 text-white" /> ۳. اقدام فوری: برآورد هزینه پستی</span>;
       case "PENDING_PAYMENT":
       case "WAITING_FOR_PAYMENT":
       case "WAITING_SHIPPING_PAYMENT":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-orange-500/10 text-orange-600 border border-orange-500/20">۴. در انتظار پرداخت</span>;
+        return <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-amber-500/15 text-amber-700 border border-amber-500/30 inline-flex items-center gap-1">۴. در انتظار پرداخت فروشگاه</span>;
       case "PAID":
       case "PENDING_POSTAL_LABEL":
       case "READY_TO_SHIP":
       case "PREPARING":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">۵. در انتظار لیبل پستی</span>;
+        return <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-600 text-white shadow-md shadow-rose-600/25 border border-rose-700 inline-flex items-center gap-1.5 animate-pulse"><AlertCircle className="w-3.5 h-3.5 text-white" /> ۵. اقدام فوری: صدور لیبل پستی</span>;
       case "SHIPPED":
       case "PROCESSING":
       case "COMPLETED":
       case "DELIVERED":
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">۶. تکمیل شده و باید ارسال شود</span>;
+        return <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 inline-flex items-center gap-1">۶. تکمیل شده / ارسال پستی</span>;
       default:
-        return <span className="px-3 py-1 rounded-full text-xs font-black bg-gray-500/10 text-gray-600">{status}</span>;
+        return <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-500/15 text-slate-700 border border-slate-500/30">{status}</span>;
     }
   };
 
@@ -652,10 +652,10 @@ export default function OrdersList() {
                     <tr key={o.id} className="hover:bg-surface/50 transition-colors">
                       {/* Order ID */}
                       <td className="p-4">
-                        <span className="font-mono font-black text-primary-default text-sm">
-                          #{o.id}
+                        <span className="font-sans font-black text-primary-default text-sm">
+                          #{Number(o.id).toLocaleString('fa-IR')}
                         </span>
-                        <p className="text-[10px] text-text-muted mt-0.5">
+                        <p className="text-[10px] text-text-muted mt-0.5 font-sans">
                           {new Date(o.createdAt).toLocaleDateString("fa-IR")}
                         </p>
                       </td>
@@ -666,7 +666,7 @@ export default function OrdersList() {
                           <StoreIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                           {storeManager?.storeName || storeManager?.username || "فروشگاه"}
                         </div>
-                        <p className="text-[10px] text-text-muted mt-0.5 dir-ltr text-right">
+                        <p className="text-[10px] text-text-muted mt-0.5 font-sans text-right">
                           {storeManager?.mobile || o.customerPhone || "-"}
                         </p>
                       </td>
@@ -677,7 +677,7 @@ export default function OrdersList() {
                           <UserIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                           {supplier?.brandName || supplier?.username || "تامین‌کننده"}
                         </div>
-                        <p className="text-[10px] text-text-muted mt-0.5 dir-ltr text-right">
+                        <p className="text-[10px] text-text-muted mt-0.5 font-sans text-right">
                           {supplier?.mobile || "-"}
                         </p>
                       </td>
@@ -687,8 +687,8 @@ export default function OrdersList() {
                         <span className="font-bold text-text-primary block truncate">
                           {product?.name || "محصول"}
                         </span>
-                        <span className="text-[10px] text-text-muted">
-                          تعداد: {item?.quantity || 1} عدد
+                        <span className="text-[10px] text-text-muted font-sans">
+                          تعداد: {(item?.quantity || 1).toLocaleString('fa-IR')} عدد
                         </span>
                       </td>
 
@@ -708,11 +708,11 @@ export default function OrdersList() {
 
                       {/* Financials */}
                       <td className="p-4">
-                        <div className="font-mono font-bold text-text-primary">
-                          {o.totalAmount?.toLocaleString()} تومان
+                        <div className="font-sans font-bold text-text-primary">
+                          {Number(o.totalAmount || 0).toLocaleString('fa-IR')} تومان
                         </div>
-                        <div className="text-[10px] text-text-muted font-bold mt-0.5">
-                          هزینه ارسال: {o.shippingFee ? `${o.shippingFee.toLocaleString()} تومان` : "برآورد نشده"}
+                        <div className="text-[10px] text-text-muted font-bold mt-0.5 font-sans">
+                          هزینه ارسال: {o.shippingFee ? `${Number(o.shippingFee).toLocaleString('fa-IR')} تومان` : "برآورد نشده"}
                         </div>
                       </td>
 
@@ -736,10 +736,14 @@ export default function OrdersList() {
                               setShippingEstimateModal(o);
                               setEstimatedFee(o.shippingFee ? String(o.shippingFee) : "");
                             }}
-                            className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 rounded-xl text-[11px] font-bold border border-amber-500/20 transition-all flex items-center gap-1 cursor-pointer"
+                            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                              o.status === "WAITING_SHIPPING_COST"
+                                ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/30 animate-pulse border border-rose-700"
+                                : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border border-amber-500/20"
+                            }`}
                             title="محاسبه و ثبت هزینه ارسال"
                           >
-                            <DollarSign className="w-3.5 h-3.5" />
+                            {o.status === "WAITING_SHIPPING_COST" ? <AlertTriangle className="w-3.5 h-3.5 text-white" /> : <DollarSign className="w-3.5 h-3.5" />}
                             هزینه ارسال
                           </button>
 
@@ -750,9 +754,14 @@ export default function OrdersList() {
                               setLabelValue(o.postalLabel || "");
                               setTrackingCodeValue(o.trackingCode || "");
                             }}
-                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shadow-sm"
+                            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                              o.status === "PENDING_POSTAL_LABEL" || o.status === "PAID"
+                                ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/30 animate-pulse border border-rose-700"
+                                : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+                            }`}
+                            title="ثبت یا صدور لیبل پستی"
                           >
-                            <Upload className="w-3.5 h-3.5" />
+                            {o.status === "PENDING_POSTAL_LABEL" || o.status === "PAID" ? <AlertCircle className="w-3.5 h-3.5 text-white" /> : <Upload className="w-3.5 h-3.5" />}
                             لیبل / کد رهگیری
                           </button>
                         </div>

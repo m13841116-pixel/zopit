@@ -70,28 +70,15 @@ export class ZibalService implements PaymentGateway {
           };
         } else {
           console.error('Zibal API error response:', data);
-          // Fallback to simulated gateway only if API returns error
-          const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-          return {
-            payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
-            authority: trackId,
-          };
+          const errorMsg = data.message || `کد خطای زیبال: ${data.result}`;
+          throw new Error(`خطا در اتصال به درگاه پرداخت زیبال: ${errorMsg}`);
         }
       }
 
-      // Fallback for test/sandbox mode
-      const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      return {
-        payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
-        authority: trackId,
-      };
+      throw new Error('کد مرچنت درگاه پرداخت زیبال تعریف نشده است.');
     } catch (error: any) {
       console.error('Zibal createPayment error:', error);
-      const trackId = `ZIBAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      return {
-        payLink: `/api/payment/zibal/simulated-gateway?trackId=${trackId}&amount=${amount}&callbackUrl=${encodeURIComponent(callbackUrl)}`,
-        authority: trackId,
-      };
+      throw new Error(error.message || 'خطا در ارتباط با درگاه بانکی زیبال');
     }
   }
 

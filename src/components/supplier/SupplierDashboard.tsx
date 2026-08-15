@@ -1576,86 +1576,45 @@ export function SupplierDashboard({
                                         <div className="text-xs text-muted mt-1">
                                           {order.product?.sku || "بدون SKU"}
                                         </div>
-                                        {/* New Shipping Details for Supplier */}
-                                        <div className="mt-2 space-y-1 text-xs text-muted bg-background p-2.5 rounded-xl border border-subtle/70 max-w-[320px]">
-                                          <div className="flex flex-col gap-1">
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-primary-default font-bold text-[10px]">
-                                                مشخصات ارسال و تحویل:
-                                              </span>
-                                              {order.order?.status === "PAID" || order.order?.status === "PROCESSING" || order.order?.status === "SHIPPED" || order.order?.status === "COMPLETED" ? (
-                                                <span className="text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded text-[9px] border border-emerald-200">
-                                                  🟢 پرداخت شده
-                                                </span>
-                                              ) : (
-                                                <span className="text-rose-600 font-extrabold bg-rose-50 px-2 py-0.5 rounded text-[9px] border border-rose-200">
-                                                  🔴 پرداخت نشده
-                                                </span>
-                                              )}
-                                            </div>
-                                            <span className="text-secondary leading-relaxed font-semibold text-[11px]">
+                                        {/* Streamlined Store & Shipping Details */}
+                                        <div className="mt-2 space-y-1.5 text-xs bg-surface p-2.5 rounded-xl border border-subtle max-w-[300px]">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="text-secondary font-bold text-xs truncate">
                                               فروشگاه: {order.order?.store?.storeName || order.order?.store?.username || "نامشخص"}
                                             </span>
-                                            
-                                            <span className="text-primary text-[11px] leading-relaxed block mt-1 bg-surface p-2 rounded-lg border border-subtle">
-                                              <span className="font-bold text-[10px] text-primary-default block mb-0.5">نشانی و مشخصات گیرنده:</span>
-                                             <div className="bg-emerald-500/10 p-1.5 rounded text-[10px] my-1 text-emerald-800 font-bold border border-emerald-500/20">
-                                               نام پستی فرستنده: زوپیت تامین‌کننده {user?.id || ""} {user?.brandName ? `(${user.brandName})` : ""}
-                                             </div>
-                                              {order.order?.shippingAddress ||
-                                                order.order?.customerAddress ||
-                                                (order.order?.store?.address ? `آدرس ثبت‌شده فروشگاه: ${order.order.store.address}` : "آدرس ثبت نشده است")}
-                                              {(order.order?.postalCode || order.order?.store?.postalCode) && (
-                                                <span className="block mt-1 text-muted text-[10px] font-mono">
-                                                  کد پستی: {order.order?.postalCode || order.order?.store?.postalCode}
-                                                </span>
-                                              )}
-                                            </span>
-
-                                            <span className="text-muted text-[11px]">
-                                              روش ارسال: {order.order?.shippingMethod === "PERSONAL_PANEL" ? "پنل اختصاصی غرفه" : "پنل پستی پلتفرم"}
-                                            </span>
+                                            {order.order?.status === "PAID" || order.order?.status === "PROCESSING" || order.order?.status === "SHIPPED" || order.order?.status === "COMPLETED" ? (
+                                              <span className="text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full text-[10px] font-black border border-emerald-500/20 shrink-0">
+                                                پرداخت شده
+                                              </span>
+                                            ) : (
+                                              <span className="text-rose-700 bg-rose-500/10 px-2 py-0.5 rounded-full text-[10px] font-black border border-rose-500/20 shrink-0">
+                                                در انتظار پرداخت
+                                              </span>
+                                            )}
                                           </div>
+
                                           {order.order?.postalLabel ? (
-                                            <div className="pt-2 mt-2 border-t border-subtle flex flex-col gap-1.5">
-                                              <div className="flex justify-between items-center bg-rose-50 p-2.5 rounded-xl border border-rose-200 shadow-sm">
-                                                <div className="flex items-center gap-2 text-right">
-                                                  <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 animate-pulse flex items-center justify-center shrink-0">
-                                                    <AlertCircle className="w-4 h-4" />
-                                                  </div>
-                                                  <div className="flex flex-col text-right">
-                                                    <span className="text-[10px] text-secondary font-bold">
-                                                      {order.order?.shippingMethod === "PERSONAL_PANEL" 
-                                                        ? "لیبل پستی اختصاصی" 
-                                                        : "لیبل صادر شده پلتفرم"}
-                                                    </span>
-                                                    <span className="text-[9px] text-emerald-700 font-bold">
-                                                      چاپ و چسباندن این لیبل روی بسته الزامی است! (تاکید پلتفرم)
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                                <a
-                                                  href={order.order.postalLabel}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="bg-rose-600 hover:bg-rose-700 text-white hover:text-white font-black text-[10px] px-3.5 py-2 rounded-lg transition-all inline-flex items-center gap-1 shrink-0 cursor-pointer shadow-md"
-                                                >
-                                                  <Printer className="w-3.5 h-3.5" />
-                                                  چاپ الزامی لیبل پستی پلتفرم
-                                                </a>
-                                              </div>
+                                            <div className="pt-1.5 border-t border-subtle">
+                                              <a
+                                                href={order.order.postalLabel}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-rose-600/20"
+                                              >
+                                                <Printer className="w-4 h-4" />
+                                                چاپ لیبل پستی مرسوله
+                                              </a>
                                             </div>
                                           ) : (
-                                            <div className="pt-1.5 mt-1 border-t border-subtle flex flex-col gap-1">
+                                            <div className="pt-1 border-t border-subtle">
                                               {order.order?.status === "PAID" || order.order?.status === "PENDING_POSTAL_LABEL" ? (
-                                                <span className="text-amber-600 font-bold text-[10px] flex items-center gap-1">
-                                                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                                  پرداخت انجام شده - در انتظار بارگذاری لیبل پستی توسط مدیریت
+                                                <span className="text-indigo-600 font-bold text-[11px] flex items-center gap-1">
+                                                  <span className="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                                                  در انتظار صدور لیبل توسط مدیریت
                                                 </span>
                                               ) : (
-                                                <span className="text-rose-600 font-bold text-[10px] flex items-center gap-1">
-                                                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                                  هنوز پرداخت انجام نشده است (صدور لیبل پس از پرداخت نهایی)
+                                                <span className="text-muted font-medium text-[10px] block">
+                                                  صدور لیبل پس از پرداخت نهایی فروشگاه
                                                 </span>
                                               )}
                                             </div>
