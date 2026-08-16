@@ -1051,7 +1051,9 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   const parseJsonResponse = async (response: Response, fallbackErrorMsg: string) => {
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
-      throw new Error("سرویس بک‌اند در دسترس نیست یا پاسخ معتبر ارسال نکرده است. لطفاً وضعیت دیتابیس Neon یا اتصال سرور را بررسی نمایید.");
+      const text = await response.text().catch(() => "");
+      console.error("[Backend Non-JSON Response]", response.status, response.statusText, text.slice(0, 300));
+      throw new Error(`سرویس بک‌اند در دسترس نیست (کد وضعیت: ${response.status}). لطفاً اتصال سرور و متغیر DATABASE_URL را بررسی فرمایید.`);
     }
     try {
       return await response.json();

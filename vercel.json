@@ -6,13 +6,17 @@
       "destination": "/api"
     },
     {
+      "source": "/api",
+      "destination": "/api"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "functions": {
     "api/index.ts": {
-      "includeFiles": "prisma/schema.prisma"
+      "includeFiles": "prisma/**"
     }
   }
 }

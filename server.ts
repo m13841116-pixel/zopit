@@ -131,7 +131,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { execSync } from 'child_process';
 
-let PrismaClient: any = StaticPrismaClient;
 import { NotificationService } from './src/services/NotificationService.js';
 import registerConfig from './src/services/configRoute.js';
 import registerNewFeatures from './src/services/newFeaturesRoute.js';
@@ -246,6 +245,11 @@ function sanitizeDbUrl(rawUrl: string): string {
   while ((url.startsWith('"') && url.endsWith('"')) || (url.startsWith("'") && url.endsWith("'"))) {
     url = url.slice(1, -1).trim();
   }
+
+  // Ensure neon.tech URLs always have sslmode=require if not present
+  if ((url.includes('neon.tech') || url.includes('aws.neon.tech')) && !url.includes('sslmode=')) {
+    url += url.includes('?') ? '&sslmode=require' : '?sslmode=require';
+  }
   
   const match = url.match(/^([a-zA-Z0-9+-]+:\/\/)(.*)$/);
   if (!match) return url;
@@ -259,23 +263,36 @@ function sanitizeDbUrl(rawUrl: string): string {
   if (firstColon === -1) return url;
   const username = credentials.substring(0, firstColon);
   let password = credentials.substring(firstColon + 1);
-  password = password.replace(/@/g, '%40');
+  if (password.includes('@') && !password.includes('%40')) {
+    password = password.replace(/@/g, '%40');
+  }
   return `${scheme}${username}:${password}@${hostAndDb}`;
 }
 
 dbUrl = sanitizeDbUrl(dbUrl);
-process.env.DATABASE_URL = dbUrl;
+if (dbUrl) {
+  process.env.DATABASE_URL = dbUrl;
+}
+
+function getCurrentDbUrl(): string {
+  return sanitizeDbUrl(process.env.DATABASE_URL || dbUrl || '');
+}
+
+function checkIsRealRemoteDb(targetUrl?: string): boolean {
+  const url = targetUrl || getCurrentDbUrl();
+  return !!url && (
+    url.startsWith('mysql://') || 
+    url.startsWith('mysqls://') || 
+    url.startsWith('postgresql://') || 
+    url.startsWith('postgres://')
+  ) && !url.includes('dummy_db');
+}
 
 const isCloudRun = !!process.env.K_SERVICE || (!!process.env.PORT && dbUrl.includes('localhost'));
 
 let provider = 'sqlite';
 
-const isRealRemoteDb = dbUrl && (
-  dbUrl.startsWith('mysql://') || 
-  dbUrl.startsWith('mysqls://') || 
-  dbUrl.startsWith('postgresql://') || 
-  dbUrl.startsWith('postgres://')
-) && !dbUrl.includes('localhost') && !dbUrl.includes('127.0.0.1') && !dbUrl.includes('dummy_db');
+const isRealRemoteDb = checkIsRealRemoteDb(dbUrl);
 
 if (dbUrl) {
   if (dbUrl.startsWith('mysql://') || dbUrl.startsWith('mysqls://')) {
@@ -285,7 +302,7 @@ if (dbUrl) {
   } else if (dbUrl.startsWith('file:') || dbUrl.includes('.db')) {
     provider = 'sqlite';
   } else {
-    provider = 'mysql';
+    provider = 'postgresql';
   }
 } else {
   if (isAIStudio || isCloudRun) {
@@ -306,6 +323,7 @@ if (dbUrl) {
 
 let realPrisma: any = null;
 let isPrismaMock = false;
+let PrismaClient: any = StaticPrismaClient;
 
 // ==========================================
 // Robust In-Memory Database Engine & Fallback
@@ -945,14 +963,14 @@ class MemoryDatabase {
 const memoryStore = new MemoryDatabase();
 
 function getActivePrisma() {
-  if (!realPrisma || isPrismaMock) {
+  if (!realPrisma) {
     try {
-      if (!PrismaClient) {
-        PrismaClient = StaticPrismaClient;
-      }
-      if (PrismaClient && isRealRemoteDb) {
-        const url = process.env.DATABASE_URL || dbUrl;
-        realPrisma = new PrismaClient({
+      const url = getCurrentDbUrl();
+      const isRemote = checkIsRealRemoteDb(url);
+      const isLocal = url.startsWith('file:') || url.includes('.db');
+
+      if (StaticPrismaClient && (isRemote || isLocal)) {
+        realPrisma = new StaticPrismaClient({
           datasources: {
             db: {
               url: url
@@ -960,11 +978,12 @@ function getActivePrisma() {
           }
         });
         isPrismaMock = false;
+        console.log('[Prisma Init] PrismaClient created successfully for:', isRemote ? 'Remote PostgreSQL/Neon' : 'Local SQLite');
       } else {
         isPrismaMock = true;
       }
     } catch (err: any) {
-      console.warn('[Server Prisma] Database connection notice:', err.message);
+      console.warn('[Server Prisma] Database connection notice:', err?.message || err);
       isPrismaMock = true;
     }
   }
@@ -986,6 +1005,14 @@ let prisma: any = new Proxy({}, {
 
     if (prop === '$transaction') {
       return async (cbOrList: any) => {
+        const active = getActivePrisma();
+        if (active && typeof active.$transaction === 'function') {
+          try {
+            return await active.$transaction(cbOrList);
+          } catch (txErr: any) {
+            console.warn('[Prisma $transaction Error]:', txErr?.message || txErr);
+          }
+        }
         if (typeof cbOrList === 'function') {
           return await cbOrList(prisma);
         }
@@ -1027,18 +1054,22 @@ let prisma: any = new Proxy({}, {
 
         return async (...args: any[]) => {
           const active = getActivePrisma();
-          if (isRealRemoteDb && active && !isPrismaMock && typeof active[prop]?.[subProp] === 'function') {
+          const isRemote = checkIsRealRemoteDb();
+          if (active && typeof active[prop]?.[subProp] === 'function') {
             try {
               return await active[prop][subProp](...args);
             } catch (err: any) {
               const errMsg = err?.message || String(err);
-              console.warn(`[Prisma Query Fallback] ${prop}.${subProp} fallback to memory store due to error:`, errMsg);
-              try {
-                return await memoryStore.execute(prop, subProp, args[0]);
-              } catch (fallbackErr: any) {
-                console.error(`[Prisma Query Fallback] Memory database fallback also failed:`, fallbackErr);
-                throw err;
+              if (!isRemote) {
+                try {
+                  return await memoryStore.execute(prop, subProp, args[0]);
+                } catch (fallbackErr: any) {
+                  throw err;
+                }
               }
+              // In remote production mode (Neon), log and throw real error so caller knows DB failure
+              console.error(`[Prisma Database Query Error] ${prop}.${subProp}:`, errMsg);
+              throw err;
             }
           }
           return await memoryStore.execute(prop, subProp, args[0]);
@@ -10057,4 +10088,5 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
 
 startServer();
 
+export { app };
 export default app;
