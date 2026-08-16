@@ -4,7 +4,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Settings,
+  Settings, Ticket,
   Search,
   Eye,
   Edit,
@@ -248,7 +248,18 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>تنظیمات عمومی پرو</span>
+            <span>تنظیمات و قوانین پکیج پرو</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("discounts")}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+              activeTab === "discounts"
+                ? "bg-emerald-500 text-slate-950 shadow-md"
+                : "text-muted hover:text-primary"
+            }`}
+          >
+            <Ticket className="w-4 h-4" />
+            <span>کدهای تخفیف و کوپن‌ها</span>
           </button>
         </div>
       </div>
@@ -481,6 +492,41 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
               />
             </div>
 
+            {/* DEDICATED DISCOUNT CODE CUSTOMIZATION FOR PRO PACKAGE */}
+            <div className="col-span-1 sm:col-span-2 pt-6 border-t border-border-subtle space-y-4">
+              <div className="bg-surface/80 p-5 sm:p-6 rounded-3xl border border-emerald-500/20 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-subtle">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
+                      <Ticket className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-primary flex items-center gap-2">
+                        <span>سفارشی‌سازی و صدور کد تخفیف برای مبلغ نهایی پکیج اکانت پرو</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-bold">ویژه هزینه اولیه ({parseInt(proAccountPrice || "0").toLocaleString()} تومان)</span>
+                      </h3>
+                      <p className="text-[11px] text-muted mt-0.5">
+                        تعیین کوپن تخفیف با محدودیت تعداد استفاده (سقف مجاز) و محدودیت زمانی اعتبار (انقضا) برای هزینه ثبت‌نام
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("discounts")}
+                    className="px-3.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-700 hover:text-slate-950 font-bold rounded-xl border border-emerald-500/20 transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                  >
+                    <BadgePercent className="w-3.5 h-3.5" />
+                    <span>مدیریت کامل کوپن‌ها</span>
+                  </button>
+                </div>
+
+                <div className="pt-2">
+                  <SuperAdminDiscountCodes />
+                </div>
+              </div>
+            </div>
+
             {/* Contract Management Section */}
             <div className="col-span-1 sm:col-span-2 pt-4 border-t border-border-subtle">
               <label className="block text-xs font-black text-primary mb-2 flex items-center gap-2">
@@ -511,6 +557,13 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
             </button>
           </div>
         </form>
+      )}
+
+      {/* TAB 3: DEDICATED DISCOUNT CODES MANAGEMENT */}
+      {activeTab === "discounts" && (
+        <div className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 shadow-xl">
+          <SuperAdminDiscountCodes />
+        </div>
       )}
 
       {/* EDIT & ASSIGN CREDENTIALS MODAL */}

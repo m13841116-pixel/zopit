@@ -7,12 +7,14 @@ import StoreTickets from "./StoreTickets";
 import StoreQuestions from "./StoreQuestions";
 import { StoreCustomers } from "./StoreCustomers";
 import { StoreProAccount } from "./StoreProAccount";
+import InstagramPageSettings from "./InstagramPageSettings";
 import { toast } from "../GlobalToast";
 import React, { useState, useEffect } from "react";
 import Announcements from "../Announcements";
 import NotificationBell from "../NotificationBell";
 import {
   Crown,
+  Award,
   Store,
   ShoppingCart,
   ShoppingBag,
@@ -145,6 +147,7 @@ export default function StoreManagerDashboard({
   const [customMenu, setCustomMenu] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+  const [showInstagramPreview, setShowInstagramPreview] = useState(false);
 
   /* Clipboard feedback states */
   const [copiedCard, setCopiedCard] = useState(false);
@@ -466,6 +469,11 @@ export default function StoreManagerDashboard({
       label: "اطلاعیه‌ها و پیام‌ها",
       icon: <Bell className="w-5 h-5" />,
     },
+    {
+      id: "page_settings",
+      label: "تنظیمات پیج (زوپیت‌گرام)",
+      icon: <Sparkles className="w-5 h-5 text-rose-500" />,
+    },
     { id: "profile", label: "مشخصات من", icon: <User className="w-5 h-5" /> },
     {
       id: "settings",
@@ -680,6 +688,37 @@ export default function StoreManagerDashboard({
                       </button>
                     </div>
                   </div>
+
+                  {/* Store Link Alert Banner */}
+                  <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-500/30 rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                    <div className="flex items-start sm:items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                        <Globe className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1 text-right">
+                        <h3 className="text-sm font-black text-primary flex items-center gap-2">
+                          <span>🌐 لینک خرید اختصاصی وب‌سایت شما برای خریداران</span>
+                          <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                            مهم
+                          </span>
+                        </h3>
+                        <p className="text-xs text-muted leading-relaxed max-w-2xl">
+                          {user?.storeLink ? (
+                            <>خریداران زوپیت در صفحه اکسپلور مستقیماً به آدرس <strong className="font-mono text-amber-600 dark:text-amber-400 dir-ltr inline-block px-1 bg-amber-500/10 rounded">{user.storeLink}</strong> منتقل می‌شوند.</>
+                          ) : (
+                            <>خریداران در صفحه اکسپلور زوپیت مستقیماً به سایت اختصاصی شما هدایت می‌شوند. لطفاً آدرس اینترنتی یا لینک خرید فروشگاه خود را تنظیم فرمایید.</>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("page_settings")}
+                      className="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-xs font-black transition-all shrink-0 cursor-pointer shadow-md flex items-center justify-center gap-2"
+                    >
+                      <Globe className="w-4 h-4" />
+                      <span>{user?.storeLink ? "ویرایش لینک وب‌سایت" : "تنظیم لینک وب‌سایت فروشگاه"}</span>
+                    </button>
+                  </div>
                   {/* 3 Stats Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-gradient-to-br from-card to-background p-7 rounded-3xl shadow-sm border border-subtle flex flex-col justify-between min-h-[140px] hover:shadow-lg hover:border-primary-default/20 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden cursor-pointer">
@@ -818,7 +857,93 @@ export default function StoreManagerDashboard({
                         </div>
                       )}
                     </div>
-                    {/* Quick Shortcuts */}
+                    
+                  {/* Better Sellers Section (لیست فروشندگان برتر و بالاتر از میانگین) */}
+                  <div className="bg-gradient-to-br from-card to-background p-5 sm:p-7 rounded-3xl border border-subtle shadow-sm">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-subtle">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 shrink-0">
+                          <Crown className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2 flex-wrap">
+                            <span>لیست فروشندگان برتر شبکه</span>
+                            <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/20">Top Sellers</span>
+                          </h3>
+                          <p className="text-xs text-muted mt-0.5">
+                            میانگین فروش شبکه: {stats.averageSales ? stats.averageSales.toLocaleString('fa-IR') : '۰'} تومان
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-surface px-3 py-1.5 rounded-xl border border-subtle text-xs text-muted flex items-center gap-2">
+                        <Award className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <span>رتبه‌بندی عملکرد بر اساس مجموع فروش موفق</span>
+                      </div>
+                    </div>
+
+                    {/* Vertical List View */}
+                    <div className="space-y-3">
+                      {stats.betterSellers && stats.betterSellers.length > 0 ? (
+                        stats.betterSellers.map((seller: any, idx: number) => {
+                          const isAboveAvg = seller.totalSales >= (stats.averageSales || 0);
+                          return (
+                            <div
+                              key={seller.id || idx}
+                              className="p-3.5 sm:p-4 rounded-2xl bg-surface/60 border border-subtle hover:border-amber-500/30 hover:bg-surface transition-all flex items-center justify-between gap-3 shadow-xs relative overflow-hidden group"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                {/* Medal / Rank badge */}
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 shadow-sm ${
+                                  idx === 0 ? "bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 font-black" :
+                                  idx === 1 ? "bg-gradient-to-tr from-slate-300 to-slate-100 text-slate-900 font-black" :
+                                  idx === 2 ? "bg-gradient-to-tr from-amber-700 to-amber-600 text-white font-black" :
+                                  "bg-card text-muted border border-subtle"
+                                }`}>
+                                  {idx === 0 ? "🥇 ۱" : idx === 1 ? "🥈 ۲" : idx === 2 ? "🥉 ۳" : idx + 1}
+                                </div>
+
+                                {/* Avatar */}
+                                <div className="w-9 h-9 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden border border-amber-500/20">
+                                  {seller.avatarUrl ? (
+                                    <img src={seller.avatarUrl} alt={seller.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  ) : (
+                                    (seller.name || seller.storeName || "ف").charAt(0)
+                                  )}
+                                </div>
+
+                                <div className="min-w-0">
+                                  <h4 className="text-xs sm:text-sm font-black text-primary truncate group-hover:text-amber-500 transition-colors">
+                                    {seller.name || seller.storeName}
+                                  </h4>
+                                  <span className="text-[10px] sm:text-xs text-muted block mt-0.5">
+                                    {seller.orderCount || 0} سفارش موفق ثبت شده
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="text-left shrink-0">
+                                <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono block">
+                                  {seller.totalSales ? seller.totalSales.toLocaleString('fa-IR') : '۰'}
+                                  <span className="text-[9px] font-normal text-muted mr-1">تومان</span>
+                                </span>
+                                {isAboveAvg && (
+                                  <span className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 border border-emerald-500/20">
+                                    + بالاتر از میانگین
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="py-8 text-center text-xs text-muted">
+                          اطلاعات فروشندگان به زودی ثبت خواهد شد.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Shortcuts */}
                     <div className="space-y-6">
                       <div className="bg-card p-6 rounded-3xl border border-subtle shadow-sm flex flex-col justify-between">
                         <div>
@@ -1192,6 +1317,12 @@ export default function StoreManagerDashboard({
               )}
               {activeTab === "settings" && <StoreConnection />}
               {activeTab === "customers" && <StoreCustomers />}
+              {activeTab === "page_settings" && (
+                <InstagramPageSettings
+                  user={user}
+                  onUpdateUser={onUpdateUser}
+                />
+              )}
               {activeTab === "profile" && (
                 <StoreManagerProfile
                   user={user}

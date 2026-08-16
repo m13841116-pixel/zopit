@@ -37,6 +37,7 @@ import {
   Mail,
   Send,
   ExternalLink,
+  Ticket,
 } from "lucide-react";
 import PaymentSmsSettings from "./PaymentSmsSettings";
 import SystemLogs from "./SystemLogs";
@@ -915,6 +916,38 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
                   className="w-full bg-background border border-border rounded-2xl p-4 text-xs text-text-primary leading-relaxed focus:ring-1 focus:ring-primary-default focus:border-primary-default focus:outline-none"
                   placeholder="متن کامل قوانین تامین‌کننده..."
                 />
+              </div>
+            </div>
+
+            {/* Pro Package Settings & Discounts Link / Section */}
+            <div className="pt-6 border-t border-border space-y-4">
+              <div className="bg-gradient-to-r from-emerald-500/10 via-background to-purple-500/10 p-5 rounded-2xl border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-text-primary">
+                      تنظیمات، قوانین و کدهای تخفیف پکیج اکانت پرو زوپیت
+                    </h4>
+                    <p className="text-[11px] text-text-muted mt-0.5">
+                      تعیین هزینه اولیه ثبت‌نام، کدهای تخفیف با سقف مجاز مصرف و انقضای زمانی، و مدیریت متن تعهدنامه پرو
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href="#pro-settings"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // trigger notification or instructions
+                    toast("برای مدیریت کامل قوانین و کدهای تخفیف پرو، به منوی «اکانت‌های پرو > تنظیمات و قوانین پکیج پرو» مراجعه کنید.", "info");
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-xs"
+                >
+                  <Ticket className="w-4 h-4" />
+                  <span>تنظیم کدهای تخفیف پرو</span>
+                </a>
               </div>
             </div>
           </div>

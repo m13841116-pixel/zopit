@@ -94,6 +94,7 @@ model ProAccount {
   hasTaxProfile     Boolean  @default(false)
   hostExpiresAt     DateTime?
   torobConnected    Boolean  @default(false)
+  payLink           String?
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

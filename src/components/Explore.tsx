@@ -23,7 +23,8 @@ import {
   Check,
   CreditCard,
   ArrowRight,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Grid
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "./GlobalToast";
@@ -37,6 +38,10 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+
+  // Store Page Instagram Modal state
+  const [showStorePage, setShowStorePage] = useState(false);
+  const [storePageData, setStorePageData] = useState<any>(null);
 
   // Search & Categories state
   const [categories, setCategories] = useState<any[]>([]);
@@ -64,17 +69,6 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
 
   const observer = useRef<IntersectionObserver | null>(null);
   const lastWheelTime = useRef(0);
-
-  // Cart & Checkout State
-  const { cartItems, addItem, removeItem, updateQuantity, clearCart } = useCart();
-  const [showCart, setShowCart] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [selectedProvince, setSelectedProvince] = useState("");
-  const [selectedCity, setSelectedCity] = useState("");
-  const [customerAddressDetail, setCustomerAddressDetail] = useState("");
-  const [customerCardNumber, setCustomerCardNumber] = useState("");
-  const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
 
   // Payment callback result
   const [paymentResult, setPaymentResult] = useState<{success: boolean; orderId?: string} | null>(null);
@@ -375,70 +369,14 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
   };
 
   const getStoreRedirectUrl = (product: any) => {
-    let link = product?.storeLink || product?.storeUrl || "";
-    if (!link) return "";
-    if (!/^https?:\/\//i.test(link)) {
+    let link = product?.storeLink || product?.storeUrl || product?.store?.storeLink || product?.storeManager?.storeLink || "";
+    if (!link && product?.storeId) {
+      link = `https://${product.storeId}.zopit.ir`;
+    }
+    if (link && !/^https?:\/\//i.test(link)) {
       return "https://" + link;
     }
     return link;
-  };
-
-  const handleCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (cartItems.length === 0) return;
-    if (!customerName || !customerPhone || !selectedProvince || !selectedCity || !customerAddressDetail || !customerCardNumber) {
-      toast("لطفاً تمامی فیلدهای فرم مشخصات، آدرس و شماره کارت را تکمیل کنید.", "error");
-      return;
-    }
-
-    // Validate phone
-    const phoneRegex = /^(09|\+989)\d{9}$/;
-    if (!phoneRegex.test(customerPhone)) {
-      toast("شماره تلفن همراه وارد شده معتبر نیست. (نمونه معتبر: 09123456789)", "error");
-      return;
-    }
-
-    // Validate card number (16 digits)
-    const cleanCard = customerCardNumber.replace(/\s|-/g, "");
-    if (!/^\d{16}$/.test(cleanCard)) {
-      toast("شماره کارت وارد شده معتبر نیست. شماره کارت باید دقیقاً ۱۶ رقم باشد.", "error");
-      return;
-    }
-
-    setIsSubmittingCheckout(true);
-    try {
-      const response = await fetch("/api/public/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cartItems.map(it => ({ id: it.id, quantity: it.quantity })),
-          customerName,
-          customerPhone,
-          customerCardNumber: cleanCard,
-          customerAddress: `${selectedProvince} - ${selectedCity} - ${customerAddressDetail}`
-        })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "خطا در برقراری ارتباط با سرور");
-      }
-
-      // Clear local cart
-      clearCart();
-      setShowCart(false);
-
-      if (data.customerCreated) {
-        toast(`حساب کاربری اختصاصی مشتری با نام کاربری ${data.accountUsername} با موفقیت ایجاد گردید.`, "success");
-      }
-
-      // Redirect to payment URL
-      window.location.href = data.paymentUrl;
-    } catch (err: any) {
-      toast(err.message || "پردازش خرید با خطا مواجه شد.", "error");
-    } finally {
-      setIsSubmittingCheckout(false);
-    }
   };
 
   const current = viewerIndex !== null ? products[viewerIndex] : null;
@@ -724,146 +662,72 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
                   </div>
 
                   {/* Bottom Info Details and Actions Panel */}
-                  <div className="absolute bottom-0 inset-x-0 z-30 bg-gradient-to-t from-black via-black/85 to-transparent pt-16 pb-6 px-4 flex flex-col gap-4">
+                  <div className="absolute bottom-0 inset-x-0 z-30 bg-gradient-to-t from-black via-black/90 to-transparent pt-12 pb-5 px-3 sm:px-4 flex flex-col gap-3">
                     
                     {/* Store Title & Avatar */}
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-500 to-amber-500 p-0.5 shadow-md flex items-center justify-center overflow-hidden">
-                        {current.avatarUrl ? (
-                          <img src={current.avatarUrl} alt={current.storeName} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-white text-xs font-bold font-mono">
-                            {current.storeName ? current.storeName.charAt(0) : "ف"}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col text-right">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-white text-sm font-black tracking-tight">{current.storeName || "فروشگاه پارس"}</span>
-                          <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-500/20">تایید شده</span>
+                    <div className="flex items-center gap-2.5 p-1">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-emerald-500 p-[2px] shadow-lg flex items-center justify-center overflow-hidden shrink-0">
+                        <div className="w-full h-full rounded-full bg-zinc-950 p-[1px]">
+                          {current.avatarUrl ? (
+                            <img src={current.avatarUrl} alt={current.storeName} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center text-white text-xs font-black">
+                              {current.storeName ? current.storeName.charAt(0) : "ف"}
+                            </div>
+                          )}
                         </div>
-                        <span className="text-zinc-400 text-[10px] font-semibold -mt-0.5 mb-1.5">فروشگاه زوپیت</span>
-                        <a 
-                          href="#" 
-                          onClick={(e) => { 
-                            e.preventDefault(); 
-                            // In a real app we'd navigate to the store link
-                            e.stopPropagation();
-                            window.open(`/?store=${current.storeId || ''}`, '_blank');
-                          }} 
-                          className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors w-max flex items-center gap-1"
-                        >
-                          خرید از این فروشگاه <ExternalLink className="w-3 h-3" />
-                        </a>
+                      </div>
+                      <div className="flex flex-col text-right min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-white text-sm font-black tracking-tight truncate">
+                            {current.storeName || "مدیر فروشگاه"}
+                          </span>
+                          <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                            مدیر فروشگاه
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Product Metadata */}
-                    <div className="text-right">
-                      <h2 className="text-white text-base font-extrabold mb-1">{current.name}</h2>
-                      <div className="flex items-center justify-end gap-3 mb-1">
-                        <div className="text-emerald-400 text-lg font-black">{Number(current.price).toLocaleString()} تومان</div>
-                      </div>
+                    <div className="text-right space-y-1">
+                      <h2 className="text-white text-sm sm:text-base font-black leading-snug">{current.name}</h2>
                       
                       {current.description && (
-                        <p className="text-zinc-300 text-xs font-bold leading-relaxed line-clamp-2 mt-1.5">
+                        <p className="text-zinc-300 text-xs font-medium leading-relaxed line-clamp-2">
                           {current.description}
                         </p>
                       )}
                     </div>
 
-                    {/* Add to Cart Area */}
-                    <div className="w-full mt-1">
-                      {(() => {
-                        const cartItem = cartItems.find((item) => item.id === current.id);
-                        if (cartItem) {
-                          return (
-                            <div className="flex items-center justify-between bg-zinc-900/95 border border-emerald-500/30 rounded-xl px-4 py-2" onClick={(e) => e.stopPropagation()}>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); if (cartItem.quantity === 1) { removeItem(current.id); } else { updateQuantity(current.id, cartItem.quantity - 1); } }}
-                                className="w-8 h-8 rounded-lg bg-zinc-850 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-center font-bold text-lg cursor-pointer transition-all active:scale-95"
-                              >
-                                -
-                              </button>
-                              <span className="text-emerald-400 font-extrabold text-xs">{cartItem.quantity} عدد در سبد خرید شما</span>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); updateQuantity(current.id, cartItem.quantity + 1); }}
-                                className="w-8 h-8 rounded-lg bg-zinc-855 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-center font-bold text-lg cursor-pointer transition-all active:scale-95"
-                              >
-                                +
-                              </button>
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const res = addItem({
-                                  id: current.id,
-                                  name: current.name,
-                                  price: current.price,
-                                  imageUrl: getValidProductImageUrl(current),
-                                  supplierId: current.supplierId,
-                                  supplierName: current.supplier?.companyName || current.supplier?.storeName,
-                                  storeId: current.storeId,
-                                  storeName: current.storeName || "فروشگاه زوپیت",
-                                });
-                                if (res?.success) {
-                                  toast("محصول به سبد خرید اضافه شد.", "success");
-                                } else {
-                                  toast(res?.error || "خطا در افزودن به سبد خرید", "error");
-                                }
-                              }}
-                              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer border-none shadow-lg shadow-emerald-900/15"
-                            >
-                              <ShoppingCart className="w-4 h-4" />
-                              <span>افزودن به سبد خرید (خرید مستقیم)</span>
-                            </button>
-                          );
-                        }
-                      })()}
-                    </div>
+                    {/* Concise Action Buttons (2 buttons on mobile and desktop) */}
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const redirectUrl = current.storeLink || current.storeUrl;
+                          if (redirectUrl) {
+                            window.open(redirectUrl.startsWith('http') ? redirectUrl : `https://${redirectUrl}`, '_blank', 'noopener,noreferrer');
+                          } else {
+                            toast(`مدیر فروشگاه (${current.storeName || "زوپیت"}) هنوز آدرس اختصاصی وب‌سایت خود را تنظیم نکرده است.`, "error");
+                          }
+                        }}
+                        className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-lg shadow-emerald-950/40 border border-emerald-400/30"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
+                        <span className="truncate">خرید از سایت</span>
+                        <ExternalLink className="w-3 h-3 text-emerald-200 shrink-0" />
+                      </button>
 
-                    {/* Navigation Buttons Row & Action Buttons */}
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      {/* Buy Store Button */}
-                      <div className="relative group/tooltip">
-                        <button
-                          disabled={!redirectUrl}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (redirectUrl) {
-                              window.open(redirectUrl, '_blank', 'noopener,noreferrer');
-                            }
-                          }}
-                          className={`w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                            redirectUrl
-                              ? "bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/10 active:scale-95"
-                              : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                          }`}
-                        >
-                          <ShoppingBag className="w-4 h-4" />
-                          <span>🛍 خرید از این فروشگاه</span>
-                        </button>
-                        
-                        {!redirectUrl && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-zinc-900 border border-white/10 text-white text-[10px] rounded-lg opacity-0 pointer-events-none group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl font-bold">
-                            لینک فروشگاه ثبت نشده است
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Ask Question Button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowQuestionModal(true);
                         }}
-                        className="w-full py-3 px-4 bg-zinc-800 hover:bg-zinc-700 border border-white/5 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                        className="w-full py-2.5 px-3 bg-zinc-800/90 hover:bg-zinc-700 border border-white/10 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
                       >
-                        <HelpCircle className="w-4 h-4 text-zinc-400" />
-                        <span>💬 پرسیدن سوال</span>
+                        <HelpCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span className="truncate">پرسش</span>
                       </button>
                     </div>
 
@@ -1135,22 +999,6 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
         )}
       </AnimatePresence>
 
-      {/* Floating Cart Button */}
-      <div className="fixed bottom-24 left-6 z-40">
-        <button
-          onClick={() => setShowCart(true)}
-          className="relative bg-emerald-600 hover:bg-emerald-500 text-white p-4 rounded-full shadow-2xl cursor-pointer flex items-center justify-center border border-white/10 active:scale-95 transition-all shadow-emerald-600/20"
-          id="explore-floating-cart-btn"
-        >
-          <ShoppingCart className="w-6 h-6" />
-          {cartItems.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border border-black animate-bounce">
-              {cartItems.reduce((acc, item) => acc + item.quantity, 0)}
-            </span>
-          )}
-        </button>
-      </div>
-
       {/* Payment Result Modal */}
       <AnimatePresence>
         {paymentResult && (
@@ -1188,234 +1036,6 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
               >
                 بستن پنجره
               </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Cart Bottom Sheet Overlay */}
-      <AnimatePresence>
-        {showCart && (
-          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-end justify-center">
-            {/* Click outside to close */}
-            <div className="absolute inset-0" onClick={() => setShowCart(false)} />
-            
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-[500px] max-h-[85vh] bg-zinc-950 border-t border-x border-white/10 rounded-t-3xl overflow-y-auto flex flex-col shadow-2xl z-10"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="sticky top-0 z-20 px-6 py-4 border-b border-white/5 bg-zinc-950/95 backdrop-blur-sm flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5 text-emerald-500" />
-                  <span className="text-white text-sm font-black">سبد خرید مستقیم (زوپیت)</span>
-                  {cartItems.length > 0 && (
-                    <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/20">
-                      {cartItems.length} کالا
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => setShowCart(false)}
-                  className="text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 p-1.5 rounded-full transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="p-6 flex flex-col gap-6">
-                {cartItems.length === 0 ? (
-                  <div className="py-12 flex flex-col items-center gap-4 text-center">
-                    <div className="w-16 h-16 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-600">
-                      <ShoppingCart className="w-8 h-8" />
-                    </div>
-                    <p className="text-zinc-400 text-xs font-bold leading-relaxed max-w-xs">
-                      سبد خرید شما خالی است. با چرخیدن در محصولات اکسپلور و کلیک روی دکمه «🛒 خرید از زوپیت»، کالاها را به سبد خرید خود اضافه کنید.
-                    </p>
-                    <button
-                      onClick={() => setShowCart(false)}
-                      className="mt-2 px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold transition-all"
-                    >
-                      شروع گشت‌وگذار
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {/* Item List */}
-                    <div className="flex flex-col gap-3">
-                      <span className="text-white text-xs font-black">کالاهای انتخابی</span>
-                      <div className="flex flex-col gap-3 max-h-[220px] overflow-y-auto pr-1">
-                        {cartItems.map((item: any) => (
-                          <div key={item.id} className="flex items-center gap-3 bg-zinc-900/40 border border-white/5 rounded-xl p-3">
-                            <img referrerPolicy="no-referrer"
-                              src={item.images?.[0]?.url || item.imageUrl || "https://picsum.photos/100"}
-                              alt={item.name}
-                              className="w-12 h-12 rounded-lg object-cover bg-black"
-                            />
-                            <div className="flex-1 min-w-0 text-right">
-                              <h4 className="text-white text-xs font-black truncate">{item.name}</h4>
-                              <span className="text-emerald-400 text-[11px] font-black block mt-0.5">
-                                {Number(item.price || item.finalPrice || item.supplierBasePrice).toLocaleString()} تومان
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-zinc-950 border border-white/5 rounded-lg px-2 py-1">
-                              <button
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="text-zinc-400 hover:text-white transition-colors"
-                              >
-                                {item.quantity === 1 ? <Trash2 className="w-3.5 h-3.5 text-rose-500" /> : <Minus className="w-3.5 h-3.5" />}
-                              </button>
-                              <span className="text-white text-xs font-black w-4 text-center font-mono">{item.quantity}</span>
-                              <button
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="text-zinc-400 hover:text-white transition-colors"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Total Section */}
-                    {cartItems.length > 0 && (
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-xl text-[11px] leading-relaxed text-right mb-3 font-bold">
-                        🚚 تمامی محصولات این فاکتور از تامین‌کننده <strong>«{cartItems[0].supplierName || "زوپیت"}»</strong> تامین می‌شوند. لذا هزینه ارسال پستی با هم تجمیع شده و فقط یک هزینه ارسال مشترک برای این مرسوله پرداخت می‌کنید.
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                      <span className="text-zinc-400 text-xs font-bold">مجموع کل خرید شما:</span>
-                      <span className="text-emerald-400 text-base font-black">
-                        {cartItems.reduce((acc, item: any) => acc + (Number(item.price || item.finalPrice || item.supplierBasePrice || 0) * item.quantity), 0).toLocaleString()} تومان
-                      </span>
-                    </div>
-
-                    {/* Customer Info Form */}
-                    <form onSubmit={handleCheckout} className="flex flex-col gap-4 border-t border-white/5 pt-4 text-right">
-                      <span className="text-white text-xs font-black mb-1">اطلاعات تحویل و گیرنده</span>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-zinc-400 text-[11px] font-bold">نام و نام خانوادگی گیرنده</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="مثال: علی احمدی"
-                            value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
-                            className="bg-zinc-900 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-emerald-500 font-bold"
-                          />
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-zinc-400 text-[11px] font-bold">شماره تماس (تلفن همراه)</label>
-                          <input
-                            type="tel"
-                            required
-                            placeholder="مثال: 09123456789"
-                            value={customerPhone}
-                            onChange={(e) => setCustomerPhone(e.target.value)}
-                            className="bg-zinc-900 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-emerald-500 font-mono font-bold"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Card Number for Refund */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-zinc-400 text-[11px] font-bold">شماره کارت ۱۶ رقمی (جهت عودت وجه در صورت لزوم)</label>
-                        <input
-                          type="text"
-                          required
-                          maxLength={19}
-                          placeholder="۶۰۳۷-۹۹۱۹-XXXX-XXXX"
-                          value={customerCardNumber}
-                          onChange={(e) => setCustomerCardNumber(e.target.value)}
-                          className="bg-zinc-900 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-emerald-500 font-mono font-bold text-center"
-                          dir="ltr"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-zinc-400 text-[11px] font-bold">انتخاب استان</label>
-                          <select
-                            required
-                            value={selectedProvince}
-                            onChange={(e) => {
-                              setSelectedProvince(e.target.value);
-                              setSelectedCity(""); // Reset city on province change
-                            }}
-                            className="bg-zinc-900 border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500 font-bold"
-                          >
-                            <option value="">-- انتخاب کنید --</option>
-                            {PROVINCES.map((p) => (
-                              <option key={p.name} value={p.name}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-zinc-400 text-[11px] font-bold">انتخاب شهر</label>
-                          <select
-                            required
-                            disabled={!selectedProvince}
-                            value={selectedCity}
-                            onChange={(e) => setSelectedCity(e.target.value)}
-                            className="bg-zinc-900 border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <option value="">-- انتخاب کنید --</option>
-                            {selectedProvince &&
-                              PROVINCES.find((p) => p.name === selectedProvince)?.cities.map((city) => (
-                                <option key={city} value={city}>
-                                  {city}
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-zinc-400 text-[11px] font-bold">نشانی دقیق پستی</label>
-                        <textarea
-                          required
-                          rows={2}
-                          placeholder="خیابان، کوچه، پلاک، واحد..."
-                          value={customerAddressDetail}
-                          onChange={(e) => setCustomerAddressDetail(e.target.value)}
-                          className="bg-zinc-900 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-emerald-500 font-bold resize-none leading-relaxed"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isSubmittingCheckout}
-                        className="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer active:scale-95 shadow-lg shadow-emerald-600/10"
-                      >
-                        {isSubmittingCheckout ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>در حال اتصال به درگاه پرداخت...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="w-4 h-4" />
-                            <span>💳 پرداخت آنلاین و ثبت نهایی</span>
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  </>
-                )}
-              </div>
             </motion.div>
           </div>
         )}

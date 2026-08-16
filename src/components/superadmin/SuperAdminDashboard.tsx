@@ -39,7 +39,8 @@ import ManualInvoices from "./ManualInvoices";
 import AdminAnnouncements from "./AdminAnnouncements";
 import SuperAdminNewFeatures from "./SuperAdminNewFeatures";
 import SuperAdminProAccounts from "./SuperAdminProAccounts";
-import { Crown, Sparkles } from "lucide-react";
+import TopStoresManager from "./TopStoresManager";
+import { Crown, Sparkles, TrendingUp, Award } from "lucide-react";
 import SupplierPenaltyManagement from "./SupplierPenaltyManagement";
 import AdminBanners from "./AdminBanners";
 import CodeEditor from "./CodeEditor";
@@ -89,6 +90,7 @@ export default function SuperAdminDashboard({
     { id: "orders", label: "سفارشات", icon: ShoppingCart, badge: badges.orders },
     { id: "settlements", label: "درخواست تسویه", icon: Wallet, badge: badges.settlements },
     { id: "tickets", label: "تیکت‌ها", icon: MessageSquare, badge: badges.tickets },
+    { id: "top-stores", label: "فروشندگان برتر و VIP", icon: Award },
     { id: "pro-accounts", label: "اکانت‌های پرو", icon: Crown },
     { id: "announcements", label: "مدیریت اعلانات", icon: Megaphone },
     { id: "manual-invoices", label: "تایید فیش‌ها", icon: DollarSign, badge: badges.invoices },
@@ -212,6 +214,9 @@ export default function SuperAdminDashboard({
           )}
           {activeTab === "pro-accounts" && (
             <SuperAdminProAccounts showNotification={showNotification} />
+          )}
+          {activeTab === "top-stores" && (
+            <TopStoresManager showNotification={showNotification} />
           )}
           {(activeTab === "all-users" ||
             activeTab === "suppliers" ||

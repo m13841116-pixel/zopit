@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { getValidProductImageUrl } from "../../utils/productUtils";
 import { formatSupplierCode, formatSupplierLocation, HighContrastStatusBadge } from "../../utils/statusUtils";
 import { DigikalaProductModal } from "../DigikalaProductModal";
+import MarketingKitModal from "./MarketingKitModal";
+import { Sparkles } from "lucide-react";
 import {
   Search,
   Layers,
@@ -33,7 +35,8 @@ export default function StoreMarketplace({
   });
   const [addingToCatalog, setAddingToCatalog] = useState<number | null>(null);
   const [myCatalogIds, setMyCatalogIds] = useState<Set<number>>(new Set());
-  /* Product Detail Modal state */ const [selectedProduct, setSelectedProduct] =
+  /* Product Detail Modal state */ const [marketingKitProduct, setMarketingKitProduct] = useState<any | null>(null);
+  const [selectedProduct, setSelectedProduct] =
     useState<any | null>(null);
   /* Filters */ const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState("");
@@ -151,6 +154,15 @@ export default function StoreMarketplace({
   return (
     <div className="space-y-6 animate-fade-in relative">
       
+      
+      {/* Marketing Kit Modal */}
+      {marketingKitProduct && (
+        <MarketingKitModal
+          product={marketingKitProduct}
+          onClose={() => setMarketingKitProduct(null)}
+        />
+      )}
+
       {/* Digikala Style Product Detail Modal */}
       {selectedProduct && (
         <DigikalaProductModal
@@ -428,11 +440,24 @@ export default function StoreMarketplace({
                           </span>
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleAddToCatalog(product)}
-                        disabled={inCatalog || (isLimitReached && !inCatalog)}
-                        className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-colors ${inCatalog ? "bg-surface text-success cursor-not-allowed" : isLimitReached ? "bg-surface text-muted cursor-not-allowed" : "bg-primary-default text-inverse hover:bg-primary-hover"}`}
-                      >
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMarketingKitProduct(product);
+                          }}
+                          className="col-span-1 py-2 px-1 rounded-xl flex items-center justify-center gap-1 text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 transition-all cursor-pointer"
+                          title="پک بازاریابی و استوری"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          <span>پک تبلیغات</span>
+                        </button>
+                        <button
+                          onClick={() => handleAddToCatalog(product)}
+                          disabled={inCatalog || (isLimitReached && !inCatalog)}
+                          className={`col-span-2 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-colors ${inCatalog ? "bg-surface text-success cursor-not-allowed" : isLimitReached ? "bg-surface text-muted cursor-not-allowed" : "bg-primary-default text-inverse hover:bg-primary-hover cursor-pointer"}`}
+                        >
                         
                         {addingToCatalog === product.id ? (
                           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -448,7 +473,8 @@ export default function StoreMarketplace({
                             من
                           </>
                         )}
-                      </button>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

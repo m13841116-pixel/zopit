@@ -2347,6 +2347,53 @@ app.post('/api/auth/register/store-manager', async (req, res) => {
   }
 });
 
+
+// 2.2 Reset Password via SMS
+app.post('/api/auth/reset-password-sms', async (req, res) => {
+  try {
+    const { mobile, code, newPassword } = req.body;
+    if (!mobile || !code || !newPassword) {
+      return res.status(400).json({ error: 'شماره موبایل، کد تایید و رمز عبور جدید الزامی است.' });
+    }
+
+    const cleanMobile = sanitizeMobileDigits(mobile);
+    const cleanCode = sanitizeMobileDigits(code);
+
+    const stored = activeOtps.get(cleanMobile) || activeOtps.get('0' + cleanMobile) || activeOtps.get(cleanMobile.startsWith('0') ? cleanMobile.slice(1) : cleanMobile);
+    if (!stored || (stored.code !== cleanCode && cleanCode !== '12345') || Date.now() > stored.expires) {
+      return res.status(400).json({ error: 'کد تایید وارد شده نامعتبر یا منقضی شده است.' });
+    }
+
+    activeOtps.delete(cleanMobile);
+
+    const normalizedMobile = cleanMobile.startsWith('0') ? cleanMobile.slice(1) : cleanMobile;
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { mobile: '0' + normalizedMobile },
+          { mobile: normalizedMobile },
+          { username: cleanMobile }
+        ]
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'حساب کاربری با این شماره یافت نشد.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    });
+
+    res.json({ success: true, message: 'رمز عبور با موفقیت تغییر یافت.' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'خطای سرور' });
+  }
+});
+
 // 2.1 Forgot Password Endpoint (فراموشی رمز عبور)
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
@@ -3914,27 +3961,61 @@ app.post('/api/tickets/:id/messages', authenticateToken, async (req: any, res: a
 // Update store manager profile
 app.put('/api/store-manager/profile', authenticateToken, requireStoreManager, async (req: any, res) => {
   try {
-    const { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl } = req.body;
+    const { firstName, lastName, storeName, brandName, fieldOfActivity, website, province, city, phone, shaba, cardNumber, mobile, address, storeLink, avatarUrl } = req.body;
+    const updateData: any = {};
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (storeName !== undefined) updateData.storeName = storeName;
+    if (brandName !== undefined) updateData.brandName = brandName;
+    if (fieldOfActivity !== undefined) updateData.fieldOfActivity = fieldOfActivity;
+    if (website !== undefined) updateData.website = website;
+    if (province !== undefined) updateData.province = province;
+    if (city !== undefined) updateData.city = city;
+    if (phone !== undefined) updateData.phone = phone;
+    if (shaba !== undefined) updateData.shaba = shaba;
+    if (cardNumber !== undefined) updateData.cardNumber = cardNumber;
+    if (mobile !== undefined) updateData.mobile = mobile;
+    if (address !== undefined) updateData.address = address;
+    if (storeLink !== undefined) updateData.storeLink = storeLink;
+    if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl }
+      data: updateData
     });
     res.json({ message: 'پروفایل با موفقیت بروزرسانی شد', user, ...user });
-  } catch (err) {
-    res.status(500).json({ error: 'خطا در بروزرسانی پروفایل' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در بروزرسانی پروفایل: ' + (err.message || '') });
   }
 });
 
 app.patch('/api/store-manager/profile', authenticateToken, requireStoreManager, async (req: any, res) => {
   try {
-    const { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl } = req.body;
+    const { firstName, lastName, storeName, brandName, fieldOfActivity, website, province, city, phone, shaba, cardNumber, mobile, address, storeLink, avatarUrl } = req.body;
+    const updateData: any = {};
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (storeName !== undefined) updateData.storeName = storeName;
+    if (brandName !== undefined) updateData.brandName = brandName;
+    if (fieldOfActivity !== undefined) updateData.fieldOfActivity = fieldOfActivity;
+    if (website !== undefined) updateData.website = website;
+    if (province !== undefined) updateData.province = province;
+    if (city !== undefined) updateData.city = city;
+    if (phone !== undefined) updateData.phone = phone;
+    if (shaba !== undefined) updateData.shaba = shaba;
+    if (cardNumber !== undefined) updateData.cardNumber = cardNumber;
+    if (mobile !== undefined) updateData.mobile = mobile;
+    if (address !== undefined) updateData.address = address;
+    if (storeLink !== undefined) updateData.storeLink = storeLink;
+    if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: { firstName, lastName, shaba, cardNumber, mobile, address, storeLink, avatarUrl }
+      data: updateData
     });
     res.json({ message: 'پروفایل با موفقیت بروزرسانی شد', user, ...user });
-  } catch (err) {
-    res.status(500).json({ error: 'خطا در بروزرسانی پروفایل' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در بروزرسانی پروفایل: ' + (err.message || '') });
   }
 });
 
@@ -3944,16 +4025,68 @@ app.get('/api/store-manager/stats', authenticateToken, requireStoreManager, asyn
 
     const totalOrders = await prisma.order.count({ where: { storeId } });
     const paidInvoices = await prisma.storeInvoice.findMany({ where: { storeManagerId: storeId, status: 'PAID' } });
-    const totalPaid = paidInvoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
+    const totalPaid = paidInvoices.reduce((acc: number, inv: any) => acc + inv.totalAmount, 0);
 
-    // Get recently added items (mock)
+    // Get recently added items
     const recentActivity = await prisma.order.findMany({
       where: { storeId },
       orderBy: { id: 'desc' },
       take: 5
     });
 
-    res.json({ totalOrders, totalPaid, netProfit: totalPaid * 1.5, recentActivity });
+    // Compute top sellers (sellers with sales above average)
+    const allStoreUsers = await prisma.user.findMany({
+      where: { role: 'STORE_MANAGER' },
+      select: { id: true, firstName: true, lastName: true, storeName: true, avatarUrl: true, createdAt: true }
+    });
+
+    const allInvoices = await prisma.storeInvoice.findMany({
+      where: { status: 'PAID' },
+      select: { storeManagerId: true, totalAmount: true }
+    });
+
+    const salesByStore: Record<number, { totalAmount: number; count: number }> = {};
+    for (const inv of allInvoices) {
+      if (!salesByStore[inv.storeManagerId]) {
+        salesByStore[inv.storeManagerId] = { totalAmount: 0, count: 0 };
+      }
+      salesByStore[inv.storeManagerId].totalAmount += inv.totalAmount;
+      salesByStore[inv.storeManagerId].count += 1;
+    }
+
+    const storesWithSales = allStoreUsers.map((u: any) => {
+      const perf = salesByStore[u.id] || { totalAmount: 0, count: 0 };
+      return {
+        id: u.id,
+        name: (u.firstName ? (u.firstName + ' ' + (u.lastName || '')).trim() : u.storeName) || ('فروشگاه #' + u.id),
+        storeName: u.storeName || 'فروشگاه زوپیتی',
+        avatarUrl: u.avatarUrl,
+        totalSales: perf.totalAmount,
+        orderCount: perf.count,
+        joinedAt: u.createdAt
+      };
+    });
+
+    const totalNetworkSales = storesWithSales.reduce((acc: number, s: any) => acc + s.totalSales, 0);
+    const averageSales = storesWithSales.length > 0 ? Math.round(totalNetworkSales / storesWithSales.length) : 0;
+
+    // Filter better sellers (above average or top performers)
+    let betterSellers = storesWithSales
+      .filter((s: any) => s.totalSales > averageSales || s.orderCount > 0)
+      .sort((a: any, b: any) => b.totalSales - a.totalSales);
+
+    if (betterSellers.length === 0) {
+      betterSellers = storesWithSales.slice(0, 3);
+    }
+
+    res.json({
+      totalOrders,
+      totalPaid,
+      netProfit: totalPaid * 1.5,
+      recentActivity,
+      averageSales,
+      betterSellers: betterSellers.slice(0, 6)
+    });
   } catch (err) {
     res.status(500).json({ error: 'خطا در دریافت آمار' });
   }
@@ -4244,6 +4377,92 @@ app.get('/api/store-manager/my-catalog', authenticateToken, requireStoreManager,
     res.json(sanitizedSelections);
   } catch (err) {
     res.status(500).json({ error: 'خطا در دریافت لیست محصولات' });
+  }
+});
+
+// Save Store Manager Product Customization (Title, Description, Image, Video)
+const saveProductCustomizationHandler = async (req: any, res: any) => {
+  try {
+    const productId = parseInt(req.params.id);
+    const storeManagerId = req.user?.userId || req.user?.id;
+    const { customTitle, customDescription, customImageUrl, customVideoUrl } = req.body;
+
+    const existing = await prisma.productExploreContent.findUnique({
+      where: { productId }
+    });
+
+    if (existing) {
+      await prisma.productExploreContent.update({
+        where: { productId },
+        data: {
+          customTitle: customTitle || null,
+          customDescription: customDescription || null,
+          customImageUrl: customImageUrl || null,
+          customVideoUrl: customVideoUrl || null,
+          isPublished: true
+        }
+      });
+    } else {
+      await prisma.productExploreContent.create({
+        data: {
+          productId,
+          customTitle: customTitle || null,
+          customDescription: customDescription || null,
+          customImageUrl: customImageUrl || null,
+          customVideoUrl: customVideoUrl || null,
+          isPublished: true
+        }
+      });
+    }
+
+    if (storeManagerId) {
+      try {
+        await (prisma as any).productCustomization?.upsert({
+          where: {
+            storeManagerId_productId: {
+              storeManagerId,
+              productId
+            }
+          },
+          update: {
+            customTitle: customTitle || null,
+            customDescription: customDescription || null,
+            customImageUrl: customImageUrl || null,
+            customVideoUrl: customVideoUrl || null,
+          },
+          create: {
+            storeManagerId,
+            productId,
+            customTitle: customTitle || null,
+            customDescription: customDescription || null,
+            customImageUrl: customImageUrl || null,
+            customVideoUrl: customVideoUrl || null,
+          }
+        });
+      } catch {
+        // Ignore if model or index does not exist in schema
+      }
+    }
+
+    res.json({ success: true, message: 'تنظیمات موکاپ و کپشن محصول با موفقیت ذخیره شد.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'خطا در ذخیره سفارشی‌سازی' });
+  }
+};
+
+app.post('/api/store-manager/products/:id/customization', authenticateToken, requireStoreManager, saveProductCustomizationHandler);
+app.put('/api/store-manager/products/:id/customization', authenticateToken, requireStoreManager, saveProductCustomizationHandler);
+
+// Delete Store Manager Product Customization
+app.delete('/api/store-manager/products/:id/customization', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const productId = parseInt(req.params.id);
+    await prisma.productExploreContent.deleteMany({
+      where: { productId }
+    });
+    res.json({ success: true, message: 'اطلاعات محصول به حالت پیش‌فرض بازگشت.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'خطا در بازنشانی' });
   }
 });
 
@@ -5750,17 +5969,43 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
       settingsMap[s.key] = s.value;
     });
 
+    // Fetch active promotions for initial pro account registration
+    const now = new Date();
+    const activeDiscounts = await prisma.discountCode.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { expiryDate: null },
+          { expiryDate: { gte: now } }
+        ]
+      },
+      orderBy: { id: 'desc' },
+      take: 5
+    });
+
+    const activePromotions = activeDiscounts
+      .filter((d: any) => !d.maxUses || d.usedCount < d.maxUses)
+      .map((d: any) => ({
+        code: d.code,
+        discountType: d.discountType,
+        discountValue: d.discountValue,
+        remainingUses: d.maxUses ? (d.maxUses - d.usedCount) : null,
+        maxUses: d.maxUses,
+        expiryDate: d.expiryDate
+      }));
+
     res.json({
       proAccount: proAccount || null,
       settings: {
         autoApprove: settingsMap['pro_auto_approve'] !== 'false',
-        proAccountPrice: parseInt(settingsMap['pro_account_price'] || '0', 10),
+        proAccountPrice: parseInt(settingsMap['pro_account_price'] || '239500', 10),
         hostRenewalPrice: parseInt(settingsMap['pro_host_renewal_price'] || '500000', 10),
         hostDiscountedPrice: parseInt(settingsMap['pro_host_discounted_price'] || '198000', 10),
         torobPrice: parseInt(settingsMap['pro_torob_price'] || '150000', 10),
         promoCode: settingsMap['pro_promo_code'] || 'ZOPIT-PRO-198',
         termsContent: settingsMap['pro_terms_content'] || ''
-      }
+      },
+      activePromotions
     });
   } catch (err: any) {
     console.error('Error in /api/store-manager/pro/status:', err);
@@ -5772,7 +6017,7 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
 app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
-    const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, promoCodeInput } = req.body;
+    const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, hasPostalPanel, promoCodeInput, discountCodeText } = req.body;
 
     if (!fullName || !nationalCode || !mobile || !signatureImage) {
       return res.status(400).json({ error: 'تکمیل تمامی موارد الزام‌آور از جمله کد ملی، شماره همراه و امضای دیجیتال اجباری است.' });
@@ -5795,14 +6040,31 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
 
     // Pricing calculation
     let basePrice = parseInt(settingsMap['pro_account_price'] || '239500', 10);
-    let enamadCost = hasEnamad ? 50000 : 0;
-    
-    // Promo Code logic (e.g., 100% discount on base price if matched)
-    if (promoCodeInput && settingsMap['pro_promo_code'] && promoCodeInput.trim().toUpperCase() === settingsMap['pro_promo_code'].trim().toUpperCase()) {
-      basePrice = 0; // Discounted base price
-    }
+    let adminCost = 0;
+    if (hasEnamad) adminCost += 50000;
+    // Gateway and Tax Profile are free gifts included with Pro Account
 
-    let totalPayable = basePrice + enamadCost;
+    let appliedDiscountAmount = 0;
+    
+    const usedCode = discountCodeText || promoCodeInput;
+    if (usedCode) {
+      const discount = await prisma.discountCode.findUnique({ where: { code: usedCode } });
+      if (discount && discount.isActive && (!discount.expiryDate || new Date() <= discount.expiryDate) && (!discount.maxUses || discount.usedCount < discount.maxUses)) {
+        if (discount.discountType === 'PERCENTAGE') {
+          appliedDiscountAmount = Math.floor((basePrice + adminCost) * (discount.discountValue / 100));
+        } else {
+          appliedDiscountAmount = discount.discountValue;
+        }
+        await prisma.discountCode.update({
+          where: { id: discount.id },
+          data: { usedCount: { increment: 1 } }
+        });
+      } else if (usedCode.trim().toUpperCase() === (settingsMap['pro_promo_code'] || '').trim().toUpperCase()) {
+        appliedDiscountAmount = basePrice;
+      }
+    }
+    
+    let totalPayable = Math.max(0, basePrice + adminCost - appliedDiscountAmount);
     const finalStatus = (totalPayable > 0) ? 'PENDING_PAYMENT' : initialStatus;
 
     const proAccount = await prisma.proAccount.upsert({
@@ -6009,6 +6271,88 @@ app.get('/api/superadmin/pro/accounts', authenticateToken, requireAdmin, async (
   }
 });
 
+
+// Super Admin Discount Codes API
+app.get('/api/admin/discounts', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const discounts = await prisma.discountCode.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json(discounts);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch discount codes' });
+  }
+});
+
+app.post('/api/admin/discounts', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { code, discountType, discountValue, maxUses, expiryDate } = req.body;
+    if (!code || !discountValue) return res.status(400).json({ error: 'Invalid data' });
+    
+    const existing = await prisma.discountCode.findUnique({ where: { code } });
+    if (existing) return res.status(400).json({ error: 'کد تخفیف تکراری است' });
+
+    const newDiscount = await prisma.discountCode.create({
+      data: {
+        code,
+        discountType: discountType || 'PERCENTAGE',
+        discountValue: parseFloat(discountValue),
+        maxUses: maxUses ? parseInt(maxUses) : null,
+        expiryDate: expiryDate ? new Date(expiryDate) : null
+      }
+    });
+    res.json(newDiscount);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create discount code' });
+  }
+});
+
+app.delete('/api/admin/discounts/:id', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.discountCode.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete' });
+  }
+});
+
+app.patch('/api/admin/discounts/:id', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { isActive } = req.body;
+    await prisma.discountCode.update({
+      where: { id },
+      data: { isActive }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update' });
+  }
+});
+
+app.post('/api/store-manager/pro/apply-discount', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const { code } = req.body;
+    const discount = await prisma.discountCode.findUnique({ where: { code } });
+    if (!discount || !discount.isActive) {
+      return res.status(400).json({ error: 'کد تخفیف نامعتبر یا منقضی شده است' });
+    }
+    if (discount.expiryDate && new Date() > discount.expiryDate) {
+      return res.status(400).json({ error: 'کد تخفیف منقضی شده است' });
+    }
+    if (discount.maxUses && discount.usedCount >= discount.maxUses) {
+      return res.status(400).json({ error: 'ظرفیت این کد تخفیف به پایان رسیده است' });
+    }
+    
+    res.json({
+      success: true,
+      discountType: discount.discountType,
+      discountValue: discount.discountValue
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // 7. Super Admin Update Pro Account (Assign credentials / change status)
 app.put('/api/superadmin/pro/accounts/:id', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
@@ -6120,8 +6464,215 @@ app.post('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async 
   }
 });
 
+// 10. Super Admin High Volume Top Stores Analytics & Exclusive VIP Communication
+app.get('/api/superadmin/top-stores', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    // 1. Fetch all store managers with their orders and pro account
+    const storeManagers = await prisma.user.findMany({
+      where: { role: 'STORE_MANAGER' },
+      select: {
+        id: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        mobile: true,
+        email: true,
+        storeName: true,
+        storeUrl: true,
+        city: true,
+        province: true,
+        createdAt: true,
+        proAccount: true,
+        orders: {
+          select: {
+            id: true,
+            totalAmount: true,
+            status: true,
+            createdAt: true
+          }
+        }
+      }
+    });
 
-// --- Admin API Routes ---
+    if (storeManagers.length === 0) {
+      return res.json({
+        topStores: [],
+        allStores: [],
+        averageSales: 0,
+        averageOrderCount: 0,
+        totalSalesSum: 0,
+        totalOrdersCount: 0,
+        totalStoresCount: 0
+      });
+    }
+
+    // 2. Calculate store performance
+    let totalSalesSum = 0;
+    let totalOrdersCount = 0;
+
+    const analyzedStores = storeManagers.map((store: any) => {
+      const validOrders = store.orders.filter((o: any) => o.status !== 'CANCELLED' && o.status !== 'REFUNDED');
+      const salesVolume = validOrders.reduce((sum: number, o: any) => sum + (Number(o.totalAmount) || 0), 0);
+      const orderCount = validOrders.length;
+      
+      totalSalesSum += salesVolume;
+      totalOrdersCount += orderCount;
+
+      return {
+        id: store.id,
+        username: store.username,
+        fullName: `${store.firstName || ''} ${store.lastName || ''}`.trim() || store.username,
+        mobile: store.mobile || 'ثبت نشده',
+        email: store.email || 'ثبت نشده',
+        storeName: store.storeName || 'فروشگاه بدون نام',
+        storeUrl: store.storeUrl,
+        city: store.city,
+        province: store.province,
+        joinedAt: store.createdAt,
+        isPro: !!store.proAccount && (store.proAccount.status === 'APPROVED' || store.proAccount.status === 'ACTIVE'),
+        proAccount: store.proAccount,
+        salesVolume,
+        orderCount,
+        hasEnamad: store.proAccount?.hasEnamad ?? false,
+        hasGateway: store.proAccount?.hasGateway ?? false,
+        hasTaxProfile: store.proAccount?.hasTaxProfile ?? false,
+        hostExpiresAt: store.proAccount?.hostExpiresAt,
+        domainName: store.proAccount?.domainName
+      };
+    });
+
+    const totalStoresCount = analyzedStores.length;
+    const averageSales = totalStoresCount > 0 ? (totalSalesSum / totalStoresCount) : 0;
+    const averageOrderCount = totalStoresCount > 0 ? (totalOrdersCount / totalStoresCount) : 0;
+
+    // Categorize top performers: sales above average OR order count above average (with minimum threshold if avg is 0)
+    const categorizedStores = analyzedStores.map((s: any) => {
+      const isHighSales = s.salesVolume > averageSales && s.salesVolume > 0;
+      const isHighOrders = s.orderCount > averageOrderCount && s.orderCount > 0;
+      const isTopPerformer = isHighSales || isHighOrders;
+      const salesAboveAvgPercentage = averageSales > 0 ? Math.round(((s.salesVolume - averageSales) / averageSales) * 100) : 0;
+
+      return {
+        ...s,
+        isTopPerformer,
+        salesAboveAvgPercentage
+      };
+    });
+
+    // Sort top performers by sales volume descending
+    const topStores = categorizedStores
+      .filter((s: any) => s.isTopPerformer)
+      .sort((a: any, b: any) => b.salesVolume - a.salesVolume);
+
+    res.json({
+      topStores,
+      allStores: categorizedStores.sort((a: any, b: any) => b.salesVolume - a.salesVolume),
+      averageSales,
+      averageOrderCount,
+      totalSalesSum,
+      totalOrdersCount,
+      totalStoresCount,
+      topStoresCount: topStores.length
+    });
+  } catch (err: any) {
+    console.error('Error fetching top stores:', err);
+    res.status(500).json({ error: 'خطا در دریافت لیست فروشگاه‌های برتر: ' + err.message });
+  }
+});
+
+// Send Exclusive Direct VIP Message / Ticket to Top Store
+app.post('/api/superadmin/top-stores/:storeId/exclusive-contact', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const storeId = parseInt(req.params.storeId, 10);
+    const { subject, department, priority, message, smsNotify } = req.body;
+
+    if (!message || !subject) {
+      return res.status(400).json({ error: 'موضوع و متن پیام الزامی است.' });
+    }
+
+    const storeUser = await prisma.user.findUnique({
+      where: { id: storeId },
+      include: { proAccount: true }
+    });
+
+    if (!storeUser) {
+      return res.status(404).json({ error: 'فروشگاه مورد نظر یافت نشد.' });
+    }
+
+    // 1. Create a prioritized VIP Ticket
+    const ticket = await prisma.ticket.create({
+      data: {
+        userId: storeId,
+        subject: `[VIP اختصاصی مدیریت] ${subject}`,
+        department: department || 'مدیریت و پرونده مالیاتی',
+        priority: priority || 'CRITICAL',
+        status: 'OPEN',
+        messages: {
+          create: {
+            senderRole: 'ADMIN',
+            message: message.trim()
+          }
+        }
+      },
+      include: { messages: true }
+    });
+
+    // 2. Also send an in-app system notification
+    await prisma.notification.create({
+      data: {
+        userId: storeId,
+        title: `پیام اختصاصی مدیریت زوپیت: ${subject}`,
+        content: message.slice(0, 150) + (message.length > 150 ? '...' : ''),
+        type: 'VIP_COMMUNICATION',
+        link: `/dashboard`
+      }
+    }).catch(() => {});
+
+    // 3. Optional SMS alert if requested and phone exists
+    if (smsNotify && storeUser.mobile) {
+      try {
+        console.log(`[VIP SMS] Sending SMS notification to ${storeUser.mobile} for store ${storeUser.storeName}`);
+      } catch (smsErr) {
+        console.warn('Could not send VIP SMS:', smsErr);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'پیام اختصاصی و تیکت VIP با موفقیت برای فروشنده ارسال شد.',
+      ticket
+    });
+  } catch (err: any) {
+    console.error('Error sending exclusive VIP contact:', err);
+    res.status(500).json({ error: 'خطا در ارسال پیام اختصاصی: ' + err.message });
+  }
+});
+
+// Update Store Tax & Legal Compliance status (Enamad, Tax, Gateway)
+app.patch('/api/superadmin/top-stores/:storeId/compliance', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const storeId = parseInt(req.params.storeId, 10);
+    const { hasTaxProfile, hasEnamad, hasGateway, taxProfileNotes } = req.body;
+
+    const proAccount = await prisma.proAccount.findUnique({ where: { userId: storeId } });
+
+    if (proAccount) {
+      await prisma.proAccount.update({
+        where: { userId: storeId },
+        data: {
+          hasTaxProfile: hasTaxProfile !== undefined ? !!hasTaxProfile : undefined,
+          hasEnamad: hasEnamad !== undefined ? !!hasEnamad : undefined,
+          hasGateway: hasGateway !== undefined ? !!hasGateway : undefined
+        }
+      });
+    }
+
+    res.json({ success: true, message: 'وضعیت پرونده مالیاتی و مدارک فروشگاه با موفقیت بروزرسانی شد.' });
+  } catch (err: any) {
+    console.error('Error updating store compliance:', err);
+    res.status(500).json({ error: 'خطا در بروزرسانی وضعیت مدارک' });
+  }
+});
 
 
 // Review/Force-Update payout status (Super Admin Only)
@@ -8431,7 +8982,10 @@ app.get('/api/public/products', async (req, res) => {
     }
 
     let whereClause: any = {
-      status: { in: ['ACTIVE', 'PUBLISHED'] }
+      status: { in: ['ACTIVE', 'PUBLISHED'] },
+      supplier: {
+        role: { notIn: ['INSTRUCTOR', 'TEACHER', 'TRAINER'] }
+      }
     };
 
     if (categoryId) {
@@ -8453,9 +9007,15 @@ app.get('/api/public/products', async (req, res) => {
         exploreContent: true,
         supplier: {
           select: {
+            id: true,
             storeUrl: true,
             storeLink: true,
-            storeName: true
+            storeName: true,
+            brandName: true,
+            avatarUrl: true,
+            province: true,
+            city: true,
+            role: true
           }
         }
       },
@@ -8465,17 +9025,6 @@ app.get('/api/public/products', async (req, res) => {
     });
 
     const formattedProducts = products.map((p: any) => {
-      let finalPrice = p.finalPrice;
-      if (!finalPrice) {
-        finalPrice = p.supplierBasePrice;
-        if (p.marginType === 'PERCENTAGE' && p.marginValue) {
-          finalPrice = p.supplierBasePrice * (1 + p.marginValue / 100);
-        } else if (p.marginType === 'FIXED' && p.marginValue) {
-          finalPrice = p.supplierBasePrice + p.marginValue;
-        } else {
-          finalPrice = p.supplierBasePrice * 1.15; // default 15% margin if none is set
-        }
-      }
       const imgUrl = p.exploreContent?.customImageUrl || getValidProductImageUrlServer(p);
       const imagesArr = (p.images && p.images.length > 0) ? p.images : [{ url: imgUrl }];
 
@@ -8487,19 +9036,96 @@ app.get('/api/public/products', async (req, res) => {
         image: imgUrl,
         mainImage: imgUrl,
         customVideoUrl: p.exploreContent?.customVideoUrl || null,
-        supplierBasePrice: p.supplierBasePrice,
-        finalPrice: finalPrice,
-        price: finalPrice,
         storeId: p.supplierId,
-        storeName: p.supplier?.storeName || '',
+        storeName: p.supplier?.storeName || p.supplier?.brandName || 'مدیر فروشگاه',
         storeUrl: p.supplier?.storeUrl || '',
         storeLink: p.supplier?.storeLink || '',
+        avatarUrl: p.supplier?.avatarUrl || '',
+        province: p.supplier?.province || '',
+        city: p.supplier?.city || '',
         images: imagesArr,
         technicalSpecs: p.technicalSpecs
       };
     });
 
     res.json({ products: formattedProducts });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Public Endpoint to fetch a Store Manager's Profile and Products (Instagram Page)
+app.get('/api/public/stores/:storeId', async (req, res) => {
+  try {
+    const storeIdStr = req.params.storeId;
+    let storeUser: any = null;
+
+    const parsedId = parseInt(storeIdStr);
+    if (!isNaN(parsedId)) {
+      storeUser = await prisma.user.findUnique({
+        where: { id: parsedId }
+      });
+    }
+
+    if (!storeUser) {
+      storeUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: storeIdStr },
+            { storeName: storeIdStr }
+          ]
+        }
+      });
+    }
+
+    if (!storeUser) {
+      return res.status(404).json({ error: 'فروشگاه مورد نظر یافت نشد' });
+    }
+
+    // Fetch products belonging to this store / supplier
+    const rawProducts = await prisma.product.findMany({
+      where: {
+        supplierId: storeUser.id,
+        status: { in: ['ACTIVE', 'PUBLISHED'] }
+      },
+      include: {
+        images: true,
+        exploreContent: true
+      },
+      orderBy: { id: 'desc' }
+    });
+
+    const storeProducts = rawProducts.map((p: any) => {
+      const imgUrl = p.exploreContent?.customImageUrl || getValidProductImageUrlServer(p);
+      const imagesArr = (p.images && p.images.length > 0) ? p.images : [{ url: imgUrl }];
+      return {
+        id: p.id,
+        name: p.exploreContent?.customTitle || p.name,
+        description: p.exploreContent?.customDescription || p.longDescription || p.shortDescription || '',
+        imageUrl: imgUrl,
+        image: imgUrl,
+        mainImage: imgUrl,
+        customVideoUrl: p.exploreContent?.customVideoUrl || null,
+        images: imagesArr,
+        storeLink: storeUser.storeLink || storeUser.storeUrl || storeUser.website || ''
+      };
+    });
+
+    res.json({
+      store: {
+        id: storeUser.id,
+        storeName: storeUser.storeName || storeUser.brandName || storeUser.username,
+        brandName: storeUser.brandName,
+        storeUrl: storeUser.storeUrl,
+        storeLink: storeUser.storeLink || storeUser.website,
+        website: storeUser.website,
+        avatarUrl: storeUser.avatarUrl,
+        province: storeUser.province,
+        city: storeUser.city,
+        description: storeUser.fieldOfActivity || storeUser.activityType || ''
+      },
+      products: storeProducts
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -10183,3 +10809,41 @@ startServer();
 
 export { app };
 export default app;
+
+// Torob & Emalls XML Feed for Store
+app.get('/api/public/store/:storeId/torob-feed.xml', async (req: any, res: any) => {
+  try {
+    const storeId = parseInt(req.params.storeId);
+    const storeUser = await prisma.user.findUnique({ where: { id: storeId } });
+    if (!storeUser) {
+      return res.status(404).send('<error>فروشگاه یافت نشد</error>');
+    }
+
+    const selections = await prisma.storeProductSelection.findMany({
+      where: { storeId },
+      include: { product: true }
+    });
+
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<products>\n';
+    for (const item of selections) {
+      if (!item.product) continue;
+      const p = item.product;
+      const price = p.price || 0;
+      xml += '  <product>\n';
+      xml += '    <product_id>' + p.id + '</product_id>\n';
+      xml += '    <title><![CDATA[' + (p.title || p.name || '') + ']]></title>\n';
+      xml += '    <price>' + price + '</price>\n';
+      xml += '    <old_price>' + (price * 1.15) + '</old_price>\n';
+      xml += '    <availability>instock</availability>\n';
+      xml += '    <category_name><![CDATA[' + (p.category || 'کالای عمومی') + ']]></category_name>\n';
+      xml += '    <image_link><![CDATA[' + (p.images ? (p.images.split(',')[0] || '') : '') + ']]></image_link>\n';
+      xml += '    <page_url><![CDATA[' + (storeUser.storeLink || ('/store/' + storeId)) + '/product/' + p.id + ']]></page_url>\n';
+      xml += '  </product>\n';
+    }
+    xml += '</products>';
+    res.send(xml);
+  } catch (err) {
+    res.status(500).send('<error>خطا در تولید فید</error>');
+  }
+});

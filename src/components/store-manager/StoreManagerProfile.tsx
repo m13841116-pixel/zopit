@@ -172,7 +172,7 @@ export function StoreManagerProfile({ user, showNotification, onUpdateUser }: an
 
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-secondary mb-2">
-                لینک فروشگاه (سایت، اینستاگرام یا کانال)
+                لینک فروشگاه (سایت، زوپیت‌گرام یا کانال)
               </label>
               <input
                 type="text"
@@ -181,7 +181,7 @@ export function StoreManagerProfile({ user, showNotification, onUpdateUser }: an
                 onChange={(e) =>
                   setFormData({ ...formData, storeLink: e.target.value })
                 }
-                placeholder="instagram.com/my_store"
+                placeholder="zoombit.com/my_store"
                 dir="ltr"
               />
             </div>

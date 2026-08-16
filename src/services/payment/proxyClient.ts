@@ -1,3 +1,7 @@
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
+
 export interface ProxyResponse {
   ok: boolean;
   status: number;
@@ -6,11 +10,11 @@ export interface ProxyResponse {
 }
 
 /**
- * Standard fetch-based proxy client with automatic Vercel Geoblock bypass.
- * Vercel AWS IPs are frequently blocked by Iranian hosts (like MizbanFa).
- * If on Vercel, this client automatically routes through a global proxy first.
+ * Highly robust HTTP/HTTPS client specifically optimized for Vercel (AWS Lambda) environments.
+ * It bypasses fetch/undici DNS resolution issues by explicitly using family: 4 (IPv4),
+ * ensuring that requests to Iranian servers that drop IPv6 packets do not hang or timeout.
  */
-export async function executeProxyRequest(
+export function executeProxyRequest(
   payload: any,
   options: {
     proxyUrl?: string;
@@ -18,81 +22,74 @@ export async function executeProxyRequest(
     timeoutMs?: number;
   } = {}
 ): Promise<ProxyResponse> {
-  const targetUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-  const apiKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  
-  // Keep timeouts short so Vercel doesn't kill the function before we can fallback
-  const timeoutMs = options.timeoutMs || 4500;
+  return new Promise((resolve, reject) => {
+    const proxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+    const apiKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
+    const timeoutMs = options.timeoutMs || 15000;
 
-  const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
-  const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-  
-  // If on Vercel, prioritize the cors proxy to bypass the firewall.
-  // Otherwise try direct first.
-  let urlsToTry = [targetUrl, `https://proxy.cors.sh/${targetUrl}`];
-  if (isVercel) {
-    urlsToTry = [`https://proxy.cors.sh/${targetUrl}`, targetUrl];
-  }
-
-  let lastError: any;
-
-  for (let i = 0; i < urlsToTry.length; i++) {
-    const url = urlsToTry[i];
+    let parsedUrl: URL;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Api-Key': apiKey,
-          'User-Agent': 'Zopit-Vercel-Client/3.0'
-        },
-        body: payloadString,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      const text = await response.text().catch(() => '');
-      let data: any = undefined;
-      try {
-        if (text) data = JSON.parse(text);
-      } catch (err) {}
-
-      // cors.sh returns 500/502 if the target is unreachable or times out,
-      // but it will have CORS headers. If it's a proxy error and we have another URL, we might want to fallback.
-      // But if it succeeded (status 200), return it!
-      if (response.ok || (data && (data.result !== undefined || data.success !== undefined))) {
-        return {
-          ok: response.ok,
-          status: response.status,
-          text,
-          data
-        };
-      } else {
-        // If it's not OK and we have another URL to try, we throw to trigger the catch block fallback
-        if (i < urlsToTry.length - 1) {
-          throw new Error(`Proxy returned status ${response.status}`);
-        }
-        
-        return {
-          ok: response.ok,
-          status: response.status,
-          text,
-          data
-        };
-      }
-
-    } catch (err: any) {
-      console.warn(`[ProxyClient] Fetch failed for ${url}:`, err.message);
-      lastError = err;
-      // loop continues to next URL
+      parsedUrl = new URL(proxyUrl);
+    } catch (e) {
+      return reject(new Error('آدرس پروکسی نامعتبر است'));
     }
-  }
 
-  throw new Error(`پاسخی از سرور واسط دریافت نشد. دلیل: مسدود بودن IP سرور. (${lastError?.message})`);
+    const isHttps = parsedUrl.protocol === 'https:';
+
+    const requestOptions = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (isHttps ? 443 : 80),
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Api-Key': apiKey,
+        'User-Agent': 'Zopit-Vercel-Client/2.0',
+        'Content-Length': Buffer.byteLength(payloadString)
+      },
+      timeout: timeoutMs,
+      family: 4, // FORCE IPv4 to prevent Vercel/AWS IPv6 DNS timeout issues
+      rejectUnauthorized: false // Skip strict SSL checks for proxy connections
+    };
+
+    const client = isHttps ? https : http;
+
+    const req = client.request(requestOptions, (res) => {
+      let responseBody = '';
+
+      res.on('data', (chunk) => {
+        responseBody += chunk;
+      });
+      
+      res.on('end', () => {
+        let data: any;
+        try {
+          if (responseBody) data = JSON.parse(responseBody);
+        } catch (e) {}
+        
+        resolve({
+          ok: res.statusCode ? res.statusCode >= 200 && res.statusCode < 300 : false,
+          status: res.statusCode || 500,
+          text: responseBody,
+          data
+        });
+      });
+    });
+
+    req.on('error', (err: any) => {
+      console.warn(`[ProxyClient] connection failed:`, err.message);
+      reject(new Error(`ارتباط با سرور واسط ایران برقرار نشد: ${err.message}`));
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('پاسخی از سرور واسط دریافت نشد (Timeout)'));
+    });
+
+    req.write(payloadString);
+    req.end();
+  });
 }

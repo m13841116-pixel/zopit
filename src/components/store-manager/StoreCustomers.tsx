@@ -110,7 +110,7 @@ export const StoreCustomers: React.FC = () => {
                 {selectedCustomer.name.charAt(0)}
               </div>
               <h3 className="font-extrabold text-text-primary text-lg">{selectedCustomer.name}</h3>
-              <p className="text-xs text-text-muted mt-1">عضو سیستم خریداران مستقیم</p>
+              <p className="text-xs text-text-muted mt-1">عضو خریداران فروشگاه</p>
             </div>
 
             <div className="space-y-3.5 text-sm">

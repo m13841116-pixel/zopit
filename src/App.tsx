@@ -980,7 +980,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/reset-password-otp", {
+      const res = await fetch("/api/auth/reset-password-sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1482,14 +1482,14 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           </div>
         )}
         {currentUser?.isImpersonated && (
-          <div className="bg-amber-600 text-white px-4 py-2 flex items-center justify-between text-xs font-bold shadow-lg z-[9999] relative" dir="rtl">
+          <div className="bg-amber-600 text-white px-3 sm:px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-bold shadow-lg z-[9999] relative text-center sm:text-right" dir="rtl">
             <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse"></span>
-              <span>شما هم‌اکنون به عنوان کاربر <strong className="underline">{currentUser.firstName || ''} {currentUser.lastName || ''} ({currentUser.username})</strong> وارد شده‌اید (حالت شبیه‌سازی).</span>
+              <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse shrink-0"></span>
+              <span className="leading-snug">شما هم‌اکنون به عنوان کاربر <strong className="underline">{currentUser.firstName || ''} {currentUser.lastName || ''} ({currentUser.username})</strong> وارد شده‌اید (حالت شبیه‌سازی).</span>
             </div>
             <button
               onClick={handleExitImpersonation}
-              className="bg-white text-amber-900 px-3 py-1 rounded-lg hover:bg-amber-100 transition cursor-pointer font-bold shadow-sm"
+              className="bg-white text-amber-900 px-3 py-1 rounded-lg hover:bg-amber-100 transition cursor-pointer font-bold shadow-sm shrink-0 w-full sm:w-auto"
             >
               خروج و بازگشت به حساب مدیریت
             </button>
@@ -3535,7 +3535,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                                 className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default"
                               >
                                 <option value="WOOCOMMERCE">فروشگاه ووکامرس (WooCommerce)</option>
-                                <option value="INSTAGRAM">پیج اینستاگرام</option>
+                                <option value="INSTAGRAM">پیج زوپیت‌گرام (ZoombitGram)</option>
                                 <option value="CUSTOM_SITE">وب‌سایت اختصاصی</option>
                                 <option value="PHYSICAL_OTHER">فروشگاه حضوری / سایر</option>
                               </select>

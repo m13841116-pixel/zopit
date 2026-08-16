@@ -1,5 +1,4 @@
 import { getPrisma } from '../../prisma.js';
-import { executeProxyRequest } from '../payment/proxyClient.js';
 
 /**
  * Standardizes mobile numbers to local Iranian format starting with 09...
@@ -154,15 +153,16 @@ export async function sendPattern(mobile: string, patternKey: string, textValues
     // 2. Fallback: Send via Iranian WordPress proxy (bankkalaha.ir)
     try {
       console.log(`[SMS Service] Routing pattern SMS through Iranian proxy for ${cleanMobile}...`);
-      const proxyResult = await executeProxyRequest(payload, {
-        proxyUrl: 'https://bankkalaha.ir/sms-proxy.php',
-        apiKey: 'ZopitSMS2026Key',
-        timeoutMs: 15000
+      const proxyResponse = await fetch('https://bankkalaha.ir/sms-proxy.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': 'ZopitSMS2026Key'
+        },
+        body: JSON.stringify(payload)
       });
-
-      const proxyData: any = proxyResult.data || {};
-
-      const isProxySuccess = proxyResult.ok && (
+      const proxyData: any = await proxyResponse.json().catch(() => ({}));
+      const isProxySuccess = proxyResponse.ok && (
         proxyData.success === true ||
         proxyData.status === true ||
         proxyData.RetStatus === 1 ||
@@ -275,15 +275,16 @@ export async function sendSms(mobile: string, message: string) {
 
     // 2. Proxy fallback
     try {
-      const proxyResult = await executeProxyRequest(payload, {
-        proxyUrl: 'https://bankkalaha.ir/sms-proxy.php',
-        apiKey: 'ZopitSMS2026Key',
-        timeoutMs: 15000
+      const proxyResponse = await fetch('https://bankkalaha.ir/sms-proxy.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': 'ZopitSMS2026Key'
+        },
+        body: JSON.stringify(payload)
       });
-
-      const proxyData: any = proxyResult.data || {};
-
-      if (proxyResult.ok && (proxyData.success || proxyData.status === true || proxyData.Value)) {
+      const proxyData: any = await proxyResponse.json().catch(() => ({}));
+      if (proxyResponse.ok && (proxyData.success || proxyData.status === true || proxyData.Value)) {
         return {
           success: true,
           message: 'پیامک با موفقیت ارسال شد.',
