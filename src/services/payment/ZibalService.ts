@@ -96,7 +96,7 @@ export class ZibalService implements PaymentGateway {
       // because Vercel IPs are blocked by Zibal and will return 115.
 
       if (!data || (Number(data.result) !== 100 && !data.payLink && !data.trackId)) {
-         throw lastProxyError || new Error('عدم پاسخگویی سرور واسط.');
+         throw new Error(`ارتباط با سرور واسط ایران (بانک کالا) با مشکل مواجه شد. در صورت امکان از سرور واسط دیگری استفاده نمایید. جزئیات خطا: ${lastProxyError?.message || 'نامشخص'}`);
       }
 
       if (data && ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId))) {

@@ -24,7 +24,7 @@ export async function executeProxyRequest(
 ): Promise<ProxyResponse> {
   const proxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
   const apiKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  const timeoutMs = options.timeoutMs || 12000;
+  const timeoutMs = options.timeoutMs || 25000;
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
   // Strategy 1: Try modern fetch API with AbortController
@@ -90,7 +90,8 @@ export async function executeProxyRequest(
         'Content-Length': Buffer.byteLength(payloadString)
       },
       timeout: timeoutMs,
-      rejectUnauthorized: false
+      rejectUnauthorized: false,
+      family: 4
     };
 
     const client = isHttps ? https : http;

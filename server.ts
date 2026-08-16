@@ -10471,6 +10471,14 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         
         if (result.data && (result.data.result !== undefined || result.data.success !== undefined)) {
           data = result.data;
+        if (data && data.result === 115) {
+          return res.json({
+            success: false,
+            active: false,
+            message: 'خطای 115: آی‌پی سرور شما (Vercel) توسط درگاه زیبال مسدود شده است. اتصال مستقیم به زیبال امکان‌پذیر نیست و باید از سرور واسط ایران استفاده کنید.',
+            merchant: merchantToTest
+          });
+        }
         } else if (result.text && result.text.trim()) {
           try {
             const parsed = JSON.parse(result.text);
