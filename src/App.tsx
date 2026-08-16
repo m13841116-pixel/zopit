@@ -1482,14 +1482,14 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           </div>
         )}
         {currentUser?.isImpersonated && (
-          <div className="bg-amber-600 text-white px-3 sm:px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-bold shadow-lg z-[9999] relative text-center sm:text-right" dir="rtl">
+          <div className="bg-slate-900 text-white px-3 sm:px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-medium shadow-xl z-[9999] relative text-center sm:text-right border-b border-white/10" dir="rtl">
             <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse shrink-0"></span>
-              <span className="leading-snug">شما هم‌اکنون به عنوان کاربر <strong className="underline">{currentUser.firstName || ''} {currentUser.lastName || ''} ({currentUser.username})</strong> وارد شده‌اید (حالت شبیه‌سازی).</span>
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+              <span className="leading-snug opacity-90">شما هم‌اکنون به عنوان کاربر <strong className="text-emerald-400 font-bold">{currentUser.firstName || ''} {currentUser.lastName || ''} ({currentUser.username})</strong> وارد شده‌اید (حالت شبیه‌سازی).</span>
             </div>
             <button
               onClick={handleExitImpersonation}
-              className="bg-white text-amber-900 px-3 py-1 rounded-lg hover:bg-amber-100 transition cursor-pointer font-bold shadow-sm shrink-0 w-full sm:w-auto"
+              className="bg-white/10 text-white border border-white/20 px-4 py-1.5 rounded-md hover:bg-white hover:text-slate-900 transition-all cursor-pointer font-bold shadow-sm shrink-0 w-full sm:w-auto flex items-center justify-center"
             >
               خروج و بازگشت به حساب مدیریت
             </button>

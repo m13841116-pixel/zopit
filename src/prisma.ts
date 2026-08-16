@@ -1,5 +1,6 @@
 let prismaInstance: any = null;
 
+// [UPDATE]: Version 1.0.1 - Added Vercel Serverless (pgbouncer) compatibility for Neon DB.
 // Use globalThis to persist Prisma client in development or serverless environments
 const globalForPrisma = globalThis as unknown as { prisma: any };
 

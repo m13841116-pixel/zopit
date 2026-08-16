@@ -60,9 +60,23 @@ export class ZibalService implements PaymentGateway {
   async createPayment(amount: number | string, description: string, callbackUrl: string, orderId?: string | number): Promise<{ payLink: string; authority: string }> {
     try {
       let finalCallbackUrl = callbackUrl;
-      if (!finalCallbackUrl.includes('zopit.ir')) {
-        finalCallbackUrl += (finalCallbackUrl.includes('?') ? '&' : '?') + 'zopit_bypass=zopit.ir';
+      
+      // Zibal strictly requires the callback URL domain to match the merchant's registered domain (zopit.ir).
+      // If we are on a Vercel staging domain (.vercel.app) or localhost, Zibal returns Error 106.
+      // We must rewrite the origin to the official domain to bypass this error.
+      if (this.zibalMerchant !== 'zibal' && !finalCallbackUrl.includes('zopit.ir')) {
+        try {
+          const urlObj = new URL(finalCallbackUrl);
+          urlObj.protocol = 'https:';
+          urlObj.hostname = 'zopit.ir';
+          urlObj.port = '';
+          finalCallbackUrl = urlObj.toString();
+          console.log('[Zibal] Rewrote callbackUrl origin to match merchant domain:', finalCallbackUrl);
+        } catch (e) {
+          // ignore parsing error
+        }
       }
+
       const numAmount = Number(amount);
       if (isNaN(numAmount) || numAmount <= 0) throw new Error('مبلغ پرداختی نامعتبر است.');
 
