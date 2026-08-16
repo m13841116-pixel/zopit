@@ -9853,9 +9853,11 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       let data: any = null;
       let proxyErrorDetails = '';
 
-      // 1. Try Iranian Proxy first
+      // 1. Try Iranian Proxy first (bankkalaha.ir)
       try {
-        const result = await requestProxy(process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php', process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key', {
+        const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+        const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
+        const result = await requestProxy(proxyUrl, proxySecret, {
           action: 'request',
           merchant: merchantToTest,
           amount: 50000, // 5,000 Tomans
@@ -9865,7 +9867,10 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         
         if (result.ok && result.text.trim()) {
           try {
-            data = JSON.parse(result.text);
+            const parsed = JSON.parse(result.text);
+            if (parsed && (parsed.result !== undefined || parsed.success !== undefined)) {
+              data = parsed;
+            }
           } catch {
             proxyErrorDetails = `پاسخ سرور واسط JSON نبود: ${result.text.slice(0, 100)}`;
           }
@@ -9876,7 +9881,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         proxyErrorDetails = proxyErr.message;
       }
 
-      // 2. If proxy had issue, attempt direct Zibal endpoint
+      // 2. If proxy had issue or returned invalid format, attempt direct Zibal endpoint
       if (!data || data.result === undefined) {
         try {
           const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
@@ -9906,11 +9911,11 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         });
       }
       
-      if (Number(data.result) === 100) {
+      if (Number(data.result) === 100 || data.success === true) {
         return res.json({
           success: true,
           active: true,
-          resultCode: data.result,
+          resultCode: data.result || 100,
           message: 'درگاه پرداخت زیبال کاملاً فعال و کد مرجنت معتبر و آماده دریافت وجه می‌باشد.',
           merchant: merchantToTest
         });
@@ -9919,7 +9924,8 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           102: 'مرجنت یافت نشد (کد مرجنت زیبال وارد شده اشتباه است)',
           103: 'مرجنت غیرفعال است (درگاه در انتظار تایید مدارک یا قرارداد زیبال است)',
           104: 'مرجنت نامعتبر است',
-          115: 'آدرس IP سرور در پنل زیبال ثبت نشده است (درخواست از طریق پروکسی ایران ارسال شد)',
+          113: 'مبلغ تراکنش نامعتبر است (حداقل ۵،۰۰۰ تومان)',
+          115: 'آدرس IP سرور در پنل زیبال نیاز به تایید دارد (یا IP سرور هاست باید در پنل زیبال اضافه شود)',
           201: 'تراکنش قبلا تایید شده',
           202: 'سفارش یافت نشد'
         };
