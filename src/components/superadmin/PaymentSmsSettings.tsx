@@ -15,6 +15,9 @@ import {
   Printer,
   FileCheck,
   MessageSquare,
+  Activity,
+  ExternalLink,
+  Zap,
 } from "lucide-react";
 
 export default function PaymentSmsSettings() {
@@ -24,7 +27,7 @@ export default function PaymentSmsSettings() {
 
   // States for Settings
   const [gatewayType, setGatewayType] = useState("ZIBAL");
-  const [merchantCode, setMerchantCode] = useState("");
+  const [merchantCode, setMerchantCode] = useState("6a0213e61b27742a09938588");
   const [gatewayKey, setGatewayKey] = useState("");
   const [enableCardToCard, setEnableCardToCard] = useState(false);
   const [shabaNumber, setShabaNumber] = useState("330560611828006022464501");
@@ -185,7 +188,13 @@ export default function PaymentSmsSettings() {
       .then((data) => {
         if (data && !data.error) {
           if (data.PAYMENT_GATEWAY_TYPE) setGatewayType(data.PAYMENT_GATEWAY_TYPE);
-          if (data.PAYMENT_GATEWAY_MERCHANT_CODE) setMerchantCode(data.PAYMENT_GATEWAY_MERCHANT_CODE);
+          if (data.PAYMENT_GATEWAY_MERCHANT_CODE) {
+            let mCode = String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim();
+            if (mCode === 'a0213e61b27742a09938588') mCode = '6a0213e61b27742a09938588';
+            setMerchantCode(mCode);
+          } else {
+            setMerchantCode('6a0213e61b27742a09938588');
+          }
           if (data.PAYMENT_GATEWAY_KEY) setGatewayKey(data.PAYMENT_GATEWAY_KEY);
           if (data.CARD_TO_CARD_SHABA) setShabaNumber(data.CARD_TO_CARD_SHABA);
           if (data.CARD_TO_CARD_CARD) setCardNumber(data.CARD_TO_CARD_CARD);
@@ -344,7 +353,7 @@ export default function PaymentSmsSettings() {
 
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1.5">کد مرچنت / پذیرنده درگاه (Merchant ID)</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2.5">
                   <input
                     type="text"
                     value={merchantCode}
@@ -356,24 +365,26 @@ export default function PaymentSmsSettings() {
                       }
                     }}
                     placeholder="مثال: 6a0213e61b27742a09938588"
-                    className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default"
+                    className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default min-w-[220px]"
                   />
                   <button
                     type="button"
                     onClick={handleTestGateway}
                     disabled={testingGateway || !merchantCode}
-                    className="px-3.5 py-2 bg-surface hover:bg-purple-100 dark:hover:bg-slate-800 border border-border text-text-primary text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold rounded-xl border border-indigo-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-md disabled:opacity-50 whitespace-nowrap"
                   >
+                    <Activity className={`w-3.5 h-3.5 ${testingGateway ? 'animate-spin' : ''}`} />
                     {testingGateway ? "در حال بررسی..." : "تست اتصال زنده"}
                   </button>
                   <a
                     href="/api/payment/test"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm text-center"
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl border border-emerald-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-md whitespace-nowrap"
                     title="تولید خودکار فاکتور و ورود فوری به صفحه رسمی درگاه زیبال شاپرک"
                   >
-                    ورود مستقیم به درگاه پرداخت زیبال ↗
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    ورود مستقیم به درگاه شاپرک
                   </a>
                 </div>
                 
@@ -423,9 +434,10 @@ export default function PaymentSmsSettings() {
                           href={testInvoiceResult.payLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 shadow-sm"
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-xs border border-emerald-700 hover:shadow-md"
                         >
-                          ورود مستقیم به صفحه پرداخت درگاه زیبال ↗
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          ورود مستقیم به درگاه شاپرک
                         </a>
                       </div>
                     )}

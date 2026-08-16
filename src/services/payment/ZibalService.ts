@@ -1,4 +1,5 @@
 import { PaymentGateway } from '../../interfaces/payment-gateway.interface.js';
+import { executeProxyRequest } from './proxyClient.js';
 
 const ZIBAL_GATEWAY_URL = 'https://gateway.zibal.ir/v1';
 const ZIBAL_API_URL = 'https://api.zibal.ir/v1';
@@ -36,61 +37,20 @@ export class ZibalService implements PaymentGateway {
   }
 
   /**
-   * Helper to send requests through the Iran Proxy Server with retries and timeout
+   * Helper to send requests through the Iran Proxy Server with IPv4 fallback and timeout
    */
   private async sendProxyRequest(payload: any): Promise<any> {
-    const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-
-    let lastError: any = null;
-    const maxAttempts = 2;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
-
-        const response = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-Api-Key': proxySecret,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        const responseText = await response.text().catch(() => '');
-
-        if (!response.ok) {
-          throw new Error(`پاسخ ناموفق از سرور واسط (کد ${response.status}): ${responseText || response.statusText}`);
-        }
-
-        if (!responseText || !responseText.trim()) {
-          throw new Error('پاسخ دریافتی از سرور واسط خالی است.');
-        }
-
-        let data: any;
-        try {
-          data = JSON.parse(responseText);
-        } catch (jsonErr) {
-          throw new Error(`پاسخ سرور واسط قالب JSON معتبر ندارد: ${responseText.slice(0, 100)}`);
-        }
-        return data;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[Zibal Proxy] Attempt ${attempt} failed:`, err.message);
-        if (attempt < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 800));
-        }
-      }
+    const result = await executeProxyRequest(payload);
+    if (result.data && (result.data.result !== undefined || result.data.success !== undefined || result.data.trackId !== undefined)) {
+      return result.data;
     }
-
-    throw lastError || new Error('ارتباط با سرور واسط ایران (bankkalaha.ir) برقرار نشد.');
+    if (result.ok && result.text) {
+      try {
+        const parsed = JSON.parse(result.text);
+        if (parsed) return parsed;
+      } catch {}
+    }
+    throw new Error(result.data?.error || result.text || 'ارتباط با سرور واسط ایران (bankkalaha.ir) برقرار نشد.');
   }
   
   /**

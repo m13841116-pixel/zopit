@@ -36,6 +36,7 @@ console.error = function (...args) {
 import { registerAdminShippingRoutes } from './src/services/adminShippingRoutes.js';
 import { registerStoreShippingRoutes } from './src/services/storeShippingRoutes.js';
 import { startCronJobs } from './src/cronJobs.js';
+import { executeProxyRequest } from './src/services/payment/proxyClient.js';
 import { 
   sendSmsViaMelliPayamak, 
   notifySupplierNewOrder, 
@@ -9177,52 +9178,18 @@ app.post('/api/payment/zibal/request-invoice-url', async (req: any, res: any) =>
   }
 });
 
-async function requestProxy(url: string, apiKey: string, body: any): Promise<{ ok: boolean; status: number; text: string }> {
-  const proxyUrl = url || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-  const proxyKey = apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
-
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Api-Key': proxyKey,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      const text = await response.text().catch(() => '');
-
-      return {
-        ok: response.ok,
-        status: response.status,
-        text: text
-      };
-    } catch (err: any) {
-      console.error(`[requestProxy] Attempt ${attempt} failed:`, err?.message || err);
-      if (attempt === 2) {
-        return {
-          ok: false,
-          status: 504,
-          text: JSON.stringify({ error: `خطا در ارتباط با سرور واسط: ${err?.message || 'عدم پاسخگویی'}` })
-        };
-      }
-      await new Promise((r) => setTimeout(r, 600));
-    }
-  }
+async function requestProxy(url: string, apiKey: string, body: any): Promise<{ ok: boolean; status: number; text: string; data?: any }> {
+  const result = await executeProxyRequest(body, {
+    proxyUrl: url,
+    apiKey: apiKey,
+    timeoutMs: 15000,
+  });
 
   return {
-    ok: false,
-    status: 500,
-    text: JSON.stringify({ error: 'Connection failed after retries' })
+    ok: result.ok,
+    status: result.status,
+    text: result.text,
+    data: result.data,
   };
 }
 
@@ -9803,10 +9770,13 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
   app.post('/api/admin/payment-gateway/test', authenticateToken, requireAdmin, async (req: any, res: any) => {
     try {
       const { merchantCode, gatewayType } = req.body;
-      let merchantToTest = merchantCode;
-      if (!merchantToTest || merchantToTest === 'zibal_merchant_key') {
+      let merchantToTest = (merchantCode || '').trim();
+      if (merchantToTest === 'a0213e61b27742a09938588') {
+        merchantToTest = '6a0213e61b27742a09938588';
+      }
+      if (!merchantToTest || merchantToTest === 'zibal' || merchantToTest === 'zibal_merchant_key') {
         const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
-        merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588';
+        merchantToTest = savedSetting?.value?.trim() || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588';
       }
 
       const selectedGateway = (gatewayType || 'ZIBAL').toUpperCase();
@@ -9857,11 +9827,10 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         }
       }
       
-      // Default: Zibal testing
+      // Default: Zibal testing via Robust Iran Proxy
       let data: any = null;
       let proxyErrorDetails = '';
 
-      // 1. Try Iranian Proxy first (bankkalaha.ir)
       try {
         const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
         const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
@@ -9871,16 +9840,19 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           amount: 50000, // 5,000 Tomans
           callbackUrl: 'https://zopit.ir/callback-test',
           description: 'تست آنلاین فعال بودن درگاه زیبال (۵ هزار تومان)',
+          linkToDirect: 1
         });
         
-        if (result.ok && result.text.trim()) {
+        if (result.data && (result.data.result !== undefined || result.data.success !== undefined)) {
+          data = result.data;
+        } else if (result.text && result.text.trim()) {
           try {
             const parsed = JSON.parse(result.text);
             if (parsed && (parsed.result !== undefined || parsed.success !== undefined)) {
               data = parsed;
             }
           } catch {
-            proxyErrorDetails = `پاسخ سرور واسط JSON نبود: ${result.text.slice(0, 100)}`;
+            proxyErrorDetails = `پاسخ سرور واسط: ${result.text.slice(0, 100)}`;
           }
         } else {
           proxyErrorDetails = result.text?.slice(0, 150) || `کد وضعیت ${result.status}`;
@@ -9958,9 +9930,12 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
   app.post('/api/admin/payment-gateway/create-test-invoice', authenticateToken, requireSuperAdmin, async (req: any, res: any) => {
     try {
       const { merchantCode } = req.body;
-      const merchantToTest = (merchantCode && typeof merchantCode === 'string') 
+      let merchantToTest = (merchantCode && typeof merchantCode === 'string') 
         ? merchantCode.trim() 
         : (process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
+      if (merchantToTest === 'a0213e61b27742a09938588') {
+        merchantToTest = '6a0213e61b27742a09938588';
+      }
 
       const baseUrl = getPublicUrl(req);
       const callbackUrl = `${baseUrl}/api/public/store-invoice/callback?testInvoice=true`;
@@ -9978,6 +9953,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           amount: amountRials,
           callbackUrl,
           description: 'تست فاکتور آزمایشی ۵،۰۰۰ تومانی زوپیت',
+          linkToDirect: 1,
         });
         if (proxyRes.ok && proxyRes.text) {
           const parsed = JSON.parse(proxyRes.text);
