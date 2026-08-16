@@ -9861,27 +9861,9 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         proxyErrorDetails = proxyErr.message;
       }
 
-      // 2. If proxy had issue or returned invalid format, attempt direct Zibal endpoint
-      if (!data || data.result === undefined) {
-        try {
-          const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              merchant: merchantToTest,
-              amount: 50000,
-              callbackUrl: 'https://zopit.ir/callback-test',
-              description: 'تست فعال بودن درگاه زیبال'
-            })
-          });
-          const directData: any = await directRes.json().catch(() => ({}));
-          if (directData && directData.result !== undefined) {
-            data = directData;
-          }
-        } catch (directErr: any) {
-          console.warn('Direct Zibal test failed:', directErr.message);
-        }
-      }
+      // 2. We strictly DO NOT fallback to direct Zibal request here,
+      // because Vercel IPs are blocked by Zibal and will return 115.
+      // Instead, we just pass the proxy result directly.
 
       if (!data || data.result === undefined) {
         return res.json({
@@ -9965,27 +9947,9 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         lastErr = pErr;
       }
 
-      // Fallback to direct Zibal
-      if (!data || !data.trackId) {
-        try {
-          const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              merchant: merchantToTest,
-              amount: amountRials,
-              callbackUrl,
-              description: 'تست فاکتور آزمایشی ۵،۰۰۰ تومانی زوپیت'
-            })
-          });
-          const directData = await directRes.json().catch(() => null);
-          if (directData && (directData.trackId || directData.result !== undefined)) {
-            data = directData;
-          }
-        } catch (dErr: any) {
-          lastErr = dErr;
-        }
-      }
+      // We strictly DO NOT fallback to direct Zibal request here,
+      // because Vercel IPs are blocked by Zibal and will return 115.
+      // Instead, we just pass the proxy result directly.
 
       if (data && (Number(data.result) === 100 || data.success) && (data.trackId || data.payLink)) {
         const trackId = data.trackId || data.authority;
