@@ -23,7 +23,7 @@ export default function PaymentSmsSettings() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // States for Settings
-  const [gatewayType, setGatewayType] = useState("ZARINPAL");
+  const [gatewayType, setGatewayType] = useState("ZIBAL");
   const [merchantCode, setMerchantCode] = useState("");
   const [gatewayKey, setGatewayKey] = useState("");
   const [enableCardToCard, setEnableCardToCard] = useState(false);
@@ -78,12 +78,12 @@ export default function PaymentSmsSettings() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
-        body: JSON.stringify({ merchantCode }),
+        body: JSON.stringify({ merchantCode, gatewayType, gatewayKey }),
       });
       const data = await res.json();
       setGatewayTestResult(data);
       if (data.active) {
-        toast("درگاه زیبال کاملاً فعال و معتبر است.", "success");
+        toast(data.message || "درگاه پرداخت کاملاً فعال و معتبر است.", "success");
       } else {
         toast(`هشدار درگاه: ${data.message}`, "error");
       }
@@ -304,7 +304,13 @@ export default function PaymentSmsSettings() {
                   <input
                     type="text"
                     value={merchantCode}
-                    onChange={(e) => setMerchantCode(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.trim();
+                      setMerchantCode(val);
+                      if (val.length === 24 && !val.includes('-') && gatewayType === 'ZARINPAL') {
+                        setGatewayType('ZIBAL');
+                      }
+                    }}
                     placeholder="مثال: 6a0213e61b27742a09938588"
                     className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default"
                   />

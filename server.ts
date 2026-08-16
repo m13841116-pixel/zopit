@@ -9175,71 +9175,53 @@ app.post('/api/payment/zibal/request-invoice-url', async (req: any, res: any) =>
   }
 });
 
-function requestProxy(url: string, apiKey: string, body: any): Promise<{ ok: boolean; status: number; text: string }> {
-  return new Promise((resolve) => {
+async function requestProxy(url: string, apiKey: string, body: any): Promise<{ ok: boolean; status: number; text: string }> {
+  const proxyUrl = url || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+  const proxyKey = apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const urlObj = new URL(url);
-      const postData = JSON.stringify(body);
-      
-      const options = {
-        hostname: urlObj.hostname,
-        port: 443,
-        path: urlObj.pathname + urlObj.search,
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-Api-Key': apiKey,
+          'X-Api-Key': proxyKey,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Content-Length': Buffer.byteLength(postData)
         },
-        rejectUnauthorized: false, // Prevents "fetch failed" SSL errors completely!
-        timeout: 10000 // 10 seconds timeout
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      const text = await response.text().catch(() => '');
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        text: text
       };
-      
-      const req = https.request(options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-        res.on('end', () => {
-          resolve({
-            ok: (res.statusCode || 200) >= 200 && (res.statusCode || 200) < 300,
-            status: res.statusCode || 200,
-            text: data
-          });
-        });
-      });
-      
-      req.on('error', (err: any) => {
-        console.error('[requestProxy] Socket Connection Error:', err);
-        resolve({
-          ok: false,
-          status: 500,
-          text: JSON.stringify({ error: `Connection failed: ${err.message || String(err)}` })
-        });
-      });
-      
-      req.on('timeout', () => {
-        req.destroy();
-        resolve({
+    } catch (err: any) {
+      console.error(`[requestProxy] Attempt ${attempt} failed:`, err?.message || err);
+      if (attempt === 2) {
+        return {
           ok: false,
           status: 504,
-          text: JSON.stringify({ error: 'Connection timeout to proxy server (bankkalaha.ir)' })
-        });
-      });
-      
-      req.write(postData);
-      req.end();
-    } catch (err: any) {
-      console.error('[requestProxy] Exception:', err);
-      resolve({
-        ok: false,
-        status: 500,
-        text: JSON.stringify({ error: `Exception: ${err.message || String(err)}` })
-      });
+          text: JSON.stringify({ error: `خطا در ارتباط با سرور واسط: ${err?.message || 'عدم پاسخگویی'}` })
+        };
+      }
+      await new Promise((r) => setTimeout(r, 600));
     }
-  });
+  }
+
+  return {
+    ok: false,
+    status: 500,
+    text: JSON.stringify({ error: 'Connection failed after retries' })
+  };
 }
 
 
@@ -9812,22 +9794,71 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
   // Payment Gateway Online Health Check API
   app.post('/api/admin/payment-gateway/test', authenticateToken, requireAdmin, async (req: any, res: any) => {
     try {
-      const { merchantCode } = req.body;
+      const { merchantCode, gatewayType } = req.body;
       let merchantToTest = merchantCode;
       if (!merchantToTest || merchantToTest === 'zibal_merchant_key') {
         const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
         merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588';
       }
+
+      const selectedGateway = (gatewayType || 'ZIBAL').toUpperCase();
+
+      // If user is testing ZarinPal
+      if (selectedGateway === 'ZARINPAL') {
+        if (merchantToTest && merchantToTest.length < 30) {
+          return res.json({
+            success: false,
+            active: false,
+            message: `کد مرجنت وارد شده (${merchantToTest.length} کاراکتر) متعلق به درگاه زیبال است. لطفاً از منوی کشویی گزینه «درگاه زیبال (Zibal)» را انتخاب فرمایید.`,
+            merchant: merchantToTest
+          });
+        }
+        try {
+          const zarinpalRes = await fetch('https://payment.zarinpal.com/pg/v4/payment/request.json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              merchant_id: merchantToTest,
+              amount: 50000,
+              callback_url: 'https://zopit.ir/callback-test',
+              description: 'تست فعال بودن درگاه زرین‌پال'
+            })
+          });
+          const zpData: any = await zarinpalRes.json().catch(() => ({}));
+          if (zpData?.data?.code === 100 || zpData?.data?.authority) {
+            return res.json({
+              success: true,
+              active: true,
+              message: 'درگاه پرداخت زرین‌پال فعال و مرجنت با موفقیت تایید شد.',
+              merchant: merchantToTest
+            });
+          } else {
+            return res.json({
+              success: false,
+              active: false,
+              message: zpData?.errors?.message || `پاسخ زرین‌پال: کد خطای ${zpData?.errors?.code || -1}`,
+              merchant: merchantToTest
+            });
+          }
+        } catch (zpErr: any) {
+          return res.json({
+            success: false,
+            active: false,
+            message: `خطا در ارتباط با وب‌سرویس زرین‌پال: ${zpErr.message}`
+          });
+        }
+      }
       
+      // Default: Zibal testing
       let data: any = null;
       let proxyErrorDetails = '';
 
-      // 1. Try proxy first
+      // 1. Try Iranian Proxy first
       try {
         const result = await requestProxy(process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php', process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key', {
           action: 'request',
           merchant: merchantToTest,
-          amount: 50000, // 5,000 Tomans (50,000 IRR) as requested
+          amount: 50000, // 5,000 Tomans
           callbackUrl: 'https://zopit.ir/callback-test',
           description: 'تست آنلاین فعال بودن درگاه زیبال (۵ هزار تومان)',
         });
@@ -9835,23 +9866,43 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         if (result.ok && result.text.trim()) {
           try {
             data = JSON.parse(result.text);
-          } catch (e) {
-            proxyErrorDetails = `پاسخ سرور واسط قالب JSON معتبر ندارد: ${result.text.slice(0, 150)}`;
+          } catch {
+            proxyErrorDetails = `پاسخ سرور واسط JSON نبود: ${result.text.slice(0, 100)}`;
           }
         } else {
-          proxyErrorDetails = `سرور واسط پاسخ خالی یا ناموفق با کد ${result.status} فرستاد. متن پاسخ: ${result.text.slice(0, 150) || 'پاسخ خالی (کد خطا یا تداخل وب‌سایت)'}`;
+          proxyErrorDetails = result.text?.slice(0, 150) || `کد وضعیت ${result.status}`;
         }
       } catch (proxyErr: any) {
-        console.warn('Proxy test failed:', proxyErr);
-        proxyErrorDetails = `خطا در اتصال به سرور واسط: ${proxyErr.message}`;
+        proxyErrorDetails = proxyErr.message;
       }
 
-      // If proxy didn't work and we have an error, return a detailed error message explaining how to fix it
+      // 2. If proxy had issue, attempt direct Zibal endpoint
+      if (!data || data.result === undefined) {
+        try {
+          const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              merchant: merchantToTest,
+              amount: 50000,
+              callbackUrl: 'https://zopit.ir/callback-test',
+              description: 'تست فعال بودن درگاه زیبال'
+            })
+          });
+          const directData: any = await directRes.json().catch(() => ({}));
+          if (directData && directData.result !== undefined) {
+            data = directData;
+          }
+        } catch (directErr: any) {
+          console.warn('Direct Zibal test failed:', directErr.message);
+        }
+      }
+
       if (!data || data.result === undefined) {
         return res.json({
           success: false,
           active: false,
-          message: `ارتباط با پروکسی ایران (bankkalaha.ir) برقرار نشد. علت: ${proxyErrorDetails || 'عدم پاسخگویی یا بسته بودن خروجی از سمت هاست'}. لطفا مطمئن شوید فایل zibal-proxy.php ارتقایافته را از پوشه پروژه خود دانلود و روی هاست وردپرسی خود آپلود کرده‌اید.`
+          message: `ارتباط با پروکسی یا سرور زیبال برقرار نشد (${proxyErrorDetails || 'تایم‌اوت سرور'}). لطفاً از اتصال هاست واسط مطمئن شوید.`
         });
       }
       
@@ -9860,14 +9911,15 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           success: true,
           active: true,
           resultCode: data.result,
-          message: 'درگاه پرداخت زیبال فعال و کد مرجنت کاملاً معتبر می‌باشد.',
+          message: 'درگاه پرداخت زیبال کاملاً فعال و کد مرجنت معتبر و آماده دریافت وجه می‌باشد.',
           merchant: merchantToTest
         });
       } else {
         const errorMessages: Record<number, string> = {
           102: 'مرجنت یافت نشد (کد مرجنت زیبال وارد شده اشتباه است)',
-          103: 'مرجنت غیرفعال است (درگاه در انتظار تایید مدارک/شناسه زیبال است)',
+          103: 'مرجنت غیرفعال است (درگاه در انتظار تایید مدارک یا قرارداد زیبال است)',
           104: 'مرجنت نامعتبر است',
+          115: 'آدرس IP سرور در پنل زیبال ثبت نشده است (درخواست از طریق پروکسی ایران ارسال شد)',
           201: 'تراکنش قبلا تایید شده',
           202: 'سفارش یافت نشد'
         };
@@ -9883,7 +9935,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       return res.json({
         success: false,
         active: false,
-        message: `خطا در اتصال به درگاه زیبال: ${err.message}`
+        message: `خطا در اتصال به درگاه پرداخت: ${err.message}`
       });
     }
   });
