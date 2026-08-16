@@ -953,10 +953,12 @@ class MemoryDatabase {
     const configs = this.getCollection('systemconfig');
     configs.push(
       { id: 1, key: 'PLATFORM_NAME', value: 'زوپیت (Zopit)' },
-      { id: 2, key: 'ZIBAL_MERCHANT_ID', value: 'zibal' },
-      { id: 3, key: 'PAYMENT_MODE', value: 'HYBRID' }
+      { id: 2, key: 'PAYMENT_GATEWAY_MERCHANT_CODE', value: '6a0213e61b27742a09938588' },
+      { id: 3, key: 'ZIBAL_MERCHANT_ID', value: '6a0213e61b27742a09938588' },
+      { id: 4, key: 'PAYMENT_GATEWAY_TYPE', value: 'zibal' },
+      { id: 5, key: 'PAYMENT_MODE', value: 'HYBRID' }
     );
-    this.autoId.set('systemconfig', 4);
+    this.autoId.set('systemconfig', 6);
   }
 }
 
@@ -9236,7 +9238,9 @@ app.get('/api/payment/test', async (req, res) => {
     const dbMerchant = await prisma.systemConfig.findUnique({
       where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
     });
-    const merchantId = dbMerchant?.value?.trim() || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || 'zibal';
+    const merchantId = (dbMerchant?.value && dbMerchant.value.trim() !== 'zibal' && dbMerchant.value.trim() !== 'zibal_merchant_key') 
+      ? dbMerchant.value.trim() 
+      : (process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
 
     const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
     const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
@@ -9249,7 +9253,8 @@ app.get('/api/payment/test', async (req, res) => {
       merchant: merchantId,
       amount: amount,
       callbackUrl,
-      description
+      description,
+      linkToDirect: 1
     });
 
     const data = JSON.parse(result.text || '{}');
@@ -9258,12 +9263,12 @@ app.get('/api/payment/test', async (req, res) => {
     const trackId = data.trackId || data.authority;
 
     if ((data.success || Number(data.result) === 100) && trackId) {
-      const payLink = `https://gateway.zibal.ir/start/${trackId}`;
+      const payLink = data.payLink || `https://gateway.zibal.ir/start/${trackId}`;
       return res.redirect(payLink);
     } else {
       return res.status(400).send(`<h1>خطا در اتصال به درگاه زیبال</h1><p>${data.message || data.error || JSON.stringify(data)}</p>`);
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Test Payment Route Error:', err);
     return res.status(500).send(`<h1>Server Error</h1><p>${err.message}</p>`);
   }
@@ -9278,7 +9283,9 @@ app.post('/api/payment/request', async (req: any, res: any) => {
     const dbMerchant = await prisma.systemConfig.findUnique({
       where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
     });
-    const merchantId = dbMerchant?.value?.trim() || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || 'zibal';
+    const merchantId = (dbMerchant?.value && dbMerchant.value.trim() !== 'zibal' && dbMerchant.value.trim() !== 'zibal_merchant_key')
+      ? dbMerchant.value.trim()
+      : (process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
 
     // 2. Create a new Order in Prisma DB with status PENDING as requested
     const order = await prisma.order.create({
@@ -9306,6 +9313,7 @@ app.post('/api/payment/request', async (req: any, res: any) => {
       orderId: order.id,
       callbackUrl,
       description: description || `پرداخت سفارش #${order.id}`,
+      linkToDirect: 1
     });
 
     const data = JSON.parse(result.text || '{}');
@@ -9943,6 +9951,93 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         active: false,
         message: `خطا در اتصال به درگاه پرداخت: ${err.message}`
       });
+    }
+  });
+
+  // Create real test invoice (5,000 Tomans) to verify Zibal gateway redirection
+  app.post('/api/admin/payment-gateway/create-test-invoice', authenticateToken, requireSuperAdmin, async (req: any, res: any) => {
+    try {
+      const { merchantCode } = req.body;
+      const merchantToTest = (merchantCode && typeof merchantCode === 'string') 
+        ? merchantCode.trim() 
+        : (process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
+
+      const baseUrl = getPublicUrl(req);
+      const callbackUrl = `${baseUrl}/api/public/store-invoice/callback?testInvoice=true`;
+      const amountRials = 50000; // 5,000 Tomans (Minimum valid Iranian gateway amount)
+
+      // Try Proxy first
+      let data: any = null;
+      let lastErr: any = null;
+      try {
+        const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+        const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
+        const proxyRes = await requestProxy(proxyUrl, proxySecret, {
+          action: 'request',
+          merchant: merchantToTest,
+          amount: amountRials,
+          callbackUrl,
+          description: 'تست فاکتور آزمایشی ۵،۰۰۰ تومانی زوپیت',
+        });
+        if (proxyRes.ok && proxyRes.text) {
+          const parsed = JSON.parse(proxyRes.text);
+          if (parsed && (parsed.trackId || parsed.result !== undefined)) {
+            data = parsed;
+          }
+        }
+      } catch (pErr: any) {
+        lastErr = pErr;
+      }
+
+      // Fallback to direct Zibal
+      if (!data || !data.trackId) {
+        try {
+          const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              merchant: merchantToTest,
+              amount: amountRials,
+              callbackUrl,
+              description: 'تست فاکتور آزمایشی ۵،۰۰۰ تومانی زوپیت'
+            })
+          });
+          const directData = await directRes.json().catch(() => null);
+          if (directData && (directData.trackId || directData.result !== undefined)) {
+            data = directData;
+          }
+        } catch (dErr: any) {
+          lastErr = dErr;
+        }
+      }
+
+      if (data && (Number(data.result) === 100 || data.success) && (data.trackId || data.payLink)) {
+        const trackId = data.trackId || data.authority;
+        const payLink = data.payLink || `https://gateway.zibal.ir/start/${trackId}`;
+        return res.json({
+          success: true,
+          trackId,
+          payLink,
+          message: 'فاکتور تستی ۵،۰۰۰ تومانی با موفقیت در زیبال ایجاد شد و آماده ورود به درگاه است.'
+        });
+      }
+
+      const rawResult = data ? data.result : 'ERR';
+      const rawMessage = data ? (data.message || '') : (lastErr?.message || 'پاسخی دریافت نشد');
+      
+      let errorHint = `کد خطای زیبال: ${rawResult} - ${rawMessage}`;
+      if (Number(rawResult) === 115 || rawMessage.includes('115') || rawMessage.includes('invalid IP')) {
+        errorHint = `خطای تایید IP زیبال (کد ۱۱۵): IP سرور شما (88.135.68.18) باید در پنل زیبال در بخش تنظیمات درگاه وارد شود.`;
+      }
+
+      return res.status(400).json({
+        success: false,
+        result: rawResult,
+        error: errorHint,
+        details: data
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'خطا در ایجاد فاکتور تست' });
     }
   });
 

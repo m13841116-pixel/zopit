@@ -59,6 +59,14 @@ export default function PaymentSmsSettings() {
     message?: string;
     resultCode?: number;
   } | null>(null);
+  const [creatingTestInvoice, setCreatingTestInvoice] = useState(false);
+  const [testInvoiceResult, setTestInvoiceResult] = useState<{
+    success?: boolean;
+    trackId?: string;
+    payLink?: string;
+    message?: string;
+    error?: string;
+  } | null>(null);
 
   // SMS Test State
   const [testPhone, setTestPhone] = useState("09180088358");
@@ -71,6 +79,7 @@ export default function PaymentSmsSettings() {
   const handleTestGateway = async () => {
     setTestingGateway(true);
     setGatewayTestResult(null);
+    setTestInvoiceResult(null);
     try {
       const res = await fetch("/api/admin/payment-gateway/test", {
         method: "POST",
@@ -91,6 +100,41 @@ export default function PaymentSmsSettings() {
       toast("خطا در برقراری ارتباط با سرور", "error");
     } finally {
       setTestingGateway(false);
+    }
+  };
+
+  const handleCreateTestInvoice = async () => {
+    if (!merchantCode) {
+      toast("لطفاً ابتدا کد مرچنت را وارد فرمایید", "error");
+      return;
+    }
+    setCreatingTestInvoice(true);
+    setTestInvoiceResult(null);
+    setGatewayTestResult(null);
+    try {
+      const res = await fetch("/api/admin/payment-gateway/create-test-invoice", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+        },
+        body: JSON.stringify({ merchantCode }),
+      });
+      const data = await res.json();
+      setTestInvoiceResult(data);
+      if (data.success && data.payLink) {
+        toast("فاکتور تست با موفقیت در زیبال ایجاد شد؛ در حال هدایت به درگاه پرداخت...", "success");
+        const opened = window.open(data.payLink, "_blank");
+        if (!opened) {
+          toast("پاپ‌آپ توسط مرورگر مسدود شد؛ لطفاً از دکمه سبز رنگ پایین صفحه وارد درگاه شوید.", "info");
+        }
+      } else {
+        toast(data.error || "خطا در ایجاد فاکتور تست زیبال", "error");
+      }
+    } catch {
+      toast("خطا در برقراری ارتباط با سرور", "error");
+    } finally {
+      setCreatingTestInvoice(false);
     }
   };
 
@@ -320,12 +364,27 @@ export default function PaymentSmsSettings() {
                     disabled={testingGateway || !merchantCode}
                     className="px-3.5 py-2 bg-surface hover:bg-purple-100 dark:hover:bg-slate-800 border border-border text-text-primary text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    {testingGateway ? "در حال تست..." : "تست اتصال زنده"}
+                    {testingGateway ? "در حال بررسی..." : "تست اتصال زنده"}
                   </button>
+                  <a
+                    href="/api/payment/test"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm text-center"
+                    title="تولید خودکار فاکتور و ورود فوری به صفحه رسمی درگاه زیبال شاپرک"
+                  >
+                    ورود مستقیم به درگاه پرداخت زیبال ↗
+                  </a>
                 </div>
+                
                 <span className="text-[11px] text-emerald-600 font-bold block mt-1.5">
                   ✓ برای درگاه زیبال، تنها وارد کردن «کد مرچنت» کافی است و پرداخت‌ها مستقیماً از طریق زیبال انجام خواهند شد.
                 </span>
+
+                {/* Important Notice regarding IP in Zibal */}
+                <div className="mt-2 p-2.5 bg-blue-50/70 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-900 rounded-xl text-[11px] text-blue-900 dark:text-blue-200 leading-relaxed">
+                  <span className="font-bold">نکته بسیار مهم برای آی‌پی (IP) در پنل زیبال:</span> در پنل کاربری زیبال (بخش ویرایش درگاه)، IP هاست پروکسی شما یعنی <strong className="font-mono bg-blue-100 dark:bg-blue-900/60 px-1.5 py-0.5 rounded text-blue-950 dark:text-blue-100 select-all">88.135.68.18</strong> را در بخش «آدرس IP مجاز سرور» ثبت کنید (یا محدودیت IP را در تیکت زیبال بردارید).
+                </div>
 
                 {gatewayTestResult && (
                   <div
@@ -343,6 +402,33 @@ export default function PaymentSmsSettings() {
                         </p>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {testInvoiceResult && (
+                  <div
+                    className={`mt-2.5 p-3 rounded-xl border text-xs ${
+                      testInvoiceResult.success
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-900 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-100"
+                        : "bg-rose-50 border-rose-300 text-rose-900 dark:bg-rose-950/50 dark:border-rose-800 dark:text-rose-100"
+                    }`}
+                  >
+                    <p className="font-bold mb-1.5">{testInvoiceResult.message || testInvoiceResult.error}</p>
+                    {testInvoiceResult.payLink && (
+                      <div className="mt-2 pt-2 border-t border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-[11px] font-medium text-emerald-800 dark:text-emerald-200">
+                          شماره تراکنش پیگیری: <strong className="font-mono">{testInvoiceResult.trackId}</strong>
+                        </span>
+                        <a
+                          href={testInvoiceResult.payLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 shadow-sm"
+                        >
+                          ورود مستقیم به صفحه پرداخت درگاه زیبال ↗
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
