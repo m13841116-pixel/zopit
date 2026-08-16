@@ -39,7 +39,7 @@ export async function executeProxyRequest(
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'X-Api-Key': apiKey,
-          'User-Agent': 'Zopit-Vercel-Client/3.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
         body: payloadString,
         signal: controller.signal,
@@ -86,7 +86,7 @@ export async function executeProxyRequest(
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'X-Api-Key': apiKey,
-        'User-Agent': 'Zopit-Vercel-Client/3.0',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Content-Length': Buffer.byteLength(payloadString)
       },
       timeout: timeoutMs,

@@ -10,7 +10,15 @@ export function getPrisma(): any {
 
   if (!prismaInstance) {
     try {
-      const dbUrl = process.env.DATABASE_URL || '';
+      
+      let dbUrl = process.env.DATABASE_URL || '';
+      
+      // Auto-fix for Neon Postgres Pooler on Vercel to prevent "Server has closed the connection"
+      if (dbUrl.includes('neon.tech') && dbUrl.includes('-pooler') && !dbUrl.includes('pgbouncer=true')) {
+        dbUrl += (dbUrl.includes('?') ? '&' : '?') + 'pgbouncer=true';
+        console.log('[Prisma] Auto-appended pgbouncer=true to Neon pooled connection string for Serverless compatibility.');
+      }
+
       const isRealDb = dbUrl && (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) && !dbUrl.includes('dummy_db');
       if (!isRealDb) {
         prismaInstance = createMemoryPrismaProxy();

@@ -9838,20 +9838,40 @@ app.get('/api/payment/test', async (req, res) => {
     const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
     const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
 
-    console.log('[Test Payment] Sending request to proxy...', { amount, merchantId });
+    
+    console.log('[Test Payment] Attempting smart direct/proxy payment...', { amount, merchantId });
 
-    // 2. Send real POST request to proxy
-    const result = await requestProxy(proxyUrl, proxySecret, {
-      action: 'request',
-      merchant: merchantId,
-      amount: amount,
-      callbackUrl,
-      description,
-      linkToDirect: 1
-    });
+    let data: any = null;
+    let directReturned115 = false;
 
-    const data = JSON.parse(result.text || '{}');
-    console.log('[Test Payment] Proxy Response:', data);
+    // 1. Try Direct
+    try {
+      const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merchant: merchantId, amount, callbackUrl, description })
+      });
+      data = await directRes.json();
+      if (data && data.result === 115) {
+        directReturned115 = true;
+        data = null;
+      }
+    } catch (err) {
+      directReturned115 = true;
+    }
+
+    // 2. Fallback to Proxy
+    if (!data || directReturned115) {
+      const result = await requestProxy(proxyUrl, proxySecret, {
+        action: 'request',
+        merchant: merchantId,
+        amount: amount,
+        callbackUrl,
+        description,
+        linkToDirect: 1
+      });
+      try { data = JSON.parse(result.text || '{}'); } catch(e) { data = result.data || {}; }
+    }
 
     const trackId = data.trackId || data.authority;
 
@@ -10201,7 +10221,15 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     const projectRootDir = (isAIStudioEnv || isCloudRunEnv) ? process.cwd() : findTrueRootDir();
     const { execSync: eSync } = require('child_process');
 
-    const dbUrl = process.env.DATABASE_URL || '';
+    
+      let dbUrl = process.env.DATABASE_URL || '';
+      
+      // Auto-fix for Neon Postgres Pooler on Vercel to prevent "Server has closed the connection"
+      if (dbUrl.includes('neon.tech') && dbUrl.includes('-pooler') && !dbUrl.includes('pgbouncer=true')) {
+        dbUrl += (dbUrl.includes('?') ? '&' : '?') + 'pgbouncer=true';
+        console.log('[Prisma] Auto-appended pgbouncer=true to Neon pooled connection string for Serverless compatibility.');
+      }
+
     if (!dbUrl) {
       res.write('<p class="error">❌ خطا: مقدار DATABASE_URL در فایل .env تعریف نشده است.</p>');
       res.write('<p>لطفا ابتدا فایل <code style="background:#eee;padding:2px 5px;">.env</code> را در پنل هاست خود (cPanel File Manager) ویرایش کرده و متغیر <code style="background:#eee;padding:2px 5px;">DATABASE_URL</code> را با اطلاعات دیتابیس MySQL خود مقداردهی کنید.</p>');
