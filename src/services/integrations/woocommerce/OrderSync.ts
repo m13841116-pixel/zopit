@@ -1,6 +1,6 @@
 import { getPrisma } from '../../../prisma.js';
 import WooCommerceRestApi from '@woocommerce/woocommerce-rest-api';
-import { processOrderPayload } from './WebhookService';
+import { processOrderPayload } from './WebhookService.js';
 
 const prisma = getPrisma();
 

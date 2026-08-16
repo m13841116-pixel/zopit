@@ -1,8 +1,8 @@
 import { getPrisma } from '../prisma.js';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { PaymentServiceFactory } from './payment/PaymentServiceFactory';
-import { appEvents } from './NotificationService';
+import { PaymentServiceFactory } from './payment/PaymentServiceFactory.js';
+import { appEvents } from './NotificationService.js';
 
 export const LedgerType = {
   CREDIT: 'CREDIT',

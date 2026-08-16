@@ -1,8 +1,8 @@
 import { getPrisma } from '../../prisma.js';
 const prisma = getPrisma();
-import { PaymentGateway } from '../../interfaces/payment-gateway.interface';
-import { ZibalService } from './ZibalService';
-import { MockZibalService } from './MockZibalService';
+import { PaymentGateway } from '../../interfaces/payment-gateway.interface.js';
+import { ZibalService } from './ZibalService.js';
+import { MockZibalService } from './MockZibalService.js';
 
 export class PaymentServiceFactory {
   static async getService(): Promise<PaymentGateway> {

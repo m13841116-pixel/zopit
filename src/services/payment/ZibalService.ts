@@ -1,4 +1,4 @@
-import { PaymentGateway } from '../../interfaces/payment-gateway.interface';
+import { PaymentGateway } from '../../interfaces/payment-gateway.interface.js';
 
 const ZIBAL_GATEWAY_URL = 'https://gateway.zibal.ir/v1';
 const ZIBAL_API_URL = 'https://api.zibal.ir/v1';

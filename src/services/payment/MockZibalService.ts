@@ -1,4 +1,4 @@
-import { PaymentGateway } from '../../interfaces/payment-gateway.interface';
+import { PaymentGateway } from '../../interfaces/payment-gateway.interface.js';
 
 // Simple in-memory store to track mock payment and payout state
 export const mockPaymentStore = new Map<string, { amount: number | string; status: 'pending' | 'success' | 'failed' }>();

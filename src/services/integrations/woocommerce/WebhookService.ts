@@ -1,7 +1,7 @@
 import { getPrisma } from '../../../prisma.js';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
-import { WalletService, LedgerType } from '../../WalletService';
+import { WalletService, LedgerType } from '../../WalletService.js';
 
 const prisma = getPrisma();
 const walletService = new WalletService();
