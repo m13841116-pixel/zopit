@@ -139,16 +139,7 @@ if ($action === 'verify') {
     $host = $_SERVER['HTTP_HOST'] ?? 'bankkalaha.ir';
     $proxyBase = $scheme . '://' . $host . '/zibal-proxy.php';
 
-    // Wrap callbackUrl through proxy if not already wrapped to guarantee domain match (fixes error 106)
     $finalCallbackUrl = $rawCallbackUrl;
-    if (!empty($rawCallbackUrl)) {
-        if (strpos($rawCallbackUrl, 'zibal-proxy.php') === false) {
-            $finalCallbackUrl = $proxyBase . '?vercelUrl=' . urlencode($rawCallbackUrl);
-        }
-    } else {
-        $finalCallbackUrl = $proxyBase;
-    }
-
     $zibalPayload = [
         'merchant'    => $merchant,
         'amount'      => $amount,
