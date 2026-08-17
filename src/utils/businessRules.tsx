@@ -92,11 +92,25 @@ export function BusinessRulesProvider({ children }: { children: React.ReactNode 
       
       // 1. Fetch system config
       const resConfig = await fetch("/api/config");
-      const configData = await resConfig.json();
+      let configData = {};
+      if (resConfig.ok && resConfig.headers.get("content-type")?.includes("application/json")) {
+        try {
+          configData = await resConfig.json();
+        } catch (e) {
+          console.error("Error parsing config JSON:", e);
+        }
+      }
       
       // 2. Fetch penalty config
       const resPenalty = await fetch("/api/admin/penalty-config").catch(() => null);
-      const penaltyData = resPenalty ? await resPenalty.json() : null;
+      let penaltyData = null;
+      if (resPenalty && resPenalty.ok && resPenalty.headers.get("content-type")?.includes("application/json")) {
+        try {
+          penaltyData = await resPenalty.json();
+        } catch (e) {
+          console.error("Error parsing penalty config JSON:", e);
+        }
+      }
 
       const mergedRules: BusinessRules = {
         ...defaultBusinessRules,

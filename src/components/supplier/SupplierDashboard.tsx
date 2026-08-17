@@ -442,10 +442,17 @@ export function SupplierDashboard({
   };
   useEffect(() => {
     fetch("/api/config")
-      .then((r) => r.json())
-      .then(setSysConfig);
+      .then((r) => {
+        if (!r.ok || !r.headers.get("content-type")?.includes("application/json")) return {};
+        return r.json();
+      })
+      .then(setSysConfig)
+      .catch((err) => console.error("Error fetching config:", err));
     fetch("/api/menus/SUPPLIER")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok || !r.headers.get("content-type")?.includes("application/json")) return [];
+        return r.json();
+      })
       .then((data) => {
         if (Array.isArray(data)) {
           setCustomMenu(data.filter((item: any) => !item.hidden));

@@ -9,6 +9,18 @@ if (isset($_GET['debug']) && $_GET['debug'] === '1') {
     error_reporting(0);
 }
 
+// 0. Intercept Zibal Callback Redirect (No API key check needed for browser redirects)
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['vercelUrl']) && (isset($_GET['trackId']) || isset($_GET['authority']) || isset($_GET['success']))) {
+    $vercelUrl = $_GET['vercelUrl'];
+    $queryParams = $_GET;
+    unset($queryParams['vercelUrl']);
+    
+    // Construct target URL and redirect user's browser back to Vercel/App
+    $redirectUrl = rtrim($vercelUrl, '/') . (strpos($vercelUrl, '?') !== false ? '&' : '?') . http_build_query($queryParams);
+    header("Location: " . $redirectUrl);
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');

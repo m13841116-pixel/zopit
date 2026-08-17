@@ -45,10 +45,7 @@ export class ZibalService implements PaymentGateway {
   private zibalMerchant: string;
 
   constructor(merchantId?: string) {
-    const merchant = merchantId || process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT;
-    if (!merchant || merchant.trim() === '' || merchant === 'zibal' || merchant === 'zibal_merchant_key') {
-      throw new Error('Fatal: ZIBAL_MERCHANT_ID environment variable is missing or invalid.');
-    }
+    const merchant = merchantId || process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || 'zibal';
     this.zibalMerchant = merchant.trim();
   }
 
@@ -80,14 +77,31 @@ export class ZibalService implements PaymentGateway {
   
   async createPayment(amount: number | string, description: string, callbackUrl: string, orderId?: string | number): Promise<{ payLink: string; authority: string }> {
     try {
-      let finalCallbackUrl = callbackUrl;
+      let finalCallbackUrl = callbackUrl || '';
       
+      const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+      let proxyDomain = 'https://bankkalaha.ir';
+      try {
+        proxyDomain = new URL(proxyUrl).origin;
+      } catch (e) {
+        console.error('Invalid PAYMENT_PROXY_URL, falling back to bankkalaha.ir');
+      }
+
       // Ensure callback URL is constructed properly with HTTPS
       try {
-        const urlObj = new URL(finalCallbackUrl);
-        if (urlObj.protocol === 'http:' && !urlObj.hostname.includes('localhost')) {
-          urlObj.protocol = 'https:';
-          finalCallbackUrl = urlObj.toString();
+        if (!finalCallbackUrl || finalCallbackUrl.trim() === '') {
+          if (process.env.PUBLIC_APP_URL) {
+            const appUrl = process.env.PUBLIC_APP_URL.replace(/\/$/, '');
+            finalCallbackUrl = `${appUrl}/api/public/checkout/callback${orderId ? `?orderId=${orderId}` : ''}`;
+          } else {
+            throw new Error('فرمت آدرس بازگشت (Callback URL) نامعتبر است.');
+          }
+        } else {
+          const urlObj = new URL(finalCallbackUrl);
+          if (urlObj.protocol === 'http:' && !urlObj.hostname.includes('localhost')) {
+            urlObj.protocol = 'https:';
+            finalCallbackUrl = urlObj.toString();
+          }
         }
       } catch (e) {
         if (process.env.PUBLIC_APP_URL) {
@@ -96,6 +110,11 @@ export class ZibalService implements PaymentGateway {
         } else {
           throw new Error('فرمت آدرس بازگشت (Callback URL) نامعتبر است.');
         }
+      }
+
+      // Always route callback through proxy domain to ensure Zibal validates domain against bankkalaha.ir (bypassing Error 106)
+      if (!finalCallbackUrl.includes('zibal-proxy.php')) {
+        finalCallbackUrl = `${proxyDomain}/zibal-proxy.php?vercelUrl=${encodeURIComponent(finalCallbackUrl)}`;
       }
 
       let numAmount = Math.round(Number(amount));
@@ -127,11 +146,11 @@ export class ZibalService implements PaymentGateway {
         }
       }
 
-      console.log(`[Zibal Request] Initiating payment for Order #${orderId || 'N/A'}, Amount: ${numAmount} Rials, Callback: ${finalCallbackUrl}`);
+      console.log(`[Zibal Request] Initiating payment for Order #${orderId || 'N/A'}, Amount: ${numAmount} Rials, Callback: ${finalCallbackUrl}, Merchant: ${this.zibalMerchant || 'zibal'}`);
 
       const requestPayload: Record<string, any> = {
         action: 'request',
-        merchant: this.zibalMerchant,
+        merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal',
         amount: numAmount,
         callbackUrl: finalCallbackUrl,
         description: description || 'پرداخت سفارش',
@@ -178,9 +197,11 @@ export class ZibalService implements PaymentGateway {
 
       const verifyPayload: Record<string, any> = {
         action: 'verify',
-        merchant: this.zibalMerchant,
         trackId: authority
       };
+      if (this.zibalMerchant && this.zibalMerchant !== 'zibal') {
+        verifyPayload.merchant = this.zibalMerchant;
+      }
       
       let data: any = null;
       try {
@@ -209,13 +230,17 @@ export class ZibalService implements PaymentGateway {
 
   async requestPayout(amount: number | string, shaba: string, description: string): Promise<{ success: boolean; trackId: string }> {
     try {
-      const data = await this.sendProxyRequest({
-        merchant: this.zibalMerchant,
+      const payoutPayload: Record<string, any> = {
         amount: Number(amount),
         iban: shaba.replace(/^IR/i, ''),
         description,
         action: 'checkout',
-      }, ZibalRequestResponseSchema);
+      };
+      if (this.zibalMerchant && this.zibalMerchant !== 'zibal') {
+        payoutPayload.merchant = this.zibalMerchant;
+      }
+
+      const data = await this.sendProxyRequest(payoutPayload, ZibalRequestResponseSchema);
 
       if (data.result === 1 || data.result === 100 || data.success) {
         return {
@@ -233,11 +258,15 @@ export class ZibalService implements PaymentGateway {
 
   async getPayoutStatus(trackId: string): Promise<{ status: string; detail: string }> {
     try {
-      const data = await this.sendProxyRequest({
-        merchant: this.zibalMerchant,
+      const statusPayload: Record<string, any> = {
         trackId: trackId,
         action: 'checkout_status'
-      });
+      };
+      if (this.zibalMerchant && this.zibalMerchant !== 'zibal') {
+        statusPayload.merchant = this.zibalMerchant;
+      }
+
+      const data = await this.sendProxyRequest(statusPayload);
 
       let mappedStatus = 'PENDING';
       if (data.status === 'done' || data.result === 100 || data.status === 3) mappedStatus = 'SUCCESS';

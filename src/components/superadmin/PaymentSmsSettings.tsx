@@ -28,6 +28,8 @@ export default function PaymentSmsSettings() {
   // States for Settings
   const [gatewayType, setGatewayType] = useState("ZIBAL");
   const [merchantCode, setMerchantCode] = useState("");
+  const [zibalMerchantCode, setZibalMerchantCode] = useState("");
+  const [sepTerminalId, setSepTerminalId] = useState("");
   const [gatewayKey, setGatewayKey] = useState("");
   const [enableCardToCard, setEnableCardToCard] = useState(false);
   const [shabaNumber, setShabaNumber] = useState("330560611828006022464501");
@@ -85,6 +87,11 @@ export default function PaymentSmsSettings() {
   const [smsTestResult, setSmsTestResult] = useState<any>(null);
 
   const handleTestGateway = async () => {
+    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode);
+    if (!liveMerchant) {
+      toast("لطفاً ابتدا کد مرچنت / ترمینال درگاه را وارد فرمایید", "error");
+      return;
+    }
     setTestingGateway(true);
     setGatewayTestResult(null);
     setTestInvoiceResult(null);
@@ -95,7 +102,7 @@ export default function PaymentSmsSettings() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
-        body: JSON.stringify({ merchantCode, gatewayType, gatewayKey }),
+        body: JSON.stringify({ merchantCode: liveMerchant, gatewayType, gatewayKey }),
       });
       const data = await res.json();
       setGatewayTestResult(data);
@@ -112,7 +119,8 @@ export default function PaymentSmsSettings() {
   };
 
   const handleCreateTestInvoice = async () => {
-    if (!merchantCode) {
+    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode);
+    if (!liveMerchant) {
       toast("لطفاً ابتدا کد مرچنت را وارد فرمایید", "error");
       return;
     }
@@ -126,12 +134,12 @@ export default function PaymentSmsSettings() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
-        body: JSON.stringify({ merchantCode }),
+        body: JSON.stringify({ merchantCode: liveMerchant, gatewayType }),
       });
       const data = await res.json();
       setTestInvoiceResult(data);
       if (data.success && data.payLink) {
-        toast("فاکتور تست با موفقیت در زیبال ایجاد شد؛ در حال هدایت به درگاه پرداخت...", "success");
+        toast("فاکتور با موفقیت ایجاد شد؛ در حال هدایت به درگاه پرداخت شاپرک...", "success");
         const opened = window.open(data.payLink, "_blank");
         if (!opened) {
           toast("پاپ‌آپ توسط مرورگر مسدود شد؛ لطفاً از دکمه سبز رنگ پایین صفحه وارد درگاه شوید.", "info");
@@ -230,6 +238,16 @@ export default function PaymentSmsSettings() {
           if (data.PAYMENT_GATEWAY_MERCHANT_CODE) {
             setMerchantCode(String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim());
           }
+          if (data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE) {
+            setZibalMerchantCode(String(data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE).trim());
+          } else if (data.PAYMENT_GATEWAY_MERCHANT_CODE) {
+            setZibalMerchantCode(String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim());
+          }
+          if (data.PAYMENT_GATEWAY_SEP_TERMINAL_ID) {
+            setSepTerminalId(String(data.PAYMENT_GATEWAY_SEP_TERMINAL_ID).trim());
+          } else if (data.PAYMENT_GATEWAY_MERCHANT_CODE) {
+            setSepTerminalId(String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim());
+          }
           if (data.PAYMENT_GATEWAY_KEY) setGatewayKey(data.PAYMENT_GATEWAY_KEY);
           if (data.CARD_TO_CARD_SHABA) setShabaNumber(data.CARD_TO_CARD_SHABA);
           if (data.CARD_TO_CARD_CARD) setCardNumber(data.CARD_TO_CARD_CARD);
@@ -279,7 +297,9 @@ export default function PaymentSmsSettings() {
 
     const settingsObj: Record<string, string> = {
       PAYMENT_GATEWAY_TYPE: gatewayType,
-      PAYMENT_GATEWAY_MERCHANT_CODE: merchantCode,
+      PAYMENT_GATEWAY_MERCHANT_CODE: gatewayType === 'SEP' ? sepTerminalId : zibalMerchantCode,
+      PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE: zibalMerchantCode,
+      PAYMENT_GATEWAY_SEP_TERMINAL_ID: sepTerminalId,
       PAYMENT_GATEWAY_KEY: gatewayKey,
       ENABLE_CARD_TO_CARD: String(enableCardToCard),
       CARD_TO_CARD_SHABA: shabaNumber,
@@ -398,38 +418,62 @@ export default function PaymentSmsSettings() {
                   {gatewayType === 'SEP' ? 'شماره ترمینال سامان (Terminal ID)' : 'کد مرچنت / پذیرنده درگاه (Merchant ID)'}
                 </label>
                 <div className="flex flex-col sm:flex-row gap-2.5">
-                  <input
-                    type="text"
-                    value={merchantCode}
-                    onChange={(e) => {
-                      const val = e.target.value.trim();
-                      setMerchantCode(val);
-                      if (val.length === 24 && !val.includes('-') && gatewayType === 'ZARINPAL') {
-                        setGatewayType('ZIBAL');
-                      }
-                    }}
-                    placeholder="کد مرچنت درگاه (مثال: zibal یا کد ترمینال سپ)"
-                    className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default min-w-[220px]"
-                  />
+                  {gatewayType === 'ZIBAL' ? (
+                    <input
+                      type="text"
+                      value={zibalMerchantCode}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setZibalMerchantCode(val);
+                      }}
+                      placeholder="کد مرچنت اختصاصی زیبال (یا zibal برای تست)"
+                      className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default min-w-[220px]"
+                    />
+                  ) : gatewayType === 'SEP' ? (
+                    <input
+                      type="text"
+                      value={sepTerminalId}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setSepTerminalId(val);
+                      }}
+                      placeholder="شماره ترمینال سامان (Terminal ID)"
+                      className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default min-w-[220px]"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={merchantCode}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setMerchantCode(val);
+                        if (val.length === 24 && !val.includes('-') && gatewayType === 'ZARINPAL') {
+                          setGatewayType('ZIBAL');
+                        }
+                      }}
+                      placeholder="کد مرچنت درگاه"
+                      className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default min-w-[220px]"
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={handleTestGateway}
-                    disabled={testingGateway || !merchantCode}
+                    disabled={testingGateway || (gatewayType === 'ZIBAL' ? !zibalMerchantCode : gatewayType === 'SEP' ? !sepTerminalId : !merchantCode)}
                     className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold rounded-xl border border-indigo-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-md disabled:opacity-50 whitespace-nowrap"
                   >
                     <Activity className={`w-3.5 h-3.5 ${testingGateway ? 'animate-spin' : ''}`} />
                     {testingGateway ? "در حال بررسی..." : "تست اتصال زنده"}
                   </button>
-                  <a
-                    href="/api/payment/test"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl border border-emerald-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-md whitespace-nowrap"
-                    title="تولید خودکار فاکتور و ورود فوری به صفحه رسمی درگاه زیبال شاپرک"
+                  <button
+                    type="button"
+                    onClick={handleCreateTestInvoice}
+                    disabled={creatingTestInvoice || (gatewayType === 'ZIBAL' ? !zibalMerchantCode : gatewayType === 'SEP' ? !sepTerminalId : !merchantCode)}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl border border-emerald-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-md disabled:opacity-50 whitespace-nowrap"
+                    title="تولید خودکار فاکتور ۵،۰۰۰ تومانی و ورود مستقیم به صفحه رسمی درگاه زیبال شاپرک"
                   >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    ورود مستقیم به درگاه شاپرک
-                  </a>
+                    <ExternalLink className={`w-3.5 h-3.5 ${creatingTestInvoice ? 'animate-spin' : ''}`} />
+                    {creatingTestInvoice ? "در حال تولید فاکتور..." : "ورود مستقیم به درگاه شاپرک"}
+                  </button>
                 </div>
                 
                 <span className="text-[11px] text-emerald-600 font-bold block mt-1.5">

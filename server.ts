@@ -9916,13 +9916,14 @@ function redirectToGateway(res: any, payLink: string) {
 // TEST PAYMENT ROUTE
 app.get('/api/payment/test', async (req, res) => {
   try {
-    const amount = 100000; // 10,000 Toman in Rials
-    const description = 'تراکنش تستی 10 هزار تومانی زوپیت';
+    const amount = 50000; // 5,000 Toman in Rials
+    const description = 'تراکنش تستی ۵ هزار تومانی زوپیت';
     const baseUrl = getPublicUrl(req);
     const callbackUrl = `${baseUrl}/api/payment/callback`;
+    const merchantQuery = req.query.merchant ? String(req.query.merchant).trim() : undefined;
 
-    console.log('[Test Payment] Initiating test payment with unified PaymentServiceFactory...');
-    const paymentGateway = await PaymentServiceFactory.getService();
+    console.log('[Test Payment] Initiating test payment with unified PaymentServiceFactory...', merchantQuery ? `Merchant: ${merchantQuery}` : '');
+    const paymentGateway = await PaymentServiceFactory.getService(merchantQuery);
     const result = await paymentGateway.createPayment(amount, description, callbackUrl);
 
     if (result && result.payLink) {

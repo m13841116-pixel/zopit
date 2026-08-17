@@ -82,7 +82,7 @@ export async function executeProxyRequest(
   } = {}
 ): Promise<ProxyResponse> {
   const baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-  const secretKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || '';
+  const secretKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
   const timeoutMs = options.timeoutMs || 10000;
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
