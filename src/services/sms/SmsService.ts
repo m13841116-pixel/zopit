@@ -155,7 +155,12 @@ export async function sendPattern(mobile: string, patternKey: string, textValues
     // 2. Fallback: Send via Iranian WordPress proxy (bankkalaha.ir)
     try {
       console.log(`[SMS Service] Routing pattern SMS through Iranian proxy for ${cleanMobile}...`);
-      const proxyResponse = await fetch('https://bankkalaha.ir/sms-proxy.php', {
+      const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV || !!process.env.NOW_BUILDER;
+      const corsProxyPrefix = process.env.PAYMENT_CORS_PROXY || 'https://corsproxy.io/?';
+      const targetProxyUrl = 'https://bankkalaha.ir/sms-proxy.php';
+      const finalSmsProxyUrl = isVercel ? `${corsProxyPrefix}${targetProxyUrl}` : targetProxyUrl;
+
+      const proxyResponse = await fetch(finalSmsProxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -277,7 +282,12 @@ export async function sendSms(mobile: string, message: string) {
 
     // 2. Proxy fallback
     try {
-      const proxyResponse = await fetch('https://bankkalaha.ir/sms-proxy.php', {
+      const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV || !!process.env.NOW_BUILDER;
+      const corsProxyPrefix = process.env.PAYMENT_CORS_PROXY || 'https://corsproxy.io/?';
+      const targetProxyUrl = 'https://bankkalaha.ir/sms-proxy.php';
+      const finalSmsProxyUrl = isVercel ? `${corsProxyPrefix}${targetProxyUrl}` : targetProxyUrl;
+
+      const proxyResponse = await fetch(finalSmsProxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

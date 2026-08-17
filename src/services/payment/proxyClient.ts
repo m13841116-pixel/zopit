@@ -78,18 +78,29 @@ export async function executeProxyRequest(
 ): Promise<ProxyResponse> {
   const baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
   const apiKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  const timeoutMs = options.timeoutMs || 5000;
+  const timeoutMs = options.timeoutMs || 12000;
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
   // Always append ?key= so that even if Apache / LiteSpeed strips custom headers, the key is passed
-  const proxyUrl = baseProxyUrl.includes('key=') 
+  const targetUrl = baseProxyUrl.includes('key=') 
     ? baseProxyUrl 
     : `${baseProxyUrl}${baseProxyUrl.includes('?') ? '&' : '?'}key=${encodeURIComponent(apiKey)}`;
 
-  // Strategy 1: Node.js https request with family: 4 (CRITICAL for Vercel -> Iran)
+  const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV || !!process.env.NOW_BUILDER;
+  const corsProxyPrefix = process.env.PAYMENT_CORS_PROXY || 'https://corsproxy.io/?';
+
+  // On Vercel, to prevent the 10s AWS network drops from Mizbanfa firewall, we immediately route through CORS proxy.
+  // In other environments, we try direct connection first, falling back to CORS proxy if it fails.
+  const proxyUrl = isVercel ? `${corsProxyPrefix}${targetUrl}` : targetUrl;
+
+  console.log(`[ProxyClient] Environment: ${isVercel ? 'Vercel' : 'Standard'}. Routing via: ${proxyUrl}`);
+
+  // Strategy 1: Node.js https request with family: 4 (CRITICAL for Vercel / Cloud Run -> Iran)
   try {
-    const res = await makeNodeRequest(proxyUrl, payloadString, apiKey, Math.min(timeoutMs, 4000));
-    if (res.ok || res.data) return res;
+    const res = await makeNodeRequest(proxyUrl, payloadString, apiKey, Math.max(timeoutMs, 10000));
+    if (res.ok || (res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.payLink !== undefined))) {
+      return res;
+    }
   } catch (err: any) {
     console.warn(`[ProxyClient] Strategy 1 (IPv4 HTTPS) error, trying Strategy 2...`, err.message);
   }
@@ -97,16 +108,32 @@ export async function executeProxyRequest(
   // Strategy 2: Node.js http request fallback with family: 4 (In case LiteSpeed SSL handshake hangs)
   try {
     const httpProxyUrl = proxyUrl.replace('https://', 'http://');
-    const res = await makeNodeRequest(httpProxyUrl, payloadString, apiKey, Math.min(timeoutMs, 3000));
-    if (res.ok || res.data) return res;
+    const res = await makeNodeRequest(httpProxyUrl, payloadString, apiKey, 8000);
+    if (res.ok || (res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.payLink !== undefined))) {
+      return res;
+    }
   } catch (err: any) {
     console.warn(`[ProxyClient] Strategy 2 (IPv4 HTTP) error, trying Strategy 3...`, err.message);
+  }
+
+  // If we are NOT on Vercel and direct connections failed, try one last time WITH CORS proxy!
+  if (!isVercel) {
+    const backupUrl = `${corsProxyPrefix}${targetUrl}`;
+    console.log(`[ProxyClient] Fallback to CORS Proxy in Standard Environment: ${backupUrl}`);
+    try {
+      const res = await makeNodeRequest(backupUrl, payloadString, apiKey, 8000);
+      if (res.ok || (res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.payLink !== undefined))) {
+        return res;
+      }
+    } catch (err: any) {
+      console.warn(`[ProxyClient] Backup CORS Proxy error:`, err.message);
+    }
   }
 
   // Strategy 3: Native fetch as ultimate fallback
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
+    const timer = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(proxyUrl, {
       method: 'POST',
@@ -135,11 +162,15 @@ export async function executeProxyRequest(
       data: data || null,
     };
   } catch (fetchErr: any) {
+    const isAbort = fetchErr.name === 'AbortError' || fetchErr.message?.includes('aborted');
+    const errMsg = isAbort 
+      ? 'زمان پاسخگویی سرور واسط ایران (bankkalaha.ir) به پایان رسید (Timeout). لطفاً مجدداً تلاش کنید.'
+      : fetchErr.message;
     return {
       ok: false,
       status: 500,
-      text: fetchErr.message,
-      data: { error: fetchErr.message },
+      text: errMsg,
+      data: { error: errMsg },
     };
   }
 }
