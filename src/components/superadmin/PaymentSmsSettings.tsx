@@ -389,6 +389,7 @@ export default function PaymentSmsSettings() {
                   className="w-full px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-default"
                 >
                   <option value="ZIBAL">درگاه زیبال (Zibal) - پیشنهادی</option>
+                  <option value="SEP">درگاه پرداخت الکترونیک سامان (سپ - SEP)</option>
                   <option value="ZARINPAL">درگاه زرین‌پال (ZarinPal)</option>
                   <option value="MELLAT">به پرداخت ملت</option>
                   <option value="IDPAY">آیدی پی (IDPay)</option>
@@ -397,7 +398,9 @@ export default function PaymentSmsSettings() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1.5">کد مرچنت / پذیرنده درگاه (Merchant ID)</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                  {gatewayType === 'SEP' ? 'شماره ترمینال سامان (Terminal ID)' : 'کد مرچنت / پذیرنده درگاه (Merchant ID)'}
+                </label>
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   <input
                     type="text"

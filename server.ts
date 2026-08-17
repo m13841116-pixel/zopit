@@ -10003,31 +10003,13 @@ app.all('/api/payment/callback', async (req: any, res: any) => {
   }
 
   try {
-    // 1. Read Merchant ID from Database
-    const dbMerchant = await prisma.systemConfig.findUnique({
-      where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
-    });
-    const merchantId = dbMerchant?.value?.trim() || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || 'zibal';
-
-    const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-
-    console.log(`[Zibal Payment Verify] Verifying trackId: ${trackId} with proxy`);
-
-    // 2. Send real POST verification request to proxy
-    const resultVerify = await requestProxy(proxyUrl, proxySecret, {
-      action: 'verify',
-      merchant: merchantId,
-      trackId: String(trackId),
-    });
-
-    const verifyData = JSON.parse(resultVerify.text || '{}');
-    console.log('[Zibal Payment Verify Proxy Response]', verifyData);
-
-    const resCode = Number(verifyData.result);
-
-    // If result is 100 (successful verification)
-    if (resCode === 100) {
+    const paymentGateway = await PaymentServiceFactory.getService();
+    console.log(`[Zibal Payment Verify] Verifying trackId: ${trackId}`);
+    
+    // We pass 0 for amount to let verifyPayment just verify the status
+    const verifyData = await paymentGateway.verifyPayment(String(trackId), 0);
+    
+    if (verifyData.success) {
       // Find the associated order (either by trackingCode matching trackId, or by orderId query)
       let orderToUpdate: any = null;
       
@@ -10053,7 +10035,7 @@ app.all('/api/payment/callback', async (req: any, res: any) => {
           where: { id: orderToUpdate.id },
           data: {
             status: 'PAID',
-            trackingCode: String(verifyData.refNumber || trackId),
+            trackingCode: String(verifyData.refId || trackId),
           }
         }).catch(() => null);
 
@@ -10090,18 +10072,18 @@ app.all('/api/payment/callback', async (req: any, res: any) => {
       }
 
       return res.redirect(
-        `${redirectBase}/checkout/success?trackId=${trackId}&orderId=${orderToUpdate?.id || orderId || ''}&refNumber=${verifyData.refNumber || ''}`
+        `${redirectBase}/?payment_status=success&trackId=${trackId}&orderId=${orderToUpdate?.id || orderId || ''}&refNumber=${verifyData.refId || ''}`
       );
     } else {
       console.error('[Zibal Payment Verify Failed]', verifyData);
       return res.redirect(
-        `${redirectBase}/checkout/failed?trackId=${trackId}&orderId=${orderId || ''}&message=${encodeURIComponent(verifyData.message || 'تایید تراکنش با خطا مواجه شد')}`
+        `${redirectBase}/?payment_status=failed&trackId=${trackId}&orderId=${orderId || ''}&reason=verification_failed`
       );
     }
   } catch (error: any) {
     console.error('Express Payment Callback Error:', error);
     return res.redirect(
-      `${redirectBase}/checkout/failed?trackId=${trackId || ''}&orderId=${orderId || ''}&message=${encodeURIComponent(error.message || 'خطا در تایید تراکنش')}`
+      `${redirectBase}/?payment_status=failed&trackId=${trackId || ''}&orderId=${orderId || ''}&message=${encodeURIComponent(error.message || 'خطا در تایید تراکنش')}`
     );
   }
 });
