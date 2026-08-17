@@ -86,48 +86,29 @@ export async function executeProxyRequest(
     ? baseProxyUrl 
     : `${baseProxyUrl}${baseProxyUrl.includes('?') ? '&' : '?'}key=${encodeURIComponent(apiKey)}`;
 
-  const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV || !!process.env.NOW_BUILDER;
-  const corsProxyPrefix = process.env.PAYMENT_CORS_PROXY || 'https://corsproxy.io/?';
-
-  // On Vercel, to prevent the 10s AWS network drops from Mizbanfa firewall, we immediately route through CORS proxy.
-  // In other environments, we try direct connection first, falling back to CORS proxy if it fails.
-  const proxyUrl = isVercel ? `${corsProxyPrefix}${targetUrl}` : targetUrl;
-
-  console.log(`[ProxyClient] Environment: ${isVercel ? 'Vercel' : 'Standard'}. Routing via: ${proxyUrl}`);
+  // ALWAYS try a direct IPv4 connection first! Standard server-side Node.js environment (including Vercel)
+  // does not need CORS proxies. Forcing IPv4 (family: 4) is sufficient to prevent network hangs on Iranian hosts.
+  console.log(`[ProxyClient] Initiating direct connection to target: ${targetUrl}`);
 
   // Strategy 1: Node.js https request with family: 4 (CRITICAL for Vercel / Cloud Run -> Iran)
   try {
-    const res = await makeNodeRequest(proxyUrl, payloadString, apiKey, Math.max(timeoutMs, 10000));
+    const res = await makeNodeRequest(targetUrl, payloadString, apiKey, Math.max(timeoutMs, 10000));
     if (res.ok || (res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.payLink !== undefined))) {
       return res;
     }
   } catch (err: any) {
-    console.warn(`[ProxyClient] Strategy 1 (IPv4 HTTPS) error, trying Strategy 2...`, err.message);
+    console.warn(`[ProxyClient] Strategy 1 (IPv4 HTTPS Direct) error, trying Strategy 2...`, err.message);
   }
 
   // Strategy 2: Node.js http request fallback with family: 4 (In case LiteSpeed SSL handshake hangs)
   try {
-    const httpProxyUrl = proxyUrl.replace('https://', 'http://');
+    const httpProxyUrl = targetUrl.replace('https://', 'http://');
     const res = await makeNodeRequest(httpProxyUrl, payloadString, apiKey, 8000);
     if (res.ok || (res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.payLink !== undefined))) {
       return res;
     }
   } catch (err: any) {
-    console.warn(`[ProxyClient] Strategy 2 (IPv4 HTTP) error, trying Strategy 3...`, err.message);
-  }
-
-  // If we are NOT on Vercel and direct connections failed, try one last time WITH CORS proxy!
-  if (!isVercel) {
-    const backupUrl = `${corsProxyPrefix}${targetUrl}`;
-    console.log(`[ProxyClient] Fallback to CORS Proxy in Standard Environment: ${backupUrl}`);
-    try {
-      const res = await makeNodeRequest(backupUrl, payloadString, apiKey, 8000);
-      if (res.ok || (res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.payLink !== undefined))) {
-        return res;
-      }
-    } catch (err: any) {
-      console.warn(`[ProxyClient] Backup CORS Proxy error:`, err.message);
-    }
+    console.warn(`[ProxyClient] Strategy 2 (IPv4 HTTP Direct) error, trying Strategy 3...`, err.message);
   }
 
   // Strategy 3: Native fetch as ultimate fallback
@@ -135,7 +116,7 @@ export async function executeProxyRequest(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(proxyUrl, {
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
