@@ -22,10 +22,15 @@ export async function executeProxyRequest(
     timeoutMs?: number;
   } = {}
 ): Promise<ProxyResponse> {
-  const proxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+  const baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
   const apiKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
   const timeoutMs = options.timeoutMs || 9000;
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
+
+  // Always append ?key= so that even if Apache / LiteSpeed strips custom headers, the key is passed
+  const proxyUrl = baseProxyUrl.includes('key=') 
+    ? baseProxyUrl 
+    : `${baseProxyUrl}${baseProxyUrl.includes('?') ? '&' : '?'}key=${encodeURIComponent(apiKey)}`;
 
   // Strategy 1: Primary fast fetch (works natively in Node.js 18+, Vercel Serverless Functions, Edge)
   try {
@@ -36,7 +41,9 @@ export async function executeProxyRequest(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'X-Api-Key': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
         'User-Agent': 'curl/7.88.1',
       },
       body: payloadString,
@@ -90,7 +97,9 @@ export async function executeProxyRequest(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'X-Api-Key': apiKey,
+          'Authorization': `Bearer ${apiKey}`,
           'User-Agent': 'curl/7.88.1',
           'Content-Length': Buffer.byteLength(payloadString),
         },

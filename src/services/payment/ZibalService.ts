@@ -15,7 +15,7 @@ function getZibalErrorMessage(resultCode: number | string, customMessage?: strin
     105: 'مبلغ باید بیشتر از ۱,۰۰۰ ریال باشد.',
     106: 'آدرس بازگشت (callbackUrl) نامعتبر است.',
     113: 'مبلغ تراکنش بیش از سقف مجاز است.',
-    115: 'IP سرور در زیبال تعریف نشده است (نیاز به استفاده از سرور واسط ایران).',
+    115: 'خطای 115 زیبال: IP سرور واسط (88.135.68.18) در پنل زیبال شما ثبت نشده است! لطفاً به تنظیمات درگاه زیبال بروید و این IP را اضافه کنید.',
     201: 'قبلا تایید شده است.',
     202: 'سفارش پرداخت نشده یا ناموفق بوده است.',
     203: 'trackId نامعتبر است.',
@@ -91,26 +91,23 @@ export class ZibalService implements PaymentGateway {
 
       let data: any = null;
 
-      // Strategy 1: Use Iran Proxy directly (Fastest & avoids Vercel Foreign IP 115 error / 8s timeout)
+      // Strategy 1: Use Iran Proxy (Fastest & avoids Vercel Foreign IP 115 error)
       try {
         data = await this.sendProxyRequest(requestPayload);
       } catch (proxyErr: any) {
-        console.warn('[Zibal] Proxy request failed, attempting direct gateway...', proxyErr.message);
-        
-        // Strategy 2: Fallback to Direct Zibal Gateway if Proxy is unreachable
+        console.warn('[Zibal] Primary proxy attempt failed, retrying proxy...', proxyErr.message);
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 4000);
-          const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestPayload),
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          data = await directRes.json();
-        } catch (directErr: any) {
-          throw new Error(`ارتباط با درگاه پرداخت زیبال برقرار نشد. خطا: ${proxyErr.message}`);
+          // Retry proxy with fresh client
+          const retryRes = await executeProxyRequest(requestPayload, { timeoutMs: 10000 });
+          if (retryRes.data && (retryRes.data.result !== undefined || retryRes.data.trackId !== undefined)) {
+            data = retryRes.data;
+          } else if (retryRes.ok && retryRes.text) {
+            try { data = JSON.parse(retryRes.text); } catch {}
+          }
+          if (!data) throw new Error(retryRes.data?.error || retryRes.text || proxyErr.message);
+        } catch (retryErr: any) {
+          console.error('[Zibal] Proxy retry also failed:', retryErr.message);
+          throw new Error(`خطا در ارتباط با سرور واسط ایران (bankkalaha.ir): ${retryErr.message}`);
         }
       }
 
@@ -154,20 +151,17 @@ export class ZibalService implements PaymentGateway {
       try {
         data = await this.sendProxyRequest(verifyPayload);
       } catch (proxyErr: any) {
-        console.warn('[Zibal] Proxy verify failed, attempting direct gateway...', proxyErr.message);
+        console.warn('[Zibal] Proxy verify attempt failed, retrying...', proxyErr.message);
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 4000);
-          const directRes = await fetch('https://gateway.zibal.ir/v1/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ merchant: this.zibalMerchant, trackId: authority }),
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          data = await directRes.json();
-        } catch (directErr: any) {
-          throw new Error(`خطا در ارتباط با سرور زیبال برای تایید تراکنش: ${proxyErr.message}`);
+          const retryRes = await executeProxyRequest(verifyPayload, { timeoutMs: 10000 });
+          if (retryRes.data && (retryRes.data.result !== undefined || retryRes.data.trackId !== undefined)) {
+            data = retryRes.data;
+          } else if (retryRes.ok && retryRes.text) {
+            try { data = JSON.parse(retryRes.text); } catch {}
+          }
+          if (!data) throw new Error(retryRes.data?.error || retryRes.text || proxyErr.message);
+        } catch (retryErr: any) {
+          throw new Error(`خطا در ارتباط با سرور واسط ایران برای تایید تراکنش: ${retryErr.message}`);
         }
       }
 
