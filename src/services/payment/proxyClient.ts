@@ -36,8 +36,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
         method: 'POST',
         headers,
         timeout: timeoutMs,
-        rejectUnauthorized: false, // Allow SSL connection even if intermediate CA is missing in Vercel Node
-        family: 4, // CRITICAL FOR VERCEL: Forces IPv4 socket connection
+        rejectUnauthorized: false, // Critical for Vercel -> Iran server SSL connection
       }, (res) => {
         let body = '';
         res.on('data', (chunk) => (body += chunk));
@@ -71,7 +70,6 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
 
 /**
  * Optimized HTTP/HTTPS client for Vercel -> Iran Proxy communication.
- * Uses fetch with node fallback and fallback environment variables.
  */
 export async function executeProxyRequest(
   payload: any,
@@ -83,58 +81,17 @@ export async function executeProxyRequest(
 ): Promise<ProxyResponse> {
   const baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
   const secretKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  const timeoutMs = options.timeoutMs || 18000;
+  const timeoutMs = options.timeoutMs || 12000;
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
   if (!baseProxyUrl) {
     throw new Error('Fatal: PAYMENT_PROXY_URL is missing in environment variables.');
   }
 
-  // 1. Try global fetch first (Native in Vercel Node 18+)
-  if (typeof fetch === 'function') {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-      const targetUrl = baseProxyUrl.includes('key=') ? baseProxyUrl : `${baseProxyUrl}?key=${encodeURIComponent(secretKey)}`;
-
-      const fetchRes = await fetch(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Api-Key': secretKey,
-          'X-Proxy-Secret': secretKey,
-          'Authorization': `Bearer ${secretKey}`,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZopitPaymentProxy/1.0',
-        },
-        body: payloadString,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timer);
-      const text = await fetchRes.text();
-      let data: any;
-      try {
-        if (text) data = JSON.parse(text);
-      } catch (e) {}
-
-      if (fetchRes.ok || data?.result !== undefined || data?.trackId || data?.payLink || data?.success) {
-        return {
-          ok: fetchRes.ok,
-          status: fetchRes.status,
-          text,
-          data,
-        };
-      }
-    } catch (fetchErr: any) {
-      console.warn(`[ProxyClient Fetch Fallback] fetch failed: ${fetchErr.message}, trying node https request...`);
-    }
-  }
-
-  // 2. Fallback to node https client
+  // Use Node https client directly with SSL bypass (rejectUnauthorized: false)
   try {
-    const res = await makeNodeRequest(baseProxyUrl, payloadString, secretKey, timeoutMs);
+    const targetUrl = baseProxyUrl.includes('key=') ? baseProxyUrl : `${baseProxyUrl}?key=${encodeURIComponent(secretKey)}`;
+    const res = await makeNodeRequest(targetUrl, payloadString, secretKey, timeoutMs);
     return res;
   } catch (err: any) {
     console.error(`[ProxyClient Error] Failed request to proxy: ${err.message}`);
@@ -146,3 +103,4 @@ export async function executeProxyRequest(
     };
   }
 }
+
