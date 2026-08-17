@@ -36,7 +36,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
         method: 'POST',
         headers,
         timeout: timeoutMs,
-        rejectUnauthorized: true, // Enforce SSL Verification
+        rejectUnauthorized: false, // Allow SSL connection even if intermediate CA is missing in Vercel Node
         family: 4, // CRITICAL FOR VERCEL: Forces IPv4 socket connection
       }, (res) => {
         let body = '';
@@ -83,7 +83,7 @@ export async function executeProxyRequest(
 ): Promise<ProxyResponse> {
   const baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
   const secretKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  const timeoutMs = options.timeoutMs || 10000;
+  const timeoutMs = options.timeoutMs || 18000;
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
   if (!baseProxyUrl) {

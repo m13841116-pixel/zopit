@@ -10567,7 +10567,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           callbackUrl: 'https://zopit.ir/api/public/store-invoice/callback?testInvoice=true',
           description: 'تست اتصال زنده درگاه زیبال',
           linkToDirect: 0,
-        }, { proxyUrl, apiKey: proxySecret, timeoutMs: 12000 });
+        }, { proxyUrl, apiKey: proxySecret, timeoutMs: 20000 });
 
         let data: any = null;
         if (proxyRes.ok && proxyRes.text) {
@@ -10648,7 +10648,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           callbackUrl,
           description: 'تست فاکتور آزمایشی ۵،۰۰۰ تومانی زوپیت',
           linkToDirect: 0,
-        }, { proxyUrl, apiKey: proxySecret, timeoutMs: 12000 });
+        }, { proxyUrl, apiKey: proxySecret, timeoutMs: 20000 });
         if (proxyRes.ok && proxyRes.text) {
           const parsed = JSON.parse(proxyRes.text);
           if (parsed && (parsed.trackId || parsed.result !== undefined)) {
