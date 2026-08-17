@@ -40,7 +40,7 @@ export class ZibalService implements PaymentGateway {
    * Helper to send requests through the Iran Proxy Server with IPv4 fallback and timeout
    */
   private async sendProxyRequest(payload: any): Promise<any> {
-    const result = await executeProxyRequest(payload);
+    const result = await executeProxyRequest(payload, { timeoutMs: 6000 });
     if (result.data && (result.data.result !== undefined || result.data.success !== undefined || result.data.trackId !== undefined)) {
       return result.data;
     }
@@ -56,19 +56,18 @@ export class ZibalService implements PaymentGateway {
   /**
    * Request a new payment from Zibal (via Proxy with fallback to direct gateway)
    */
-  
   async createPayment(amount: number | string, description: string, callbackUrl: string, orderId?: string | number): Promise<{ payLink: string; authority: string }> {
     try {
       let finalCallbackUrl = callbackUrl;
       
       // Zibal strictly requires the callback URL domain to match the merchant's registered domain (zopit.ir).
       // If we are on a Vercel staging domain (.vercel.app) or localhost, Zibal returns Error 106.
-      // We must rewrite the origin to the official domain to bypass this error.
+      // We rewrite the origin to the official domain to prevent Error 106.
       if (this.zibalMerchant !== 'zibal' && !finalCallbackUrl.includes('zopit.ir')) {
         try {
           const urlObj = new URL(finalCallbackUrl);
           urlObj.protocol = 'https:';
-          urlObj.hostname = 'zopit.ir';
+          urlObj.hostname = 'www.zopit.ir';
           urlObj.port = '';
           finalCallbackUrl = urlObj.toString();
           console.log('[Zibal] Rewrote callbackUrl origin to match merchant domain:', finalCallbackUrl);
@@ -81,6 +80,7 @@ export class ZibalService implements PaymentGateway {
       if (isNaN(numAmount) || numAmount <= 0) throw new Error('مبلغ پرداختی نامعتبر است.');
 
       const requestPayload: Record<string, any> = {
+        action: 'request',
         merchant: this.zibalMerchant,
         amount: numAmount,
         callbackUrl: finalCallbackUrl,
@@ -90,39 +90,28 @@ export class ZibalService implements PaymentGateway {
       if (orderId) requestPayload.orderId = orderId;
 
       let data: any = null;
-      let directError: any = null;
-      let directReturned115 = false;
 
-      // 1. Try Direct Zibal Gateway First (for Iranian servers)
+      // Strategy 1: Use Iran Proxy directly (Fastest & avoids Vercel Foreign IP 115 error / 8s timeout)
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestPayload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        data = await directRes.json();
+        data = await this.sendProxyRequest(requestPayload);
+      } catch (proxyErr: any) {
+        console.warn('[Zibal] Proxy request failed, attempting direct gateway...', proxyErr.message);
         
-        if (data && data.result === 115) {
-          directReturned115 = true; // Need proxy!
-          data = null;
+        // Strategy 2: Fallback to Direct Zibal Gateway if Proxy is unreachable
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestPayload),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          data = await directRes.json();
+        } catch (directErr: any) {
+          throw new Error(`ارتباط با درگاه پرداخت زیبال برقرار نشد. خطا: ${proxyErr.message}`);
         }
-      } catch (err: any) {
-        directError = err;
-        directReturned115 = true; // Network error or blocked, try proxy
-      }
-
-      // 2. Fallback to Proxy if Direct failed or returned 115 (for Vercel / Foreign servers)
-      if (!data || directReturned115) {
-         try {
-           requestPayload.action = 'request';
-           data = await this.sendProxyRequest(requestPayload);
-         } catch (proxyErr: any) {
-           throw new Error(`ارتباط با سرور واسط ایران با مشکل مواجه شد. در صورت امکان از سرور واسط دیگری استفاده نمایید. جزئیات خطا: ${proxyErr.message || 'نامشخص'}`);
-         }
       }
 
       if (data && ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId || data.authority))) {
@@ -143,49 +132,43 @@ export class ZibalService implements PaymentGateway {
       throw new Error(error.message || 'خطا در ارتباط با درگاه بانکی زیبال');
     }
   }
-/**
+
+  /**
    * Verify an existing payment with Zibal (via Proxy with fallback)
    */
-  
   async verifyPayment(authority: string, amount: number | string): Promise<{ success: boolean; trackId: string; refId: string }> {
     try {
       if (authority.startsWith('ZIBAL_') || authority.startsWith('SIM_') || this.zibalMerchant === 'zibal') {
         return { success: true, trackId: authority, refId: `REF_${authority}` };
       }
 
-      const verifyPayload = { merchant: this.zibalMerchant, trackId: authority };
+      const verifyPayload: Record<string, any> = {
+        action: 'verify',
+        merchant: this.zibalMerchant,
+        trackId: authority
+      };
+      
       let data: any = null;
-      let directReturned115 = false;
 
-      // 1. Try Direct Zibal Gateway First
+      // Strategy 1: Use Iran Proxy directly
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const directRes = await fetch('https://gateway.zibal.ir/v1/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(verifyPayload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        data = await directRes.json();
-        
-        if (data && data.result === 115) {
-          directReturned115 = true;
-          data = null;
+        data = await this.sendProxyRequest(verifyPayload);
+      } catch (proxyErr: any) {
+        console.warn('[Zibal] Proxy verify failed, attempting direct gateway...', proxyErr.message);
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          const directRes = await fetch('https://gateway.zibal.ir/v1/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ merchant: this.zibalMerchant, trackId: authority }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          data = await directRes.json();
+        } catch (directErr: any) {
+          throw new Error(`خطا در ارتباط با سرور زیبال برای تایید تراکنش: ${proxyErr.message}`);
         }
-      } catch (err: any) {
-        directReturned115 = true;
-      }
-
-      // 2. Fallback to Proxy
-      if (!data || directReturned115) {
-         try {
-           const proxyPayload = { ...verifyPayload, action: 'verify' };
-           data = await this.sendProxyRequest(proxyPayload);
-         } catch (pErr: any) {
-           throw new Error(`خطا در ارتباط با سرور واسط: ${pErr.message}`);
-         }
       }
 
       if (data) {

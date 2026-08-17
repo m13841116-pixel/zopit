@@ -6194,10 +6194,31 @@ app.post('/api/store-manager/pro/pay-torob', authenticateToken, requireStoreMana
 // 5. Public callback for Pro payments
 app.get('/api/public/pro/callback', async (req: any, res: any) => {
   try {
-    const { userId, type, success } = req.query;
+    const { userId, type, success, trackId, status } = req.query;
     const parsedUserId = parseInt(userId as string, 10);
 
-    if (parsedUserId && (success === 'true' || req.query.status === 'OK' || req.query.trackId)) {
+    let isSuccess = success === 'true' || success === '1' || status === 'OK' || status === '2';
+    let refId = '';
+
+    if (trackId && (isSuccess || !success)) {
+      try {
+        const paymentGateway = await PaymentServiceFactory.getService();
+        const verifyRes = await paymentGateway.verifyPayment(trackId.toString(), 0);
+        if (verifyRes && verifyRes.success) {
+          isSuccess = true;
+          refId = verifyRes.refId || trackId.toString();
+        }
+      } catch (vErr: any) {
+        console.warn('[Pro Callback] Verification notice:', vErr.message);
+        // If trackId was received and status is 2 (Zibal paid), accept
+        if (status === '2' || success === '1') {
+          isSuccess = true;
+          refId = trackId.toString();
+        }
+      }
+    }
+
+    if (parsedUserId && isSuccess) {
       if (type === 'HOST_RENEWAL') {
         const nextMonth = new Date();
         nextMonth.setDate(nextMonth.getDate() + 30);
@@ -6218,29 +6239,55 @@ app.get('/api/public/pro/callback', async (req: any, res: any) => {
           data: { torobConnected: true }
         }).catch(() => {});
       }
+
+      return res.send(`
+        <!DOCTYPE html>
+        <html dir="rtl" lang="fa">
+        <head>
+          <meta charset="utf-8" />
+          <title>نتیجه تراکنش - زوپیت پرو</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 40px 16px; background: #0f172a; color: #fff; line-height: 1.6; }
+            .card { background: #1e293b; max-width: 480px; margin: 0 auto; padding: 32px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #334155; }
+            .btn { display: inline-block; margin-top: 24px; padding: 12px 28px; background: #10b981; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; }
+            .ref-box { background: #0f172a; border: 1px dashed #475569; padding: 12px; border-radius: 10px; margin-top: 16px; font-family: monospace; color: #38bdf8; font-size: 15px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2 style="color: #10b981; margin-bottom: 8px;">✅ پرداخت با موفقیت انجام شد</h2>
+            <p>سرویس زوپیت پرو با موفقیت برای حساب کاربری شما فعال گردید.</p>
+            ${refId ? `<div class="ref-box">کد پیگیری درگاه: ${refId}</div>` : ''}
+            <a href="/dashboard" class="btn">بازگشت به پنل مدیریت فروشگاه</a>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      return res.send(`
+        <!DOCTYPE html>
+        <html dir="rtl" lang="fa">
+        <head>
+          <meta charset="utf-8" />
+          <title>پرداخت ناموفق - زوپیت پرو</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 40px 16px; background: #0f172a; color: #fff; line-height: 1.6; }
+            .card { background: #1e293b; max-width: 480px; margin: 0 auto; padding: 32px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #334155; }
+            .btn { display: inline-block; margin-top: 24px; padding: 12px 28px; background: #ef4444; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2 style="color: #ef4444; margin-bottom: 8px;">❌ پرداخت لغو شد یا ناموفق بود</h2>
+            <p>عملیات پرداخت توسط کاربر لغو گردید یا از سمت بانک تایید نشد.</p>
+            <a href="/dashboard" class="btn">تلاش مجدد از پنل مدیریت</a>
+          </div>
+        </body>
+        </html>
+      `);
     }
-    res.send(`
-      <!DOCTYPE html>
-      <html dir="rtl" lang="fa">
-      <head>
-        <meta charset="utf-8" />
-        <title>نتیجه تراکنش - زوپیت پرو</title>
-        <style>
-          body { font-family: tahoma, sans-serif; text-align: center; padding: 50px; background: #0f172a; color: #fff; }
-          .card { background: #1e293b; max-width: 480px; margin: 0 auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #334155; }
-          .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background: #10b981; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h2 style="color: #10b981;">✅ تراکنش با موفقیت انجام شد</h2>
-          <p>عملیات مربوط به سرویس پرو زوپیت با موفقیت ثبت و فعال گردید.</p>
-          <a href="/dashboard" class="btn">بازگشت به پنل مدیریت فروشگاه</a>
-        </div>
-      </body>
-      </html>
-    `);
   } catch (err: any) {
+    console.error('Pro callback error:', err);
     res.redirect('/dashboard');
   }
 });
@@ -9820,73 +9867,61 @@ async function requestProxy(url: string, apiKey: string, body: any): Promise<{ o
 }
 
 
+function redirectToGateway(res: any, payLink: string) {
+  return res.send(`
+    <!DOCTYPE html>
+    <html lang="fa" dir="rtl">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="referrer" content="no-referrer" />
+      <meta http-equiv="refresh" content="0;url=${payLink}" />
+      <title>در حال انتقال به درگاه بانکی...</title>
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 32px; text-align: center; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top-color: #10b981; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn { display: inline-block; margin-top: 16px; padding: 10px 20px; background: #10b981; color: white; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="spinner"></div>
+        <h2 style="font-size: 18px; margin: 0 0 8px;">در حال انتقال به درگاه امن بانکی...</h2>
+        <p style="font-size: 14px; color: #94a3b8; margin: 0 0 16px;">لطفاً چند لحظه شکیبا باشید</p>
+        <a id="payBtn" href="${payLink}" rel="noreferrer" class="btn">ورود مستقیم به درگاه پرداخت</a>
+      </div>
+      <script>
+        setTimeout(function() {
+          window.location.replace("${payLink}");
+        }, 80);
+      </script>
+    </body>
+    </html>
+  `);
+}
+
 // TEST PAYMENT ROUTE
 app.get('/api/payment/test', async (req, res) => {
   try {
     const amount = 100000; // 10,000 Toman in Rials
-    const description = 'تراکنش تستی 10 هزار تومانی';
-    const callbackUrl = 'https://www.zopit.ir/api/payment/callback';
+    const description = 'تراکنش تستی 10 هزار تومانی زوپیت';
+    const baseUrl = getPublicUrl(req);
+    const callbackUrl = `${baseUrl}/api/payment/callback`;
 
-    // 1. Read Merchant ID from Database
-    const dbMerchant = await prisma.systemConfig.findUnique({
-      where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
-    });
-    const merchantId = (dbMerchant?.value && dbMerchant.value.trim() !== 'zibal' && dbMerchant.value.trim() !== 'zibal_merchant_key') 
-      ? dbMerchant.value.trim() 
-      : (process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
+    console.log('[Test Payment] Initiating test payment with unified PaymentServiceFactory...');
+    const paymentGateway = await PaymentServiceFactory.getService();
+    const result = await paymentGateway.createPayment(amount, description, callbackUrl);
 
-    const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-
-    
-    console.log('[Test Payment] Attempting smart direct/proxy payment...', { amount, merchantId });
-
-    let data: any = null;
-    let directReturned115 = false;
-
-    // 1. Try Direct
-    try {
-      const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ merchant: merchantId, amount, callbackUrl, description })
-      });
-      data = await directRes.json();
-      if (data && data.result === 115) {
-        directReturned115 = true;
-        data = null;
-      }
-    } catch (err) {
-      directReturned115 = true;
-    }
-
-    // 2. Fallback to Proxy
-    if (!data || directReturned115) {
-      const result = await requestProxy(proxyUrl, proxySecret, {
-        action: 'request',
-        merchant: merchantId,
-        amount: amount,
-        callbackUrl,
-        description,
-        linkToDirect: 1
-      });
-      data = result.data || {};
-      if (!data.trackId && result.text) {
-        try { data = JSON.parse(result.text); } catch(e) {}
-      }
-    }
-
-    const trackId = data.trackId || data.authority;
-
-    if ((data.success || Number(data.result) === 100) && trackId) {
-      const payLink = data.payLink || `https://gateway.zibal.ir/start/${trackId}`;
-      return res.redirect(payLink);
+    if (result && result.payLink) {
+      return redirectToGateway(res, result.payLink);
     } else {
-      return res.status(400).send(`<h1>خطا در اتصال به درگاه زیبال</h1><p>${data.message || data.error || JSON.stringify(data)}</p>`);
+      return res.status(400).send(`<h1>خطا در اتصال به درگاه زیبال</h1><p>عدم دریافت لینک پرداخت معتبر</p>`);
     }
   } catch (err: any) {
     console.error('Test Payment Route Error:', err);
-    return res.status(500).send(`<h1>Server Error</h1><p>${err.message}</p>`);
+    return res.status(500).send(`<h1>خطای درگاه پرداخت</h1><p>${err.message}</p>`);
   }
 });
 
@@ -9895,15 +9930,7 @@ app.post('/api/payment/request', async (req: any, res: any) => {
   try {
     const { amount, description, storeId, customerName, customerPhone, customerAddress } = req.body || {};
 
-    // 1. Read Merchant ID from Database
-    const dbMerchant = await prisma.systemConfig.findUnique({
-      where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' }
-    });
-    const merchantId = (dbMerchant?.value && dbMerchant.value.trim() !== 'zibal' && dbMerchant.value.trim() !== 'zibal_merchant_key')
-      ? dbMerchant.value.trim()
-      : (process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
-
-    // 2. Create a new Order in Prisma DB with status PENDING as requested
+    // 1. Create a new Order in Prisma DB with status PENDING as requested
     const order = await prisma.order.create({
       data: {
         totalAmount: Number(amount || 0),
@@ -9915,58 +9942,39 @@ app.post('/api/payment/request', async (req: any, res: any) => {
       },
     });
 
-    const callbackUrl = 'https://www.zopit.ir/api/payment/callback';
-    const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-    const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
+    const baseUrl = getPublicUrl(req);
+    const callbackUrl = `${baseUrl}/api/payment/callback?orderId=${order.id}`;
 
-    console.log(`[Zibal Payment Request] Sending request to proxy for Order #${order.id}, Amount: ${order.totalAmount}`);
+    console.log(`[Zibal Payment Request] Initiating payment for Order #${order.id}, Amount: ${order.totalAmount}`);
 
-    // 3. Send real POST request to proxy
-    const result = await requestProxy(proxyUrl, proxySecret, {
-      action: 'request',
-      merchant: merchantId,
-      amount: Number(order.totalAmount),
-      orderId: order.id,
+    const paymentGateway = await PaymentServiceFactory.getService();
+    const result = await paymentGateway.createPayment(
+      Number(order.totalAmount) * 10,
+      description || `پرداخت سفارش #${order.id}`,
       callbackUrl,
-      description: description || `پرداخت سفارش #${order.id}`,
-      linkToDirect: 1
-    });
+      order.id
+    );
 
-    let data: any = result.data || {};
-    if (!data.trackId && result.text) {
-      try { data = JSON.parse(result.text); } catch(e) {}
-    }
-    console.log('[Zibal Payment Proxy Response]', data);
-
-    const trackId = data.trackId || data.authority;
-
-    if ((data.success || Number(data.result) === 100) && trackId) {
-      // Store the trackId on the order for callback lookup
+    const trackId = result.authority;
+    if (trackId) {
       await prisma.order.update({
         where: { id: order.id },
         data: { trackingCode: String(trackId) }
       }).catch((err) => console.error('Error storing trackingCode on order:', err));
-
-      const payLink = `https://gateway.zibal.ir/start/${trackId}`;
-
-      if (req.headers.accept && req.headers.accept.includes('text/html')) {
-        return res.redirect(payLink);
-      }
-
-      return res.json({
-        success: true,
-        trackId,
-        orderId: order.id,
-        payLink,
-        redirectUrl: payLink,
-        message: 'درخواست پرداخت با موفقیت ثبت شد.',
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        error: data.message || data.error || 'خطا در دریافت پاسخ از پروکسی درگاه زیبال',
-      });
     }
+
+    if (req.headers.accept && req.headers.accept.includes('text/html')) {
+      return redirectToGateway(res, result.payLink);
+    }
+
+    return res.json({
+      success: true,
+      trackId,
+      orderId: order.id,
+      payLink: result.payLink,
+      redirectUrl: result.payLink,
+      message: 'درخواست پرداخت با موفقیت ثبت شد.',
+    });
   } catch (error: any) {
     console.error('Express Payment Request Error:', error);
     return res.status(500).json({

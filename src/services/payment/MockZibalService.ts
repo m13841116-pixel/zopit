@@ -5,7 +5,7 @@ export const mockPaymentStore = new Map<string, { amount: number | string; statu
 export const mockPayoutStore = new Map<string, { status: 'pending' | 'processing' | 'success' | 'failed' }>();
 
 export class MockZibalService implements PaymentGateway {
-  async createPayment(amount: number | string, description: string, callbackUrl: string): Promise<{ payLink: string; authority: string }> {
+  async createPayment(amount: number | string, description: string, callbackUrl: string, orderId?: string | number): Promise<{ payLink: string; authority: string }> {
     const authority = `MOCK_AUTH_${Date.now()}`;
     mockPaymentStore.set(authority, { amount, status: 'pending' });
     
