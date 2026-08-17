@@ -10620,7 +10620,10 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         merchantToTest = process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || '';
       }
 
-      const baseUrl = getPublicUrl(req);
+      let baseUrl = getPublicUrl(req);
+      if (merchantToTest && merchantToTest !== 'zibal') {
+        baseUrl = 'https://zopit.ir';
+      }
       const callbackUrl = `${baseUrl}/api/public/store-invoice/callback?testInvoice=true`;
       const amountRials = 50000; // 5,000 Tomans (Minimum valid Iranian gateway amount)
 

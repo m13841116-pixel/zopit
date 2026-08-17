@@ -87,34 +87,21 @@ export class ZibalService implements PaymentGateway {
         console.error('Invalid PAYMENT_PROXY_URL, falling back to bankkalaha.ir');
       }
 
-      // Ensure callback URL is constructed properly with HTTPS
+      // Ensure callback URL is constructed properly with HTTPS and uses zopit.ir
       try {
         if (!finalCallbackUrl || finalCallbackUrl.trim() === '') {
-          if (process.env.PUBLIC_APP_URL) {
-            const appUrl = process.env.PUBLIC_APP_URL.replace(/\/$/, '');
-            finalCallbackUrl = `${appUrl}/api/public/checkout/callback${orderId ? `?orderId=${orderId}` : ''}`;
-          } else {
-            throw new Error('فرمت آدرس بازگشت (Callback URL) نامعتبر است.');
-          }
+          finalCallbackUrl = 'https://zopit.ir/api/public/checkout/callback' + (orderId ? `?orderId=${orderId}` : '');
         } else {
           const urlObj = new URL(finalCallbackUrl);
-          if (urlObj.protocol === 'http:' && !urlObj.hostname.includes('localhost')) {
+          if (urlObj.hostname.includes('run.app') || urlObj.hostname.includes('localhost') || urlObj.hostname.includes('bankkalaha.ir')) {
+            finalCallbackUrl = `https://zopit.ir${urlObj.pathname}${urlObj.search}`;
+          } else {
             urlObj.protocol = 'https:';
             finalCallbackUrl = urlObj.toString();
           }
         }
       } catch (e) {
-        if (process.env.PUBLIC_APP_URL) {
-          const appUrl = process.env.PUBLIC_APP_URL.replace(/\/$/, '');
-          finalCallbackUrl = `${appUrl}/api/public/checkout/callback${orderId ? `?orderId=${orderId}` : ''}`;
-        } else {
-          throw new Error('فرمت آدرس بازگشت (Callback URL) نامعتبر است.');
-        }
-      }
-
-      // Always route callback through proxy domain to ensure Zibal validates domain against bankkalaha.ir (bypassing Error 106)
-      if (!finalCallbackUrl.includes('zibal-proxy.php')) {
-        finalCallbackUrl = `${proxyDomain}/zibal-proxy.php?vercelUrl=${encodeURIComponent(finalCallbackUrl)}`;
+        finalCallbackUrl = 'https://zopit.ir/api/public/checkout/callback' + (orderId ? `?orderId=${orderId}` : '');
       }
 
       let numAmount = Math.round(Number(amount));

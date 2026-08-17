@@ -1,21 +1,42 @@
 <?php
 /**
- * Zibal Payment Gateway Production Proxy
+ * Zibal Payment Gateway Production Proxy with Diagnostic & Logging Engine
  * Domain: bankkalaha.ir
  * Secret: ZopitPay2026Key
  */
 
-// Enable error reporting only if ?debug=1 is passed
-if (isset($_GET['debug']) && $_GET['debug'] === '1') {
-    ini_set('display_errors', 1);
-    ini_set('display_startup_errors', 1);
-    error_reporting(E_ALL);
-} else {
-    ini_set('display_errors', 0);
-    error_reporting(0);
+$logFile = __DIR__ . '/zibal-debug.log';
+
+function logZibalDebug($tag, $data) {
+    global $logFile;
+    $timestamp = date('Y-m-d H:i:s');
+    $content = is_array($data) || is_object($data) ? json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : $data;
+    $entry = "[{$timestamp}] [{$tag}]\n{$content}\n" . str_repeat('-', 60) . "\n";
+    @file_put_contents($logFile, $entry, FILE_APPEND);
 }
 
-// 0. Intercept Zibal Callback Redirect (No API key check needed for browser redirects)
+// Enable error reporting
+ini_set('display_errors', 0);
+error_reporting(0);
+
+// 0. Log Viewer / Direct Diagnostic Page for Admin
+if (isset($_GET['action']) && $_GET['action'] === 'get_logs') {
+    $apiKey = $_GET['key'] ?? '';
+    if ($apiKey !== 'ZopitPay2026Key') {
+        http_response_code(403);
+        echo 'Access Denied: Invalid Key';
+        exit;
+    }
+    header('Content-Type: text/plain; charset=utf-8');
+    if (file_exists($logFile)) {
+        echo file_get_contents($logFile);
+    } else {
+        echo "هنوز لاگی ثبت نشده است.";
+    }
+    exit;
+}
+
+// 0.1 Intercept Zibal Callback Redirect (No API key check needed for browser redirects)
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['vercelUrl'])) {
     $vercelUrl = $_GET['vercelUrl'];
     $queryParams = $_GET;
@@ -25,6 +46,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['vercelUrl'])) {
     $separator = (strpos($vercelUrl, '?') !== false) ? '&' : '?';
     $redirectUrl = rtrim($vercelUrl, '/') . $separator . http_build_query($queryParams);
     
+    logZibalDebug('CALLBACK_REDIRECT', [
+        'vercelUrl' => $vercelUrl,
+        'finalRedirect' => $redirectUrl,
+        'params' => $queryParams
+    ]);
+
     header("Location: " . $redirectUrl);
     exit;
 }
@@ -44,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $headers = function_exists('getallheaders') ? getallheaders() : [];
 $apiKey = $headers['X-Api-Key'] ?? $headers['x-api-key'] ?? $_SERVER['HTTP_X_API_KEY'] ?? $_SERVER['x-api-key'] ?? '';
 
-// Also check query param for key
 if (empty($apiKey) && isset($_GET['key'])) {
     $apiKey = $_GET['key'];
 }
@@ -52,6 +78,11 @@ if (empty($apiKey) && isset($_GET['key'])) {
 const PROXY_SECRET_KEY = 'ZopitPay2026Key';
 
 if ($apiKey !== PROXY_SECRET_KEY) {
+    logZibalDebug('UNAUTHORIZED_ATTEMPT', [
+        'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+        'receivedKey' => $apiKey,
+        'headers' => $headers
+    ]);
     http_response_code(403);
     echo json_encode([
         'success' => false,
@@ -82,9 +113,17 @@ if (empty($action)) {
 // 4. Validate Merchant Code (Ensure Production Mode)
 $merchant = !empty($data['merchant']) ? trim($data['merchant']) : '';
 if (empty($merchant)) {
-    // If not provided in body, check environment or fallback to default
     $merchant = 'zibal';
 }
+
+logZibalDebug('INCOMING_REQUEST', [
+    'action' => $action,
+    'merchant' => $merchant,
+    'merchant_length' => strlen($merchant),
+    'is_sandbox' => ($merchant === 'zibal'),
+    'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+    'raw_payload' => $data
+]);
 
 // 5. Handle Actions
 if ($action === 'verify') {
@@ -109,6 +148,7 @@ if ($action === 'verify') {
     $amount = isset($data['amount']) ? (int)$data['amount'] : 0;
     $iban = $data['iban'] ?? '';
     $description = $data['description'] ?? 'تسویه حساب';
+
     $zibalPayload = [
         'merchant' => $merchant,
         'amount' => $amount,
@@ -134,12 +174,8 @@ if ($action === 'verify') {
         exit;
     }
 
-    // Determine current proxy host and scheme
-    $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'https';
-    $host = $_SERVER['HTTP_HOST'] ?? 'bankkalaha.ir';
-    $proxyBase = $scheme . '://' . $host . '/zibal-proxy.php';
+    $finalCallbackUrl = !empty($rawCallbackUrl) ? $rawCallbackUrl : 'https://zopit.ir/callback-test';
 
-    $finalCallbackUrl = $rawCallbackUrl;
     $zibalPayload = [
         'merchant'    => $merchant,
         'amount'      => $amount,
@@ -150,7 +186,6 @@ if ($action === 'verify') {
     if (!empty($orderId)) {
         $zibalPayload['orderId'] = $orderId;
     }
-
     if (!empty($data['linkToDirect'])) {
         $zibalPayload['linkToDirect'] = $data['linkToDirect'];
     }
@@ -162,6 +197,12 @@ if ($action === 'verify') {
 $responseBody = '';
 $httpCode = 0;
 $errorMessage = '';
+$curlInfo = [];
+
+logZibalDebug('SENDING_TO_ZIBAL', [
+    'target_url' => $zibalUrl,
+    'outgoing_payload' => $zibalPayload
+]);
 
 if (function_exists('curl_init')) {
     $ch = curl_init($zibalUrl);
@@ -179,6 +220,11 @@ if (function_exists('curl_init')) {
     $responseBody = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $errorMessage = curl_error($ch);
+    $curlInfo = [
+        'primary_ip' => curl_getinfo($ch, CURLINFO_PRIMARY_IP),
+        'total_time' => curl_getinfo($ch, CURLINFO_TOTAL_TIME),
+        'http_code'  => $httpCode
+    ];
     curl_close($ch);
 } else {
     $options = [
@@ -206,12 +252,23 @@ if (function_exists('curl_init')) {
     }
 }
 
+logZibalDebug('RECEIVED_FROM_ZIBAL', [
+    'http_code' => $httpCode,
+    'curl_info' => $curlInfo,
+    'error_message' => $errorMessage,
+    'raw_response' => $responseBody
+]);
+
 if (empty($responseBody) && !empty($errorMessage)) {
     http_response_code(500);
     echo json_encode([
         'success' => false,
         'result' => -1,
-        'error' => 'Proxy Connection Error: ' . $errorMessage
+        'error' => 'Proxy Connection Error: ' . $errorMessage,
+        'debug' => [
+            'merchant_sent' => $merchant,
+            'curl_info' => $curlInfo
+        ]
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -221,7 +278,11 @@ if (empty($responseBody)) {
     echo json_encode([
         'success' => false,
         'result' => -1,
-        'error' => 'Empty response received from Zibal gateway.'
+        'error' => 'Empty response received from Zibal gateway.',
+        'debug' => [
+            'merchant_sent' => $merchant,
+            'http_code' => $httpCode
+        ]
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -235,6 +296,13 @@ if (isset($decodedResponse['trackId']) && !isset($decodedResponse['payLink'])) {
 if (isset($decodedResponse['result']) && (int)$decodedResponse['result'] === 100) {
     $decodedResponse['success'] = true;
 }
+
+// Attach debug telemetry
+$decodedResponse['_debug'] = [
+    'merchant_used' => $merchant,
+    'is_sandbox' => ($merchant === 'zibal'),
+    'zibal_http_status' => $httpCode
+];
 
 http_response_code($httpCode >= 200 && $httpCode < 300 ? 200 : $httpCode);
 echo json_encode($decodedResponse, JSON_UNESCAPED_UNICODE);
