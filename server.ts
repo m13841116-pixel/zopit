@@ -10556,26 +10556,33 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         }
       }
 
-      // Default: Zibal testing directly (since 115 proves the merchant is valid)
+      // Route Zibal test requests through the Iran Proxy (bankkalaha.ir)
       try {
-        const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            merchant: merchantToTest,
-            amount: 50000,
-            callbackUrl: 'https://zopit.ir/callback-test'
-          })
-        });
-        
-        const data: any = await directRes.json().catch(() => ({}));
+        const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
+        const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
+        const proxyRes = await executeProxyRequest({
+          action: 'request',
+          merchant: merchantToTest,
+          amount: 50000,
+          callbackUrl: 'https://zopit.ir/api/public/store-invoice/callback?testInvoice=true',
+          description: 'تست اتصال زنده درگاه زیبال',
+          linkToDirect: 0,
+        }, { proxyUrl, apiKey: proxySecret, timeoutMs: 12000 });
 
-        if (data && (data.result === 100 || data.result === 115 || data.success)) {
+        let data: any = null;
+        if (proxyRes.ok && proxyRes.text) {
+          try { data = JSON.parse(proxyRes.text); } catch (e) {}
+        }
+        if (!data && proxyRes.data) {
+          data = proxyRes.data;
+        }
+
+        if (data && (Number(data.result) === 100 || Number(data.result) === 115 || data.success)) {
           return res.json({
             success: true,
             active: true,
             resultCode: data.result,
-            message: 'کد مرچنت با موفقیت تایید شد! (ارتباط مستقیم با زیبال برقرار است)',
+            message: 'کد مرچنت با موفقیت تایید شد! (اتصال زنده زیبال از طریق پروکسی ایران فعال است)',
             merchant: merchantToTest
           });
         } else {
@@ -10584,12 +10591,13 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
             103: 'مرجنت غیرفعال است (درگاه در انتظار تایید مدارک است)',
             104: 'مرجنت نامعتبر است',
             113: 'مبلغ تراکنش نامعتبر است',
+            115: 'آی‌پی سرور در زیبال مجاز نیست',
           };
           return res.json({
             success: false,
             active: false,
             resultCode: data?.result,
-            message: errorMessages[Number(data?.result)] || data?.message || `کد پاسخ زیبال: ${data?.result}`,
+            message: errorMessages[Number(data?.result)] || data?.message || data?.error || `کد پاسخ زیبال: ${data?.result || 'ERR - پاسخی دریافت نشد'}`,
             merchant: merchantToTest
           });
         }
@@ -10597,7 +10605,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         return res.json({
           success: false,
           active: false,
-          message: `خطا در ارتباط مستقیم با زیبال: ${err.message}`
+          message: `خطا در ارتباط با سرور پروکسی زیبال: ${err.message}`
         });
       }
     } catch (err: any) {
@@ -10633,14 +10641,14 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       try {
         const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
         const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-        const proxyRes = await requestProxy(proxyUrl, proxySecret, {
+        const proxyRes = await executeProxyRequest({
           action: 'request',
           merchant: merchantToTest,
           amount: amountRials,
           callbackUrl,
           description: 'تست فاکتور آزمایشی ۵،۰۰۰ تومانی زوپیت',
-          linkToDirect: 1,
-        });
+          linkToDirect: 0,
+        }, { proxyUrl, apiKey: proxySecret, timeoutMs: 12000 });
         if (proxyRes.ok && proxyRes.text) {
           const parsed = JSON.parse(proxyRes.text);
           if (parsed && (parsed.trackId || parsed.result !== undefined)) {

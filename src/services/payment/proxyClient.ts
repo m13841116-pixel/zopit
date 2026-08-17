@@ -71,7 +71,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
 
 /**
  * Optimized HTTP/HTTPS client for Vercel -> Iran Proxy communication.
- * Uses environment variables for proxy URL and secret key without hardcoded fallbacks.
+ * Uses fetch with node fallback and fallback environment variables.
  */
 export async function executeProxyRequest(
   payload: any,
@@ -90,12 +90,51 @@ export async function executeProxyRequest(
     throw new Error('Fatal: PAYMENT_PROXY_URL is missing in environment variables.');
   }
 
-  // Pure POST request directly to the proxy URL without appending query string parameters
+  // 1. Try global fetch first (Native in Vercel Node 18+)
+  if (typeof fetch === 'function') {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      const targetUrl = baseProxyUrl.includes('key=') ? baseProxyUrl : `${baseProxyUrl}?key=${encodeURIComponent(secretKey)}`;
+
+      const fetchRes = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Api-Key': secretKey,
+          'X-Proxy-Secret': secretKey,
+          'Authorization': `Bearer ${secretKey}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZopitPaymentProxy/1.0',
+        },
+        body: payloadString,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+      const text = await fetchRes.text();
+      let data: any;
+      try {
+        if (text) data = JSON.parse(text);
+      } catch (e) {}
+
+      if (fetchRes.ok || data?.result !== undefined || data?.trackId || data?.payLink || data?.success) {
+        return {
+          ok: fetchRes.ok,
+          status: fetchRes.status,
+          text,
+          data,
+        };
+      }
+    } catch (fetchErr: any) {
+      console.warn(`[ProxyClient Fetch Fallback] fetch failed: ${fetchErr.message}, trying node https request...`);
+    }
+  }
+
+  // 2. Fallback to node https client
   try {
     const res = await makeNodeRequest(baseProxyUrl, payloadString, secretKey, timeoutMs);
-    if (res.ok || (res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.payLink !== undefined))) {
-      return res;
-    }
     return res;
   } catch (err: any) {
     console.error(`[ProxyClient Error] Failed request to proxy: ${err.message}`);

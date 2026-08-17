@@ -141,7 +141,7 @@ export class ZibalService implements PaymentGateway {
         amount: numAmount,
         callbackUrl: finalCallbackUrl,
         description: description || 'پرداخت سفارش',
-        linkToDirect: 1,
+        linkToDirect: 0,
       };
       if (orderId) requestPayload.orderId = orderId;
 
