@@ -27,7 +27,7 @@ export default function PaymentSmsSettings() {
 
   // States for Settings
   const [gatewayType, setGatewayType] = useState("ZIBAL");
-  const [merchantCode, setMerchantCode] = useState("6a0213e61b27742a09938588");
+  const [merchantCode, setMerchantCode] = useState("");
   const [gatewayKey, setGatewayKey] = useState("");
   const [enableCardToCard, setEnableCardToCard] = useState(false);
   const [shabaNumber, setShabaNumber] = useState("330560611828006022464501");
@@ -228,11 +228,7 @@ export default function PaymentSmsSettings() {
         if (data && !data.error) {
           if (data.PAYMENT_GATEWAY_TYPE) setGatewayType(data.PAYMENT_GATEWAY_TYPE);
           if (data.PAYMENT_GATEWAY_MERCHANT_CODE) {
-            let mCode = String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim();
-            if (mCode === 'a0213e61b27742a09938588') mCode = '6a0213e61b27742a09938588';
-            setMerchantCode(mCode);
-          } else {
-            setMerchantCode('6a0213e61b27742a09938588');
+            setMerchantCode(String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim());
           }
           if (data.PAYMENT_GATEWAY_KEY) setGatewayKey(data.PAYMENT_GATEWAY_KEY);
           if (data.CARD_TO_CARD_SHABA) setShabaNumber(data.CARD_TO_CARD_SHABA);
@@ -412,7 +408,7 @@ export default function PaymentSmsSettings() {
                         setGatewayType('ZIBAL');
                       }
                     }}
-                    placeholder="مثال: 6a0213e61b27742a09938588"
+                    placeholder="کد مرچنت درگاه (مثال: zibal یا کد ترمینال سپ)"
                     className="flex-1 px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs text-text-primary font-mono text-left focus:outline-none focus:ring-2 focus:ring-primary-default min-w-[220px]"
                   />
                   <button

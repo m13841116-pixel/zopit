@@ -6,8 +6,11 @@ export class SepService implements PaymentGateway {
   private proxyUrl: string;
 
   constructor(terminalId: string) {
-    this.terminalId = terminalId;
-    this.proxyUrl = process.env.SEP_PROXY_URL || 'https://bankkalaha.ir/sep-proxy.php';
+    if (!terminalId || terminalId.trim() === '') {
+      throw new Error('Fatal: SEP terminalId is missing.');
+    }
+    this.terminalId = terminalId.trim();
+    this.proxyUrl = process.env.SEP_PROXY_URL || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
   }
 
   async createPayment(amount: number | string, description: string, callbackUrl: string, mobile?: string): Promise<{ payLink: string; authority: string; }> {

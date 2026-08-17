@@ -954,8 +954,8 @@ class MemoryDatabase {
     const configs = this.getCollection('systemconfig');
     configs.push(
       { id: 1, key: 'PLATFORM_NAME', value: 'زوپیت (Zopit)' },
-      { id: 2, key: 'PAYMENT_GATEWAY_MERCHANT_CODE', value: '6a0213e61b27742a09938588' },
-      { id: 3, key: 'ZIBAL_MERCHANT_ID', value: '6a0213e61b27742a09938588' },
+      { id: 2, key: 'PAYMENT_GATEWAY_MERCHANT_CODE', value: process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || '' },
+      { id: 3, key: 'ZIBAL_MERCHANT_ID', value: process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || '' },
       { id: 4, key: 'PAYMENT_GATEWAY_TYPE', value: 'zibal' },
       { id: 5, key: 'PAYMENT_MODE', value: 'HYBRID' }
     );
@@ -9644,6 +9644,8 @@ app.get('/api/public/shipping/callback', async (req, res) => {
 app.get('/api/public/checkout/callback', async (req, res) => {
   try {
     const { orderId, success, trackId } = req.query;
+    console.log(`[Checkout Callback] OrderId: ${orderId}, TrackId: ${trackId}, SuccessQuery: ${success}`);
+
     if (!orderId) {
       return res.status(400).json({ error: 'شناسه سفارش ارسال نشده است.' });
     }
@@ -9655,6 +9657,12 @@ app.get('/api/public/checkout/callback', async (req, res) => {
 
     if (!order) {
       return res.status(404).json({ error: 'سفارش مورد نظر یافت نشد.' });
+    }
+
+    // Idempotency: If order is already paid/processed, skip double crediting
+    if (order.status === 'WAITING_SUPPLIER_CONFIRMATION' || order.status === 'PROCESSING' || order.status === 'COMPLETED' || order.status === 'PAID') {
+      console.log(`[Checkout Callback Idempotency] Order #${parsedOrderId} is already paid (status: ${order.status}). Skipping duplicate processing.`);
+      return res.redirect(`/?payment_status=success&trackId=${trackId || order.trackingCode || 'DIRECT'}&invoiceId=DIRECT_${orderId}`);
     }
 
     let isPaid = false;
@@ -9671,13 +9679,15 @@ app.get('/api/public/checkout/callback', async (req, res) => {
       refId = `MOCK_REF_${Date.now()}`;
     }
 
-    
+    console.log(`[Checkout Callback Result] Order #${parsedOrderId}, Paid: ${isPaid}, RefId: ${refId}`);
+
     if (isPaid) {
       const nextStatus = order.orderSource === 'store' ? 'WAITING_SUPPLIER_CONFIRMATION' : 'PROCESSING';
       const updatedOrder = await prisma.order.update({
         where: { id: parsedOrderId },
         data: {
           status: nextStatus,
+          trackingCode: refId || (trackId ? String(trackId) : undefined),
           statusHistory: {
             create: {
               fromStatus: order.status,
@@ -9695,10 +9705,10 @@ app.get('/api/public/checkout/callback', async (req, res) => {
 
       res.redirect(`/?payment_status=success&trackId=${trackId || refId || 'DIRECT'}&invoiceId=DIRECT_${orderId}`);
     } else {
-
       res.redirect(`/?payment_status=failed&trackId=${trackId || 'DIRECT'}&invoiceId=DIRECT_${orderId}`);
     }
   } catch (err: any) {
+    console.error('[Checkout Callback Error]', err.message);
     res.redirect(`/?payment_status=error&message=${encodeURIComponent(err.message)}`);
   }
 });
@@ -10031,6 +10041,11 @@ app.all('/api/payment/callback', async (req: any, res: any) => {
       }
 
       if (orderToUpdate) {
+        if (orderToUpdate.status === 'PAID' || orderToUpdate.status === 'SUCCESS' || orderToUpdate.status === 'COMPLETED' || orderToUpdate.status === 'WAITING_SUPPLIER_CONFIRMATION') {
+          console.log(`[Payment Callback Idempotency] Order #${orderToUpdate.id} is already marked as paid/processed. Skipping duplicate wallet credit.`);
+          return res.redirect(`${redirectBase}/checkout/success?trackId=${trackId}&orderId=${orderToUpdate.id}`);
+        }
+
         await prisma.order.update({
           where: { id: orderToUpdate.id },
           data: {
@@ -10422,12 +10437,12 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     try {
       const { merchantCode, gatewayType } = req.body;
       let merchantToTest = (merchantCode || '').trim();
-      if (merchantToTest === 'a0213e61b27742a09938588') {
-        merchantToTest = '6a0213e61b27742a09938588';
+      if (false) {
+        merchantToTest = process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || '';
       }
       if (!merchantToTest || merchantToTest === 'zibal' || merchantToTest === 'zibal_merchant_key') {
         const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
-        merchantToTest = savedSetting?.value?.trim() || process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588';
+        merchantToTest = savedSetting?.value?.trim() || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || '';
       }
 
       const selectedGateway = (gatewayType || 'ZIBAL').toUpperCase();
@@ -10599,9 +10614,9 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       const { merchantCode } = req.body;
       let merchantToTest = (merchantCode && typeof merchantCode === 'string') 
         ? merchantCode.trim() 
-        : (process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588');
-      if (merchantToTest === 'a0213e61b27742a09938588') {
-        merchantToTest = '6a0213e61b27742a09938588';
+        : (process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || '');
+      if (false) {
+        merchantToTest = process.env.ZIBAL_MERCHANT || process.env.ZIBAL_MERCHANT_ID || '';
       }
 
       const baseUrl = getPublicUrl(req);
