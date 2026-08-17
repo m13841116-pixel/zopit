@@ -10478,6 +10478,68 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         }
       }
       
+      // If user is testing SEP (Saman)
+      if (selectedGateway === 'SEP') {
+        if (!merchantToTest || merchantToTest.length < 5) {
+          return res.json({
+            success: false,
+            active: false,
+            message: `شماره ترمینال نامعتبر است. لطفاً شماره ترمینال صحیح سامان را وارد کنید.`,
+            merchant: merchantToTest
+          });
+        }
+        try {
+          const sepProxyUrl = process.env.SEP_PROXY_URL || 'https://bankkalaha.ir/sep-proxy.php';
+          const sepApiKey = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
+          const sepPayload = {
+            action: 'token',
+            terminalId: merchantToTest,
+            amount: 50000,
+            resNum: Math.floor(Math.random() * 1000000000).toString(),
+            callbackUrl: 'https://zopit.ir/callback-test'
+          };
+          
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+          
+          const targetUrl = sepProxyUrl.includes('key=') 
+            ? sepProxyUrl 
+            : `${sepProxyUrl}?key=${sepApiKey}`;
+            
+          const sepRes = await fetch(targetUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sepPayload),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timer);
+          const sepData: any = await sepRes.json().catch(() => ({}));
+          
+          if (sepData && sepData.status === 1 && sepData.token) {
+            return res.json({
+              success: true,
+              active: true,
+              message: 'درگاه سامان فعال است و شماره ترمینال با موفقیت تایید شد.',
+              merchant: merchantToTest
+            });
+          } else {
+            return res.json({
+              success: false,
+              active: false,
+              message: sepData?.errorDesc || sepData?.error || 'خطا در دریافت توکن از سامان. ترمینال نامعتبر است یا آی‌پی مسدود است.',
+              merchant: merchantToTest
+            });
+          }
+        } catch (sepErr: any) {
+          return res.json({
+            success: false,
+            active: false,
+            message: `خطا در ارتباط با سرور واسط سامان (Timeout یا قطعی): ${sepErr.message}`
+          });
+        }
+      }
+
       // Default: Zibal testing directly (since 115 proves the merchant is valid)
       try {
         const directRes = await fetch('https://gateway.zibal.ir/v1/request', {

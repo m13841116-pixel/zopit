@@ -95,8 +95,19 @@ export class ZibalService implements PaymentGateway {
       try {
         data = await this.sendProxyRequest(requestPayload);
       } catch (proxyErr: any) {
-        console.error('[Zibal] Proxy request failed:', proxyErr.message);
-        throw new Error(`خطا در ارتباط با سرور واسط ایران (bankkalaha.ir): ${proxyErr.message}`);
+        console.warn('[Zibal] Proxy request failed, attempting direct connection to Zibal:', proxyErr.message);
+        
+        // Strategy 2: Direct connection to Zibal (Fallback)
+        try {
+          const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestPayload)
+          });
+          data = await directRes.json();
+        } catch (directErr: any) {
+          throw new Error(`خطا در ارتباط با سرور واسط و سرور اصلی زیبال: ${directErr.message}`);
+        }
       }
 
       if (data && ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId || data.authority))) {
@@ -139,17 +150,19 @@ export class ZibalService implements PaymentGateway {
       try {
         data = await this.sendProxyRequest(verifyPayload);
       } catch (proxyErr: any) {
-        console.warn('[Zibal] Proxy verify attempt failed, retrying...', proxyErr.message);
+        console.warn('[Zibal] Proxy verify attempt failed, retrying direct to Zibal...', proxyErr.message);
         try {
-          const retryRes = await executeProxyRequest(verifyPayload, { timeoutMs: 10000 });
-          if (retryRes.data && (retryRes.data.result !== undefined || retryRes.data.trackId !== undefined)) {
-            data = retryRes.data;
-          } else if (retryRes.ok && retryRes.text) {
-            try { data = JSON.parse(retryRes.text); } catch {}
-          }
-          if (!data) throw new Error(retryRes.data?.error || retryRes.text || proxyErr.message);
-        } catch (retryErr: any) {
-          throw new Error(`خطا در ارتباط با سرور واسط ایران برای تایید تراکنش: ${retryErr.message}`);
+          const directRes = await fetch('https://gateway.zibal.ir/v1/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              merchant: this.zibalMerchant,
+              trackId: authority
+            })
+          });
+          data = await directRes.json();
+        } catch (directErr: any) {
+          throw new Error(`خطا در ارتباط با سرور واسط ایران و سرور اصلی زیبال برای تایید تراکنش: ${directErr.message}`);
         }
       }
 
