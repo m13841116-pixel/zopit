@@ -7,11 +7,16 @@ import { MockZibalService } from './MockZibalService.js';
 export class PaymentServiceFactory {
   static async getService(): Promise<PaymentGateway> {
     try {
-      // 1. Check individual system config saved from the admin page
-      const merchantCodeSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
+      // 1. Check individual system config saved from the admin page with a fast 2s timeout
+      const dbPromise = Promise.all([
+        prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } }),
+        prisma.systemConfig.findUnique({ where: { key: 'payment_gateway_settings' } })
+      ]);
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
       
-      // 2. Also check the legacy/JSON settings key for fallback
-      const configRecord = await prisma.systemConfig.findUnique({ where: { key: 'payment_gateway_settings' } });
+      const res: any = await Promise.race([dbPromise, timeoutPromise]);
+      const merchantCodeSetting = res ? res[0] : null;
+      const configRecord = res ? res[1] : null;
       let config: any = {};
       if (configRecord && configRecord.value) {
         try {

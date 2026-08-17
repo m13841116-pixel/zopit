@@ -11,8 +11,8 @@ export interface ProxyResponse {
 
 /**
  * Highly robust HTTP/HTTPS client specifically optimized for Vercel (AWS Lambda) & Node.js environments.
- * It uses a standard fetch call with safe headers that pass Apache/cPanel ModSecurity on Iranian proxy hosts,
- * with fallback to https.request.
+ * Uses native fetch with AbortController for fast execution within Vercel's 10s serverless timeout,
+ * with fallback to Node https module.
  */
 export async function executeProxyRequest(
   payload: any,
@@ -24,7 +24,7 @@ export async function executeProxyRequest(
 ): Promise<ProxyResponse> {
   const baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
   const apiKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  const timeoutMs = options.timeoutMs || 9000;
+  const timeoutMs = options.timeoutMs || 6000;
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
   // Always append ?key= so that even if Apache / LiteSpeed strips custom headers, the key is passed
@@ -32,7 +32,7 @@ export async function executeProxyRequest(
     ? baseProxyUrl 
     : `${baseProxyUrl}${baseProxyUrl.includes('?') ? '&' : '?'}key=${encodeURIComponent(apiKey)}`;
 
-  // Strategy 1: Primary fast fetch (works natively in Node.js 18+, Vercel Serverless Functions, Edge)
+  // Strategy 1: Primary fast fetch (works natively in Node 18+, Vercel Serverless Functions)
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -57,27 +57,17 @@ export async function executeProxyRequest(
       if (responseText) data = JSON.parse(responseText);
     } catch (e) {}
 
-    if (response.ok && data) {
+    if (response.ok || data) {
       return {
-        ok: true,
+        ok: response.ok,
         status: response.status,
         text: responseText,
         data,
       };
     }
-
-    if (response.ok && responseText) {
-      return {
-        ok: true,
-        status: response.status,
-        text: responseText,
-        data: data || null,
-      };
-    }
-
     console.warn(`[ProxyClient] Fetch returned status ${response.status}: ${responseText.slice(0, 200)}`);
   } catch (fetchErr: any) {
-    console.warn(`[ProxyClient] Fetch attempt error:`, fetchErr.message);
+    console.warn(`[ProxyClient] Fetch attempt failed: ${fetchErr.message}`);
   }
 
   // Strategy 2: Node.js https fallback
@@ -103,7 +93,7 @@ export async function executeProxyRequest(
           'User-Agent': 'curl/7.88.1',
           'Content-Length': Buffer.byteLength(payloadString),
         },
-        timeout: timeoutMs,
+        timeout: Math.min(timeoutMs, 5000),
         rejectUnauthorized: false,
       };
 
@@ -143,3 +133,4 @@ export async function executeProxyRequest(
     };
   }
 }
+

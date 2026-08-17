@@ -95,20 +95,8 @@ export class ZibalService implements PaymentGateway {
       try {
         data = await this.sendProxyRequest(requestPayload);
       } catch (proxyErr: any) {
-        console.warn('[Zibal] Primary proxy attempt failed, retrying proxy...', proxyErr.message);
-        try {
-          // Retry proxy with fresh client
-          const retryRes = await executeProxyRequest(requestPayload, { timeoutMs: 10000 });
-          if (retryRes.data && (retryRes.data.result !== undefined || retryRes.data.trackId !== undefined)) {
-            data = retryRes.data;
-          } else if (retryRes.ok && retryRes.text) {
-            try { data = JSON.parse(retryRes.text); } catch {}
-          }
-          if (!data) throw new Error(retryRes.data?.error || retryRes.text || proxyErr.message);
-        } catch (retryErr: any) {
-          console.error('[Zibal] Proxy retry also failed:', retryErr.message);
-          throw new Error(`خطا در ارتباط با سرور واسط ایران (bankkalaha.ir): ${retryErr.message}`);
-        }
+        console.error('[Zibal] Proxy request failed:', proxyErr.message);
+        throw new Error(`خطا در ارتباط با سرور واسط ایران (bankkalaha.ir): ${proxyErr.message}`);
       }
 
       if (data && ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId || data.authority))) {
