@@ -19,7 +19,7 @@ function sanitizeMobileNumber(mobile: string): string {
 async function getMelliPayamakConfig() {
   const prisma = getPrisma();
   
-  const [dbUser, dbPass, dbFrom, dbPatternGeneral, dbPatternOtp, dbPatternSupplier, dbPatternLabel] = await Promise.all([
+  const [dbUser, dbPass, dbFrom, dbPatternGeneral, dbPatternOtp, dbPatternSupplier, dbPatternLabel, dbPatternAnnouncement] = await Promise.all([
     prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_USERNAME' } }),
     prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PASSWORD' } }),
     prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_FROM_NUMBER' } }),
@@ -27,6 +27,7 @@ async function getMelliPayamakConfig() {
     prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_OTP' } }),
     prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT' } }),
     prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_LABEL_ISSUED' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_ANNOUNCEMENT' } }),
   ]);
 
   const username = dbUser?.value?.trim() || process.env.MELLIPAYAMAK_USERNAME?.trim() || '';
@@ -42,6 +43,7 @@ async function getMelliPayamakConfig() {
       MELLIPAYAMAK_PATTERN_OTP: dbPatternOtp?.value?.trim() || '',
       MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT: dbPatternSupplier?.value?.trim() || '',
       MELLIPAYAMAK_PATTERN_LABEL_ISSUED: dbPatternLabel?.value?.trim() || '',
+      MELLIPAYAMAK_PATTERN_ANNOUNCEMENT: dbPatternAnnouncement?.value?.trim() || '',
     }
   };
 }

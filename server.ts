@@ -2826,14 +2826,15 @@ app.post('/api/auth/reset-password-otp', async (req, res) => {
 // Admin SMS Test Endpoint
 app.post('/api/admin/sms/test', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
-    const { mobile, message, patternKey, patternValues } = req.body;
+    const { mobile, message, patternKey, patternCode, patternValues } = req.body;
     if (!mobile) {
       return res.status(400).json({ success: false, error: 'شماره موبایل الزامی است' });
     }
 
     let result: any;
-    if (patternKey) {
-      result = await sendMelliPayamakPattern(mobile, patternKey, patternValues || ['12345']);
+    const targetPattern = (patternCode && patternCode.trim()) ? patternCode.trim() : patternKey;
+    if (targetPattern) {
+      result = await sendMelliPayamakPattern(mobile, targetPattern, patternValues || ['12345']);
     } else {
       result = await sendSmsViaMelliPayamak(mobile, message || 'این یک پیامک آزمایشی از سامانه زوپیت می‌باشد.');
     }

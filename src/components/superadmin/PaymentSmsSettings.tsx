@@ -42,6 +42,7 @@ export default function PaymentSmsSettings() {
   const [melliPatternOtp, setMelliPatternOtp] = useState("");
   const [melliPatternSupplierCommit, setMelliPatternSupplierCommit] = useState("");
   const [melliPatternLabelIssued, setMelliPatternLabelIssued] = useState("");
+  const [melliPatternAnnouncement, setMelliPatternAnnouncement] = useState("");
 
   // Primary Requested SMS Triggers
   const [smsNotifyUserLogin, setSmsNotifyUserLogin] = useState(true);
@@ -75,7 +76,9 @@ export default function PaymentSmsSettings() {
 
   // SMS Test State
   const [testPhone, setTestPhone] = useState("09180088358");
-  const [testSmsMode, setTestSmsMode] = useState<"pattern_otp" | "text">("pattern_otp");
+  const [testSmsMode, setTestSmsMode] = useState<"pattern" | "text">("pattern");
+  const [testPatternType, setTestPatternType] = useState<"otp" | "supplier" | "label" | "announcement" | "custom">("otp");
+  const [testCustomBodyId, setTestCustomBodyId] = useState("");
   const [testOtpCode, setTestOtpCode] = useState("12345");
   const [testMessage, setTestMessage] = useState("این یک پیامک آزمایشی جهت بررسی اتصال درگاه پیامکی زوپیت است.");
   const [testingSms, setTestingSms] = useState(false);
@@ -155,9 +158,43 @@ export default function PaymentSmsSettings() {
         mobile: testPhone,
       };
 
-      if (testSmsMode === "pattern_otp") {
-        payload.patternKey = "MELLIPAYAMAK_PATTERN_OTP";
-        payload.patternValues = [testOtpCode || "12345"];
+      if (testSmsMode === "pattern") {
+        if (testPatternType === "otp") {
+          payload.patternKey = "MELLIPAYAMAK_PATTERN_OTP";
+          payload.patternCode = melliPatternOtp;
+          payload.patternValues = [testOtpCode || "12345"];
+        } else if (testPatternType === "supplier") {
+          payload.patternKey = "MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT";
+          payload.patternCode = melliPatternSupplierCommit;
+          payload.patternValues = [testOtpCode || "1001"];
+        } else if (testPatternType === "label") {
+          payload.patternKey = "MELLIPAYAMAK_PATTERN_LABEL_ISSUED";
+          payload.patternCode = melliPatternLabelIssued;
+          payload.patternValues = [testOtpCode || "1001", "2420000111"];
+        } else if (testPatternType === "announcement") {
+          payload.patternKey = "MELLIPAYAMAK_PATTERN_ANNOUNCEMENT";
+          payload.patternCode = melliPatternAnnouncement;
+          payload.patternValues = [testOtpCode || "اطلاعیه مهم جدید سیستم"];
+        } else if (testPatternType === "custom") {
+          if (!testCustomBodyId) {
+            toast("لطفاً کد پترن سفارشی (Body ID) را وارد فرمایید", "error");
+            setTestingSms(false);
+            return;
+          }
+          payload.patternKey = testCustomBodyId;
+          payload.patternCode = testCustomBodyId;
+          payload.patternValues = [testOtpCode || "تست"];
+        }
+
+        if (testPatternType !== "custom" && !payload.patternCode) {
+          toast(`کد پترن برای ${testPatternType.toUpperCase()} وارد نشده است. لطفاً کد الگوی مربوطه را در کارت فوق وارد فرمایید.`, "error");
+          setSmsTestResult({
+            success: false,
+            error: `شناسه پترن (Body ID) برای رویداد انتخاب‌شده در فرم تنظیمات سیستم وارد نشده است. لطفاً کد پترن را در فیلدهای بالا وارد نموده یا ذخیره کنید.`
+          });
+          setTestingSms(false);
+          return;
+        }
       } else {
         payload.message = testMessage;
       }
@@ -215,6 +252,7 @@ export default function PaymentSmsSettings() {
           if (data.MELLIPAYAMAK_PATTERN_OTP) setMelliPatternOtp(data.MELLIPAYAMAK_PATTERN_OTP);
           if (data.MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT) setMelliPatternSupplierCommit(data.MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT);
           if (data.MELLIPAYAMAK_PATTERN_LABEL_ISSUED) setMelliPatternLabelIssued(data.MELLIPAYAMAK_PATTERN_LABEL_ISSUED);
+          if (data.MELLIPAYAMAK_PATTERN_ANNOUNCEMENT) setMelliPatternAnnouncement(data.MELLIPAYAMAK_PATTERN_ANNOUNCEMENT);
 
           // Primary Requested Toggles
           setSmsNotifyUserLogin(data.SMS_NOTIFY_USER_LOGIN !== "false" && data.SMS_NOTIFY_USER_LOGIN !== false);
@@ -260,6 +298,7 @@ export default function PaymentSmsSettings() {
       MELLIPAYAMAK_PATTERN_OTP: melliPatternOtp,
       MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT: melliPatternSupplierCommit,
       MELLIPAYAMAK_PATTERN_LABEL_ISSUED: melliPatternLabelIssued,
+      MELLIPAYAMAK_PATTERN_ANNOUNCEMENT: melliPatternAnnouncement,
       SMS_NOTIFY_USER_LOGIN: String(smsNotifyUserLogin),
       SMS_NOTIFY_SUPPLIER_COMMITMENT: String(smsNotifySupplierCommitment),
       SMS_NOTIFY_LABEL_PRINT: String(smsNotifyLabelPrint),
@@ -655,7 +694,7 @@ export default function PaymentSmsSettings() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Trigger 1: User Login & OTP */}
             <div
               className={`p-5 rounded-xl border transition-all flex flex-col justify-between ${
@@ -796,6 +835,43 @@ export default function PaymentSmsSettings() {
                   value={melliPatternLabelIssued}
                   onChange={(e) => setMelliPatternLabelIssued(e.target.value)}
                   placeholder="مثال: 54321 (کد الگو لیبل)"
+                  className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-xs font-mono text-left outline-none focus:ring-1 focus:ring-primary-default text-text-primary"
+                />
+              </div>
+            </div>
+
+            {/* Trigger 4: Announcement Notification */}
+            <div
+              className={`p-5 rounded-xl border transition-all flex flex-col justify-between ${
+                melliPatternAnnouncement
+                  ? "border-purple-300 bg-purple-50/40 dark:bg-purple-950/20 dark:border-purple-800"
+                  : "border-border bg-surface/40 opacity-80"
+              }`}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="p-2 bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 rounded-lg">
+                    <Bell className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-2 py-0.5 rounded-md">
+                    جدید
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-text-primary">۴. اعلانات و اطلاعیه‌های گروه‌های شغلی</h4>
+                  <p className="text-[11px] text-text-secondary mt-1 leading-relaxed">
+                    ارسال پیامک اطلاع‌رسانی آنی هنگام ثبت اطلاعیه جدید برای تأمین‌کنندگان، مدیران فروشگاه یا کلیه کاربران.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-border space-y-1">
+                <label className="block text-[10px] font-semibold text-text-muted">کد پترن اعلانات سیستم (MelliPayamak):</label>
+                <input
+                  type="text"
+                  value={melliPatternAnnouncement}
+                  onChange={(e) => setMelliPatternAnnouncement(e.target.value)}
+                  placeholder="مثال: 987654 (کد الگوی اعلانات)"
                   className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-xs font-mono text-left outline-none focus:ring-1 focus:ring-primary-default text-text-primary"
                 />
               </div>
@@ -1029,14 +1105,14 @@ export default function PaymentSmsSettings() {
             <div className="flex bg-surface p-1 rounded-xl border border-border text-xs">
               <button
                 type="button"
-                onClick={() => setTestSmsMode("pattern_otp")}
+                onClick={() => setTestSmsMode("pattern")}
                 className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
-                  testSmsMode === "pattern_otp"
+                  testSmsMode === "pattern"
                     ? "bg-primary-default text-white shadow-xs"
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
-                تست با پترن خدماتی (OTP)
+                تست با پترن خدماتی (Pattern)
               </button>
               <button
                 type="button"
@@ -1053,10 +1129,73 @@ export default function PaymentSmsSettings() {
           </div>
 
           <p className="text-xs text-text-muted leading-relaxed">
-            {testSmsMode === "pattern_otp"
-              ? "در این حالت پیامک از طریق خط خدماتی اشتراکی ملی‌پیامک (بدون تاخیر و حتی به شماره‌های بلک‌لیست) بر اساس کد پترن تعریف‌شده در فیلد فوق ارسال می‌شود."
+            {testSmsMode === "pattern"
+              ? "در این حالت پیامک از طریق خط خدماتی اشتراکی ملی‌پیامک (بدون تاخیر و حتی به شماره‌های بلک‌لیست) بر اساس الگوی انتخابی و متغیرهای تعریف‌شده ارسال می‌شود."
               : "در این حالت پیامک متنی مستقیم با شماره اختصاصی پنل ارسال می‌گردد (در صورتی که شماره گیرنده پیامک‌های تبلیغاتی را بسته باشد، ممکن است دریافت نشود)."}
           </p>
+
+          {testSmsMode === "pattern" && (
+            <div className="bg-surface/50 p-3 rounded-xl border border-border space-y-3">
+              <label className="block text-[11px] font-bold text-text-primary">انتخاب الگوی پیامکی جهت تست:</label>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setTestPatternType("otp")}
+                  className={`px-2.5 py-2 rounded-lg font-semibold border transition-all text-center cursor-pointer ${
+                    testPatternType === "otp"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                      : "bg-card border-border text-text-secondary hover:bg-surface"
+                  }`}
+                >
+                  🔑 پترن OTP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTestPatternType("supplier")}
+                  className={`px-2.5 py-2 rounded-lg font-semibold border transition-all text-center cursor-pointer ${
+                    testPatternType === "supplier"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                      : "bg-card border-border text-text-secondary hover:bg-surface"
+                  }`}
+                >
+                  📦 پترن تأمین‌کننده
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTestPatternType("label")}
+                  className={`px-2.5 py-2 rounded-lg font-semibold border transition-all text-center cursor-pointer ${
+                    testPatternType === "label"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                      : "bg-card border-border text-text-secondary hover:bg-surface"
+                  }`}
+                >
+                  🏷️ پترن لیبل پستی
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTestPatternType("announcement")}
+                  className={`px-2.5 py-2 rounded-lg font-semibold border transition-all text-center cursor-pointer ${
+                    testPatternType === "announcement"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                      : "bg-card border-border text-text-secondary hover:bg-surface"
+                  }`}
+                >
+                  📢 پترن اعلانات
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTestPatternType("custom")}
+                  className={`px-2.5 py-2 rounded-lg font-semibold border transition-all text-center cursor-pointer col-span-2 sm:col-span-1 ${
+                    testPatternType === "custom"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                      : "bg-card border-border text-text-secondary hover:bg-surface"
+                  }`}
+                >
+                  🔢 کد پترن دلخواه
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
             <div>
@@ -1070,17 +1209,38 @@ export default function PaymentSmsSettings() {
               />
             </div>
 
-            {testSmsMode === "pattern_otp" ? (
-              <div>
-                <label className="block text-[11px] font-semibold text-text-secondary mb-1">کد تست یا متغیر الگو (OTP Code)</label>
-                <input
-                  type="text"
-                  value={testOtpCode}
-                  onChange={(e) => setTestOtpCode(e.target.value)}
-                  placeholder="مثال: 58241"
-                  className="w-full px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs font-mono text-left focus:ring-2 focus:ring-primary-default outline-none text-text-primary"
-                />
-              </div>
+            {testSmsMode === "pattern" ? (
+              <>
+                {testPatternType === "custom" ? (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-text-secondary mb-1">کد الگوی دلخواه (Body ID)</label>
+                    <input
+                      type="text"
+                      value={testCustomBodyId}
+                      onChange={(e) => setTestCustomBodyId(e.target.value)}
+                      placeholder="مثال: 123456"
+                      className="w-full px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs font-mono text-left focus:ring-2 focus:ring-primary-default outline-none text-text-primary"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-text-secondary mb-1">
+                      {testPatternType === "otp"
+                        ? "کد متغیر OTP"
+                        : testPatternType === "supplier" || testPatternType === "label"
+                        ? "شماره سفارش نمونه"
+                        : "عنوان نمونه خبر"}
+                    </label>
+                    <input
+                      type="text"
+                      value={testOtpCode}
+                      onChange={(e) => setTestOtpCode(e.target.value)}
+                      placeholder="مثال: 58241"
+                      className="w-full px-3.5 py-2.5 bg-card border border-border rounded-xl text-xs font-mono text-left focus:ring-2 focus:ring-primary-default outline-none text-text-primary"
+                    />
+                  </div>
+                )}
+              </>
             ) : (
               <div className="sm:col-span-2">
                 <label className="block text-[11px] font-semibold text-text-secondary mb-1">متن پیامک آزمایشی</label>

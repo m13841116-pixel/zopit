@@ -23,6 +23,7 @@ export default function AdminAnnouncements() {
   const [target, setTarget] = useState("ALL");
   const [isLoginPopup, setIsLoginPopup] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
+  const [sendSms, setSendSms] = useState(true);
   const [imageUrl, setImageUrl] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [attachmentName, setAttachmentName] = useState("");
@@ -103,6 +104,7 @@ export default function AdminAnnouncements() {
           target,
           isLoginPopup,
           isSticky,
+          sendSms,
           imageUrl,
           attachmentUrl,
         }),
@@ -113,10 +115,11 @@ export default function AdminAnnouncements() {
         setTarget("ALL");
         setIsLoginPopup(false);
         setIsSticky(false);
+        setSendSms(true);
         setImageUrl("");
         setAttachmentUrl("");
         setAttachmentName("");
-        toast("اطلاعیه جدید با موفقیت منتشر شد.", "success");
+        toast("اطلاعیه جدید ثبت شد" + (sendSms ? " و پیامک اطلاع‌رسانی برای کاربران ارسال گردید." : "."), "success");
         fetchAnnouncements();
       } else {
         toast("خطا در انتشار اطلاعیه", "error");
@@ -343,7 +346,7 @@ export default function AdminAnnouncements() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 pt-2">
+          <div className="flex flex-wrap gap-4 pt-2 border-t border-slate-100">
             <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
               <input
                 type="checkbox"
@@ -361,6 +364,15 @@ export default function AdminAnnouncements() {
                 className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
               />
               سنجاق شده (مهم)
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-200">
+              <input
+                type="checkbox"
+                checked={sendSms}
+                onChange={(e) => setSendSms(e.target.checked)}
+                className="w-4 h-4 rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+              />
+              📱 ارسال پیامک اطلاع‌رسانی به شماره موبایل کاربران این نقش (SMS)
             </label>
           </div>
 
