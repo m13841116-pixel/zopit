@@ -40,7 +40,7 @@ export class ZibalService implements PaymentGateway {
    * Helper to send requests through the Iran Proxy Server with IPv4 fallback and timeout
    */
   private async sendProxyRequest(payload: any): Promise<any> {
-    const result = await executeProxyRequest(payload, { timeoutMs: 6000 });
+    const result = await executeProxyRequest(payload, { timeoutMs: 8000 });
     if (result.data && (result.data.result !== undefined || result.data.success !== undefined || result.data.trackId !== undefined)) {
       return result.data;
     }

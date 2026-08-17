@@ -10,9 +10,9 @@ export interface ProxyResponse {
 }
 
 /**
- * Highly robust HTTP/HTTPS client specifically optimized for Vercel (AWS Lambda) environments.
- * It bypasses fetch/undici DNS resolution issues by explicitly using family: 4 (IPv4),
- * ensuring that requests to Iranian servers that drop IPv6 packets do not hang or timeout.
+ * Highly robust HTTP/HTTPS client specifically optimized for Vercel (AWS Lambda) & Node.js environments.
+ * It uses a standard fetch call with safe headers that pass Apache/cPanel ModSecurity on Iranian proxy hosts,
+ * with fallback to https.request.
  */
 export async function executeProxyRequest(
   payload: any,
@@ -24,102 +24,113 @@ export async function executeProxyRequest(
 ): Promise<ProxyResponse> {
   const proxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
   const apiKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  const timeoutMs = options.timeoutMs || 8000; // Vercel Free limits is 10s, reduce to 8s
+  const timeoutMs = options.timeoutMs || 9000;
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
-  // Strategy 1: Use Node.js http/https module explicitly with IPv4 (family: 4)
-  // This bypasses Vercel's native fetch() (Undici) which hangs on dual-stack Iranian servers causing 10s timeouts.
-  return new Promise((resolve, reject) => {
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(proxyUrl);
-    } catch (e) {
-      return reject(new Error('آدرس پروکسی نامعتبر است'));
-    }
+  // Strategy 1: Primary fast fetch (works natively in Node.js 18+, Vercel Serverless Functions, Edge)
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    const isHttps = parsedUrl.protocol === 'https:';
-    const requestOptions = {
-      hostname: parsedUrl.hostname,
-      port: parsedUrl.port || (isHttps ? 443 : 80),
-      path: parsedUrl.pathname + parsedUrl.search,
+    const response = await fetch(proxyUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
         'X-Api-Key': apiKey,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZopitNodeClient/1.0',
-        'Content-Length': Buffer.byteLength(payloadString)
+        'User-Agent': 'curl/7.88.1',
       },
-      timeout: timeoutMs,
-      rejectUnauthorized: false,
-      family: 4 // FORCES IPv4 RESOLUTION - CRITICAL FOR VERCEL -> IRAN
-    };
-
-    const client = isHttps ? https : http;
-    const req = client.request(requestOptions, (res) => {
-      let responseBody = '';
-      res.on('data', (chunk) => {
-        responseBody += chunk;
-      });
-      
-      res.on('end', () => {
-        let data: any;
-        try {
-          if (responseBody) data = JSON.parse(responseBody);
-        } catch (e) {}
-        
-        resolve({
-          ok: res.statusCode ? res.statusCode >= 200 && res.statusCode < 300 : false,
-          status: res.statusCode || 500,
-          text: responseBody,
-          data
-        });
-      });
+      body: payloadString,
+      signal: controller.signal,
     });
+    clearTimeout(timer);
 
-    req.on('error', (err: any) => {
-      console.warn(`[ProxyClient] connection failed:`, err.message);
-      // Fallback to fetch if node https fails (e.g. Edge runtime where https module is polyfilled/unavailable)
-      fallbackToFetch();
-    });
+    const responseText = await response.text();
+    let data: any;
+    try {
+      if (responseText) data = JSON.parse(responseText);
+    } catch (e) {}
 
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error('پاسخی از سرور واسط دریافت نشد (Timeout)'));
-    });
-
-    req.write(payloadString);
-    req.end();
-
-    // Fallback for edge environments
-    async function fallbackToFetch() {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-        const response = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-Api-Key': apiKey,
-          },
-          body: payloadString,
-          signal: controller.signal,
-        });
-        clearTimeout(timer);
-        const responseText = await response.text();
-        let data: any;
-        try { if (responseText) data = JSON.parse(responseText); } catch (e) {}
-        
-        resolve({
-          ok: response.ok,
-          status: response.status,
-          text: responseText,
-          data,
-        });
-      } catch (fetchErr: any) {
-        reject(new Error(`ارتباط با سرور واسط برقرار نشد: ${fetchErr.message}`));
-      }
+    if (response.ok && data) {
+      return {
+        ok: true,
+        status: response.status,
+        text: responseText,
+        data,
+      };
     }
-  });
+
+    if (response.ok && responseText) {
+      return {
+        ok: true,
+        status: response.status,
+        text: responseText,
+        data: data || null,
+      };
+    }
+
+    console.warn(`[ProxyClient] Fetch returned status ${response.status}: ${responseText.slice(0, 200)}`);
+  } catch (fetchErr: any) {
+    console.warn(`[ProxyClient] Fetch attempt error:`, fetchErr.message);
+  }
+
+  // Strategy 2: Node.js https fallback
+  try {
+    const { default: https } = await import('https');
+    const { default: http } = await import('http');
+    const { URL } = await import('url');
+
+    const parsedUrl = new URL(proxyUrl);
+    const isHttps = parsedUrl.protocol === 'https:';
+
+    return await new Promise<ProxyResponse>((resolve, reject) => {
+      const requestOptions = {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port || (isHttps ? 443 : 80),
+        path: parsedUrl.pathname + parsedUrl.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': apiKey,
+          'User-Agent': 'curl/7.88.1',
+          'Content-Length': Buffer.byteLength(payloadString),
+        },
+        timeout: timeoutMs,
+        rejectUnauthorized: false,
+      };
+
+      const client = isHttps ? https : http;
+      const req = client.request(requestOptions, (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          let data: any;
+          try {
+            if (body) data = JSON.parse(body);
+          } catch (e) {}
+          resolve({
+            ok: res.statusCode ? res.statusCode >= 200 && res.statusCode < 300 : false,
+            status: res.statusCode || 500,
+            text: body,
+            data,
+          });
+        });
+      });
+
+      req.on('error', (err) => reject(new Error(`ارتباط با سرور واسط برقرار نشد: ${err.message}`)));
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('زمان پاسخگویی سرور واسط پایان یافت (Timeout).'));
+      });
+
+      req.write(payloadString);
+      req.end();
+    });
+  } catch (err: any) {
+    return {
+      ok: false,
+      status: 500,
+      text: err.message,
+      data: { error: err.message },
+    };
+  }
 }
