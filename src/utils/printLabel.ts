@@ -16,7 +16,12 @@ export function printOrderInvoice(order: any) {
 
   const itemsHtml = (order.items || []).map((item: any, index: number) => {
     const title = item.product?.title || item.variant?.product?.title || "کالای عمده";
-    const variantDesc = item.variant?.attributes ? JSON.parse(item.variant.attributes) : {};
+    let variantDesc: any = {};
+    if (item.variant?.attributes) {
+      try {
+        variantDesc = typeof item.variant.attributes === 'string' ? JSON.parse(item.variant.attributes) : item.variant.attributes;
+      } catch {}
+    }
     const variantStr = Object.entries(variantDesc).map(([k, v]) => `${k}: ${v}`).join(" | ");
     const price = item.price || item.variant?.supplierBasePrice || 0;
     const qty = item.quantity || 1;

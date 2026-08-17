@@ -472,13 +472,12 @@ ${returnFileBase64 ? `${returnFileBase64}` : ""}`;
           {/* Messages Thread list */}
           <div className="p-6 flex-1 space-y-4 max-h-[350px] overflow-y-auto bg-background/30">
             {selectedTicket.messages?.map((msg: any) => {
-              const isMe =
-                msg.userId ===
-                parseInt(
-                  localStorage.getItem("user")
-                    ? JSON.parse(localStorage.getItem("user")!).id
-                    : "0",
-                );
+              let currentUserId = 0;
+              try {
+                const storedUser = localStorage.getItem("user");
+                if (storedUser) currentUserId = parseInt(JSON.parse(storedUser)?.id || "0", 10);
+              } catch {}
+              const isMe = msg.userId === currentUserId;
               return (
                 <div
                   key={msg.id}

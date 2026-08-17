@@ -497,10 +497,20 @@ export default function ProductsList() {
       : [];
 
     const parsedVariants = Array.isArray(product.variants)
-      ? product.variants.map((v: any) => ({
-          ...v,
-          attributes: typeof v.attributes === 'string' ? JSON.parse(v.attributes) : (v.attributes || {})
-        }))
+      ? product.variants.map((v: any) => {
+          let attrs = v.attributes || {};
+          if (typeof v.attributes === 'string') {
+            try {
+              attrs = JSON.parse(v.attributes);
+            } catch {
+              attrs = {};
+            }
+          }
+          return {
+            ...v,
+            attributes: attrs
+          };
+        })
       : [];
 
     // Reconstruct attributes

@@ -565,8 +565,12 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     {},
   );
   const [supplierData, setSupplierData] = useState(() => {
-    const saved = sessionStorage.getItem("supplierData");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = sessionStorage.getItem("supplierData");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
     return {
       firstName: "",
       lastName: "",
@@ -609,8 +613,12 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   // Customer form state
   const [customerErrors, setCustomerErrors] = useState<Record<string, string>>({});
   const [customerData, setCustomerData] = useState(() => {
-    const saved = sessionStorage.getItem("customerData");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = sessionStorage.getItem("customerData");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
     return {
       firstName: "",
       lastName: "",
@@ -627,8 +635,12 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
 
   const [storeErrors, setStoreErrors] = useState<Record<string, string>>({});
   const [storeData, setStoreData] = useState(() => {
-    const saved = sessionStorage.getItem("storeData");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = sessionStorage.getItem("storeData");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
     return {
       firstName: "",
       lastName: "",
@@ -2752,7 +2764,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               const savedStep =
                                 localStorage.getItem("supplierStepDraft");
                               if (savedData) {
-                                setSupplierData(JSON.parse(savedData));
+                                try {
+                                  setSupplierData(JSON.parse(savedData));
+                                } catch (e) {
+                                  console.error("Failed to parse supplier draft:", e);
+                                }
                               }
                               if (savedStep) {
                                 const parsed = parseInt(savedStep, 10);

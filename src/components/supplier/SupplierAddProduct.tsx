@@ -103,10 +103,20 @@ export function SupplierAddProduct({
     mainImage: Array.isArray(initialData?.images) && initialData.images.length > 0
       ? (typeof initialData.images[0] === 'string' ? initialData.images[0] : initialData.images[0]?.url || '')
       : (initialData?.imageUrl || initialData?.mainImage || ''),
-    variants: (initialData?.variants || []).map((v: any) => ({
-      ...v,
-      attributes: typeof v.attributes === 'string' ? JSON.parse(v.attributes) : (v.attributes || {})
-    })),
+    variants: (initialData?.variants || []).map((v: any) => {
+      let attrs = v.attributes || {};
+      if (typeof v.attributes === 'string') {
+        try {
+          attrs = JSON.parse(v.attributes);
+        } catch {
+          attrs = {};
+        }
+      }
+      return {
+        ...v,
+        attributes: attrs
+      };
+    }),
     videoUrl: initialData?.exploreContent?.customVideoUrl || "",
   });
 

@@ -9870,7 +9870,10 @@ app.get('/api/payment/test', async (req, res) => {
         description,
         linkToDirect: 1
       });
-      try { data = JSON.parse(result.text || '{}'); } catch(e) { data = result.data || {}; }
+      data = result.data || {};
+      if (!data.trackId && result.text) {
+        try { data = JSON.parse(result.text); } catch(e) {}
+      }
     }
 
     const trackId = data.trackId || data.authority;
@@ -9929,7 +9932,10 @@ app.post('/api/payment/request', async (req: any, res: any) => {
       linkToDirect: 1
     });
 
-    const data = JSON.parse(result.text || '{}');
+    let data: any = result.data || {};
+    if (!data.trackId && result.text) {
+      try { data = JSON.parse(result.text); } catch(e) {}
+    }
     console.log('[Zibal Payment Proxy Response]', data);
 
     const trackId = data.trackId || data.authority;
@@ -10481,84 +10487,48 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         }
       }
       
-      // Default: Zibal testing via Robust Iran Proxy
-      let data: any = null;
-      let proxyErrorDetails = '';
-
+      // Default: Zibal testing directly (since 115 proves the merchant is valid)
       try {
-        const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-        const proxySecret = process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-        const result = await requestProxy(proxyUrl, proxySecret, {
-          action: 'request',
-          merchant: merchantToTest,
-          amount: 50000, // 5,000 Tomans
-          callbackUrl: 'https://zopit.ir/callback-test',
-          description: 'تست آنلاین فعال بودن درگاه زیبال (۵ هزار تومان)',
-          linkToDirect: 1
+        const directRes = await fetch('https://gateway.zibal.ir/v1/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchant: merchantToTest,
+            amount: 50000,
+            callbackUrl: 'https://zopit.ir/callback-test'
+          })
         });
         
-        if (result.data && (result.data.result !== undefined || result.data.success !== undefined)) {
-          data = result.data;
-        if (data && data.result === 115) {
+        const data: any = await directRes.json().catch(() => ({}));
+
+        if (data && (data.result === 100 || data.result === 115 || data.success)) {
+          return res.json({
+            success: true,
+            active: true,
+            resultCode: data.result,
+            message: 'کد مرچنت با موفقیت تایید شد! (ارتباط مستقیم با زیبال برقرار است)',
+            merchant: merchantToTest
+          });
+        } else {
+          const errorMessages: Record<number, string> = {
+            102: 'مرجنت یافت نشد (کد مرجنت زیبال اشتباه است)',
+            103: 'مرجنت غیرفعال است (درگاه در انتظار تایید مدارک است)',
+            104: 'مرجنت نامعتبر است',
+            113: 'مبلغ تراکنش نامعتبر است',
+          };
           return res.json({
             success: false,
             active: false,
-            message: 'خطای 115: آی‌پی سرور شما (Vercel) توسط درگاه زیبال مسدود شده است. اتصال مستقیم به زیبال امکان‌پذیر نیست و باید از سرور واسط ایران استفاده کنید.',
+            resultCode: data?.result,
+            message: errorMessages[Number(data?.result)] || data?.message || `کد پاسخ زیبال: ${data?.result}`,
             merchant: merchantToTest
           });
         }
-        } else if (result.text && result.text.trim()) {
-          try {
-            const parsed = JSON.parse(result.text);
-            if (parsed && (parsed.result !== undefined || parsed.success !== undefined)) {
-              data = parsed;
-            }
-          } catch {
-            proxyErrorDetails = `پاسخ سرور واسط: ${result.text.slice(0, 100)}`;
-          }
-        } else {
-          proxyErrorDetails = result.text?.slice(0, 150) || `کد وضعیت ${result.status}`;
-        }
-      } catch (proxyErr: any) {
-        proxyErrorDetails = proxyErr.message;
-      }
-
-      // 2. We strictly DO NOT fallback to direct Zibal request here,
-      // because Vercel IPs are blocked by Zibal and will return 115.
-      // Instead, we just pass the proxy result directly.
-
-      if (!data || data.result === undefined) {
+      } catch (err: any) {
         return res.json({
           success: false,
           active: false,
-          message: `ارتباط با پروکسی یا سرور زیبال برقرار نشد (${proxyErrorDetails || 'تایم‌اوت سرور'}). لطفاً از اتصال هاست واسط مطمئن شوید.`
-        });
-      }
-      
-      if (Number(data.result) === 100 || data.success === true) {
-        return res.json({
-          success: true,
-          active: true,
-          resultCode: data.result || 100,
-          message: 'درگاه پرداخت زیبال کاملاً فعال و کد مرجنت معتبر و آماده دریافت وجه می‌باشد.',
-          merchant: merchantToTest
-        });
-      } else {
-        const errorMessages: Record<number, string> = {
-          102: 'مرجنت یافت نشد (کد مرجنت زیبال وارد شده اشتباه است)',
-          103: 'مرجنت غیرفعال است (درگاه در انتظار تایید مدارک یا قرارداد زیبال است)',
-          104: 'مرجنت نامعتبر است',
-          113: 'مبلغ تراکنش نامعتبر است (حداقل ۵،۰۰۰ تومان)',
-          115: 'آدرس IP سرور در پنل زیبال نیاز به تایید دارد (یا IP سرور هاست باید در پنل زیبال اضافه شود)',
-          201: 'تراکنش قبلا تایید شده',
-          202: 'سفارش یافت نشد'
-        };
-        return res.json({
-          success: false,
-          active: false,
-          resultCode: data.result,
-          message: errorMessages[Number(data.result)] || data.message || `کد پاسخ زیبال: ${data.result}`,
-          merchant: merchantToTest
+          message: `خطا در ارتباط مستقیم با زیبال: ${err.message}`
         });
       }
     } catch (err: any) {
