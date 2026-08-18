@@ -191,11 +191,13 @@ export function SupplierDashboard({
 
   const checkNewSupplierOrders = async () => {
     try {
-      const token = localStorage.getItem("token") || "";
+      const token = localStorage.getItem("token");
+      if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
-      const ordRes = await fetch("/api/supplier/orders", { credentials: "include", headers });
-      if (ordRes.ok) {
-        const orderData = await ordRes.json();
+      const ordRes = await fetch("/api/supplier/orders", { credentials: "include", headers }).catch(() => null);
+      if (ordRes && ordRes.ok) {
+        const orderData = await ordRes.json().catch(() => null);
+        if (!orderData || !Array.isArray(orderData)) return;
         setOrders(orderData);
         
         const pendingItems = orderData.filter((o: any) => o.status === "REQUESTED" || o.status === "PENDING");
@@ -220,7 +222,7 @@ export function SupplierDashboard({
         setPrevPendingIds(pendingIds);
       }
     } catch (err) {
-      console.error("Error checking new supplier orders:", err);
+      // Silently handle transient background polling network failures
     }
   };
 

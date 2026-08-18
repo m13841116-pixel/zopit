@@ -10569,12 +10569,9 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           linkToDirect: 0,
         }, { proxyUrl, apiKey: proxySecret, timeoutMs: 20000 });
 
-        let data: any = null;
-        if (proxyRes.ok && proxyRes.text) {
+        let data: any = proxyRes.data;
+        if (!data && proxyRes.text) {
           try { data = JSON.parse(proxyRes.text); } catch (e) {}
-        }
-        if (!data && proxyRes.data) {
-          data = proxyRes.data;
         }
 
         if (data && (Number(data.result) === 100 || Number(data.result) === 115 || data.success)) {
@@ -10593,11 +10590,12 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
             113: 'مبلغ تراکنش نامعتبر است',
             115: 'آی‌پی سرور در زیبال مجاز نیست',
           };
+          const rawErr = data?.message || data?.error || (proxyRes.ok ? '' : proxyRes.text);
           return res.json({
             success: false,
             active: false,
             resultCode: data?.result,
-            message: errorMessages[Number(data?.result)] || data?.message || data?.error || `کد پاسخ زیبال: ${data?.result || 'ERR - پاسخی دریافت نشد'}`,
+            message: errorMessages[Number(data?.result)] || rawErr || `کد پاسخ زیبال: ${data?.result || 'ERR'}`,
             merchant: merchantToTest
           });
         }
@@ -10649,11 +10647,10 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           description: 'تست فاکتور آزمایشی ۵،۰۰۰ تومانی زوپیت',
           linkToDirect: 0,
         }, { proxyUrl, apiKey: proxySecret, timeoutMs: 20000 });
-        if (proxyRes.ok && proxyRes.text) {
-          const parsed = JSON.parse(proxyRes.text);
-          if (parsed && (parsed.trackId || parsed.result !== undefined)) {
-            data = parsed;
-          }
+        
+        data = proxyRes.data;
+        if (!data && proxyRes.text) {
+          try { data = JSON.parse(proxyRes.text); } catch (e) {}
         }
       } catch (pErr: any) {
         lastErr = pErr;
@@ -10674,10 +10671,10 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         });
       }
 
-      const rawResult = data ? data.result : 'ERR';
-      const rawMessage = data ? (data.message || '') : (lastErr?.message || 'پاسخی دریافت نشد');
+      const rawResult = data && data.result !== undefined ? data.result : 'ERR';
+      const rawMessage = data ? (data.message || data.error || '') : (lastErr?.message || 'پاسخی دریافت نشد');
       
-      let errorHint = `کد خطای زیبال: ${rawResult} - ${rawMessage}`;
+      let errorHint = `کد خطای زیبال: ${rawResult} - ${rawMessage || 'پاسخی دریافت نشد'}`;
       if (Number(rawResult) === 115 || rawMessage.includes('115') || rawMessage.includes('invalid IP')) {
         errorHint = `خطای تایید IP زیبال (کد ۱۱۵): IP سرور شما (88.135.68.18) باید در پنل زیبال در بخش تنظیمات درگاه وارد شود.`;
       }
