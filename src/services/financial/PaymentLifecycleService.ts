@@ -1,6 +1,7 @@
 import { getPrisma } from '../../prisma.js';
 import { PaymentStatus } from '../../types.js';
 import { PaymentServiceFactory } from '../payment/PaymentServiceFactory.js';
+import { PaymentLogger } from '../payment/PaymentLogger.js';
 
 const prisma = getPrisma();
 
@@ -11,6 +12,7 @@ export class PaymentLifecycleService {
   async initiatePayment(userId: number, amount: number, callbackUrl: string) {
     // Generate an idempotency key if not provided
     const idempotencyKey = `PAY_${userId}_${Date.now()}`;
+    const reqId = PaymentLogger.generateRequestId();
     
     // Create the DB record first
     const payment = await prisma.payment.create({
@@ -23,10 +25,19 @@ export class PaymentLifecycleService {
     });
 
     try {
+      await PaymentLogger.logPaymentEvent({
+        requestId: reqId,
+        gateway: 'SYSTEM',
+        action: 'LIFECYCLE_INIT_START',
+        status: 'SUCCESS',
+        orderId: payment.id,
+        userId: userId,
+      });
+
       const paymentGateway = await PaymentServiceFactory.getService();
       
       // Request payment from gateway
-      const gatewayResponse = await paymentGateway.createPayment(amount, 'Payment for order', callbackUrl);
+      const gatewayResponse = await paymentGateway.createPayment(amount, 'Payment for order', callbackUrl, payment.id);
       
       // Update payment with gateway reference
       const updatedPayment = await prisma.$transaction(async  (tx: any) => {
@@ -56,6 +67,16 @@ export class PaymentLifecycleService {
         return p;
       });
 
+      await PaymentLogger.logPaymentEvent({
+        requestId: reqId,
+        gateway: 'SYSTEM',
+        action: 'LIFECYCLE_INIT_END',
+        status: 'SUCCESS',
+        orderId: payment.id,
+        userId: userId,
+        responseBody: JSON.stringify(gatewayResponse)
+      });
+
       return {
         payment: updatedPayment,
         payLink: gatewayResponse.payLink
@@ -64,6 +85,15 @@ export class PaymentLifecycleService {
       await prisma.payment.update({
         where: { id: payment.id },
         data: { status: PaymentStatus.FAILED }
+      });
+      await PaymentLogger.logPaymentEvent({
+        requestId: reqId,
+        gateway: 'SYSTEM',
+        action: 'LIFECYCLE_INIT_END',
+        status: 'FAILED',
+        errorMessage: err.message,
+        orderId: payment.id,
+        userId: userId,
       });
       throw new Error(`Failed to initiate payment: ${err.message}`);
     }
@@ -76,10 +106,29 @@ export class PaymentLifecycleService {
     const payment = await prisma.payment.findFirst({
       where: { gatewayReference: authority }
     });
+    
+    const reqId = PaymentLogger.generateRequestId();
 
     if (!payment) {
+      await PaymentLogger.logPaymentEvent({
+        requestId: reqId,
+        gateway: 'SYSTEM',
+        action: 'LIFECYCLE_VERIFY_START',
+        status: 'FAILED',
+        errorMessage: 'Payment not found for the given authority',
+        userId: userId
+      });
       throw new Error('Payment not found for the given authority');
     }
+
+    await PaymentLogger.logPaymentEvent({
+      requestId: reqId,
+      gateway: 'SYSTEM',
+      action: 'LIFECYCLE_VERIFY_START',
+      status: 'SUCCESS',
+      orderId: payment.id,
+      userId: userId,
+    });
 
     if (payment.status === PaymentStatus.PAID) {
       return { payment, message: 'Payment already verified' };
@@ -117,6 +166,16 @@ export class PaymentLifecycleService {
           resource: 'Payment',
           metadata: JSON.stringify({ paymentId: payment.id, status: newStatus })
         }
+      });
+
+      await PaymentLogger.logPaymentEvent({
+        requestId: reqId,
+        gateway: 'SYSTEM',
+        action: 'LIFECYCLE_VERIFY_END',
+        status: verification.success ? 'SUCCESS' : 'FAILED',
+        orderId: payment.id,
+        userId: userId,
+        responseBody: JSON.stringify(verification)
       });
 
       // If PAID, queue invoice generation...

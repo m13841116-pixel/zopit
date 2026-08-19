@@ -2,6 +2,7 @@ import { PaymentGateway } from '../../interfaces/payment-gateway.interface.js';
 import { executeProxyRequest } from './proxyClient.js';
 import { getPrisma } from '../../prisma.js';
 import { z } from 'zod';
+import { PaymentLogger } from './PaymentLogger.js';
 
 function getZibalErrorMessage(code: number | string, customMessage?: string): string {
   const zibalErrors: Record<number | string, string> = {
@@ -49,24 +50,60 @@ export class ZibalService implements PaymentGateway {
     this.zibalMerchant = merchant.trim();
   }
 
-  private async sendProxyRequest(payload: any, schema?: z.ZodTypeAny): Promise<any> {
-    const result = await executeProxyRequest(payload, { timeoutMs: 10000 });
-    
-    let responseData = result.data;
-    if (!responseData && result.ok && result.text) {
-      try {
-        responseData = JSON.parse(result.text);
-      } catch {}
+  private async sendZibalRequest(action: string, payload: any, schema?: z.ZodTypeAny, orderId?: string, userId?: number): Promise<any> {
+    let responseData: any = null;
+    const reqId = PaymentLogger.generateRequestId();
+
+    let actionName = 'CREATE_PAYMENT';
+    if (action === 'verify') {
+      actionName = 'VERIFY_PAYMENT';
+    } else if (action === 'checkout') {
+      actionName = 'PAYOUT';
+    } else if (action === 'checkout_status') {
+      actionName = 'PAYOUT_STATUS';
+    }
+
+    try {
+      const result = await executeProxyRequest(
+        { ...payload, action }, 
+        { 
+          timeoutMs: 7000, 
+          requestId: reqId, 
+          gateway: 'ZIBAL', 
+          action: actionName,
+          orderId,
+          userId
+        }
+      );
+      if (result.ok && result.data) {
+        responseData = result.data;
+      } else if (result.text) {
+        try { responseData = JSON.parse(result.text); } catch {}
+      }
+    } catch (err: any) {
+      throw err;
     }
 
     if (!responseData) {
-      throw new Error(result.data?.error || result.text || 'ارتباط با سرور واسط (proxy) برقرار نشد.');
+      throw new Error('عدم دریافت پاسخ معتبر از درگاه پرداخت زیبال.');
     }
 
     if (schema) {
       const parsed = schema.safeParse(responseData);
       if (!parsed.success) {
-        console.error('[Zibal - Validation Error] Invalid response structure from proxy.');
+        console.error('[Zibal - Validation Error] Invalid response structure from gateway');
+        
+        await PaymentLogger.logPaymentEvent({
+          requestId: reqId,
+          gateway: 'ZIBAL',
+          action: actionName,
+          status: 'VALIDATION_ERROR',
+          errorMessage: 'Invalid schema response from gateway',
+          responseBody: JSON.stringify(responseData),
+          orderId,
+          userId
+        });
+
         throw new Error('ساختار پاسخ دریافتی از درگاه نامعتبر است.');
       }
       return parsed.data;
@@ -78,14 +115,6 @@ export class ZibalService implements PaymentGateway {
   async createPayment(amount: number | string, description: string, callbackUrl: string, orderId?: string | number): Promise<{ payLink: string; authority: string }> {
     try {
       let finalCallbackUrl = callbackUrl || '';
-      
-      const proxyUrl = process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-      let proxyDomain = 'https://bankkalaha.ir';
-      try {
-        proxyDomain = new URL(proxyUrl).origin;
-      } catch (e) {
-        console.error('Invalid PAYMENT_PROXY_URL, falling back to bankkalaha.ir');
-      }
 
       // Ensure callback URL is constructed properly with HTTPS and uses zopit.ir
       try {
@@ -109,12 +138,16 @@ export class ZibalService implements PaymentGateway {
         throw new Error('مبلغ پرداختی نامعتبر است. مبلغ باید یک عدد صحیح مثبت باشد.');
       }
 
+      const strOrderId = orderId ? String(orderId) : undefined;
+      let userId: number | undefined = undefined;
+
       if (orderId) {
         const prisma = getPrisma();
         const order = await prisma.order.findUnique({ where: { id: Number(orderId) } });
         if (!order) {
            throw new Error(`سفارش با شناسه ${orderId} یافت نشد.`);
         }
+        userId = order.customerId;
         
         // Amount check in DB (Rials)
         const expectedAmount = Math.round(order.totalAmount * 10);
@@ -125,7 +158,8 @@ export class ZibalService implements PaymentGateway {
 
         // Idempotency: Return existing tracking code if payment was already initialized or completed
         if ((order.status === 'PENDING' || order.status === 'SUCCESS' || order.status === 'PAID') && order.trackingCode) {
-           console.log(`[Zibal Idempotency] Order #${orderId} already has payment trackingCode: ${order.trackingCode}`);
+           const maskedTrackId = PaymentLogger.maskSensitiveData(order.trackingCode);
+           console.log(`[Zibal Idempotency] Order #${orderId} already has payment trackingCode: ${maskedTrackId}`);
            return {
              payLink: `https://gateway.zibal.ir/start/${order.trackingCode}`,
              authority: String(order.trackingCode)
@@ -133,10 +167,7 @@ export class ZibalService implements PaymentGateway {
         }
       }
 
-      console.log(`[Zibal Request] Initiating payment for Order #${orderId || 'N/A'}, Amount: ${numAmount} Rials, Callback: ${finalCallbackUrl}, Merchant: ${this.zibalMerchant || 'zibal'}`);
-
       const requestPayload: Record<string, any> = {
-        action: 'request',
         merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal',
         amount: numAmount,
         callbackUrl: finalCallbackUrl,
@@ -145,15 +176,7 @@ export class ZibalService implements PaymentGateway {
       };
       if (orderId) requestPayload.orderId = orderId;
 
-      let data: any = null;
-      try {
-        data = await this.sendProxyRequest(requestPayload, ZibalRequestResponseSchema);
-      } catch (proxyErr: any) {
-        console.error(`[Zibal - FATAL] Proxy connection failed for Order #${orderId || 'N/A'}: ${proxyErr.message}`);
-        throw new Error(`عملیات متوقف شد: ارتباط با سرور واسط پرداخت برقرار نشد.`);
-      }
-
-      console.log(`[Zibal Request Response] Order #${orderId || 'N/A'}, Result Code: ${data?.result}, TrackId: ${data?.trackId || data?.authority}`);
+      const data = await this.sendZibalRequest('request', requestPayload, ZibalRequestResponseSchema, strOrderId, userId);
 
       if (data && ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId || data.authority))) {
         const trackId = (data.trackId || data.authority)?.toString();
@@ -180,25 +203,12 @@ export class ZibalService implements PaymentGateway {
         return { success: true, trackId: authority, refId: `REF_${authority}` };
       }
 
-      console.log(`[Zibal Verify] Verifying trackId: ${authority}`);
-
       const verifyPayload: Record<string, any> = {
-        action: 'verify',
-        trackId: authority
+        trackId: authority,
+        merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal'
       };
-      if (this.zibalMerchant && this.zibalMerchant !== 'zibal') {
-        verifyPayload.merchant = this.zibalMerchant;
-      }
       
-      let data: any = null;
-      try {
-        data = await this.sendProxyRequest(verifyPayload, ZibalVerifyResponseSchema);
-      } catch (proxyErr: any) {
-        console.error(`[Zibal - FATAL] Proxy verify failed for trackId ${authority}: ${proxyErr.message}`);
-        throw new Error(`عملیات متوقف شد: ارتباط با سرور واسط برای تایید تراکنش برقرار نشد.`);
-      }
-
-      console.log(`[Zibal Verify Response] TrackId: ${authority}, Result Code: ${data?.result}`);
+      const data = await this.sendZibalRequest('verify', verifyPayload, ZibalVerifyResponseSchema);
 
       if (data) {
         const resCode = Number(data.result);
@@ -210,7 +220,7 @@ export class ZibalService implements PaymentGateway {
       }
       throw new Error('خطا در تایید تراکنش بانکی');
     } catch (error: any) {
-      console.error(`[Zibal verifyPayment Error] TrackId ${authority}: ${error.message}`);
+      console.error(`[Zibal verifyPayment Error]: ${error.message}`);
       throw new Error(`خطا در تایید تراکنش بانکی: ${error.message}`);
     }
   }
@@ -221,13 +231,10 @@ export class ZibalService implements PaymentGateway {
         amount: Number(amount),
         iban: shaba.replace(/^IR/i, ''),
         description,
-        action: 'checkout',
+        merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal'
       };
-      if (this.zibalMerchant && this.zibalMerchant !== 'zibal') {
-        payoutPayload.merchant = this.zibalMerchant;
-      }
 
-      const data = await this.sendProxyRequest(payoutPayload, ZibalRequestResponseSchema);
+      const data = await this.sendZibalRequest('checkout', payoutPayload, ZibalRequestResponseSchema);
 
       if (data.result === 1 || data.result === 100 || data.success) {
         return {
@@ -247,13 +254,10 @@ export class ZibalService implements PaymentGateway {
     try {
       const statusPayload: Record<string, any> = {
         trackId: trackId,
-        action: 'checkout_status'
+        merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal'
       };
-      if (this.zibalMerchant && this.zibalMerchant !== 'zibal') {
-        statusPayload.merchant = this.zibalMerchant;
-      }
 
-      const data = await this.sendProxyRequest(statusPayload);
+      const data = await this.sendZibalRequest('checkout_status', statusPayload);
 
       let mappedStatus = 'PENDING';
       if (data.status === 'done' || data.result === 100 || data.status === 3) mappedStatus = 'SUCCESS';
@@ -273,3 +277,4 @@ export class ZibalService implements PaymentGateway {
     }
   }
 }
+

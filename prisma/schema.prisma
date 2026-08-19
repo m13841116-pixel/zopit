@@ -773,3 +773,28 @@ model DiscountCode {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
 }
+
+model PaymentLog {
+  id           String   @id @default(cuid())
+  requestId    String
+  gateway      String   @default("ZIBAL")
+  action       String
+  status       String
+  targetUrl    String?
+  httpStatus   Int?
+  durationMs   Int?
+  dnsMs        Int?
+  connectMs    Int?
+  tlsMs        Int?
+  errorMessage String?  @db.Text
+  errorCode    String?
+  requestBody  String?  @db.Text
+  responseBody String?  @db.Text
+  orderId      String?
+  userId       Int?
+  createdAt    DateTime @default(now())
+
+  @@index([requestId])
+  @@index([createdAt])
+  @@index([status])
+}

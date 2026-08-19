@@ -748,7 +748,11 @@ ${returnFileBase64 ? `${returnFileBase64}` : ""}`;
                     value={selectedProduct ? JSON.stringify(selectedProduct) : ""}
                     onChange={(e) => {
                       if (e.target.value) {
-                        setSelectedProduct(JSON.parse(e.target.value));
+                        try {
+                          setSelectedProduct(JSON.parse(e.target.value));
+                        } catch {
+                          setSelectedProduct(null);
+                        }
                       } else {
                         setSelectedProduct(null);
                       }

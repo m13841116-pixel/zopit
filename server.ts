@@ -10433,6 +10433,59 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     }
   });
 
+  // GET Payment Logs (SUPERADMIN ONLY)
+  app.get('/api/admin/payment-logs', authenticateToken, requireSuperAdmin, async (req: any, res: any) => {
+    try {
+      const page = safeParseInt(req.query.page, 1);
+      const pageSize = safeParseInt(req.query.pageSize, 50);
+      const skip = (page - 1) * pageSize;
+      
+      const status = req.query.status as string;
+      const gateway = req.query.gateway as string;
+      const action = req.query.action as string;
+      const orderId = req.query.orderId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+
+      const where: any = {};
+      if (status) where.status = status;
+      if (gateway) where.gateway = gateway;
+      if (action) where.action = action;
+      if (orderId) where.orderId = orderId;
+      if (startDate && endDate) {
+        where.createdAt = {
+          gte: new Date(startDate),
+          lte: new Date(endDate)
+        };
+      } else if (startDate) {
+        where.createdAt = { gte: new Date(startDate) };
+      } else if (endDate) {
+        where.createdAt = { lte: new Date(endDate) };
+      }
+
+      const activePrisma = getActivePrisma();
+      
+      const totalCount = await activePrisma.paymentLog.count({ where });
+      const logs = await activePrisma.paymentLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize
+      });
+
+      res.json({
+        logs,
+        total: totalCount,
+        page,
+        pageSize,
+        totalPages: Math.ceil(totalCount / pageSize)
+      });
+    } catch (error: any) {
+      console.error('[Payment Logs Error]', error.message);
+      res.status(500).json({ error: 'خطا در دریافت لاگ‌های پرداخت', details: error.message });
+    }
+  });
+
   // Payment Gateway Online Health Check API
   app.post('/api/admin/payment-gateway/test', authenticateToken, requireAdmin, async (req: any, res: any) => {
     try {

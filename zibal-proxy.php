@@ -5,6 +5,10 @@
  * Secret: ZopitPay2026Key
  */
 
+ini_set('display_errors', 0);
+error_reporting(0);
+
+const PROXY_SECRET_KEY = 'ZopitPay2026Key';
 $logFile = __DIR__ . '/zibal-debug.log';
 
 function logZibalDebug($tag, $data) {
@@ -15,34 +19,45 @@ function logZibalDebug($tag, $data) {
     @file_put_contents($logFile, $entry, FILE_APPEND);
 }
 
-// Enable error reporting
-ini_set('display_errors', 0);
-error_reporting(0);
-
-// 0. Log Viewer / Direct Diagnostic Page for Admin
-if (isset($_GET['action']) && $_GET['action'] === 'get_logs') {
-    $apiKey = $_GET['key'] ?? '';
-    if ($apiKey !== 'ZopitPay2026Key') {
-        http_response_code(403);
-        echo 'Access Denied: Invalid Key';
-        exit;
+function extractApiKey() {
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
+    $apiKey = $headers['X-Api-Key'] ?? $headers['x-api-key'] ?? $headers['X-Proxy-Secret'] ?? $headers['x-proxy-secret'] ?? $_SERVER['HTTP_X_API_KEY'] ?? $_SERVER['HTTP_X_PROXY_SECRET'] ?? '';
+    
+    if (empty($apiKey) && !empty($headers['Authorization'])) {
+        if (preg_match('/Bearer\s+(.+)/i', $headers['Authorization'], $matches)) {
+            $apiKey = trim($matches[1]);
+        }
     }
-    header('Content-Type: text/plain; charset=utf-8');
-    if (file_exists($logFile)) {
-        echo file_get_contents($logFile);
-    } else {
-        echo "هنوز لاگی ثبت نشده است.";
-    }
-    exit;
+    return $apiKey;
 }
 
-// 0.1 Intercept Zibal Callback Redirect (No API key check needed for browser redirects)
+function isAllowedRedirectUrl($url) {
+    $host = parse_url($url, PHP_URL_HOST);
+    if (!$host) return false;
+    $host = strtolower($host);
+    return (
+        $host === 'zopit.ir' ||
+        substr($host, -9) === '.zopit.ir' ||
+        substr($host, -11) === '.vercel.app' ||
+        substr($host, -11) === '.run.app' ||
+        $host === 'localhost' ||
+        $host === '127.0.0.1'
+    );
+}
+
+// 0. Intercept Zibal Callback Redirect (Allowlist protected)
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['vercelUrl'])) {
     $vercelUrl = $_GET['vercelUrl'];
+    
+    if (!isAllowedRedirectUrl($vercelUrl)) {
+        http_response_code(400);
+        echo "Invalid or unauthorized redirect URL.";
+        exit;
+    }
+    
     $queryParams = $_GET;
     unset($queryParams['vercelUrl']);
     
-    // Construct target URL and redirect user's browser back to Vercel/App
     $separator = (strpos($vercelUrl, '?') !== false) ? '&' : '?';
     $redirectUrl = rtrim($vercelUrl, '/') . $separator . http_build_query($queryParams);
     
@@ -56,10 +71,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['vercelUrl'])) {
     exit;
 }
 
+// 0.1 Log Viewer (Protected by Header-based API Key)
+if (isset($_GET['action']) && $_GET['action'] === 'get_logs') {
+    $apiKey = extractApiKey();
+    if (empty($apiKey) || !hash_equals(PROXY_SECRET_KEY, $apiKey)) {
+        http_response_code(403);
+        echo 'Access Denied: Invalid or missing authentication header.';
+        exit;
+    }
+    header('Content-Type: text/plain; charset=utf-8');
+    if (file_exists($logFile)) {
+        echo file_get_contents($logFile);
+    } else {
+        echo "هنوز لاگی ثبت نشده است.";
+    }
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-Api-Key, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, X-Api-Key, X-Proxy-Secret, Authorization');
 
 // Handle preflight OPTIONS request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -67,26 +99,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// 1. Validate Secret API Key
-$headers = function_exists('getallheaders') ? getallheaders() : [];
-$apiKey = $headers['X-Api-Key'] ?? $headers['x-api-key'] ?? $_SERVER['HTTP_X_API_KEY'] ?? $_SERVER['x-api-key'] ?? '';
+// 1. Validate Secret API Key (Strict Header Authentication)
+$apiKey = extractApiKey();
 
-if (empty($apiKey) && isset($_GET['key'])) {
-    $apiKey = $_GET['key'];
-}
-
-const PROXY_SECRET_KEY = 'ZopitPay2026Key';
-
-if ($apiKey !== PROXY_SECRET_KEY) {
+if (empty($apiKey) || !hash_equals(PROXY_SECRET_KEY, $apiKey)) {
     logZibalDebug('UNAUTHORIZED_ATTEMPT', [
         'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-        'receivedKey' => $apiKey,
-        'headers' => $headers
+        'receivedKeyLength' => strlen($apiKey)
     ]);
     http_response_code(403);
     echo json_encode([
         'success' => false,
-        'error' => 'Unauthorized: Invalid or missing X-Api-Key.'
+        'error' => 'Unauthorized: Invalid or missing X-Api-Key header.'
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -174,7 +198,7 @@ if ($action === 'verify') {
         exit;
     }
 
-    $finalCallbackUrl = !empty($rawCallbackUrl) ? $rawCallbackUrl : 'https://zopit.ir/callback-test';
+    $finalCallbackUrl = !empty($rawCallbackUrl) ? $rawCallbackUrl : 'https://zopit.ir/api/public/checkout/callback';
 
     $zibalPayload = [
         'merchant'    => $merchant,
@@ -213,7 +237,7 @@ if (function_exists('curl_init')) {
         'Content-Type: application/json',
         'Accept: application/json'
     ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     
@@ -232,7 +256,7 @@ if (function_exists('curl_init')) {
             'header'  => "Content-Type: application/json\r\nAccept: application/json\r\n",
             'method'  => 'POST',
             'content' => json_encode($zibalPayload),
-            'timeout' => 30,
+            'timeout' => 10,
             'ignore_errors' => true
         ],
         'ssl' => [
@@ -260,7 +284,7 @@ logZibalDebug('RECEIVED_FROM_ZIBAL', [
 ]);
 
 if (empty($responseBody) && !empty($errorMessage)) {
-    http_response_code(500);
+    http_response_code(502);
     echo json_encode([
         'success' => false,
         'result' => -1,
@@ -274,7 +298,7 @@ if (empty($responseBody) && !empty($errorMessage)) {
 }
 
 if (empty($responseBody)) {
-    http_response_code(500);
+    http_response_code(502);
     echo json_encode([
         'success' => false,
         'result' => -1,
