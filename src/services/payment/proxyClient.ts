@@ -37,10 +37,12 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
 
       if (secretKey) {
         headers['X-Proxy-Secret'] = secretKey;
+        headers['X-Proxy-Secret-Key'] = secretKey;
         headers['X-Api-Key'] = secretKey;
         headers['Authorization'] = `Bearer ${secretKey}`;
       }
 
+      const isDev = process.env.NODE_ENV !== 'production';
       const req = client.request({
         hostname: parsedUrl.hostname,
         port: parsedUrl.port || (isHttps ? 443 : 80),
@@ -48,7 +50,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
         method: 'POST',
         headers,
         timeout: timeoutMs,
-        rejectUnauthorized: false, // Critical for Vercel -> Iran server SSL connection
+        rejectUnauthorized: isDev ? false : true, // Only bypass SSL in development
       }, (res) => {
         let body = '';
         res.once('data', () => {
@@ -131,11 +133,43 @@ export async function executeProxyRequest(
     userId?: number;
   } = {}
 ): Promise<ProxyResponse> {
-  const baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL || 'https://bankkalaha.ir/zibal-proxy.php';
-  const secretKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || 'ZopitPay2026Key';
-  const timeoutMs = options.timeoutMs || 7000;
+  let baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL;
+  let secretKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY;
+  
+  const isProduction =
+    process.env.VERCEL === '1' ||
+    process.env.VERCEL === 'true' ||
+    process.env.NODE_ENV === 'production';
+
+  if (isProduction) {
+    if (!baseProxyUrl || baseProxyUrl.trim() === '') {
+      throw new Error('PAYMENT_PROXY_URL is not configured in production environment variables.');
+    }
+    if (!baseProxyUrl.startsWith('https://')) {
+      throw new Error('PAYMENT_PROXY_URL must use HTTPS protocol in production.');
+    }
+    if (!secretKey || secretKey.trim() === '') {
+      throw new Error('PAYMENT_PROXY_SECRET_KEY is not configured in production environment variables.');
+    }
+  } else {
+    baseProxyUrl = baseProxyUrl || 'https://bankkalaha.ir/zibal-proxy.php';
+    if (!secretKey || secretKey.trim() === '') {
+      throw new Error('PAYMENT_PROXY_SECRET_KEY is required.');
+    }
+  }
+
+  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '20000', 10);
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const reqId = options.requestId || PaymentLogger.generateRequestId();
+
+  let logRequestBody = payloadString;
+  try {
+    if (typeof payload === 'object' && payload.iban) {
+      const maskedPayload = { ...payload };
+      maskedPayload.iban = PaymentLogger.maskSensitiveData(maskedPayload.iban);
+      logRequestBody = JSON.stringify(maskedPayload);
+    }
+  } catch(e) {}
 
   let proxyUrlToLog = baseProxyUrl;
   try {
@@ -168,12 +202,16 @@ export async function executeProxyRequest(
       dnsMs: res.dnsMs,
       connectMs: res.connectMs,
       tlsMs: res.tlsMs,
-      requestBody: payloadString,
+      requestBody: logRequestBody,
       responseBody: res.text,
       orderId: options.orderId,
       userId: options.userId
     });
 
+    if (!res.ok) {
+      console.error(`[ProxyClient Error] Proxy request failed. Status: ${res.status}, URL: ${baseProxyUrl}`);
+      console.error(`[ProxyClient Error Response]: ${res.text}`);
+    }
     if (!res.ok && res.status >= 500) {
       // It's a server error on proxy, let's trigger fallback
       throw new Error(`پاسخ سرور واسط نامعتبر است (کد ${res.status})`);
@@ -202,75 +240,13 @@ export async function executeProxyRequest(
       tlsMs: err.tlsMs,
       errorMessage: err.message,
       errorCode,
-      requestBody: payloadString,
+      requestBody: logRequestBody,
       orderId: options.orderId,
       userId: options.userId
     });
 
-    // Attempt 2: Direct Fallback to Zibal
-    if (options.action === 'request' || options.action === 'verify' || options.action === 'checkout') {
-      let directUrl = `https://gateway.zibal.ir/v1/${options.action}`;
-      
-      try {
-        console.warn(`[ProxyClient] Switching to direct fallback for ${directUrl} (ReqID: ${reqId})`);
-        // Note: passing null for secretKey because direct Zibal uses the payload for merchant info, not headers
-        const fallbackRes = await makeNodeRequest(directUrl, payloadString, null, timeoutMs);
-        
-        await PaymentLogger.logPaymentEvent({
-          requestId: reqId,
-          gateway: options.gateway || 'ZIBAL',
-          action: options.action || 'UNKNOWN',
-          status: fallbackRes.ok ? 'SUCCESS' : 'FAILED',
-          targetUrl: directUrl,
-          httpStatus: fallbackRes.status,
-          durationMs: fallbackRes.durationMs,
-          dnsMs: fallbackRes.dnsMs,
-          connectMs: fallbackRes.connectMs,
-          tlsMs: fallbackRes.tlsMs,
-          requestBody: payloadString,
-          responseBody: fallbackRes.text,
-          orderId: options.orderId,
-          userId: options.userId
-        });
-        
-        return fallbackRes;
-      } catch (fallbackErr: any) {
-        const fErrorCode = fallbackErr.code || '';
-        const fIsTimeout = fErrorCode === 'ETIMEDOUT' || fErrorCode === 'ECONNABORTED' || fallbackErr.message.includes('Timeout');
-        let fStatus = fIsTimeout ? 'TIMEOUT' : 'NETWORK_ERROR';
-        
-        await PaymentLogger.logPaymentEvent({
-          requestId: reqId,
-          gateway: options.gateway || 'ZIBAL',
-          action: options.action || 'UNKNOWN',
-          status: fStatus,
-          targetUrl: directUrl,
-          durationMs: fallbackErr.durationMs || 0,
-          dnsMs: fallbackErr.dnsMs,
-          connectMs: fallbackErr.connectMs,
-          tlsMs: fallbackErr.tlsMs,
-          errorMessage: fallbackErr.message,
-          errorCode: fErrorCode,
-          requestBody: payloadString,
-          orderId: options.orderId,
-          userId: options.userId
-        });
-        
-        const finalErrorMsg = fIsTimeout 
-          ? 'ارتباط با درگاه پرداخت به دلیل کندی شبکه مقدور نیست. لطفا از اتصال اینترنت خود اطمینان حاصل کنید.'
-          : `خطای شبکه در ارتباط مستقیم با درگاه: ${fallbackErr.message}`;
-          
-        return {
-          ok: false,
-          status: fIsTimeout ? 504 : 502,
-          text: finalErrorMsg,
-          data: { error: finalErrorMsg, isTimeout: fIsTimeout, canRetry: true },
-          durationMs: (err.durationMs || 0) + (fallbackErr.durationMs || 0)
-        };
-      }
-    }
-
     // If no fallback supported for this action
+    console.error(`[ProxyClient Network Error] Code: ${errorCode}, Message: ${err.message}`);
     const errorMsg = isTimeout 
       ? 'ارتباط با سرور واسط به دلیل کندی شبکه مقدور نیست.'
       : `خطا در ارتباط با سرور: ${err.message}`;
@@ -279,7 +255,7 @@ export async function executeProxyRequest(
       ok: false,
       status: isTimeout ? 504 : 502,
       text: errorMsg,
-      data: { error: errorMsg, isTimeout, canRetry: true },
+      data: { error: isTimeout ? 'PAYMENT_PROXY_TIMEOUT' : errorMsg, isTimeout, canRetry: true },
       durationMs: err.durationMs || 0
     };
   }

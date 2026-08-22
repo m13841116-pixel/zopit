@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { PaymentServiceFactory } from './payment/PaymentServiceFactory.js';
+import { getCanonicalAppUrl } from '../utils/canonicalUrl.js';
 
 export function registerStoreShippingRoutes(app: any, prisma: PrismaClient, authenticateToken: any, requireStoreManager: any) {
   // Pay shipping cost
@@ -23,9 +24,8 @@ export function registerStoreShippingRoutes(app: any, prisma: PrismaClient, auth
       }
 
       const paymentGateway = await PaymentServiceFactory.getService();
-      const host = req.headers.host || 'localhost:3000';
-      const protocol = req.headers['x-forwarded-proto'] || 'http';
-      const callbackUrl = `${protocol}://${host}/api/public/shipping/callback?invoiceId=${order.shippingInvoice.id}`;
+      const baseUrl = getCanonicalAppUrl(req);
+      const callbackUrl = `${baseUrl}/api/public/shipping/callback?invoiceId=${order.shippingInvoice.id}`;
 
       try {
         const zibalResult = await paymentGateway.createPayment(
@@ -39,13 +39,19 @@ export function registerStoreShippingRoutes(app: any, prisma: PrismaClient, auth
           data: { payLink: zibalResult.payLink }
         });
 
-        res.json({ payLink: zibalResult.payLink });
-      } catch (paymentErr) {
+        return res.json({ payLink: zibalResult.payLink });
+      } catch (paymentErr: any) {
         console.error('Error creating Zibal payment for shipping:', paymentErr);
-        res.json({ payLink: `/api/public/shipping/callback?invoiceId=${order.shippingInvoice.id}&success=true` });
+        const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+        if (isProduction) {
+          return res.status(502).json({ error: 'خطا در ارتباط با درگاه پرداخت. لطفاً دقایقی دیگر مجدداً تلاش کنید.' });
+        }
+        // Development-only fallback
+        return res.json({ payLink: `/api/public/shipping/callback?invoiceId=${order.shippingInvoice.id}&success=true` });
       }
     } catch (err: any) {
-      res.status(500).json({ error: 'خطا در پرداخت هزینه ارسال' });
+      return res.status(500).json({ error: 'خطا در پرداخت هزینه ارسال' });
     }
   });
 }
+

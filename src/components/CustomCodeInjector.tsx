@@ -11,7 +11,7 @@ function safeExecuteScript(code: string, sourceName = "CustomScript") {
     // 1. Syntax check before running
     new Function(code);
     // 2. Execute safely
-    const fn = new Function(`try { ${code} } catch(err) { console.warn("[${sourceName} Runtime Error]:", err); }`);
+    const fn = new Function(`try { \n${code}\n } catch(err) { console.warn(\"[${sourceName} Runtime Error]:\", err); }`);
     fn();
   } catch (syntaxError) {
     console.warn(`[${sourceName} Syntax Error - Ignored]:`, syntaxError);

@@ -9,9 +9,13 @@ export function getPrisma(): any {
     return globalForPrisma.prisma;
   }
 
+  const isProduction =
+    process.env.VERCEL === '1' ||
+    process.env.VERCEL === 'true' ||
+    process.env.NODE_ENV === 'production';
+
   if (!prismaInstance) {
     try {
-      
       let dbUrl = process.env.DATABASE_URL || '';
       
       // Auto-fix for Neon Postgres Pooler on Vercel to prevent "Server has closed the connection"
@@ -20,36 +24,69 @@ export function getPrisma(): any {
         console.log('[Prisma] Auto-appended pgbouncer=true to Neon pooled connection string for Serverless compatibility.');
       }
 
-      const isRealDb = dbUrl && (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) && !dbUrl.includes('dummy_db');
-      if (!isRealDb) {
-        prismaInstance = createMemoryPrismaProxy();
-      } else {
+      const isRealDb = dbUrl && (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) && !dbUrl.includes('dummy_db') && !dbUrl.includes('dummy:dummy');
+      
+      if (isProduction) {
+        if (!isRealDb) {
+          throw new Error('DATABASE_URL must be a valid PostgreSQL URL in production');
+        }
+
         let ClientClass: any = null;
         try {
           const prismaModule = require('@prisma/client');
           ClientClass = prismaModule.PrismaClient;
         } catch (e: any) {
-          console.warn('[Prisma] Could not load @prisma/client package dynamically:', e.message);
+          throw new Error(`[Prisma Fatal] Could not load @prisma/client package: ${e.message}`);
         }
 
-        if (ClientClass) {
-          prismaInstance = new ClientClass({
-            datasources: {
-              db: {
-                url: dbUrl,
-              },
+        if (!ClientClass) {
+          throw new Error('[Prisma Fatal] PrismaClient class is not available.');
+        }
+
+        prismaInstance = new ClientClass({
+          datasources: {
+            db: {
+              url: dbUrl,
             },
-          });
-          // Attempt eager connection to detect immediate failures
-          prismaInstance.$connect().catch((err: any) => {
-            console.error('[Prisma] Database eager connection failed:', err);
-          });
-        } else {
+          },
+        });
+        
+        prismaInstance.$connect().catch((err: any) => {
+          console.error('[Prisma] Database eager connection notice:', err?.message || err);
+        });
+      } else {
+        // Local development / testing mode
+        if (!isRealDb) {
+          console.log('[Prisma Dev] Non-PostgreSQL or missing DATABASE_URL in dev, using memory proxy.');
           prismaInstance = createMemoryPrismaProxy();
+        } else {
+          let ClientClass: any = null;
+          try {
+            const prismaModule = require('@prisma/client');
+            ClientClass = prismaModule.PrismaClient;
+          } catch (e: any) {
+            console.warn('[Prisma] Could not load @prisma/client in dev:', e.message);
+          }
+
+          if (ClientClass) {
+            prismaInstance = new ClientClass({
+              datasources: {
+                db: {
+                  url: dbUrl,
+                },
+              },
+            });
+          } else {
+            prismaInstance = createMemoryPrismaProxy();
+          }
         }
       }
     } catch (err: any) {
-      console.warn('[Prisma] Initialization failed, falling back to mock proxy:', err.message);
+      if (isProduction) {
+        console.error('[Prisma Fatal Error]:', err.message);
+        throw err;
+      }
+      console.warn('[Prisma] Dev initialization fallback to mock proxy:', err.message);
       prismaInstance = createMemoryPrismaProxy();
     }
     globalForPrisma.prisma = prismaInstance;

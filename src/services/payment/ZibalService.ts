@@ -3,6 +3,7 @@ import { executeProxyRequest } from './proxyClient.js';
 import { getPrisma } from '../../prisma.js';
 import { z } from 'zod';
 import { PaymentLogger } from './PaymentLogger.js';
+import { getCanonicalAppUrl } from '../../utils/canonicalUrl.js';
 
 function getZibalErrorMessage(code: number | string, customMessage?: string): string {
   const zibalErrors: Record<number | string, string> = {
@@ -46,8 +47,12 @@ export class ZibalService implements PaymentGateway {
   private zibalMerchant: string;
 
   constructor(merchantId?: string) {
-    const merchant = merchantId || process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || 'zibal';
+    const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+    const merchant = merchantId || process.env.ZIBAL_MERCHANT_ID || '';
     this.zibalMerchant = merchant.trim();
+    if (isProduction && !this.zibalMerchant) {
+      throw new Error('ZIBAL_MERCHANT_ID is not configured in production.');
+    }
   }
 
   private async sendZibalRequest(action: string, payload: any, schema?: z.ZodTypeAny, orderId?: string, userId?: number): Promise<any> {
@@ -67,9 +72,9 @@ export class ZibalService implements PaymentGateway {
       const result = await executeProxyRequest(
         { ...payload, action }, 
         { 
-          timeoutMs: 7000, 
-          requestId: reqId, 
-          gateway: 'ZIBAL', 
+          timeoutMs: parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '20000', 10), 
+          requestId: reqId,
+          gateway: 'ZIBAL',
           action: actionName,
           orderId,
           userId
@@ -116,21 +121,21 @@ export class ZibalService implements PaymentGateway {
     try {
       let finalCallbackUrl = callbackUrl || '';
 
-      // Ensure callback URL is constructed properly with HTTPS and uses zopit.ir
+      // Ensure callback URL is constructed properly with canonical base URL and HTTPS
+      const canonicalBase = getCanonicalAppUrl();
       try {
         if (!finalCallbackUrl || finalCallbackUrl.trim() === '') {
-          finalCallbackUrl = 'https://zopit.ir/api/public/checkout/callback' + (orderId ? `?orderId=${orderId}` : '');
+          finalCallbackUrl = `${canonicalBase}/api/payment/callback${orderId ? `?orderId=${orderId}` : ''}`;
+        } else if (finalCallbackUrl.startsWith('/')) {
+          finalCallbackUrl = `${canonicalBase}${finalCallbackUrl}`;
         } else {
           const urlObj = new URL(finalCallbackUrl);
-          if (urlObj.hostname.includes('run.app') || urlObj.hostname.includes('localhost') || urlObj.hostname.includes('bankkalaha.ir')) {
-            finalCallbackUrl = `https://zopit.ir${urlObj.pathname}${urlObj.search}`;
-          } else {
-            urlObj.protocol = 'https:';
-            finalCallbackUrl = urlObj.toString();
+          if (process.env.NODE_ENV === 'production' || process.env.APP_BASE_URL) {
+            finalCallbackUrl = `${canonicalBase}${urlObj.pathname}${urlObj.search}`;
           }
         }
       } catch (e) {
-        finalCallbackUrl = 'https://zopit.ir/api/public/checkout/callback' + (orderId ? `?orderId=${orderId}` : '');
+        finalCallbackUrl = `${canonicalBase}/api/payment/callback${orderId ? `?orderId=${orderId}` : ''}`;
       }
 
       let numAmount = Math.round(Number(amount));
@@ -167,8 +172,10 @@ export class ZibalService implements PaymentGateway {
         }
       }
 
+      const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+      if (isProduction && !this.zibalMerchant) throw new Error('ZIBAL_MERCHANT_ID is empty');
       const requestPayload: Record<string, any> = {
-        merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal',
+        merchant: this.zibalMerchant || (isProduction ? null : 'zibal'),
         amount: numAmount,
         callbackUrl: finalCallbackUrl,
         description: description || 'پرداخت سفارش',
@@ -199,13 +206,16 @@ export class ZibalService implements PaymentGateway {
 
   async verifyPayment(authority: string, amount: number | string): Promise<{ success: boolean; trackId: string; refId: string }> {
     try {
+      const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
       if (authority.startsWith('ZIBAL_') || authority.startsWith('SIM_')) {
+        if (isProduction) throw new Error('Simulation payments are disabled in production');
         return { success: true, trackId: authority, refId: `REF_${authority}` };
       }
 
+      if (isProduction && !this.zibalMerchant) throw new Error('ZIBAL_MERCHANT_ID is empty');
       const verifyPayload: Record<string, any> = {
         trackId: authority,
-        merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal'
+        merchant: this.zibalMerchant || (isProduction ? null : 'zibal')
       };
       
       const data = await this.sendZibalRequest('verify', verifyPayload, ZibalVerifyResponseSchema);
@@ -213,6 +223,9 @@ export class ZibalService implements PaymentGateway {
       if (data) {
         const resCode = Number(data.result);
         if (data.success || resCode === 100 || resCode === 201) {
+          if (amount && data.amount && Number(data.amount) !== Number(amount)) {
+             throw new Error('مبلغ پرداختی با مبلغ فاکتور تطابق ندارد.');
+          }
           return { success: true, trackId: authority, refId: data.refNumber?.toString() || data.refId?.toString() || authority };
         } else {
           throw new Error(getZibalErrorMessage(data.result, data.message));
@@ -227,11 +240,12 @@ export class ZibalService implements PaymentGateway {
 
   async requestPayout(amount: number | string, shaba: string, description: string): Promise<{ success: boolean; trackId: string }> {
     try {
+      const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
       const payoutPayload: Record<string, any> = {
         amount: Number(amount),
         iban: shaba.replace(/^IR/i, ''),
         description,
-        merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal'
+        merchant: this.zibalMerchant || (isProduction ? null : 'zibal')
       };
 
       const data = await this.sendZibalRequest('checkout', payoutPayload, ZibalRequestResponseSchema);
@@ -252,9 +266,10 @@ export class ZibalService implements PaymentGateway {
 
   async getPayoutStatus(trackId: string): Promise<{ status: string; detail: string }> {
     try {
+      const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
       const statusPayload: Record<string, any> = {
         trackId: trackId,
-        merchant: (this.zibalMerchant && this.zibalMerchant.trim() !== '') ? this.zibalMerchant.trim() : 'zibal'
+        merchant: this.zibalMerchant || (isProduction ? null : 'zibal')
       };
 
       const data = await this.sendZibalRequest('checkout_status', statusPayload);

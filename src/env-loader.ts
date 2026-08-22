@@ -19,7 +19,13 @@ const isAIStudioEnv = !!process.env.APPLET_ID;
 const isCloudRunEnv = !!process.env.K_SERVICE;
 const rootDir = (isAIStudioEnv || isCloudRunEnv) ? process.cwd() : findTrueRootDir();
 
-dotenv.config({ path: path.join(rootDir, '.env') });
+
+if (!process.env.VERCEL) {
+  try {
+    dotenv.config({ path: path.join(rootDir, '.env') });
+  } catch (e) {}
+}
+
 
 let dbUrl = process.env.DATABASE_URL || '';
 function sanitizeDbUrl(url: string): string {
@@ -43,45 +49,38 @@ function sanitizeDbUrl(url: string): string {
 dbUrl = sanitizeDbUrl(dbUrl);
 process.env.DATABASE_URL = dbUrl;
 
-const isRealRemoteDb = dbUrl && (
-  dbUrl.startsWith('mysql://') || 
-  dbUrl.startsWith('mysqls://') || 
-  dbUrl.startsWith('postgresql://') || 
-  dbUrl.startsWith('postgres://')
-) && !dbUrl.includes('localhost') && !dbUrl.includes('127.0.0.1') && !dbUrl.includes('dummy_db');
+const isProduction =
+  process.env.VERCEL === '1' ||
+  process.env.VERCEL === 'true' ||
+  process.env.NODE_ENV === 'production';
 
 const isVercelEnv = !!process.env.VERCEL;
 
-if (!isRealRemoteDb || (isAIStudioEnv && !process.env.FORCE_PRODUCTION_DB)) {
-  const dbDir = process.env.SQLITE_DIR ? process.env.SQLITE_DIR : (((process.env.NODE_ENV === 'production' && isCloudRunEnv) || isVercelEnv) ? '/tmp/prisma' : path.join(rootDir || process.cwd(), 'prisma'));
-  if (!fs.existsSync(dbDir)) {
-    try { fs.mkdirSync(dbDir, { recursive: true }); } catch (e) {}
+if (isProduction) {
+  if (!dbUrl || dbUrl.trim() === '') {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL in production');
   }
-  const dbPath = path.join(dbDir, 'dev.db');
-  
-  if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size === 0) {
-    // Try copying from pre-built locations to ensure tables exist
-    const possibleSources = [
-      path.join(process.cwd(), 'dist', 'dev.db'),
-      path.join(process.cwd(), 'prisma', 'dev.db'),
-      path.join(rootDir || process.cwd(), 'dist', 'dev.db'),
-      path.join(rootDir || process.cwd(), 'prisma', 'dev.db'),
-    ];
-    for (const src of possibleSources) {
-      if (fs.existsSync(src) && fs.statSync(src).size > 0) {
-        try {
-          fs.copyFileSync(src, dbPath);
-          console.log(`[Env Loader] Copied pre-built database from ${src} to ${dbPath}`);
-          break;
-        } catch (copyErr: any) {
-          console.warn(`[Env Loader] Failed to copy database from ${src}:`, copyErr.message);
-        }
-      }
-    }
+  const isPostgres = (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) && !dbUrl.includes('dummy_db') && !dbUrl.includes('dummy:dummy');
+  if (!isPostgres) {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL in production');
   }
+} else {
+  const isRealRemoteDb = dbUrl && (
+    dbUrl.startsWith('mysql://') || 
+    dbUrl.startsWith('mysqls://') || 
+    dbUrl.startsWith('postgresql://') || 
+    dbUrl.startsWith('postgres://')
+  ) && !dbUrl.includes('localhost') && !dbUrl.includes('127.0.0.1') && !dbUrl.includes('dummy_db');
 
-  dbUrl = `file:///${dbPath.replace(/^\//, '')}`;
-  process.env.DATABASE_URL = dbUrl;
+  if (!isRealRemoteDb || (isAIStudioEnv && !process.env.FORCE_PRODUCTION_DB)) {
+    const dbDir = process.env.SQLITE_DIR ? process.env.SQLITE_DIR : path.join(rootDir || process.cwd(), 'prisma');
+    if (!fs.existsSync(dbDir)) {
+      try { fs.mkdirSync(dbDir, { recursive: true }); } catch (e) {}
+    }
+    const dbPath = path.join(dbDir, 'dev.db');
+    dbUrl = `file:///${dbPath.replace(/^\//, '')}`;
+    process.env.DATABASE_URL = dbUrl;
+  }
 }
 
 // Ensure database setup and schema-client alignment synchronously at startup before other modules load
@@ -107,9 +106,8 @@ try {
 
 const prismaClientDir = path.join(process.cwd(), 'node_modules', '@prisma', 'client');
 const clientExists = fs.existsSync(prismaClientDir);
-const isProduction = process.env.NODE_ENV === 'production' || !!process.env.K_SERVICE;
 
-if (resolvedProvider !== currentSchemaProvider || !clientExists || isProduction) {
+if (!isVercelEnv && (resolvedProvider !== currentSchemaProvider || !clientExists || isProduction)) {
   console.log(`[Env Loader] Database setup needed (resolved="${resolvedProvider}", schema="${currentSchemaProvider}", exists=${clientExists}, prod=${isProduction})`);
   const setupScriptPath = path.join(process.cwd(), 'setup-db.js');
   if (fs.existsSync(setupScriptPath)) {

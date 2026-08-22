@@ -57,11 +57,17 @@ export class PaymentServiceFactory {
         merchantId = config.zibalMerchant;
       }
       if (!merchantId || merchantId === 'zibal_merchant_key') {
-        merchantId = process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT;
+        merchantId = process.env.ZIBAL_MERCHANT_ID;
       }
 
-      if (!merchantId || merchantId.trim() === '') {
-        merchantId = 'zibal';
+      if (process.env.NODE_ENV === 'production') {
+        if (!merchantId || merchantId.trim() === '' || merchantId === 'zibal' || merchantId === 'zibal_merchant_key') {
+          throw new Error('ZIBAL_MERCHANT_ID is not configured');
+        }
+      } else {
+        if (!merchantId || merchantId.trim() === '') {
+          merchantId = 'zibal';
+        }
       }
 
       await PaymentLogger.logPaymentEvent({
@@ -77,7 +83,17 @@ export class PaymentServiceFactory {
 
     } catch (err: any) {
       console.error('[PaymentServiceFactory Error]', err.message);
-      const fallbackMerchant = forcedMerchantId || process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || 'zibal';
+      
+      let fallbackMerchant = forcedMerchantId || process.env.ZIBAL_MERCHANT_ID;
+      if (process.env.NODE_ENV === 'production') {
+        if (!fallbackMerchant || fallbackMerchant.trim() === '' || fallbackMerchant === 'zibal' || fallbackMerchant === 'zibal_merchant_key') {
+          throw new Error('ZIBAL_MERCHANT_ID is not configured');
+        }
+      } else {
+        if (!fallbackMerchant || fallbackMerchant.trim() === '') {
+          fallbackMerchant = 'zibal';
+        }
+      }
       
       await PaymentLogger.logPaymentEvent({
         requestId: PaymentLogger.generateRequestId(),
