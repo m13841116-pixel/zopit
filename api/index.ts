@@ -13,11 +13,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Dynamically import the compiled CJS server bundle to bypass ESM/TS Node issues
+    // Dynamically import the compiled CJS server bundle
     // @ts-ignore
     const serverModule = await import('../dist/server.cjs');
-    const app = serverModule.default || serverModule;
     
+    // In Node's ESM, importing a CJS module places its module.exports on the 'default' key.
+    // Since our CJS bundle exports a default property (module.exports = { default: app }),
+    // we need to unwrap it twice.
+    const app = serverModule.default?.default || serverModule.default || serverModule;
+    
+    if (typeof app !== 'function') {
+      throw new Error(`Exported app is not a function. It is: ${typeof app}`);
+    }
+
     // Let Express handle routing naturally
     return app(req, res);
   } catch (err: any) {

@@ -9838,8 +9838,9 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     });
   }
 
-  if (process.env.VERCEL === '1' || process.env.VERCEL === 'true' || !!process.env.VERCEL || process.env.NOW_REGION) {
-    console.log("Running on Vercel Serverless environment: skipping app.listen() and background startup tasks.");
+    // In a serverless environment, skip app.listen
+  if (process.env.VERCEL === '1' || process.env.VERCEL === 'true' || process.env.NOW_REGION) {
+    console.log("Running on Serverless environment: skipping app.listen() and background startup tasks.");
     return;
   }
 
