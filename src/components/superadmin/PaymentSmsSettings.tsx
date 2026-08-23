@@ -358,13 +358,17 @@ export default function PaymentSmsSettings() {
       .then((data) => {
         if (data && !data.error) {
           if (data.PAYMENT_GATEWAY_TYPE) setGatewayType(data.PAYMENT_GATEWAY_TYPE);
-          if (data.PAYMENT_GATEWAY_MERCHANT_CODE) {
+          if (data.PAYMENT_GATEWAY_MERCHANT_CODE && data.PAYMENT_GATEWAY_MERCHANT_CODE !== 'zibal' && data.PAYMENT_GATEWAY_MERCHANT_CODE !== 'zibal_merchant_key') {
             setMerchantCode(String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim());
+          } else {
+            setMerchantCode('6a0213e61b27742a09938588');
           }
-          if (data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE) {
+          if (data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE && data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE !== 'zibal' && data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE !== 'zibal_merchant_key') {
             setZibalMerchantCode(String(data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE).trim());
-          } else if (data.PAYMENT_GATEWAY_MERCHANT_CODE) {
+          } else if (data.PAYMENT_GATEWAY_MERCHANT_CODE && data.PAYMENT_GATEWAY_MERCHANT_CODE !== 'zibal' && data.PAYMENT_GATEWAY_MERCHANT_CODE !== 'zibal_merchant_key') {
             setZibalMerchantCode(String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim());
+          } else {
+            setZibalMerchantCode('6a0213e61b27742a09938588');
           }
           if (data.PAYMENT_GATEWAY_SEP_TERMINAL_ID) {
             setSepTerminalId(String(data.PAYMENT_GATEWAY_SEP_TERMINAL_ID).trim());

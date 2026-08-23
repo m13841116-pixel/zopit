@@ -31,33 +31,43 @@ async function makeFetchRequest(urlStr: string, payloadString: string, secretKey
   };
 
   if (secretKey) {
-    headers['X-Proxy-Secret'] = secretKey;
     headers['X-Proxy-Secret-Key'] = secretKey;
+    headers['X-Proxy-Secret'] = secretKey;
     headers['X-Api-Key'] = secretKey;
-    headers['Authorization'] = `Bearer ${secretKey}`;
   }
 
-  const res = await fetch(urlStr, {
-    method: 'POST',
-    headers,
-    body: payloadString,
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-
-  const durationMs = Date.now() - startTime;
-  const text = await res.text();
-  let data: any;
   try {
-    if (text) data = JSON.parse(text);
-  } catch (e) {}
+    const res = await fetch(urlStr, {
+      method: 'POST',
+      headers,
+      body: payloadString,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
 
-  return {
-    ok: res.ok,
-    status: res.status,
-    text,
-    data,
-    durationMs,
-  };
+    const durationMs = Date.now() - startTime;
+    const text = await res.text();
+    let data: any;
+    try {
+      if (text) data = JSON.parse(text);
+    } catch (e) {}
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      text,
+      data,
+      durationMs,
+    };
+  } catch (err: any) {
+    const elapsed = Date.now() - startTime;
+    if (err.name === 'AbortError' || err.name === 'TimeoutError' || err.message?.toLowerCase().includes('timeout') || err.message?.includes('پاسخگویی')) {
+      const timeoutErr = new Error(`زمان پاسخگویی پایان یافت (${elapsed}ms Timeout)`) as any;
+      timeoutErr.name = 'TimeoutError';
+      timeoutErr.durationMs = elapsed;
+      throw timeoutErr;
+    }
+    throw err;
+  }
 }
 
 function makeNodeRequest(urlStr: string, payloadString: string, secretKey: string | null, timeoutMs: number): Promise<ProxyResponse> {
@@ -81,10 +91,9 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
       };
 
       if (secretKey) {
-        headers['X-Proxy-Secret'] = secretKey;
         headers['X-Proxy-Secret-Key'] = secretKey;
+        headers['X-Proxy-Secret'] = secretKey;
         headers['X-Api-Key'] = secretKey;
-        headers['Authorization'] = `Bearer ${secretKey}`;
       }
 
       const req = client.request({
@@ -165,12 +174,14 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
 }
 
 async function makeUnifiedRequest(urlStr: string, payloadString: string, secretKey: string | null, timeoutMs: number): Promise<ProxyResponse> {
-  try {
-    if (typeof globalThis.fetch === 'function') {
+  if (typeof globalThis.fetch === 'function') {
+    try {
       return await makeFetchRequest(urlStr, payloadString, secretKey, timeoutMs);
+    } catch (fetchErr: any) {
+      if (fetchErr.name === 'TimeoutError' || fetchErr.name === 'AbortError' || fetchErr.message?.includes('Timeout') || fetchErr.message?.includes('پاسخگویی')) {
+        throw fetchErr;
+      }
     }
-  } catch (fetchErr: any) {
-    // Fall back to Node request on fetch failure
   }
   return await makeNodeRequest(urlStr, payloadString, secretKey, timeoutMs);
 }
@@ -237,6 +248,7 @@ export async function executeProxyRequest(
   let proxyErrToLog: any = null;
   const proxyCandidates = Array.from(new Set([
     'https://bankkalaha.ir/zibal-proxy.php',
+    'https://www.bankkalaha.ir/zibal-proxy.php',
     baseProxyUrl,
     defaultProxyUrl,
   ])).filter(Boolean);
@@ -245,8 +257,8 @@ export async function executeProxyRequest(
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const activeSecret = targetProxyUrl.includes('bankkalaha.ir') ? defaultSecretKey : secretKey;
-        // Allow up to 8.5s for attempt 1 and 6.0s for attempt 2 so bankkalaha.ir has sufficient time to complete the Zibal transaction
-        const currentAttemptTimeout = attempt === 1 ? 8500 : 6000;
+        // Fast timeouts for serverless: 4.5s attempt 1, 3.0s attempt 2 (Total max 7.5s, well within Vercel limit)
+        const currentAttemptTimeout = attempt === 1 ? 4500 : 3000;
         const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, currentAttemptTimeout);
         
         // If we got a valid response (JSON from proxy or Zibal)
