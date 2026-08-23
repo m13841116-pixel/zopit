@@ -171,60 +171,15 @@ export async function executeProxyRequest(
     directZibalUrl = 'https://gateway.zibal.ir/v1/checkout/status';
   }
 
-  // Attempt 1: Proxy via Iran intermediary host (e.g. bankkalaha.ir)
+  // Attempt: Direct Gateway Connection to Zibal (Proxy completely bypassed for speed)
   try {
-    const res = await makeNodeRequest(baseProxyUrl, payloadString, secretKey, timeoutMs);
-    
-    // Check if proxy responded successfully with valid Zibal format
-    if (res.ok && res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.success !== undefined)) {
-      await PaymentLogger.logPaymentEvent({
-        requestId: reqId,
-        gateway: options.gateway || 'ZIBAL',
-        action: options.action || 'UNKNOWN',
-        status: 'SUCCESS',
-        targetUrl: proxyUrlToLog,
-        httpStatus: res.status,
-        durationMs: res.durationMs,
-        dnsMs: res.dnsMs,
-        connectMs: res.connectMs,
-        tlsMs: res.tlsMs,
-        requestBody: logRequestBody,
-        responseBody: res.text,
-        orderId: options.orderId,
-        userId: options.userId
-      });
-      return res;
-    }
-
-    // If proxy returned a 404/500/502/504 or invalid HTML (e.g. script missing), do NOT fallback to direct Zibal because direct Zibal will block Vercel's IP.
-    console.warn(`[ProxyClient Warning] Proxy returned status ${res.status} or invalid data. Returning proxy error...`);
-    
-    // Check if the proxy itself was blocked by a firewall (e.g. 403 Forbidden)
-    if (res.status === 403 || res.status === 406) {
-      throw new Error('سرور واسط بانکی (پروکسی) دسترسی را مسدود کرده است. لطفا تنظیمات فایروال سرور واسط را بررسی کنید.');
-    }
-    
-    throw new Error(`ارتباط با سرور واسط بانکی ناموفق بود (کد وضعیت: ${res.status}).`);
-  } catch (proxyErr: any) {
-    console.warn(`[ProxyClient Warning] Proxy connection error (${proxyErr.message}).`);
-    
-    // Do not fall back to direct gateway in production/vercel because it will fail with Invalid IP.
-    if (process.env.VERCEL === '1' || process.env.VERCEL === 'true' || process.env.NOW_REGION) {
-      throw new Error(`اتصال به سرور واسط بانکی برقرار نشد: ${proxyErr.message}`);
-    }
-    
-    console.warn(`Attempting direct gateway fallback to ${directZibalUrl}...`);
-  }
-
-  // Attempt 2: Direct Gateway Connection to Zibal (Fallback - Only on local dev)
-  try {
-    const directRes = await makeNodeRequest(directZibalUrl, payloadString, null, 5000);
+    const directRes = await makeNodeRequest(directZibalUrl, payloadString, null, 8000);
     if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
       await PaymentLogger.logPaymentEvent({
         requestId: reqId,
         gateway: options.gateway || 'ZIBAL',
         action: options.action || 'UNKNOWN',
-        status: 'SUCCESS_DIRECT_FALLBACK',
+        status: 'SUCCESS_DIRECT',
         targetUrl: directZibalUrl,
         httpStatus: directRes.status,
         durationMs: directRes.durationMs,
