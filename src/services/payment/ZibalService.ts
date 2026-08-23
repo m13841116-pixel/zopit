@@ -72,7 +72,7 @@ export class ZibalService implements PaymentGateway {
       const result = await executeProxyRequest(
         { ...payload, action }, 
         { 
-          timeoutMs: parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '5000', 10), 
+          timeoutMs: parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '10000', 10), 
           requestId: reqId,
           gateway: 'ZIBAL',
           action: actionName,

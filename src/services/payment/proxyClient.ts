@@ -245,8 +245,8 @@ export async function executeProxyRequest(
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const activeSecret = targetProxyUrl.includes('bankkalaha.ir') ? defaultSecretKey : secretKey;
-        // Keep timeout strictly under Vercel function timeout (3.5s for 1st attempt, 2s for 2nd attempt)
-        const currentAttemptTimeout = attempt === 1 ? 3500 : 2000;
+        // Allow up to 8.5s for attempt 1 and 6.0s for attempt 2 so bankkalaha.ir has sufficient time to complete the Zibal transaction
+        const currentAttemptTimeout = attempt === 1 ? 8500 : 6000;
         const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, currentAttemptTimeout);
         
         // If we got a valid response (JSON from proxy or Zibal)
@@ -268,7 +268,7 @@ export async function executeProxyRequest(
             }).catch(() => {});
             return proxyRes;
           }
-          // If proxy returned a specific gateway business error (e.g. 106 callback mismatch, 102 merchant invalid)
+          // If proxy returned a specific gateway business error (e.g. 106 callback mismatch)
           if (proxyRes.data.result && Number(proxyRes.data.result) !== 104) {
             return proxyRes;
           }
@@ -280,10 +280,25 @@ export async function executeProxyRequest(
     }
   }
 
-  // If proxy attempts did not succeed, try direct Zibal as a last resort (2s timeout)
+  // If proxy attempts did not succeed, try direct Zibal as a last resort (3s timeout)
   try {
-    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 2000);
+    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 3000);
     if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
+      // Check if direct Zibal returned an IP restriction error (e.g., "invalid IP ...")
+      const msgStr = String(directRes.data.message || directRes.data.error || '');
+      const isInvalidIp = msgStr.toLowerCase().includes('invalid ip') || directRes.data.result === 115;
+      
+      if (isInvalidIp) {
+        console.warn(`[ProxyClient] Direct Zibal rejected server IP (${msgStr}). Returning connection error.`);
+        return {
+          ok: false,
+          status: 503,
+          text: JSON.stringify({ result: -1, message: 'ارتباط با درگاه پرداخت به دلیل کندی شبکه برقرار نشد. لطفاً مجدداً دکمه تایید و ادامه را بزنید.' }),
+          data: { result: -1, message: 'ارتباط با درگاه پرداخت به دلیل کندی شبکه برقرار نشد. لطفاً مجدداً دکمه تایید و ادامه را بزنید.' },
+          durationMs: directRes.durationMs
+        };
+      }
+
       PaymentLogger.logPaymentEvent({
         requestId: reqId,
         gateway: options.gateway || 'ZIBAL',
