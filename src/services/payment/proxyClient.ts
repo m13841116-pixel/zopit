@@ -244,16 +244,20 @@ export async function executeProxyRequest(
     directZibalUrl = 'https://gateway.zibal.ir/v1/checkout/status';
   }
 
-  // Primary: Connect through Iranian Static IP Proxy (for Zibal IP whitelisting)
+  // Primary and secondary Iranian Static IP Proxies (for Zibal IP whitelisting)
   let proxyErrToLog: any = null;
-  const primaryProxyUrl = 'https://bankkalaha.ir/zibal-proxy.php';
+  const proxyCandidates = [
+    'https://bankkalaha.ir/zibal-proxy.php',
+    'https://www.bankkalaha.ir/zibal-proxy.php'
+  ];
 
-  // Maximum 2 attempts on primary proxy url with 3.5s and 2.0s timeouts
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let i = 0; i < proxyCandidates.length; i++) {
+    const targetProxyUrl = proxyCandidates[i];
     try {
       const activeSecret = defaultSecretKey;
-      const currentAttemptTimeout = attempt === 1 ? 3500 : 2000;
-      const proxyRes = await makeUnifiedRequest(primaryProxyUrl, payloadString, activeSecret, currentAttemptTimeout);
+      // Generous timeouts for Vercel-to-Iran latency: 12s for primary, 10s for secondary
+      const currentAttemptTimeout = i === 0 ? 12000 : 10000;
+      const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, currentAttemptTimeout);
       
       // If we got a valid response (JSON from proxy or Zibal)
       if (proxyRes.data && (proxyRes.data.result !== undefined || proxyRes.data.trackId !== undefined || proxyRes.data.success !== undefined)) {
@@ -264,7 +268,7 @@ export async function executeProxyRequest(
             gateway: options.gateway || 'ZIBAL',
             action: options.action || 'UNKNOWN',
             status: 'SUCCESS',
-            targetUrl: primaryProxyUrl,
+            targetUrl: targetProxyUrl,
             httpStatus: proxyRes.status,
             durationMs: proxyRes.durationMs,
             requestBody: logRequestBody,
@@ -281,13 +285,13 @@ export async function executeProxyRequest(
       }
     } catch (proxyErr: any) {
       proxyErrToLog = proxyErr;
-      console.warn(`[ProxyClient] Attempt ${attempt} failed for ${primaryProxyUrl} (${proxyErr.message})`);
+      console.warn(`[ProxyClient] Attempt failed for ${targetProxyUrl} (${proxyErr.message})`);
     }
   }
 
-  // If primary proxy failed, try direct Zibal as a last resort (2.0s timeout)
+  // If proxy attempts failed, try direct Zibal as a last resort (5.0s timeout)
   try {
-    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 2000);
+    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 5000);
     if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
       // Check if direct Zibal returned an IP restriction error (e.g., "invalid IP ...")
       const msgStr = String(directRes.data.message || directRes.data.error || '');

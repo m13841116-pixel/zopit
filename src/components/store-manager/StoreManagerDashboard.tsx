@@ -359,7 +359,7 @@ export default function StoreManagerDashboard({
     if (selectedOrders.length === 0) return;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
 
       const token = localStorage.getItem("token") || "";
       const res = await fetch("/api/store-manager/settle-orders", { credentials: "include",
