@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import app from '../server.js';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Ensure CORS headers for API calls
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -13,7 +12,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // Let Express handle routing naturally
-  return app(req, res);
+  try {
+    // Dynamically import the compiled CJS server bundle to bypass ESM/TS Node issues
+    // @ts-ignore
+    const serverModule = await import('../dist/server.cjs');
+    const app = serverModule.default || serverModule;
+    
+    // Let Express handle routing naturally
+    return app(req, res);
+  } catch (err: any) {
+    console.error("Failed to load server.cjs:", err);
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  }
 }
 
