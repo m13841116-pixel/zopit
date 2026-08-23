@@ -4895,7 +4895,7 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
       try {
         const zibalResult = await paymentGateway.createPayment(
           totalAmount * 10,
-          `تسویه فاکتور فروشگاه #${invoice.id}`,
+          `تسویه فاکتور فروشگاه ${invoice.id}`,
           callbackUrl
         );
         payLink = zibalResult.payLink;
@@ -9043,7 +9043,7 @@ app.post('/api/payment/zibal/request-invoice-url', async (req: any, res: any) =>
           const order = await prisma.order.findUnique({ where: { id: numericInvoiceId } });
           if (order) {
             resolvedAmountToman = order.totalAmount;
-            descText = descText || `پرداخت سفارش #${order.id}`;
+            descText = descText || `پرداخت سفارش ${order.id}`;
           }
         }
       }
@@ -9053,7 +9053,7 @@ app.post('/api/payment/zibal/request-invoice-url', async (req: any, res: any) =>
         const order = await prisma.order.findUnique({ where: { id: numericOrderId } });
         if (order) {
           resolvedAmountToman = order.totalAmount;
-          descText = descText || `پرداخت سفارش #${order.id}`;
+          descText = descText || `پرداخت سفارش ${order.id}`;
         }
       }
     }
@@ -9120,7 +9120,7 @@ app.post('/api/payment/request', async (req: any, res: any) => {
         const order = await prisma.order.findUnique({ where: { id: numericOrderId } });
         if (order) {
           resolvedAmountToman = order.totalAmount;
-          descText = descText || `پرداخت سفارش #${order.id}`;
+          descText = descText || `پرداخت سفارش ${order.id}`;
         }
       }
     }

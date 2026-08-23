@@ -1057,6 +1057,9 @@ export default function OrdersList() {
                     { key: "PAID", label: "پرداخت شده" },
                     { key: "PENDING_POSTAL_LABEL", label: "در انتظار لیبل" },
                     { key: "COMPLETED", label: "تکمیل شده" },
+                    { key: "PENDING", label: "در انتظار بررسی" },
+                    { key: "SHIPPED", label: "ارسال شده" },
+                    { key: "CANCELLED", label: "لغو شده" },
                   ].map((st) => (
                     <button
                       key={st.key}
