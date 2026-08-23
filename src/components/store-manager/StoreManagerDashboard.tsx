@@ -370,9 +370,8 @@ export default function StoreManagerDashboard({
       const data = await res.json();
       if (res.ok && data.payLink) {
         setSelectedOrders([]);
-        showNotification("در حال انتقال به درگاه پرداخت زیبال...", "success");
-        const newTab = window.open(data.payLink, "_blank");
-        if (!newTab) window.location.href = data.payLink;
+        showNotification("در حال انتقال به درگاه پرداخت...", "success");
+        window.location.href = data.payLink;
       } else {
         showNotification(
           data.error || "خطا در ارتباط با درگاه پرداخت",

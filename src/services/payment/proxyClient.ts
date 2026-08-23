@@ -15,6 +15,44 @@ export interface ProxyResponse {
   ttfbMs?: number;
 }
 
+async function makeFetchRequest(urlStr: string, payloadString: string, secretKey: string | null, timeoutMs: number): Promise<ProxyResponse> {
+  const startTime = Date.now();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  };
+
+  if (secretKey) {
+    headers['X-Proxy-Secret'] = secretKey;
+    headers['X-Proxy-Secret-Key'] = secretKey;
+    headers['X-Api-Key'] = secretKey;
+    headers['Authorization'] = `Bearer ${secretKey}`;
+  }
+
+  const res = await fetch(urlStr, {
+    method: 'POST',
+    headers,
+    body: payloadString,
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  const durationMs = Date.now() - startTime;
+  const text = await res.text();
+  let data: any;
+  try {
+    if (text) data = JSON.parse(text);
+  } catch (e) {}
+
+  return {
+    ok: res.ok,
+    status: res.status,
+    text,
+    data,
+    durationMs,
+  };
+}
+
 function makeNodeRequest(urlStr: string, payloadString: string, secretKey: string | null, timeoutMs: number): Promise<ProxyResponse> {
   const startTime = Date.now();
   let dnsTime: number | null = null;
@@ -119,6 +157,17 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
   });
 }
 
+async function makeUnifiedRequest(urlStr: string, payloadString: string, secretKey: string | null, timeoutMs: number): Promise<ProxyResponse> {
+  try {
+    if (typeof globalThis.fetch === 'function') {
+      return await makeFetchRequest(urlStr, payloadString, secretKey, timeoutMs);
+    }
+  } catch (fetchErr: any) {
+    // Fall back to Node request on fetch failure
+  }
+  return await makeNodeRequest(urlStr, payloadString, secretKey, timeoutMs);
+}
+
 export async function executeProxyRequest(
   payload: any,
   options: {
@@ -145,8 +194,8 @@ export async function executeProxyRequest(
     secretKey = defaultSecretKey;
   }
 
-  // Fast timeout for serverless environments (e.g. 10000ms max)
-  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '10000', 10);
+  // Generous timeout for serverless environments to Iran
+  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '15000', 10);
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const reqId = options.requestId || PaymentLogger.generateRequestId();
 
@@ -177,27 +226,25 @@ export async function executeProxyRequest(
     directZibalUrl = 'https://gateway.zibal.ir/v1/checkout/status';
   }
 
-  // Attempt 1: Connect through Iranian Static IP Proxy (for Zibal IP whitelisting)
+  // Primary: Connect through Iranian Static IP Proxy (for Zibal IP whitelisting)
   let proxyErrToLog: any = null;
-  // Guarantee bankkalaha.ir proxy is always the primary target
   const proxyCandidates = Array.from(new Set([
     'https://bankkalaha.ir/zibal-proxy.php',
     baseProxyUrl,
     defaultProxyUrl,
-    'http://bankkalaha.ir/zibal-proxy.php'
   ])).filter(Boolean);
 
   for (const targetProxyUrl of proxyCandidates) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const activeSecret = targetProxyUrl.includes('bankkalaha.ir') ? defaultSecretKey : secretKey;
-        const proxyRes = await makeNodeRequest(targetProxyUrl, payloadString, activeSecret, Math.min(timeoutMs, 8000));
+        const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, Math.min(timeoutMs, 14000));
         
         // If we got a valid response (JSON from proxy or Zibal)
         if (proxyRes.data && (proxyRes.data.result !== undefined || proxyRes.data.trackId !== undefined || proxyRes.data.success !== undefined)) {
           // If proxy returned success or valid trackId
           if (proxyRes.data.result === 100 || proxyRes.data.trackId || proxyRes.data.success) {
-            await PaymentLogger.logPaymentEvent({
+            PaymentLogger.logPaymentEvent({
               requestId: reqId,
               gateway: options.gateway || 'ZIBAL',
               action: options.action || 'UNKNOWN',
@@ -209,7 +256,7 @@ export async function executeProxyRequest(
               responseBody: proxyRes.text,
               orderId: options.orderId,
               userId: options.userId
-            });
+            }).catch(() => {});
             return proxyRes;
           }
           // If proxy returned a specific gateway business error (e.g. 106 callback mismatch, 102 merchant invalid)
@@ -224,22 +271,33 @@ export async function executeProxyRequest(
     }
   }
 
-  // Attempt 2: Direct Gateway Connection to Zibal (Fallback)
+  // If proxy attempts did not succeed, try direct Zibal as a last resort
   try {
-    const directRes = await makeNodeRequest(directZibalUrl, payloadString, null, 6000);
+    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 8000);
     if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
-      // If direct connection fails with invalid IP, try proxy once more
-      if (directRes.data.message && typeof directRes.data.message === 'string' && directRes.data.message.includes('invalid IP')) {
-        console.warn('[ProxyClient] Direct connection rejected due to IP whitelist. Retrying primary proxy relay...');
+      // If direct connection fails with invalid IP, retry the proxy with longer timeout
+      const isInvalidIp = (directRes.data.message && typeof directRes.data.message === 'string' && directRes.data.message.includes('invalid IP')) || directRes.data.result === 104;
+      
+      if (isInvalidIp) {
+        console.warn('[ProxyClient] Direct connection rejected due to IP whitelist. Retrying primary proxy relay with 15s timeout...');
         try {
-          const retryProxy = await makeNodeRequest('https://bankkalaha.ir/zibal-proxy.php', payloadString, defaultSecretKey, 9000);
+          const retryProxy = await makeUnifiedRequest('https://bankkalaha.ir/zibal-proxy.php', payloadString, defaultSecretKey, 15000);
           if (retryProxy.data && (retryProxy.data.result === 100 || retryProxy.data.trackId)) {
             return retryProxy;
           }
         } catch (e) {}
+
+        // Do NOT expose raw serverless foreign IP to user
+        return {
+          ok: false,
+          status: 503,
+          text: JSON.stringify({ result: 104, message: 'سرور پرداخت به دلیل ترافیک شبکه پاسخ نداد. لطفاً مجدداً تلاش کنید.' }),
+          data: { result: 104, message: 'سرور پرداخت به دلیل ترافیک شبکه پاسخ نداد. لطفاً مجدداً تلاش کنید.' },
+          durationMs: 0
+        };
       }
 
-      await PaymentLogger.logPaymentEvent({
+      PaymentLogger.logPaymentEvent({
         requestId: reqId,
         gateway: options.gateway || 'ZIBAL',
         action: options.action || 'UNKNOWN',
@@ -251,7 +309,7 @@ export async function executeProxyRequest(
         responseBody: directRes.text,
         orderId: options.orderId,
         userId: options.userId
-      });
+      }).catch(() => {});
       return directRes;
     }
 
@@ -259,7 +317,7 @@ export async function executeProxyRequest(
   } catch (directErr: any) {
     console.error(`[ProxyClient Error] Both Proxy and Direct Gateway failed. Proxy error: ${proxyErrToLog?.message}, Direct error: ${directErr.message}`);
     
-    await PaymentLogger.logPaymentEvent({
+    PaymentLogger.logPaymentEvent({
       requestId: reqId,
       gateway: options.gateway || 'ZIBAL',
       action: options.action || 'UNKNOWN',
@@ -269,13 +327,13 @@ export async function executeProxyRequest(
       requestBody: logRequestBody,
       orderId: options.orderId,
       userId: options.userId
-    });
+    }).catch(() => {});
 
     return {
       ok: false,
       status: 502,
-      text: JSON.stringify({ result: -1, message: `خطا در برقراری ارتباط با درگاه پرداخت: ${directErr.message}` }),
-      data: { result: -1, message: `خطا در برقراری ارتباط با درگاه پرداخت: ${directErr.message}` },
+      text: JSON.stringify({ result: -1, message: 'ارتباط با درگاه پرداخت به دلیل ترافیک شبکه برقرار نشد. لطفاً مجدداً دکمه تایید و پرداخت را بزنید.' }),
+      data: { result: -1, message: 'ارتباط با درگاه پرداخت به دلیل ترافیک شبکه برقرار نشد. لطفاً مجدداً دکمه تایید و پرداخت را بزنید.' },
       durationMs: 0
     };
   }

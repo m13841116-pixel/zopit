@@ -146,29 +146,26 @@ export class ZibalService implements PaymentGateway {
       const strOrderId = orderId ? String(orderId) : undefined;
       let userId: number | undefined = undefined;
 
-      if (orderId) {
-        const prisma = getPrisma();
-        const order = await prisma.order.findUnique({ where: { id: Number(orderId) } });
-        if (!order) {
-           throw new Error(`سفارش با شناسه ${orderId} یافت نشد.`);
-        }
-        userId = order.customerId;
-        
-        // Amount check in DB (Rials)
-        const expectedAmount = Math.round(order.totalAmount * 10);
-        if (numAmount !== expectedAmount) {
-           console.warn(`[Zibal] Amount mismatch for Order #${orderId}. Reverting to Database amount.`);
-           numAmount = expectedAmount;
-        }
-
-        // Idempotency: Return existing tracking code if payment was already initialized or completed
-        if ((order.status === 'PENDING' || order.status === 'SUCCESS' || order.status === 'PAID') && order.trackingCode) {
-           const maskedTrackId = PaymentLogger.maskSensitiveData(order.trackingCode);
-           console.log(`[Zibal Idempotency] Order #${orderId} already has payment trackingCode: ${maskedTrackId}`);
-           return {
-             payLink: `https://gateway.zibal.ir/start/${order.trackingCode}`,
-             authority: String(order.trackingCode)
-           };
+      if (orderId && !isNaN(Number(orderId))) {
+        try {
+          const prisma = getPrisma();
+          const order = await prisma.order.findUnique({ where: { id: Number(orderId) } });
+          if (order) {
+            userId = order.customerId;
+            
+            // Amount check in DB (Rials)
+            const expectedAmount = Math.round(order.totalAmount * 10);
+            if (numAmount === expectedAmount && (order.status === 'PENDING' || order.status === 'SUCCESS' || order.status === 'PAID') && order.trackingCode) {
+              const maskedTrackId = PaymentLogger.maskSensitiveData(order.trackingCode);
+              console.log(`[Zibal Idempotency] Order #${orderId} already has payment trackingCode: ${maskedTrackId}`);
+              return {
+                payLink: `https://gateway.zibal.ir/start/${order.trackingCode}`,
+                authority: String(order.trackingCode)
+              };
+            }
+          }
+        } catch (dbErr) {
+          // Non-blocking
         }
       }
 
