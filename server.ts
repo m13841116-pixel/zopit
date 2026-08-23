@@ -4283,28 +4283,35 @@ app.get('/api/store-manager/orders', authenticateToken, requireStoreManager, asy
         {
           OR: [
             { storeInvoiceId: null },
-            { storeInvoice: { status: 'PENDING' } }
+            { invoice: { status: 'PENDING' } }
           ]
         }
       ];
     } else if (status === 'paid') {
       whereClause.OR = [
         { status: { in: ['PAID', 'COMPLETED', 'PREPARING', 'SHIPPED', 'DELIVERED'] } },
-        { storeInvoice: { status: 'PAID' } }
+        { invoice: { status: 'PAID' } }
       ];
     }
 
     const orders = await prisma.order.findMany({
       where: whereClause,
       include: {
-        storeInvoice: true,
+        invoice: true,
         items: { include: { product: { include: { supplier: true } }, variant: true } }
       },
       orderBy: { id: 'desc' }
     });
-    res.json(orders);
-  } catch (err) {
-    res.status(500).json({ error: 'خطا در دریافت سفارشات' });
+
+    const mappedOrders = orders.map((o: any) => ({
+      ...o,
+      storeInvoice: o.invoice
+    }));
+
+    res.json(mappedOrders);
+  } catch (err: any) {
+    console.error('Error fetching store manager orders:', err);
+    res.status(500).json({ error: 'خطا در دریافت سفارشات', details: err?.message || String(err) });
   }
 });
 
@@ -4836,7 +4843,7 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
         status: { notIn: ['PAID', 'COMPLETED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REJECTED'] },
         OR: [
           { storeInvoiceId: null },
-          { storeInvoice: { status: 'PENDING' } }
+          { invoice: { status: 'PENDING' } }
         ]
       }
     });

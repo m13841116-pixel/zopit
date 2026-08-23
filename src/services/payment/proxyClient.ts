@@ -179,33 +179,48 @@ export async function executeProxyRequest(
 
   // Attempt 1: Connect through Iranian Static IP Proxy (for Zibal IP whitelisting)
   let proxyErrToLog: any = null;
-  const proxyCandidates = Array.from(new Set([baseProxyUrl, defaultProxyUrl]));
+  // Guarantee bankkalaha.ir proxy is always the primary target
+  const proxyCandidates = Array.from(new Set([
+    'https://bankkalaha.ir/zibal-proxy.php',
+    baseProxyUrl,
+    defaultProxyUrl,
+    'http://bankkalaha.ir/zibal-proxy.php'
+  ])).filter(Boolean);
 
   for (const targetProxyUrl of proxyCandidates) {
-    try {
-      const activeSecret = targetProxyUrl === defaultProxyUrl ? defaultSecretKey : secretKey;
-      const proxyRes = await makeNodeRequest(targetProxyUrl, payloadString, activeSecret, timeoutMs);
-      
-      // If we got a valid response (JSON from proxy or Zibal)
-      if (proxyRes.data && (proxyRes.data.result !== undefined || proxyRes.data.trackId !== undefined || proxyRes.data.success !== undefined)) {
-        await PaymentLogger.logPaymentEvent({
-          requestId: reqId,
-          gateway: options.gateway || 'ZIBAL',
-          action: options.action || 'UNKNOWN',
-          status: 'SUCCESS',
-          targetUrl: targetProxyUrl,
-          httpStatus: proxyRes.status,
-          durationMs: proxyRes.durationMs,
-          requestBody: logRequestBody,
-          responseBody: proxyRes.text,
-          orderId: options.orderId,
-          userId: options.userId
-        });
-        return proxyRes;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const activeSecret = targetProxyUrl.includes('bankkalaha.ir') ? defaultSecretKey : secretKey;
+        const proxyRes = await makeNodeRequest(targetProxyUrl, payloadString, activeSecret, Math.min(timeoutMs, 8000));
+        
+        // If we got a valid response (JSON from proxy or Zibal)
+        if (proxyRes.data && (proxyRes.data.result !== undefined || proxyRes.data.trackId !== undefined || proxyRes.data.success !== undefined)) {
+          // If proxy returned success or valid trackId
+          if (proxyRes.data.result === 100 || proxyRes.data.trackId || proxyRes.data.success) {
+            await PaymentLogger.logPaymentEvent({
+              requestId: reqId,
+              gateway: options.gateway || 'ZIBAL',
+              action: options.action || 'UNKNOWN',
+              status: 'SUCCESS',
+              targetUrl: targetProxyUrl,
+              httpStatus: proxyRes.status,
+              durationMs: proxyRes.durationMs,
+              requestBody: logRequestBody,
+              responseBody: proxyRes.text,
+              orderId: options.orderId,
+              userId: options.userId
+            });
+            return proxyRes;
+          }
+          // If proxy returned a specific gateway business error (e.g. 106 callback mismatch, 102 merchant invalid)
+          if (proxyRes.data.result && Number(proxyRes.data.result) !== 104) {
+            return proxyRes;
+          }
+        }
+      } catch (proxyErr: any) {
+        proxyErrToLog = proxyErr;
+        console.warn(`[ProxyClient] Attempt ${attempt} failed for ${targetProxyUrl} (${proxyErr.message})`);
       }
-    } catch (proxyErr: any) {
-      proxyErrToLog = proxyErr;
-      console.warn(`[ProxyClient] Iranian proxy attempt failed for ${targetProxyUrl} (${proxyErr.message}), trying next candidate...`);
     }
   }
 
@@ -213,11 +228,22 @@ export async function executeProxyRequest(
   try {
     const directRes = await makeNodeRequest(directZibalUrl, payloadString, null, 6000);
     if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
+      // If direct connection fails with invalid IP, try proxy once more
+      if (directRes.data.message && typeof directRes.data.message === 'string' && directRes.data.message.includes('invalid IP')) {
+        console.warn('[ProxyClient] Direct connection rejected due to IP whitelist. Retrying primary proxy relay...');
+        try {
+          const retryProxy = await makeNodeRequest('https://bankkalaha.ir/zibal-proxy.php', payloadString, defaultSecretKey, 9000);
+          if (retryProxy.data && (retryProxy.data.result === 100 || retryProxy.data.trackId)) {
+            return retryProxy;
+          }
+        } catch (e) {}
+      }
+
       await PaymentLogger.logPaymentEvent({
         requestId: reqId,
         gateway: options.gateway || 'ZIBAL',
         action: options.action || 'UNKNOWN',
-        status: 'SUCCESS_DIRECT',
+        status: directRes.ok ? 'SUCCESS_DIRECT' : 'FAILED',
         targetUrl: directZibalUrl,
         httpStatus: directRes.status,
         durationMs: directRes.durationMs,
