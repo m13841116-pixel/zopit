@@ -5,43 +5,14 @@
  */
 
 export function getCanonicalAppUrl(req?: any): string {
-  const isProduction =
-    process.env.VERCEL === '1' ||
-    process.env.VERCEL === 'true' ||
-    process.env.NODE_ENV === 'production';
+  const rawUrl = process.env.APP_BASE_URL?.trim();
 
-  if (isProduction) {
-    const rawUrl = process.env.APP_BASE_URL?.trim();
-
-    if (!rawUrl) {
-      throw new Error('APP_BASE_URL is required in production');
-    }
-
+  if (rawUrl) {
     let normalizedUrl = rawUrl;
     if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
       normalizedUrl = `https://${normalizedUrl}`;
     }
-
-    const url = new URL(normalizedUrl);
-
-    if (url.protocol !== 'https:') {
-      throw new Error('APP_BASE_URL must use HTTPS in production');
-    }
-
-    if (url.hostname.endsWith('.vercel.app')) {
-      throw new Error('APP_BASE_URL must not be a Vercel domain in production');
-    }
-
-    return url.toString().replace(/\/+$/, '');
-  }
-
-  // Non-production (local development/testing):
-  if (process.env.APP_BASE_URL && process.env.APP_BASE_URL.trim()) {
-    let url = process.env.APP_BASE_URL.trim();
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = `https://${url}`;
-    }
-    return url.replace(/\/+$/, '');
+    return normalizedUrl.replace(/\/+$/, '');
   }
 
   if (req && req.headers) {
@@ -55,7 +26,14 @@ export function getCanonicalAppUrl(req?: any): string {
     }
   }
 
-  // Default fallback for local development
-  return 'http://localhost:3000';
+  if (process.env.VERCEL_URL) {
+    const vUrl = process.env.VERCEL_URL.trim();
+    if (vUrl) {
+      return `https://${vUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`;
+    }
+  }
+
+  // Official production domain fallback
+  return 'https://www.zopit.ir';
 }
 

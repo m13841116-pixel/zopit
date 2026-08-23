@@ -333,8 +333,7 @@ export default function StoreOrders({
           setPaymentSuccessData({ invoiceId: data.invoiceId });
           fetchOrders();
         } else if (data.payLink) {
-          const newTab = window.open(data.payLink, "_blank");
-          if (!newTab) window.location.href = data.payLink;
+          window.location.href = data.payLink;
           setPaymentModalOpen(false);
           setSelectedOrders([]);
         }
@@ -398,10 +397,38 @@ export default function StoreOrders({
     };
     return colorMap[status] || "text-muted bg-background";
   };
-  const payableOrders = orders.filter(
-    (order) =>
-      (order.status === "SUPPLIER_APPROVED" || order.status === "PENDING_PAYMENT") && order.storeInvoiceId === null,
-  );
+  const isOrderPayable = (order: any) => {
+    const paidStatuses = ["PAID", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED", "COMPLETED", "CANCELLED", "REJECTED"];
+    if (paidStatuses.includes(order.status)) return false;
+    return order.storeInvoiceId === null || order.storeInvoice?.status === "PENDING";
+  };
+
+  const payableOrders = orders.filter(isOrderPayable);
+
+  const getOrderSupplierId = (order: any): number | null => {
+    if (order.items && order.items.length > 0) {
+      return order.items[0].product?.supplierId || order.items[0].supplierId || null;
+    }
+    return null;
+  };
+
+  const handleToggleOrderSelection = (order: any) => {
+    const orderId = order.id;
+    if (selectedOrders.includes(orderId)) {
+      setSelectedOrders(selectedOrders.filter((id) => id !== orderId));
+    } else {
+      const targetSupplierId = getOrderSupplierId(order);
+      const firstSelectedOrder = orders.find((o) => selectedOrders.includes(o.id));
+      if (firstSelectedOrder) {
+        const firstSupplierId = getOrderSupplierId(firstSelectedOrder);
+        if (firstSupplierId && targetSupplierId && firstSupplierId !== targetSupplierId) {
+          toast("جهت محاسبه دقیق هزینه ارسال، لطفاً سفارش‌های مربوط به یک تأمین‌کننده را به صورت گروهی برای تسویه انتخاب کنید.", "info");
+          return;
+        }
+      }
+      setSelectedOrders([...selectedOrders, orderId]);
+    }
+  };
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-card p-5 rounded-2xl shadow-sm border border-subtle gap-4">
@@ -506,9 +533,7 @@ export default function StoreOrders({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {orders.map((order) => {
-                    const isPayable =
-                      (order.status === "SUPPLIER_APPROVED" || order.status === "PENDING_PAYMENT") &&
-                      order.storeInvoiceId === null;
+                    const isPayable = isOrderPayable(order);
                     const isSelected = selectedOrders.includes(order.id);
                     return (
                       <tr
@@ -521,20 +546,7 @@ export default function StoreOrders({
                               type="checkbox"
                               className="rounded border-default text-primary-default focus:ring-primary-default w-4 h-4 cursor-pointer"
                               checked={isSelected}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedOrders([
-                                    ...selectedOrders,
-                                    order.id,
-                                  ]);
-                                } else {
-                                  setSelectedOrders(
-                                    selectedOrders.filter(
-                                      (id) => id !== order.id,
-                                    ),
-                                  );
-                                }
-                              }}
+                              onChange={() => handleToggleOrderSelection(order)}
                             />
                           ) : (
                             <span className="text-inverse text-xs">-</span>
@@ -1067,10 +1079,12 @@ export default function StoreOrders({
                   </span>
                   <span className="w-1 h-1 bg-surface rounded-full"></span>
                   <span>
-                    روش تسویه:
-                    {selectedOrderForDetails.storeInvoiceId
-                      ? "فاکتور صادر شده"
-                      : "نیازمند صدور فاکتور"}
+                    وضعیت پرداخت:{" "}
+                    {["PAID", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED", "COMPLETED"].includes(selectedOrderForDetails.status)
+                      ? "پرداخت شده"
+                      : selectedOrderForDetails.storeInvoiceId && selectedOrderForDetails.storeInvoice?.status === "PENDING"
+                      ? "در انتظار واریز / ثبت فیش"
+                      : "پرداخت نشده (نیازمند صدور فاکتور)"}
                   </span>
                 </div>
               </div>
@@ -1503,8 +1517,8 @@ export default function StoreOrders({
               </div>
             )}
 
-            {(selectedOrderForDetails.status === "SUPPLIER_APPROVED" || selectedOrderForDetails.status === "PENDING_PAYMENT") &&
-                selectedOrderForDetails.storeInvoiceId === null && (
+            {!["PAID", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED", "COMPLETED", "CANCELLED", "REJECTED"].includes(selectedOrderForDetails.status) &&
+             (selectedOrderForDetails.storeInvoiceId === null || selectedOrderForDetails.storeInvoice?.status === "PENDING") && (
                   <button
                     onClick={() => {
                       const id = selectedOrderForDetails.id;

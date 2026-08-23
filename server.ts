@@ -4278,14 +4278,26 @@ app.get('/api/store-manager/orders', authenticateToken, requireStoreManager, asy
 
     let whereClause: any = { storeId };
     if (status === 'unpaid') {
-      whereClause.storeInvoiceId = null;
+      whereClause.AND = [
+        { status: { notIn: ['PAID', 'COMPLETED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REJECTED'] } },
+        {
+          OR: [
+            { storeInvoiceId: null },
+            { storeInvoice: { status: 'PENDING' } }
+          ]
+        }
+      ];
     } else if (status === 'paid') {
-      whereClause.storeInvoiceId = { not: null };
+      whereClause.OR = [
+        { status: { in: ['PAID', 'COMPLETED', 'PREPARING', 'SHIPPED', 'DELIVERED'] } },
+        { storeInvoice: { status: 'PAID' } }
+      ];
     }
 
     const orders = await prisma.order.findMany({
       where: whereClause,
       include: {
+        storeInvoice: true,
         items: { include: { product: { include: { supplier: true } }, variant: true } }
       },
       orderBy: { id: 'desc' }
@@ -4821,12 +4833,16 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
       where: {
         id: { in: orderIds },
         storeId,
-        storeInvoiceId: null
+        status: { notIn: ['PAID', 'COMPLETED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REJECTED'] },
+        OR: [
+          { storeInvoiceId: null },
+          { storeInvoice: { status: 'PENDING' } }
+        ]
       }
     });
 
     if (ordersToPay.length !== orderIds.length) {
-      return res.status(400).json({ error: 'برخی از سفارشات نامعتبر یا قبلا پرداخت شده اند' });
+      return res.status(400).json({ error: 'برخی از سفارشات انتخاب شده نامعتبر، لغو شده یا قبلاً به طور کامل پرداخت شده‌اند.' });
     }
 
     const totalAmount = ordersToPay.reduce((acc, o) => acc + o.totalAmount, 0);
@@ -4886,30 +4902,38 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
         return inv;
       });
 
-      
       // Generate real Zibal payLink
-      const paymentGateway = await PaymentServiceFactory.getService();
-      const baseUrl = getCanonicalAppUrl(req);
-      const callbackUrl = `${baseUrl}/api/public/store-invoice/callback?invoiceId=${invoice.id}`;
-      let payLink = '';
       try {
+        const paymentGateway = await PaymentServiceFactory.getService();
+        const baseUrl = getCanonicalAppUrl(req);
+        const callbackUrl = `${baseUrl}/api/public/store-invoice/callback?invoiceId=${invoice.id}`;
+
         const zibalResult = await paymentGateway.createPayment(
           totalAmount * 10,
-          `تسویه فاکتور فروشگاه ${invoice.id}`,
+          `تسویه فاکتور فروشگاه #${invoice.id}`,
           callbackUrl
         );
-        payLink = zibalResult.payLink;
+
         // Store trackId for verification later
         await prisma.storeInvoice.update({
           where: { id: invoice.id },
           data: { trackId: zibalResult.authority }
         });
+
+        return res.json({ payLink: zibalResult.payLink });
       } catch (paymentErr: any) {
         console.error('Error creating Zibal payment for store invoice:', paymentErr);
-        // Throw an error instead of automatically paying the invoice
-        throw new Error(`خطا در ایجاد تراکنش پرداخت: ${paymentErr.message}`);
+        // Clean up created storeInvoice and restore order links so orders remain payable
+        await prisma.order.updateMany({
+          where: { storeInvoiceId: invoice.id },
+          data: { storeInvoiceId: null }
+        }).catch(() => {});
+        await prisma.storeInvoice.delete({
+          where: { id: invoice.id }
+        }).catch(() => {});
+
+        return res.status(500).json({ error: `خطا در ایجاد تراکنش درگاه پرداخت: ${paymentErr.message}` });
       }
-      return res.json({ payLink });
     }
   } catch (err: any) {
     console.error('Settle orders error:', err);

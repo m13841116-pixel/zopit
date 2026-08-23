@@ -138,8 +138,15 @@ export async function executeProxyRequest(
   let baseProxyUrl = (options.proxyUrl || process.env.PAYMENT_PROXY_URL || defaultProxyUrl).trim();
   let secretKey = (options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || defaultSecretKey).trim();
 
-  // Fast timeout for serverless environments (e.g. 7000ms max)
-  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '7000', 10);
+  if (!baseProxyUrl || baseProxyUrl === 'undefined' || baseProxyUrl === 'null' || baseProxyUrl.length < 8) {
+    baseProxyUrl = defaultProxyUrl;
+  }
+  if (!secretKey || secretKey === 'undefined' || secretKey === 'null') {
+    secretKey = defaultSecretKey;
+  }
+
+  // Fast timeout for serverless environments (e.g. 10000ms max)
+  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '10000', 10);
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const reqId = options.requestId || PaymentLogger.generateRequestId();
 
@@ -172,9 +179,12 @@ export async function executeProxyRequest(
 
   // Attempt 1: Connect through Iranian Static IP Proxy (for Zibal IP whitelisting)
   let proxyErrToLog: any = null;
-  if (baseProxyUrl) {
+  const proxyCandidates = Array.from(new Set([baseProxyUrl, defaultProxyUrl]));
+
+  for (const targetProxyUrl of proxyCandidates) {
     try {
-      const proxyRes = await makeNodeRequest(baseProxyUrl, payloadString, secretKey, timeoutMs);
+      const activeSecret = targetProxyUrl === defaultProxyUrl ? defaultSecretKey : secretKey;
+      const proxyRes = await makeNodeRequest(targetProxyUrl, payloadString, activeSecret, timeoutMs);
       
       // If we got a valid response (JSON from proxy or Zibal)
       if (proxyRes.data && (proxyRes.data.result !== undefined || proxyRes.data.trackId !== undefined || proxyRes.data.success !== undefined)) {
@@ -183,7 +193,7 @@ export async function executeProxyRequest(
           gateway: options.gateway || 'ZIBAL',
           action: options.action || 'UNKNOWN',
           status: 'SUCCESS',
-          targetUrl: proxyUrlToLog,
+          targetUrl: targetProxyUrl,
           httpStatus: proxyRes.status,
           durationMs: proxyRes.durationMs,
           requestBody: logRequestBody,
@@ -195,7 +205,7 @@ export async function executeProxyRequest(
       }
     } catch (proxyErr: any) {
       proxyErrToLog = proxyErr;
-      console.warn(`[ProxyClient] Iranian proxy attempt failed (${proxyErr.message}), falling back to direct gateway...`);
+      console.warn(`[ProxyClient] Iranian proxy attempt failed for ${targetProxyUrl} (${proxyErr.message}), trying next candidate...`);
     }
   }
 
