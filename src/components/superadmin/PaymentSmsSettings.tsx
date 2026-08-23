@@ -104,15 +104,20 @@ export default function PaymentSmsSettings() {
         },
         body: JSON.stringify({ merchantCode: liveMerchant, gatewayType, gatewayKey }),
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        data = { message: "پاسخ نامعتبر از سرور دریافت شد." };
+      }
       setGatewayTestResult(data);
-      if (data.active) {
+      if (data.active || data.success) {
         toast(data.message || "درگاه پرداخت کاملاً فعال و معتبر است.", "success");
       } else {
-        toast(`هشدار درگاه: ${data.message}`, "error");
+        toast(data.message || data.error || "خطا در بررسی درگاه پرداخت", "error");
       }
-    } catch {
-      toast("خطا در برقراری ارتباط با سرور", "error");
+    } catch (err: any) {
+      toast(err?.message || "خطا در برقراری ارتباط با سرور", "error");
     } finally {
       setTestingGateway(false);
     }
@@ -136,7 +141,12 @@ export default function PaymentSmsSettings() {
         },
         body: JSON.stringify({ merchantCode: liveMerchant, gatewayType }),
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        data = { error: "پاسخ نامعتبر از سرور دریافت شد." };
+      }
       setTestInvoiceResult(data);
       if (data.success && data.payLink) {
         toast("فاکتور با موفقیت ایجاد شد؛ در حال هدایت به درگاه پرداخت شاپرک...", "success");
@@ -145,10 +155,10 @@ export default function PaymentSmsSettings() {
           toast("پاپ‌آپ توسط مرورگر مسدود شد؛ لطفاً از دکمه سبز رنگ پایین صفحه وارد درگاه شوید.", "info");
         }
       } else {
-        toast(data.error || "خطا در ایجاد فاکتور تست زیبال", "error");
+        toast(data.error || data.message || "خطا در ایجاد فاکتور تست زیبال", "error");
       }
-    } catch {
-      toast("خطا در برقراری ارتباط با سرور", "error");
+    } catch (err: any) {
+      toast(err?.message || "خطا در برقراری ارتباط با سرور", "error");
     } finally {
       setCreatingTestInvoice(false);
     }

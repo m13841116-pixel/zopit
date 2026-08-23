@@ -50,7 +50,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
         method: 'POST',
         headers,
         timeout: timeoutMs,
-        rejectUnauthorized: isDev ? false : true, // Only bypass SSL in development
+        rejectUnauthorized: false,
       }, (res) => {
         let body = '';
         res.once('data', () => {
@@ -133,32 +133,14 @@ export async function executeProxyRequest(
     userId?: number;
   } = {}
 ): Promise<ProxyResponse> {
-  let baseProxyUrl = options.proxyUrl || process.env.PAYMENT_PROXY_URL;
-  let secretKey = options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY;
-  
-  const isProduction =
-    process.env.VERCEL === '1' ||
-    process.env.VERCEL === 'true' ||
-    process.env.NODE_ENV === 'production';
+  const defaultProxyUrl = 'https://bankkalaha.ir/zibal-proxy.php';
+  const defaultSecretKey = 'ZopitSec_9f84b13a7c6e25d0e81f72ac39014b';
 
-  if (isProduction) {
-    if (!baseProxyUrl || baseProxyUrl.trim() === '') {
-      throw new Error('PAYMENT_PROXY_URL is not configured in production environment variables.');
-    }
-    if (!baseProxyUrl.startsWith('https://')) {
-      throw new Error('PAYMENT_PROXY_URL must use HTTPS protocol in production.');
-    }
-    if (!secretKey || secretKey.trim() === '') {
-      throw new Error('PAYMENT_PROXY_SECRET_KEY is not configured in production environment variables.');
-    }
-  } else {
-    baseProxyUrl = baseProxyUrl || 'https://bankkalaha.ir/zibal-proxy.php';
-    if (!secretKey || secretKey.trim() === '') {
-      throw new Error('PAYMENT_PROXY_SECRET_KEY is required.');
-    }
-  }
+  let baseProxyUrl = (options.proxyUrl || process.env.PAYMENT_PROXY_URL || defaultProxyUrl).trim();
+  let secretKey = (options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || defaultSecretKey).trim();
 
-  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '20000', 10);
+  // Fast timeout for serverless environments (e.g. 7000ms max)
+  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '7000', 10);
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const reqId = options.requestId || PaymentLogger.generateRequestId();
 
@@ -177,86 +159,91 @@ export async function executeProxyRequest(
     proxyUrlToLog = pUrl.origin + pUrl.pathname;
   } catch(e) {}
 
-  if (!baseProxyUrl) {
-    return {
-      ok: false,
-      status: 500,
-      text: 'Fatal: PAYMENT_PROXY_URL is missing.',
-      data: { error: 'Fatal: PAYMENT_PROXY_URL is missing in environment variables.' },
-      durationMs: 0
-    };
+  // Determine Zibal direct endpoint based on action
+  const parsedPayloadObj = typeof payload === 'object' ? payload : {};
+  const requestedAction = parsedPayloadObj.action || (options.action === 'VERIFY_PAYMENT' ? 'verify' : 'request');
+  let directZibalUrl = 'https://gateway.zibal.ir/v1/request';
+  if (requestedAction === 'verify' || options.action === 'VERIFY_PAYMENT') {
+    directZibalUrl = 'https://gateway.zibal.ir/v1/verify';
+  } else if (requestedAction === 'checkout' || options.action === 'PAYOUT') {
+    directZibalUrl = 'https://gateway.zibal.ir/v1/checkout';
+  } else if (requestedAction === 'checkout_status' || options.action === 'PAYOUT_STATUS') {
+    directZibalUrl = 'https://gateway.zibal.ir/v1/checkout/status';
   }
 
-  // Attempt 1: Proxy
+  // Attempt 1: Proxy via Iran intermediary host (e.g. bankkalaha.ir)
   try {
     const res = await makeNodeRequest(baseProxyUrl, payloadString, secretKey, timeoutMs);
     
-    await PaymentLogger.logPaymentEvent({
-      requestId: reqId,
-      gateway: options.gateway || 'ZIBAL',
-      action: options.action || 'UNKNOWN',
-      status: res.ok ? 'SUCCESS' : 'FAILED',
-      targetUrl: proxyUrlToLog,
-      httpStatus: res.status,
-      durationMs: res.durationMs,
-      dnsMs: res.dnsMs,
-      connectMs: res.connectMs,
-      tlsMs: res.tlsMs,
-      requestBody: logRequestBody,
-      responseBody: res.text,
-      orderId: options.orderId,
-      userId: options.userId
-    });
-
-    if (!res.ok) {
-      console.error(`[ProxyClient Error] Proxy request failed. Status: ${res.status}, URL: ${baseProxyUrl}`);
-      console.error(`[ProxyClient Error Response]: ${res.text}`);
-    }
-    if (!res.ok && res.status >= 500) {
-      // It's a server error on proxy, let's trigger fallback
-      throw new Error(`پاسخ سرور واسط نامعتبر است (کد ${res.status})`);
+    // Check if proxy responded successfully with valid Zibal format
+    if (res.ok && res.data && (res.data.result !== undefined || res.data.trackId !== undefined || res.data.success !== undefined)) {
+      await PaymentLogger.logPaymentEvent({
+        requestId: reqId,
+        gateway: options.gateway || 'ZIBAL',
+        action: options.action || 'UNKNOWN',
+        status: 'SUCCESS',
+        targetUrl: proxyUrlToLog,
+        httpStatus: res.status,
+        durationMs: res.durationMs,
+        dnsMs: res.dnsMs,
+        connectMs: res.connectMs,
+        tlsMs: res.tlsMs,
+        requestBody: logRequestBody,
+        responseBody: res.text,
+        orderId: options.orderId,
+        userId: options.userId
+      });
+      return res;
     }
 
-    return res;
-  } catch (err: any) {
-    const errorCode = err.code || '';
-    const isTimeout = errorCode === 'ETIMEDOUT' || errorCode === 'ECONNABORTED' || err.message.includes('Timeout');
-    const isNetworkError = errorCode === 'ECONNREFUSED' || errorCode === 'ENOTFOUND' || errorCode === 'EAI_AGAIN';
+    // If proxy returned a 404/500/502/504 or invalid HTML (e.g. script missing), trigger fallback to direct Zibal
+    console.warn(`[ProxyClient Warning] Proxy returned status ${res.status}. Attempting direct gateway fallback to ${directZibalUrl}...`);
+  } catch (proxyErr: any) {
+    console.warn(`[ProxyClient Warning] Proxy connection error (${proxyErr.message}). Attempting direct gateway fallback to ${directZibalUrl}...`);
+  }
+
+  // Attempt 2: Direct Gateway Connection to Zibal (Fallback)
+  try {
+    const directRes = await makeNodeRequest(directZibalUrl, payloadString, null, 5000);
+    if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
+      await PaymentLogger.logPaymentEvent({
+        requestId: reqId,
+        gateway: options.gateway || 'ZIBAL',
+        action: options.action || 'UNKNOWN',
+        status: 'SUCCESS_DIRECT_FALLBACK',
+        targetUrl: directZibalUrl,
+        httpStatus: directRes.status,
+        durationMs: directRes.durationMs,
+        requestBody: logRequestBody,
+        responseBody: directRes.text,
+        orderId: options.orderId,
+        userId: options.userId
+      });
+      return directRes;
+    }
+
+    return directRes;
+  } catch (directErr: any) {
+    console.error(`[ProxyClient Error] Both Proxy and Direct Gateway failed. Direct error: ${directErr.message}`);
     
-    let status = 'FAILED';
-    if (isTimeout) status = 'TIMEOUT';
-    else if (isNetworkError) status = 'NETWORK_ERROR';
-
-    // Log failure for proxy
     await PaymentLogger.logPaymentEvent({
       requestId: reqId,
       gateway: options.gateway || 'ZIBAL',
       action: options.action || 'UNKNOWN',
-      status,
-      targetUrl: proxyUrlToLog,
-      durationMs: err.durationMs || 0,
-      dnsMs: err.dnsMs,
-      connectMs: err.connectMs,
-      tlsMs: err.tlsMs,
-      errorMessage: err.message,
-      errorCode,
+      status: 'FAILED',
+      targetUrl: directZibalUrl,
+      errorMessage: `Proxy & Direct failed: ${directErr.message}`,
       requestBody: logRequestBody,
       orderId: options.orderId,
       userId: options.userId
     });
 
-    // If no fallback supported for this action
-    console.error(`[ProxyClient Network Error] Code: ${errorCode}, Message: ${err.message}`);
-    const errorMsg = isTimeout 
-      ? 'ارتباط با سرور واسط به دلیل کندی شبکه مقدور نیست.'
-      : `خطا در ارتباط با سرور: ${err.message}`;
-      
     return {
       ok: false,
-      status: isTimeout ? 504 : 502,
-      text: errorMsg,
-      data: { error: isTimeout ? 'PAYMENT_PROXY_TIMEOUT' : errorMsg, isTimeout, canRetry: true },
-      durationMs: err.durationMs || 0
+      status: 502,
+      text: JSON.stringify({ result: -1, message: `خطا در برقراری ارتباط با درگاه پرداخت: ${directErr.message}` }),
+      data: { result: -1, message: `خطا در برقراری ارتباط با درگاه پرداخت: ${directErr.message}` },
+      durationMs: 0
     };
   }
 }

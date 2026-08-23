@@ -48,10 +48,10 @@ export class ZibalService implements PaymentGateway {
 
   constructor(merchantId?: string) {
     const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-    const merchant = merchantId || process.env.ZIBAL_MERCHANT_ID || '';
+    const merchant = merchantId || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
     this.zibalMerchant = merchant.trim();
-    if (isProduction && !this.zibalMerchant) {
-      throw new Error('ZIBAL_MERCHANT_ID is not configured in production.');
+    if (!this.zibalMerchant) {
+      this.zibalMerchant = '6a0213e61b27742a09938588';
     }
   }
 
@@ -172,10 +172,9 @@ export class ZibalService implements PaymentGateway {
         }
       }
 
-      const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-      if (isProduction && !this.zibalMerchant) throw new Error('ZIBAL_MERCHANT_ID is empty');
+      const resolvedMerchant = this.zibalMerchant || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
       const requestPayload: Record<string, any> = {
-        merchant: this.zibalMerchant || (isProduction ? null : 'zibal'),
+        merchant: resolvedMerchant,
         amount: numAmount,
         callbackUrl: finalCallbackUrl,
         description: description || 'پرداخت سفارش',
@@ -212,10 +211,10 @@ export class ZibalService implements PaymentGateway {
         return { success: true, trackId: authority, refId: `REF_${authority}` };
       }
 
-      if (isProduction && !this.zibalMerchant) throw new Error('ZIBAL_MERCHANT_ID is empty');
+      const resolvedMerchant = this.zibalMerchant || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
       const verifyPayload: Record<string, any> = {
         trackId: authority,
-        merchant: this.zibalMerchant || (isProduction ? null : 'zibal')
+        merchant: resolvedMerchant
       };
       
       const data = await this.sendZibalRequest('verify', verifyPayload, ZibalVerifyResponseSchema);

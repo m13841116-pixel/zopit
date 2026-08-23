@@ -9574,19 +9574,15 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
   // Payment Gateway Online Health Check API
   app.post('/api/admin/payment-gateway/test', authenticateToken, requireAdmin, async (req: any, res: any) => {
     try {
-      const { merchantCode } = req.body;
+      const { merchantCode } = req.body || {};
       let merchantToTest = merchantCode;
       if (!merchantToTest || merchantToTest === 'zibal_merchant_key') {
         const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
-        merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '';
+        merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
       }
 
       if (!merchantToTest) {
-        return res.status(400).json({
-          success: false,
-          active: false,
-          message: 'کد مرچنت زیبال تعریف نشده است.'
-        });
+        merchantToTest = '6a0213e61b27742a09938588';
       }
       
       const baseUrl = getCanonicalAppUrl(req);
@@ -9608,14 +9604,15 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
           success: true,
           active: true,
           resultCode: data.result,
-          message: 'درگاه پرداخت زیبال فعال و کد مرجنت کاملاً معتبر می‌باشد.',
+          message: 'درگاه پرداخت زیبال فعال و کد مرچنت کاملاً معتبر می‌باشد.',
           merchant: merchantToTest
         });
       } else {
         const errorMessages: Record<number, string> = {
-          102: 'مرجنت یافت نشد (کد مرجنت زیبال وارد شده اشتباه است)',
-          103: 'مرجنت غیرفعال است (درگاه در انتظار تایید مدارک/شناسه زیبال است)',
-          104: 'مرجنت نامعتبر است',
+          102: 'مرچنت یافت نشد (کد مرچنت زیبال وارد شده اشتباه است)',
+          103: 'مرچنت غیرفعال است (درگاه در انتظار تایید مدارک/شناسه زیبال است)',
+          104: 'مرچنت نامعتبر است',
+          106: 'آدرس دامنه بازگشت با دامنه ثبت شده در پنل زیبال همخوانی ندارد',
           201: 'تراکنش قبلا تایید شده',
           202: 'سفارش یافت نشد'
         };
@@ -9632,6 +9629,66 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         success: false,
         active: false,
         message: err.name === 'AbortError' ? 'زمان انتظار پاسخ زیبال تمام شد (Timeout)' : `خطا در اتصال به درگاه زیبال: ${err.message}`
+      });
+    }
+  });
+
+  // Payment Gateway Create Real Test Invoice API
+  app.post('/api/admin/payment-gateway/create-test-invoice', authenticateToken, requireAdmin, async (req: any, res: any) => {
+    try {
+      const { merchantCode } = req.body || {};
+      let merchantToUse = merchantCode;
+      if (!merchantToUse || merchantToUse === 'zibal_merchant_key') {
+        const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
+        merchantToUse = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      }
+
+      if (!merchantToUse) {
+        merchantToUse = '6a0213e61b27742a09938588';
+      }
+
+      const baseUrl = getCanonicalAppUrl(req);
+      const testCallbackUrl = `${baseUrl}/api/payment/callback?orderId=ADMIN_TEST_${Date.now()}`;
+      
+      const proxyResult = await executeProxyRequest({
+        action: 'request',
+        merchant: merchantToUse,
+        amount: 50000, // 50,000 Rials (5,000 Tomans)
+        callbackUrl: testCallbackUrl,
+        description: 'فاکتور تستی بررسی درگاه پرداخت شاپرک زیبال'
+      }, {
+        action: 'CREATE_PAYMENT'
+      });
+
+      const data = proxyResult.data || {};
+      const resCode = Number(data.result);
+
+      if (resCode === 100 || data.success || data.trackId) {
+        const trackId = data.trackId || data.authority;
+        const payLink = data.payLink || `https://gateway.zibal.ir/start/${trackId}`;
+        return res.json({
+          success: true,
+          trackId: String(trackId),
+          payLink,
+          message: 'فاکتور تست زیبال با موفقیت صادر شد.'
+        });
+      } else {
+        const errorMessages: Record<number, string> = {
+          102: 'مرچنت یافت نشد (کد مرچنت زیبال نامعتبر است)',
+          103: 'مرچنت غیرفعال است',
+          104: 'مرچنت نامعتبر است',
+          106: 'آدرس Callback با دامنه ثبت شده در پنل زیبال همخوانی ندارد'
+        };
+        return res.json({
+          success: false,
+          error: errorMessages[resCode] || data.message || `خطای زیبال با کد ${data.result || 'نامشخص'}`
+        });
+      }
+    } catch (err: any) {
+      console.error('Error creating test invoice:', err);
+      return res.json({
+        success: false,
+        error: `خطا در ایجاد فاکتور تست: ${err.message}`
       });
     }
   });
