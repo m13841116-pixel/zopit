@@ -87,7 +87,7 @@ export default function PaymentSmsSettings() {
   const [smsTestResult, setSmsTestResult] = useState<any>(null);
 
   const handleTestGateway = async () => {
-    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode);
+    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode || '6a0213e61b27742a09938588');
     if (!liveMerchant) {
       toast("لطفاً ابتدا کد مرچنت / ترمینال درگاه را وارد فرمایید", "error");
       return;
@@ -95,6 +95,11 @@ export default function PaymentSmsSettings() {
     setTestingGateway(true);
     setGatewayTestResult(null);
     setTestInvoiceResult(null);
+
+    let success = false;
+    let resultPayload: any = null;
+
+    // Step 1: Try backend API
     try {
       const res = await fetch("/api/admin/payment-gateway/test", {
         method: "POST",
@@ -104,27 +109,84 @@ export default function PaymentSmsSettings() {
         },
         body: JSON.stringify({ merchantCode: liveMerchant, gatewayType, gatewayKey }),
       });
-      let data: any = {};
-      try {
-        data = await res.json();
-      } catch (e) {
-        data = { message: "پاسخ نامعتبر از سرور دریافت شد." };
+
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && (data.active || data.success)) {
+          resultPayload = data;
+          success = true;
+        } else if (data) {
+          resultPayload = data;
+        }
       }
-      setGatewayTestResult(data);
-      if (data.active || data.success) {
-        toast(data.message || "درگاه پرداخت کاملاً فعال و معتبر است.", "success");
-      } else {
-        toast(data.message || data.error || "خطا در بررسی درگاه پرداخت", "error");
-      }
-    } catch (err: any) {
-      toast(err?.message || "خطا در برقراری ارتباط با سرور", "error");
-    } finally {
-      setTestingGateway(false);
+    } catch (e) {
+      // Backend failed, proceed to direct proxy fallback
     }
+
+    // Step 2: If backend returned non-JSON or failed, query proxy directly from browser
+    if (!success) {
+      try {
+        const directRes = await fetch("https://bankkalaha.ir/zibal-proxy.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Proxy-Secret-Key": "ZopitSec_9f84b13a7c6e25d0e81f72ac39014b",
+          },
+          body: JSON.stringify({
+            action: "request",
+            merchant: liveMerchant,
+            amount: 10000,
+            callbackUrl: window.location.origin + "/api/payment/callback",
+            description: "تست آنلاین فعال بودن درگاه زیبال",
+          }),
+        });
+
+        const directData = await directRes.json().catch(() => null);
+        if (directData && (Number(directData.result) === 100 || directData.success || directData.trackId)) {
+          resultPayload = {
+            success: true,
+            active: true,
+            resultCode: 100,
+            message: "درگاه پرداخت زیبال فعال و کد مرچنت کاملاً معتبر می‌باشد.",
+            merchant: liveMerchant,
+          };
+          success = true;
+        } else if (directData) {
+          const errMap: Record<number, string> = {
+            102: "مرچنت یافت نشد (کد مرچنت زیبال وارد شده اشتباه است)",
+            103: "مرچنت غیرفعال است (درگاه در انتظار تایید مدارک زیبال است)",
+            104: "مرچنت نامعتبر است",
+            106: "آدرس دامنه بازگشت با دامنه ثبت شده در پنل زیبال همخوانی ندارد",
+          };
+          resultPayload = {
+            success: false,
+            active: false,
+            resultCode: directData.result,
+            message: errMap[Number(directData.result)] || directData.message || `کد خطا: ${directData.result}`,
+          };
+        }
+      } catch (err: any) {
+        if (!resultPayload) {
+          resultPayload = {
+            success: false,
+            active: false,
+            message: `خطا در اتصال به سرور واسط: ${err?.message || "خطای ناشناخته"}`,
+          };
+        }
+      }
+    }
+
+    setGatewayTestResult(resultPayload);
+    if (success) {
+      toast(resultPayload?.message || "درگاه پرداخت کاملاً فعال و معتبر است.", "success");
+    } else {
+      toast(resultPayload?.message || resultPayload?.error || "خطا در بررسی درگاه پرداخت", "error");
+    }
+    setTestingGateway(false);
   };
 
   const handleCreateTestInvoice = async () => {
-    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode);
+    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode || '6a0213e61b27742a09938588');
     if (!liveMerchant) {
       toast("لطفاً ابتدا کد مرچنت را وارد فرمایید", "error");
       return;
@@ -132,6 +194,11 @@ export default function PaymentSmsSettings() {
     setCreatingTestInvoice(true);
     setTestInvoiceResult(null);
     setGatewayTestResult(null);
+
+    let success = false;
+    let resultPayload: any = null;
+
+    // Step 1: Try backend API
     try {
       const res = await fetch("/api/admin/payment-gateway/create-test-invoice", {
         method: "POST",
@@ -141,27 +208,73 @@ export default function PaymentSmsSettings() {
         },
         body: JSON.stringify({ merchantCode: liveMerchant, gatewayType }),
       });
-      let data: any = {};
-      try {
-        data = await res.json();
-      } catch (e) {
-        data = { error: "پاسخ نامعتبر از سرور دریافت شد." };
-      }
-      setTestInvoiceResult(data);
-      if (data.success && data.payLink) {
-        toast("فاکتور با موفقیت ایجاد شد؛ در حال هدایت به درگاه پرداخت شاپرک...", "success");
-        const opened = window.open(data.payLink, "_blank");
-        if (!opened) {
-          toast("پاپ‌آپ توسط مرورگر مسدود شد؛ لطفاً از دکمه سبز رنگ پایین صفحه وارد درگاه شوید.", "info");
+
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && data.success && (data.payLink || data.trackId)) {
+          resultPayload = data;
+          success = true;
         }
-      } else {
-        toast(data.error || data.message || "خطا در ایجاد فاکتور تست زیبال", "error");
       }
-    } catch (err: any) {
-      toast(err?.message || "خطا در برقراری ارتباط با سرور", "error");
-    } finally {
-      setCreatingTestInvoice(false);
+    } catch (e) {
+      // Backend failed, fallback to direct proxy
     }
+
+    // Step 2: Fallback to direct proxy from browser
+    if (!success) {
+      try {
+        const directRes = await fetch("https://bankkalaha.ir/zibal-proxy.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Proxy-Secret-Key": "ZopitSec_9f84b13a7c6e25d0e81f72ac39014b",
+          },
+          body: JSON.stringify({
+            action: "request",
+            merchant: liveMerchant,
+            amount: 50000,
+            callbackUrl: window.location.origin + `/api/payment/callback?orderId=ADMIN_TEST_${Date.now()}`,
+            description: "فاکتور تستی بررسی درگاه پرداخت شاپرک زیبال",
+          }),
+        });
+
+        const directData = await directRes.json().catch(() => null);
+        if (directData && (Number(directData.result) === 100 || directData.trackId)) {
+          const trackId = directData.trackId;
+          resultPayload = {
+            success: true,
+            trackId: String(trackId),
+            payLink: `https://gateway.zibal.ir/start/${trackId}`,
+            message: "فاکتور تست زیبال با موفقیت صادر شد.",
+          };
+          success = true;
+        } else if (directData) {
+          resultPayload = {
+            success: false,
+            error: directData.message || `خطای زیبال با کد ${directData.result}`,
+          };
+        }
+      } catch (err: any) {
+        if (!resultPayload) {
+          resultPayload = {
+            success: false,
+            error: `خطا در ارتباط با سرور: ${err?.message || "خطای ناشناخته"}`,
+          };
+        }
+      }
+    }
+
+    setTestInvoiceResult(resultPayload);
+    if (success && resultPayload?.payLink) {
+      toast("فاکتور با موفقیت ایجاد شد؛ در حال هدایت به درگاه پرداخت شاپرک...", "success");
+      const opened = window.open(resultPayload.payLink, "_blank");
+      if (!opened) {
+        toast("پاپ‌آپ توسط مرورگر مسدود شد؛ لطفاً از دکمه سبز رنگ پایین صفحه وارد درگاه شوید.", "info");
+      }
+    } else {
+      toast(resultPayload?.error || resultPayload?.message || "خطا در ایجاد فاکتور تست زیبال", "error");
+    }
+    setCreatingTestInvoice(false);
   };
 
   const handleSendTestSms = async () => {

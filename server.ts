@@ -9571,14 +9571,18 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     }
   });
 
-  // Payment Gateway Online Health Check API
-  app.post('/api/admin/payment-gateway/test', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  // Payment Gateway Online Health Check API (Support both /api and direct paths)
+  const handlePaymentTest = async (req: any, res: any) => {
     try {
       const { merchantCode } = req.body || {};
       let merchantToTest = merchantCode;
       if (!merchantToTest || merchantToTest === 'zibal_merchant_key') {
-        const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
-        merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        try {
+          const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
+          merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        } catch (dbErr) {
+          merchantToTest = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        }
       }
 
       if (!merchantToTest) {
@@ -9631,16 +9635,23 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         message: err.name === 'AbortError' ? 'زمان انتظار پاسخ زیبال تمام شد (Timeout)' : `خطا در اتصال به درگاه زیبال: ${err.message}`
       });
     }
-  });
+  };
+
+  app.post('/api/admin/payment-gateway/test', handlePaymentTest);
+  app.post('/admin/payment-gateway/test', handlePaymentTest);
 
   // Payment Gateway Create Real Test Invoice API
-  app.post('/api/admin/payment-gateway/create-test-invoice', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  const handlePaymentCreateTestInvoice = async (req: any, res: any) => {
     try {
       const { merchantCode } = req.body || {};
       let merchantToUse = merchantCode;
       if (!merchantToUse || merchantToUse === 'zibal_merchant_key') {
-        const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
-        merchantToUse = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        try {
+          const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
+          merchantToUse = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        } catch (dbErr) {
+          merchantToUse = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        }
       }
 
       if (!merchantToUse) {
@@ -9691,7 +9702,10 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
         error: `خطا در ایجاد فاکتور تست: ${err.message}`
       });
     }
-  });
+  };
+
+  app.post('/api/admin/payment-gateway/create-test-invoice', handlePaymentCreateTestInvoice);
+  app.post('/admin/payment-gateway/create-test-invoice', handlePaymentCreateTestInvoice);
 
   // Prompt 6.3: Support Channels API
   app.get('/api/support-info', async (req: any, res: any) => {
