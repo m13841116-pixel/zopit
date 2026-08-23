@@ -4939,7 +4939,12 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
           where: { id: invoice.id }
         }).catch(() => {});
 
-        return res.status(500).json({ error: `خطا در ایجاد تراکنش درگاه پرداخت: ${paymentErr.message}` });
+        return res.status(500).json({
+          error: `خطا در ایجاد تراکنش درگاه پرداخت: ${paymentErr.message}`,
+          invoiceId: invoice.id,
+          totalAmount: invoice.totalAmount,
+          merchantCode: process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588'
+        });
       }
     }
   } catch (err: any) {

@@ -336,8 +336,47 @@ export default function StoreOrders({
           window.location.href = data.payLink;
           setPaymentModalOpen(false);
           setSelectedOrders([]);
+          return;
         }
       } else {
+        // Fallback for online payment: If serverless timeout occurs on backend, attempt direct bankkalaha proxy connection from client
+        if (paymentMethod === 'ONLINE' && data?.invoiceId) {
+          try {
+            const invoiceId = data.invoiceId;
+            const totalAmountRials = Math.round((data.totalAmount || 0) * 10);
+            const merchantCode = data.merchantCode || "6a0213e61b27742a09938588";
+            const callbackUrl = `${window.location.origin}/api/public/store-invoice/callback?invoiceId=${invoiceId}`;
+
+            const directRes = await fetch("https://bankkalaha.ir/zibal-proxy.php", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Proxy-Secret-Key": "ZopitSec_9f84b13a7c6e25d0e81f72ac39014b",
+              },
+              body: JSON.stringify({
+                action: "request",
+                merchant: merchantCode,
+                amount: totalAmountRials,
+                callbackUrl: callbackUrl,
+                description: `تسویه فاکتور فروشگاه #${invoiceId}`,
+                orderId: String(invoiceId),
+              }),
+            });
+
+            const directData = await directRes.json().catch(() => null);
+            if (directData && (Number(directData.result) === 100 || directData.trackId)) {
+              const trackId = directData.trackId;
+              const payLink = `https://gateway.zibal.ir/start/${trackId}`;
+              window.location.href = payLink;
+              setPaymentModalOpen(false);
+              setSelectedOrders([]);
+              return;
+            }
+          } catch (directErr) {
+            console.error("Direct payment proxy attempt failed:", directErr);
+          }
+        }
+
         setPaymentError(data.error || "خطا در ارتباط با درگاه پرداخت");
       }
     } catch (err) {

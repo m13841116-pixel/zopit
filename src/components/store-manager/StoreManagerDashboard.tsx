@@ -372,7 +372,45 @@ export default function StoreManagerDashboard({
         setSelectedOrders([]);
         showNotification("در حال انتقال به درگاه پرداخت...", "success");
         window.location.href = data.payLink;
+        return;
       } else {
+        if (data?.invoiceId) {
+          try {
+            const invoiceId = data.invoiceId;
+            const totalAmountRials = Math.round((data.totalAmount || 0) * 10);
+            const merchantCode = data.merchantCode || "6a0213e61b27742a09938588";
+            const callbackUrl = `${window.location.origin}/api/public/store-invoice/callback?invoiceId=${invoiceId}`;
+
+            const directRes = await fetch("https://bankkalaha.ir/zibal-proxy.php", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Proxy-Secret-Key": "ZopitSec_9f84b13a7c6e25d0e81f72ac39014b",
+              },
+              body: JSON.stringify({
+                action: "request",
+                merchant: merchantCode,
+                amount: totalAmountRials,
+                callbackUrl: callbackUrl,
+                description: `تسویه فاکتور فروشگاه #${invoiceId}`,
+                orderId: String(invoiceId),
+              }),
+            });
+
+            const directData = await directRes.json().catch(() => null);
+            if (directData && (Number(directData.result) === 100 || directData.trackId)) {
+              const trackId = directData.trackId;
+              const payLink = `https://gateway.zibal.ir/start/${trackId}`;
+              setSelectedOrders([]);
+              showNotification("در حال انتقال به درگاه پرداخت...", "success");
+              window.location.href = payLink;
+              return;
+            }
+          } catch (directErr) {
+            console.error("Direct payment proxy attempt failed:", directErr);
+          }
+        }
+
         showNotification(
           data.error || "خطا در ارتباط با درگاه پرداخت",
           "error",
