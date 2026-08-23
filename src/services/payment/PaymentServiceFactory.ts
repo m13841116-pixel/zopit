@@ -26,7 +26,7 @@ export class PaymentServiceFactory {
         prisma.systemConfig.findUnique({ where: { key: 'payment_gateway_settings' } }),
         prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE' } })
       ]);
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000));
       
       const res: any = await Promise.race([dbPromise, timeoutPromise]);
 

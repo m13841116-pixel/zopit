@@ -1,7 +1,14 @@
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
+import dns from 'dns';
 import { PaymentLogger } from './PaymentLogger.js';
+
+try {
+  if (dns && typeof dns.setDefaultResultOrder === 'function') {
+    dns.setDefaultResultOrder('ipv4first');
+  }
+} catch (e) {}
 
 export interface ProxyResponse {
   ok: boolean;
@@ -238,7 +245,9 @@ export async function executeProxyRequest(
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const activeSecret = targetProxyUrl.includes('bankkalaha.ir') ? defaultSecretKey : secretKey;
-        const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, Math.min(timeoutMs, 14000));
+        // Keep timeout strictly under Vercel function timeout (3.5s for 1st attempt, 2s for 2nd attempt)
+        const currentAttemptTimeout = attempt === 1 ? 3500 : 2000;
+        const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, currentAttemptTimeout);
         
         // If we got a valid response (JSON from proxy or Zibal)
         if (proxyRes.data && (proxyRes.data.result !== undefined || proxyRes.data.trackId !== undefined || proxyRes.data.success !== undefined)) {
@@ -271,32 +280,10 @@ export async function executeProxyRequest(
     }
   }
 
-  // If proxy attempts did not succeed, try direct Zibal as a last resort
+  // If proxy attempts did not succeed, try direct Zibal as a last resort (2s timeout)
   try {
-    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 8000);
+    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 2000);
     if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
-      // If direct connection fails with invalid IP, retry the proxy with longer timeout
-      const isInvalidIp = (directRes.data.message && typeof directRes.data.message === 'string' && directRes.data.message.includes('invalid IP')) || directRes.data.result === 104;
-      
-      if (isInvalidIp) {
-        console.warn('[ProxyClient] Direct connection rejected due to IP whitelist. Retrying primary proxy relay with 15s timeout...');
-        try {
-          const retryProxy = await makeUnifiedRequest('https://bankkalaha.ir/zibal-proxy.php', payloadString, defaultSecretKey, 15000);
-          if (retryProxy.data && (retryProxy.data.result === 100 || retryProxy.data.trackId)) {
-            return retryProxy;
-          }
-        } catch (e) {}
-
-        // Do NOT expose raw serverless foreign IP to user
-        return {
-          ok: false,
-          status: 503,
-          text: JSON.stringify({ result: 104, message: 'سرور پرداخت به دلیل ترافیک شبکه پاسخ نداد. لطفاً مجدداً تلاش کنید.' }),
-          data: { result: 104, message: 'سرور پرداخت به دلیل ترافیک شبکه پاسخ نداد. لطفاً مجدداً تلاش کنید.' },
-          durationMs: 0
-        };
-      }
-
       PaymentLogger.logPaymentEvent({
         requestId: reqId,
         gateway: options.gateway || 'ZIBAL',

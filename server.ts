@@ -1,4 +1,10 @@
 import './src/env-loader.js';
+import dns from 'dns';
+try {
+  if (dns && typeof dns.setDefaultResultOrder === 'function') {
+    dns.setDefaultResultOrder('ipv4first');
+  }
+} catch (e) {}
 import multer from 'multer';
 import AdmZip from 'adm-zip';
 
