@@ -31,7 +31,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZopitPaymentProxy/1.0',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Content-Length': String(Buffer.byteLength(payloadString)),
       };
 
@@ -42,7 +42,6 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
         headers['Authorization'] = `Bearer ${secretKey}`;
       }
 
-      const isDev = process.env.NODE_ENV !== 'production';
       const req = client.request({
         hostname: parsedUrl.hostname,
         port: parsedUrl.port || (isHttps ? 443 : 80),
@@ -140,7 +139,7 @@ export async function executeProxyRequest(
   let secretKey = (options.apiKey || process.env.PAYMENT_PROXY_SECRET_KEY || defaultSecretKey).trim();
 
   // Fast timeout for serverless environments (e.g. 7000ms max)
-  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '12000', 10);
+  const timeoutMs = options.timeoutMs || parseInt(process.env.PAYMENT_PROXY_TIMEOUT_MS || '7000', 10);
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const reqId = options.requestId || PaymentLogger.generateRequestId();
 
@@ -171,9 +170,38 @@ export async function executeProxyRequest(
     directZibalUrl = 'https://gateway.zibal.ir/v1/checkout/status';
   }
 
-  // Attempt: Direct Gateway Connection to Zibal (Proxy completely bypassed for speed)
+  // Attempt 1: Connect through Iranian Static IP Proxy (for Zibal IP whitelisting)
+  let proxyErrToLog: any = null;
+  if (baseProxyUrl) {
+    try {
+      const proxyRes = await makeNodeRequest(baseProxyUrl, payloadString, secretKey, timeoutMs);
+      
+      // If we got a valid response (JSON from proxy or Zibal)
+      if (proxyRes.data && (proxyRes.data.result !== undefined || proxyRes.data.trackId !== undefined || proxyRes.data.success !== undefined)) {
+        await PaymentLogger.logPaymentEvent({
+          requestId: reqId,
+          gateway: options.gateway || 'ZIBAL',
+          action: options.action || 'UNKNOWN',
+          status: 'SUCCESS',
+          targetUrl: proxyUrlToLog,
+          httpStatus: proxyRes.status,
+          durationMs: proxyRes.durationMs,
+          requestBody: logRequestBody,
+          responseBody: proxyRes.text,
+          orderId: options.orderId,
+          userId: options.userId
+        });
+        return proxyRes;
+      }
+    } catch (proxyErr: any) {
+      proxyErrToLog = proxyErr;
+      console.warn(`[ProxyClient] Iranian proxy attempt failed (${proxyErr.message}), falling back to direct gateway...`);
+    }
+  }
+
+  // Attempt 2: Direct Gateway Connection to Zibal (Fallback)
   try {
-    const directRes = await makeNodeRequest(directZibalUrl, payloadString, null, 8000);
+    const directRes = await makeNodeRequest(directZibalUrl, payloadString, null, 6000);
     if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
       await PaymentLogger.logPaymentEvent({
         requestId: reqId,
@@ -193,7 +221,7 @@ export async function executeProxyRequest(
 
     return directRes;
   } catch (directErr: any) {
-    console.error(`[ProxyClient Error] Both Proxy and Direct Gateway failed. Direct error: ${directErr.message}`);
+    console.error(`[ProxyClient Error] Both Proxy and Direct Gateway failed. Proxy error: ${proxyErrToLog?.message}, Direct error: ${directErr.message}`);
     
     await PaymentLogger.logPaymentEvent({
       requestId: reqId,
@@ -201,7 +229,7 @@ export async function executeProxyRequest(
       action: options.action || 'UNKNOWN',
       status: 'FAILED',
       targetUrl: directZibalUrl,
-      errorMessage: `Proxy & Direct failed: ${directErr.message}`,
+      errorMessage: `Proxy & Direct failed: ${proxyErrToLog?.message || ''} / ${directErr.message}`,
       requestBody: logRequestBody,
       orderId: options.orderId,
       userId: options.userId

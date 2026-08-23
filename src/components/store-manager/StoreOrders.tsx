@@ -918,17 +918,19 @@ export default function StoreOrders({
                       const id = parseInt(orderIdStr);
                       const orderItem = orders.find((o) => o.id === id);
                       if (!orderItem) return null;
+                      const productSummary = orderItem.items && orderItem.items.length > 0
+                        ? orderItem.items.map((i: any) => `${i.product?.name || 'کالا'} (${(i.quantity || 1).toLocaleString('fa-IR')} عدد)`).join(' + ')
+                        : (orderItem.product?.name ? `${orderItem.product?.name} (${(orderItem.quantity || 1).toLocaleString('fa-IR')} عدد)` : `سفارش #${id}`);
                       return (
                         <div
                           key={id}
-                          className="flex justify-between items-center text-xs text-muted"
+                          className="flex justify-between items-center text-xs text-muted py-1 border-b border-subtle/40 last:border-b-0"
                         >
-                          <span>
-                            سفارش #{id} - {orderItem.product?.name} (
-                            {orderItem.quantity} عدد)
+                          <span className="font-medium text-slate-700">
+                            سفارش #{Number(id).toLocaleString('fa-IR')}: {productSummary}
                           </span>
-                          <span className="font-bold text-primary">
-                            {(orderItem.totalAmount || 0).toLocaleString()}{" "}
+                          <span className="font-bold text-primary font-sans">
+                            {(orderItem.totalAmount || 0).toLocaleString('fa-IR')}{" "}
                             تومان
                           </span>
                         </div>
