@@ -358,6 +358,9 @@ export default function StoreManagerDashboard({
   const handleSettleOrders = async () => {
     if (selectedOrders.length === 0) return;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const token = localStorage.getItem("token") || "";
       const res = await fetch("/api/store-manager/settle-orders", { credentials: "include",
         method: "POST",
@@ -366,7 +369,10 @@ export default function StoreManagerDashboard({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ orderIds: selectedOrders }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const resText = await res.text();
       let data: any = {};
@@ -378,8 +384,8 @@ export default function StoreManagerDashboard({
 
       if (res.ok && data.payLink) {
         setSelectedOrders([]);
-        showNotification("در حال انتقال به درگاه پرداخت...", "success");
-        window.location.href = data.payLink;
+        showNotification("در حال انتقال به درگاه پرداخت زیبال...", "success");
+        window.location.assign(data.payLink);
         return;
       } else {
         showNotification(

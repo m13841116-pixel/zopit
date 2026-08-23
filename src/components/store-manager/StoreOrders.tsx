@@ -317,6 +317,9 @@ export default function StoreOrders({
     const formattedDetails = orderIds.map((id) => ({ id }));
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch("/api/store-manager/settle-orders", {
         credentials: "include",
         method: "POST",
@@ -325,7 +328,10 @@ export default function StoreOrders({
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
         body: JSON.stringify({ orderDetails: formattedDetails, paymentMethod }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const resText = await res.text();
       let data: any = {};
@@ -341,9 +347,12 @@ export default function StoreOrders({
           setPaymentSuccessData({ invoiceId: data.invoiceId });
           fetchOrders();
         } else if (data.payLink) {
-          window.location.href = data.payLink;
-          setPaymentModalOpen(false);
-          setSelectedOrders([]);
+          toast("در حال انتقال به درگاه پرداخت زیبال...", "info");
+          window.location.assign(data.payLink);
+          setTimeout(() => {
+            setPaymentModalOpen(false);
+            setSelectedOrders([]);
+          }, 1000);
           return;
         } else {
           setPaymentError(data.error || "لینک درگاه پرداخت دریافت نشد. لطفاً دوباره تلاش کنید.");
@@ -353,9 +362,13 @@ export default function StoreOrders({
       }
     } catch (err: any) {
       console.error("Payment error:", err);
-      setPaymentError(
-        err?.message || "خطای شبکه در ارتباط با سرور. لطفاً اتصال خود را بررسی کنید.",
-      );
+      if (err.name === 'AbortError') {
+        setPaymentError("زمان پاسخگویی سرور به پایان رسید. لطفاً مجدداً دکمه «تایید و ادامه» را فشار دهید.");
+      } else {
+        setPaymentError(
+          err?.message || "خطای شبکه در ارتباط با سرور. لطفاً اتصال خود را بررسی کنید.",
+        );
+      }
     } finally {
       setPaymentSubmitting(false);
     }
