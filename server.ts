@@ -5343,16 +5343,98 @@ app.post('/api/wallet/deposit', authenticateToken, async (req: any, res: any) =>
       return res.status(400).json({ error: 'مبلغ نامعتبر است' });
     }
 
-    if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-      return res.status(502).json({
-        error: 'Payment gateway unavailable'
-      });
-    }
+    const paymentGateway = await PaymentServiceFactory.getService();
+    const baseUrl = getCanonicalAppUrl(req);
+    const callbackUrl = `${baseUrl}/api/public/wallet/deposit/callback?userId=${userId}&amount=${numericAmount}`;
 
-    return res.json({ payLink: `/api/public/wallet/deposit-simulate?userId=${userId}&amount=${numericAmount}` });
+    const zibalResult = await paymentGateway.createPayment(
+      numericAmount * 10,
+      `افزایش موجودی کیف پول - کاربر #${userId}`,
+      callbackUrl
+    );
+
+    return res.json({ payLink: zibalResult.payLink });
   } catch (err: any) {
     console.error('Deposit error:', err);
-    res.status(500).json({ error: 'خطا در ایجاد تراکنش افزایش موجودی' });
+    res.status(500).json({ error: 'خطا در ایجاد تراکنش افزایش موجودی: ' + err.message });
+  }
+});
+
+app.get('/api/public/wallet/deposit/callback', async (req: any, res: any) => {
+  try {
+    const userId = parseInt(req.query.userId as string);
+    const amount = parseFloat(req.query.amount as string);
+    const success = req.query.success;
+    const trackId = req.query.trackId;
+
+    if (!userId || isNaN(userId) || isNaN(amount) || amount <= 0) {
+      return res.status(400).send('پارامترهای نامعتبر');
+    }
+
+    if (success === '0' || !trackId) {
+      return res.send(`
+        <script>
+          alert('پرداخت لغو شد یا ناموفق بود.');
+          window.location.href = '/dashboard/store/wallet';
+        </script>
+      `);
+    }
+
+    const paymentGateway = await PaymentServiceFactory.getService();
+    const verification = await paymentGateway.verifyPayment(trackId.toString(), amount * 10);
+
+    if (verification && verification.success) {
+      await prisma.$transaction(async (tx) => {
+        // Ensure wallet exists
+        let wallet = await tx.wallet.findUnique({
+          where: { supplierId: userId }
+        });
+        
+        if (!wallet) {
+          wallet = await tx.wallet.create({
+            data: { supplierId: userId, balance: 0 }
+          });
+        }
+
+        // Create wallet history entry
+        await tx.ledgerEntry.create({
+          data: {
+            walletId: wallet.id,
+            amount,
+            type: 'DEPOSIT',
+            status: 'COMPLETED',
+            description: `افزایش موجودی آنلاین (کد رهگیری: ${trackId})`
+          }
+        });
+
+        // Update balance
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance: {
+              increment: amount
+            }
+          }
+        });
+      });
+
+      res.send(`
+        <script>
+          alert('موجودی کیف پول شما با موفقیت افزایش یافت.');
+          window.location.href = '/dashboard/store/wallet';
+        </script>
+      `);
+    } else {
+      res.send(`
+        <script>
+          alert('تایید تراکنش با خطا مواجه شد.');
+          window.location.href = '/dashboard/store/wallet';
+        </script>
+      `);
+    }
+  } catch (err: any) {
+    console.error('Deposit callback error:', err);
+    res.status(500).send('خطا در تایید تراکنش: ' + err.message);
   }
 });
 
@@ -9718,7 +9800,7 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
 
       if (resCode === 100 || data.success || data.trackId) {
         const trackId = data.trackId || data.authority;
-        const payLink = data.payLink || `https://gateway.zibal.ir/start/${trackId}`;
+        const payLink = data.payLink || `https://gateway.zibal.ir/start/${trackId}/direct`;
         return res.json({
           success: true,
           trackId: String(trackId),

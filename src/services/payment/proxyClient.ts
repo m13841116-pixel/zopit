@@ -278,8 +278,8 @@ export async function executeProxyRequest(
           }).catch(() => {});
           return proxyRes;
         }
-        // If proxy returned a specific gateway business error (e.g. 106 callback mismatch)
-        if (proxyRes.data.result && Number(proxyRes.data.result) !== 104) {
+        // If proxy returned a specific gateway business error (e.g. 104, 106)
+        if (proxyRes.data.result !== undefined) {
           return proxyRes;
         }
       }

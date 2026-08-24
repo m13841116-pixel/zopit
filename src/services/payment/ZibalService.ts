@@ -159,7 +159,7 @@ export class ZibalService implements PaymentGateway {
               const maskedTrackId = PaymentLogger.maskSensitiveData(order.trackingCode);
               console.log(`[Zibal Idempotency] Order #${orderId} already has payment trackingCode: ${maskedTrackId}`);
               return {
-                payLink: `https://gateway.zibal.ir/start/${order.trackingCode}`,
+                payLink: `https://gateway.zibal.ir/start/${order.trackingCode}/direct`,
                 authority: String(order.trackingCode)
               };
             }
@@ -175,7 +175,7 @@ export class ZibalService implements PaymentGateway {
         amount: numAmount,
         callbackUrl: finalCallbackUrl,
         description: description || 'پرداخت سفارش',
-        linkToDirect: 0,
+        linkToDirect: 1,
       };
       if (orderId) requestPayload.orderId = orderId;
 
@@ -184,7 +184,7 @@ export class ZibalService implements PaymentGateway {
       if (data && ((data.success || Number(data.result) === 100) && (data.payLink || data.trackId || data.authority))) {
         const trackId = (data.trackId || data.authority)?.toString();
         return {
-          payLink: data.payLink || `https://gateway.zibal.ir/start/${trackId}`,
+          payLink: data.payLink || `https://gateway.zibal.ir/start/${trackId}/direct`,
           authority: trackId,
         };
       }

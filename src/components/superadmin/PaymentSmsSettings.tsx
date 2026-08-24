@@ -244,7 +244,7 @@ export default function PaymentSmsSettings() {
           resultPayload = {
             success: true,
             trackId: String(trackId),
-            payLink: `https://gateway.zibal.ir/start/${trackId}`,
+            payLink: `https://gateway.zibal.ir/start/${trackId}/direct`,
             message: "فاکتور تست زیبال با موفقیت صادر شد.",
           };
           success = true;

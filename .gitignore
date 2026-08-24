@@ -16,3 +16,9 @@ coverage/
 .env.*
 node_modules/
 .vercel/
+
+# Local secrets / deployment files
+.env
+.env.*
+node_modules/
+.vercel/
