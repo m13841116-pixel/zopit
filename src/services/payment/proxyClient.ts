@@ -27,6 +27,7 @@ async function makeFetchRequest(urlStr: string, payloadString: string, secretKey
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'Connection': 'close',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   };
 
@@ -86,6 +87,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Connection': 'close',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Content-Length': String(Buffer.byteLength(payloadString)),
       };

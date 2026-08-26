@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import OrderTimeline from "../OrderTimeline";
 import { PROVINCES } from "../../data/provinces";
 import { useMobileScrollLock } from "../../hooks/useMobileScrollLock";
+import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
 import {
   ShoppingCart,
   Plus,
@@ -354,6 +355,27 @@ export default function StoreOrders({
             setSelectedOrders([]);
           }, 1000);
           return;
+        } else if (data.clientPaymentRequired && data.invoiceId) {
+          toast("در حال دریافت شناسه پرداخت از درگاه زیبال...", "info");
+          const clientRes = await requestClientSideZibalPayment({
+            invoiceId: data.invoiceId,
+            amountInRials: data.amountInRials,
+            merchant: data.merchant,
+            callbackUrl: data.callbackUrl,
+            description: data.description,
+          });
+
+          if (clientRes.success && clientRes.payLink) {
+            toast("در حال انتقال به درگاه پرداخت زیبال...", "info");
+            window.location.assign(clientRes.payLink);
+            setTimeout(() => {
+              setPaymentModalOpen(false);
+              setSelectedOrders([]);
+            }, 1000);
+            return;
+          } else {
+            setPaymentError(clientRes.error || "خطا در اتصال به درگاه پرداخت زیبال. لطفاً دوباره تلاش کنید.");
+          }
         } else {
           setPaymentError(data.error || "لینک درگاه پرداخت دریافت نشد. لطفاً دوباره تلاش کنید.");
         }

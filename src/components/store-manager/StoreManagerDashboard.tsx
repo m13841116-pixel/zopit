@@ -12,6 +12,7 @@ import { toast } from "../GlobalToast";
 import React, { useState, useEffect } from "react";
 import Announcements from "../Announcements";
 import NotificationBell from "../NotificationBell";
+import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
 import {
   Crown,
   Award,
@@ -333,13 +334,27 @@ export default function StoreManagerDashboard({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
         },
       });
       const data = await res.json();
       if (res.ok && data.payLink) {
-        const newTab = window.open(data.payLink, "_blank");
-        if (!newTab) window.location.href = data.payLink;
+        window.location.assign(data.payLink);
+      } else if (res.ok && data.clientPaymentRequired && data.invoiceId) {
+        toast("در حال دریافت شناسه پرداخت از درگاه زیبال...", "info");
+        const clientRes = await requestClientSideZibalPayment({
+          invoiceId: data.invoiceId,
+          amountInRials: data.amountInRials,
+          merchant: data.merchant,
+          callbackUrl: data.callbackUrl,
+          description: data.description,
+        });
+        if (clientRes.success && clientRes.payLink) {
+          toast("در حال انتقال به درگاه پرداخت زیبال...", "info");
+          window.location.assign(clientRes.payLink);
+        } else {
+          toast(clientRes.error || "خطا در اتصال به درگاه پرداخت زیبال", "error");
+        }
       } else {
         if (showNotification)
           showNotification(
@@ -387,6 +402,23 @@ export default function StoreManagerDashboard({
         showNotification("در حال انتقال به درگاه پرداخت زیبال...", "success");
         window.location.assign(data.payLink);
         return;
+      } else if (res.ok && data.clientPaymentRequired && data.invoiceId) {
+        setSelectedOrders([]);
+        showNotification("در حال دریافت شناسه پرداخت از درگاه زیبال...", "info");
+        const clientRes = await requestClientSideZibalPayment({
+          invoiceId: data.invoiceId,
+          amountInRials: data.amountInRials,
+          merchant: data.merchant,
+          callbackUrl: data.callbackUrl,
+          description: data.description,
+        });
+        if (clientRes.success && clientRes.payLink) {
+          showNotification("در حال انتقال به درگاه پرداخت زیبال...", "success");
+          window.location.assign(clientRes.payLink);
+          return;
+        } else {
+          showNotification(clientRes.error || "خطا در برقراری ارتباط با درگاه پرداخت", "error");
+        }
       } else {
         showNotification(
           data.error || "خطا در برقراری ارتباط با درگاه پرداخت",

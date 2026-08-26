@@ -4933,23 +4933,19 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
           data: { trackId: zibalResult.authority }
         });
 
-        return res.json({ payLink: zibalResult.payLink });
+        return res.json({ payLink: zibalResult.payLink, invoiceId: invoice.id });
       } catch (paymentErr: any) {
-        console.error('Error creating Zibal payment for store invoice:', paymentErr);
-        // Clean up created storeInvoice and restore order links so orders remain payable
-        await prisma.order.updateMany({
-          where: { storeInvoiceId: invoice.id },
-          data: { storeInvoiceId: null }
-        }).catch(() => {});
-        await prisma.storeInvoice.delete({
-          where: { id: invoice.id }
-        }).catch(() => {});
-
-        return res.status(500).json({
-          error: `خطا در ایجاد تراکنش درگاه پرداخت: ${paymentErr.message}`,
+        console.warn('Server-side Zibal payment creation failed, providing client-side payment fallback:', paymentErr.message);
+        const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        const baseUrl = getCanonicalAppUrl(req);
+        return res.json({
+          success: true,
+          clientPaymentRequired: true,
           invoiceId: invoice.id,
-          totalAmount: invoice.totalAmount,
-          merchantCode: process.env.ZIBAL_MERCHANT || '6a0213e61b27742a09938588'
+          amountInRials: totalAmount * 10,
+          merchant: resolvedMerchant,
+          callbackUrl: `${baseUrl}/api/public/store-invoice/callback?invoiceId=${invoice.id}`,
+          description: `تسویه فاکتور فروشگاه #${invoice.id} در سامانه زوپیت`
         });
       }
     }
@@ -4957,6 +4953,24 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
     console.error('Settle orders error:', err);
 
     res.status(500).json({ error: 'خطا در تسویه سفارشات: ' + err.message });
+  }
+});
+
+app.post(['/api/public/store-invoice/:id/attach-track-id', '/api/store-manager/invoices/:id/attach-track-id'], async (req: any, res: any) => {
+  try {
+    const invoiceId = parseInt(req.params.id);
+    const { trackId } = req.body;
+    if (!invoiceId || !trackId) {
+      return res.status(400).json({ error: 'شناسه فاکتور یا کد رهگیری نامعتبر است' });
+    }
+    await prisma.storeInvoice.update({
+      where: { id: invoiceId },
+      data: { trackId: String(trackId) }
+    });
+    res.json({ success: true, message: 'کد رهگیری با موفقیت ثبت شد' });
+  } catch (err: any) {
+    console.error('Error attaching trackId to invoice:', err);
+    res.status(500).json({ error: 'خطا در ثبت کد رهگیری فاکتور' });
   }
 });
 
@@ -5024,12 +5038,20 @@ app.post('/api/store-manager/invoices/:id/pay', authenticateToken, requireStoreM
         where: { id: invoice.id },
         data: { trackId: zibalResult.authority }
       });
-    } catch (paymentErr) {
-      console.error('Error creating Zibal payment for invoice:', paymentErr);
-      throw new Error("درگاه پرداخت در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.");
+      return res.json({ payLink, invoiceId: invoice.id });
+    } catch (paymentErr: any) {
+      console.warn('Error creating Zibal payment for invoice, using client fallback:', paymentErr.message);
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      return res.json({
+        success: true,
+        clientPaymentRequired: true,
+        invoiceId: invoice.id,
+        amountInRials: invoice.totalAmount * 10,
+        merchant: resolvedMerchant,
+        callbackUrl,
+        description: `پرداخت فاکتور فروشگاه #${invoice.id} در سامانه زوپیت`
+      });
     }
-
-    res.json({ payLink });
   } catch (err: any) {
     console.error('Invoice pay link generation error:', err);
     res.status(500).json({ error: 'خطا در ایجاد لینک پرداخت' });
