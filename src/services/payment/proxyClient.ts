@@ -290,7 +290,7 @@ export async function executeProxyRequest(
         status: 503,
         text: JSON.stringify({ result: -1, message: 'ارتباط با سرور واسط به دلیل خطا برقرار نشد: ' + proxyErr.message }),
         data: { result: -1, message: 'ارتباط با سرور واسط به دلیل خطا برقرار نشد: ' + proxyErr.message },
-        durationMs: Date.now() - startTime
+        durationMs: 0
       };
     }
   }
