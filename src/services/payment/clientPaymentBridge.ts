@@ -25,8 +25,8 @@ const DEFAULT_ZIBAL_MERCHANT = "6a0213e61b27742a09938588";
 
 const PROXY_CANDIDATES = [
   "https://bankkalaha.ir/zibal-proxy.php",
-  "http://bankkalaha.ir/zibal-proxy.php",
   "https://www.bankkalaha.ir/zibal-proxy.php",
+  "http://bankkalaha.ir/zibal-proxy.php",
   "http://www.bankkalaha.ir/zibal-proxy.php",
 ];
 
@@ -42,13 +42,13 @@ export async function requestClientSideZibalPayment(
   const paymentDesc =
     description || `تسویه فاکتور فروشگاه #${invoiceId} در سامانه زوپیت`;
 
-  let lastError = "خطا در ارتباط با سرور پرداخت";
+  let lastError = "خطا در ارتباط با درگاه پرداخت زیبال";
 
-  // 1. Try Iranian Proxy endpoints first (from user's browser in Iran)
+  // 1. Try Iranian Proxy endpoints (from client's browser)
   for (const proxyUrl of PROXY_CANDIDATES) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
 
       const response = await fetch(proxyUrl, {
         method: "POST",
@@ -69,35 +69,32 @@ export async function requestClientSideZibalPayment(
 
       clearTimeout(timeoutId);
 
-      if (response.ok) {
-        const data = await response.json().catch(() => null);
-        if (data && (Number(data.result) === 100 || data.trackId || data.success)) {
-          const trackId = String(data.trackId || data.authority);
-          const payLink =
-            data.payLink || `https://gateway.zibal.ir/start/${trackId}/direct`;
+      const data = await response.json().catch(() => null);
+      if (data && (Number(data.result) === 100 || data.trackId || data.success)) {
+        const trackId = String(data.trackId || data.authority);
+        const payLink =
+          data.payLink || `https://gateway.zibal.ir/start/${trackId}/direct`;
 
-          // Attach trackId to the invoice in the backend
-          await attachTrackIdToInvoice(invoiceId, trackId);
+        // Attach trackId to the invoice in the backend
+        await attachTrackIdToInvoice(invoiceId, trackId);
 
-          return {
-            success: true,
-            payLink,
-            trackId,
-          };
-        } else if (data && data.message) {
-          lastError = data.message;
-        }
+        return {
+          success: true,
+          payLink,
+          trackId,
+        };
+      } else if (data && data.message) {
+        lastError = data.message;
       }
     } catch (err: any) {
       console.warn(`[ClientPaymentBridge] Proxy ${proxyUrl} attempt failed:`, err.message);
-      lastError = err.message;
     }
   }
 
-  // 2. Try Direct Zibal endpoint (client's browser has Iranian IP)
+  // 2. Direct Zibal attempt from Iranian client
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const directRes = await fetch("https://gateway.zibal.ir/v1/request", {
       method: "POST",
@@ -116,27 +113,24 @@ export async function requestClientSideZibalPayment(
 
     clearTimeout(timeoutId);
 
-    if (directRes.ok) {
-      const data = await directRes.json().catch(() => null);
-      if (data && Number(data.result) === 100 && data.trackId) {
-        const trackId = String(data.trackId);
-        const payLink = `https://gateway.zibal.ir/start/${trackId}/direct`;
+    const data = await directRes.json().catch(() => null);
+    if (data && Number(data.result) === 100 && data.trackId) {
+      const trackId = String(data.trackId);
+      const payLink = `https://gateway.zibal.ir/start/${trackId}/direct`;
 
-        // Attach trackId to the invoice in the backend
-        await attachTrackIdToInvoice(invoiceId, trackId);
+      // Attach trackId to the invoice in the backend
+      await attachTrackIdToInvoice(invoiceId, trackId);
 
-        return {
-          success: true,
-          payLink,
-          trackId,
-        };
-      } else if (data && data.message) {
-        lastError = data.message;
-      }
+      return {
+        success: true,
+        payLink,
+        trackId,
+      };
+    } else if (data && data.message) {
+      lastError = data.message;
     }
   } catch (directErr: any) {
     console.warn("[ClientPaymentBridge] Direct Zibal attempt failed:", directErr.message);
-    lastError = directErr.message;
   }
 
   return {
