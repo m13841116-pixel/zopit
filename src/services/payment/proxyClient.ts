@@ -244,21 +244,22 @@ export async function executeProxyRequest(
     directZibalUrl = 'https://gateway.zibal.ir/v1/checkout/status';
   }
 
-  // Primary and secondary Iranian Static IP Proxies (for Zibal IP whitelisting)
-  let proxyErrToLog: any = null;
+  // Primary and secondary Iranian Proxies (both HTTP and HTTPS to handle DNS/SSL propagation gracefully)
+  let lastProxyErr: any = null;
   const proxyCandidates = [
+    'http://bankkalaha.ir/zibal-proxy.php',
     'https://bankkalaha.ir/zibal-proxy.php',
+    'http://www.bankkalaha.ir/zibal-proxy.php',
     'https://www.bankkalaha.ir/zibal-proxy.php',
-    'https://bankkalaha.ir/zibal-proxy.php',
-    'https://www.bankkalaha.ir/zibal-proxy.php'
+    'http://88.135.68.18/zibal-proxy.php'
   ];
 
   for (let i = 0; i < proxyCandidates.length; i++) {
     const targetProxyUrl = proxyCandidates[i];
     try {
       const activeSecret = defaultSecretKey;
-      // Generous timeouts for Vercel-to-Iran latency: 12s for primary, 10s for secondary
-      const currentAttemptTimeout = i === 0 ? 12000 : 10000;
+      // Fast timeout per candidate so we fail-over rapidly
+      const currentAttemptTimeout = 4000;
       const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, currentAttemptTimeout);
       
       // If we got a valid response (JSON from proxy or Zibal)
@@ -286,32 +287,29 @@ export async function executeProxyRequest(
         }
       }
     } catch (proxyErr: any) {
-      console.error(`[ProxyClient] Attempt failed for ${targetProxyUrl} (${proxyErr.message})`);
-      return {
-        ok: false,
-        status: 503,
-        text: JSON.stringify({ result: -1, message: 'ارتباط با سرور واسط به دلیل خطا برقرار نشد: ' + proxyErr.message }),
-        data: { result: -1, message: 'ارتباط با سرور واسط به دلیل خطا برقرار نشد: ' + proxyErr.message },
-        durationMs: 0
-      };
+      lastProxyErr = proxyErr;
+      console.warn(`[ProxyClient] Candidate ${targetProxyUrl} failed (${proxyErr.message}), trying next candidate...`);
+      // Continue loop to try next candidate (e.g., http vs https vs IP)
+      continue;
     }
   }
 
-  // If proxy attempts failed, try direct Zibal as a last resort (5.0s timeout)
+  // If all proxy attempts failed, try direct Zibal as fallback
   try {
-    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 5000);
+    console.info(`[ProxyClient] All proxy candidates failed (${lastProxyErr?.message || 'none available'}). Trying direct Zibal endpoint...`);
+    const directRes = await makeUnifiedRequest(directZibalUrl, payloadString, null, 6000);
     if (directRes.data && (directRes.data.result !== undefined || directRes.data.trackId !== undefined || directRes.data.success !== undefined)) {
       // Check if direct Zibal returned an IP restriction error (e.g., "invalid IP ...")
       const msgStr = String(directRes.data.message || directRes.data.error || '');
       const isInvalidIp = msgStr.toLowerCase().includes('invalid ip') || directRes.data.result === 115;
       
       if (isInvalidIp) {
-        console.warn(`[ProxyClient] Direct Zibal rejected server IP (${msgStr}). Returning connection error.`);
+        console.warn(`[ProxyClient] Direct Zibal rejected server IP (${msgStr}).`);
         return {
           ok: false,
           status: 503,
-          text: JSON.stringify({ result: -1, message: 'ارتباط با درگاه پرداخت به دلیل کندی شبکه برقرار نشد. لطفاً مجدداً دکمه تایید و ادامه را بزنید.' }),
-          data: { result: -1, message: 'ارتباط با درگاه پرداخت به دلیل کندی شبکه برقرار نشد. لطفاً مجدداً دکمه تایید و ادامه را بزنید.' },
+          text: JSON.stringify({ result: -1, message: 'ارتباط با درگاه پرداخت به دلیل عدم تایید موقت IP برقرار نشد. لطفاً چند لحظه بعد مجدداً تلاش کنید.' }),
+          data: { result: -1, message: 'ارتباط با درگاه پرداخت به دلیل عدم تایید موقت IP برقرار نشد. لطفاً چند لحظه بعد مجدداً تلاش کنید.' },
           durationMs: directRes.durationMs
         };
       }
@@ -334,7 +332,7 @@ export async function executeProxyRequest(
 
     return directRes;
   } catch (directErr: any) {
-    console.error(`[ProxyClient Error] Both Proxy and Direct Gateway failed. Proxy error: ${proxyErrToLog?.message}, Direct error: ${directErr.message}`);
+    console.error(`[ProxyClient Error] Both Proxy and Direct Gateway failed. Proxy error: ${lastProxyErr?.message}, Direct error: ${directErr.message}`);
     
     PaymentLogger.logPaymentEvent({
       requestId: reqId,
@@ -342,7 +340,7 @@ export async function executeProxyRequest(
       action: options.action || 'UNKNOWN',
       status: 'FAILED',
       targetUrl: directZibalUrl,
-      errorMessage: `Proxy & Direct failed: ${proxyErrToLog?.message || ''} / ${directErr.message}`,
+      errorMessage: `Proxy & Direct failed: ${lastProxyErr?.message || ''} / ${directErr.message}`,
       requestBody: logRequestBody,
       orderId: options.orderId,
       userId: options.userId
@@ -351,8 +349,8 @@ export async function executeProxyRequest(
     return {
       ok: false,
       status: 502,
-      text: JSON.stringify({ result: -1, message: 'ارتباط با درگاه پرداخت به دلیل ترافیک شبکه برقرار نشد. لطفاً مجدداً دکمه تایید و پرداخت را بزنید.' }),
-      data: { result: -1, message: 'ارتباط با درگاه پرداخت به دلیل ترافیک شبکه برقرار نشد. لطفاً مجدداً دکمه تایید و پرداخت را بزنید.' },
+      text: JSON.stringify({ result: -1, message: 'ارتباط با درگاه پرداخت برقرار نشد. لطفاً مجدداً دکمه تایید و ادامه را بزنید.' }),
+      data: { result: -1, message: 'ارتباط با درگاه پرداخت برقرار نشد. لطفاً مجدداً دکمه تایید و ادامه را بزنید.' },
       durationMs: 0
     };
   }
