@@ -7,16 +7,26 @@
  * And place the `proxy-config.php` ONE DIRECTORY ABOVE public_html for security.
  */
 
-// Strict JSON response
+// Strict JSON response & CORS for direct client browser support
 header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Proxy-Secret, X-Proxy-Secret-Key, X-Api-Key');
 
 // Only allow POST and OPTIONS
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'OPTIONS') {
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Proxy-Secret, X-Api-Key');
     http_response_code(200);
+    exit;
+}
+
+if ($method === 'GET') {
+    echo json_encode([
+        'status' => 'online',
+        'message' => 'Zibal Payment Proxy on bankkalaha.ir is active and ready!',
+        'server_ip' => isset($_SERVER['SERVER_ADDR']) ? $_SERVER['SERVER_ADDR'] : 'unknown',
+        'time' => date('Y-m-d H:i:s')
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

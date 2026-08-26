@@ -4,6 +4,7 @@ import Announcements from "../Announcements";
 import NotificationBell from "../NotificationBell";
 import OrderTimeline from "../OrderTimeline";
 import { useEffect } from "react";
+import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
 import {
   Package,
   ShoppingCart,
@@ -393,17 +394,31 @@ export function SupplierDashboard({
     if (!depositAmount || Number(depositAmount) < 1000)
       return toast("مبلغ نامعتبر است (حداقل ۱۰۰۰ تومان)", "error");
     try {
+      const token = localStorage.getItem("token") || "";
       const res = await fetch(`/api/wallet/deposit`, { credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ amount: Number(depositAmount) }),
       });
       const data = await res.json();
       if (res.ok && data.payLink) {
-        window.location.href = data.payLink;
+        window.location.assign(data.payLink);
+      } else if (res.ok && data.clientPaymentRequired) {
+        toast("در حال انتقال سریع به درگاه زیبال...", "info");
+        const clientRes = await requestClientSideZibalPayment({
+          amountInRials: data.amountInRials,
+          merchant: data.merchant,
+          callbackUrl: data.callbackUrl,
+          description: data.description,
+        });
+        if (clientRes.success && clientRes.payLink) {
+          window.location.assign(clientRes.payLink);
+        } else {
+          toast(clientRes.error || "خطا در اتصال به درگاه پرداخت زیبال", "error");
+        }
       } else {
         toast(data.error || "خطا در ارتباط با درگاه پرداخت", "error");
       }

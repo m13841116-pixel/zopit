@@ -28,6 +28,7 @@ import {
   Building2
 } from "lucide-react";
 import { toast } from "../GlobalToast";
+import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
 
 interface StoreProAccountProps {
   user?: any;
@@ -406,7 +407,23 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       const data = await res.json();
       if (res.ok) {
         if (data.payLink) {
-          window.location.href = data.payLink;
+          window.location.assign(data.payLink);
+          return;
+        }
+        if (data.clientPaymentRequired) {
+          toast("در حال انتقال سریع به درگاه زیبال...", "info");
+          const clientRes = await requestClientSideZibalPayment({
+            amountInRials: data.amountInRials,
+            merchant: data.merchant,
+            callbackUrl: data.callbackUrl,
+            description: data.description,
+          });
+          if (clientRes.success && clientRes.payLink) {
+            window.location.assign(clientRes.payLink);
+            return;
+          } else {
+            toast(clientRes.error || "خطا در اتصال به درگاه زیبال", "error");
+          }
           return;
         }
         if (showNotification) showNotification(data.message, "success");
@@ -435,7 +452,22 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       });
       const data = await res.json();
       if (res.ok && data.payLink) {
-        window.location.href = data.payLink;
+        window.location.assign(data.payLink);
+        return;
+      } else if (res.ok && data.clientPaymentRequired) {
+        toast("در حال انتقال سریع به درگاه زیبال...", "info");
+        const clientRes = await requestClientSideZibalPayment({
+          amountInRials: data.amountInRials,
+          merchant: data.merchant,
+          callbackUrl: data.callbackUrl,
+          description: data.description,
+        });
+        if (clientRes.success && clientRes.payLink) {
+          window.location.assign(clientRes.payLink);
+          return;
+        } else {
+          toast(clientRes.error || "خطا در اتصال به درگاه پرداخت", "error");
+        }
       } else {
         const msg = data.error || "خطا در انتقال به درگاه پرداخت";
         if (showNotification) showNotification(msg, "error");
@@ -460,7 +492,22 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       });
       const data = await res.json();
       if (res.ok && data.payLink) {
-        window.location.href = data.payLink;
+        window.location.assign(data.payLink);
+        return;
+      } else if (res.ok && data.clientPaymentRequired) {
+        toast("در حال انتقال سریع به درگاه زیبال...", "info");
+        const clientRes = await requestClientSideZibalPayment({
+          amountInRials: data.amountInRials,
+          merchant: data.merchant,
+          callbackUrl: data.callbackUrl,
+          description: data.description,
+        });
+        if (clientRes.success && clientRes.payLink) {
+          window.location.assign(clientRes.payLink);
+          return;
+        } else {
+          toast(clientRes.error || "خطا در اتصال به درگاه پرداخت", "error");
+        }
       } else {
         const msg = data.error || "خطا در ایجاد لینک پرداخت ترب";
         if (showNotification) showNotification(msg, "error");

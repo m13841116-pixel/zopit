@@ -5365,17 +5365,30 @@ app.post('/api/wallet/deposit', authenticateToken, async (req: any, res: any) =>
       return res.status(400).json({ error: 'مبلغ نامعتبر است' });
     }
 
-    const paymentGateway = await PaymentServiceFactory.getService();
     const baseUrl = getCanonicalAppUrl(req);
     const callbackUrl = `${baseUrl}/api/public/wallet/deposit/callback?userId=${userId}&amount=${numericAmount}`;
 
-    const zibalResult = await paymentGateway.createPayment(
-      numericAmount * 10,
-      `افزایش موجودی کیف پول - کاربر #${userId}`,
-      callbackUrl
-    );
-
-    return res.json({ payLink: zibalResult.payLink });
+    try {
+      const paymentGateway = await PaymentServiceFactory.getService();
+      const zibalResult = await paymentGateway.createPayment(
+        numericAmount * 10,
+        `افزایش موجودی کیف پول - کاربر #${userId}`,
+        callbackUrl
+      );
+      return res.json({ payLink: zibalResult.payLink });
+    } catch (paymentErr: any) {
+      console.warn('Server Zibal error for wallet deposit, providing client fallback:', paymentErr.message);
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      return res.json({
+        success: true,
+        clientPaymentRequired: true,
+        amountInRials: numericAmount * 10,
+        merchant: resolvedMerchant,
+        callbackUrl,
+        description: `افزایش موجودی کیف پول - کاربر #${userId}`,
+        amount: numericAmount
+      });
+    }
   } catch (err: any) {
     console.error('Deposit error:', err);
     res.status(500).json({ error: 'خطا در ایجاد تراکنش افزایش موجودی: ' + err.message });
@@ -5828,10 +5841,10 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
 
     let payLink = null;
     if (totalPayable > 0) {
-      const paymentGateway = await PaymentServiceFactory.getService();
       const baseUrl = getCanonicalAppUrl(req);
-      const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=PRO_REGISTER`;
+      const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=PRO_REGISTER&amount=${totalPayable}`;
       try {
+        const paymentGateway = await PaymentServiceFactory.getService();
         const zibalResult = await paymentGateway.createPayment(
           totalPayable * 10,
           `ثبت نام اکانت پرو زوپیت - کاربر #${userId}`,
@@ -5844,8 +5857,17 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
           data: { payLink }
         });
       } catch (paymentErr: any) {
-        console.error('Zibal error for pro register:', paymentErr);
-        throw new Error(`خطا در ایجاد درگاه پرداخت: ${paymentErr.message}`);
+        console.warn('Server Zibal error for pro register, providing client fallback:', paymentErr.message);
+        const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        return res.json({
+          success: true,
+          clientPaymentRequired: true,
+          amountInRials: totalPayable * 10,
+          merchant: resolvedMerchant,
+          callbackUrl,
+          description: `ثبت نام اکانت پرو زوپیت - کاربر #${userId}`,
+          proAccount
+        });
       }
     }
 
@@ -5867,17 +5889,30 @@ app.post('/api/store-manager/pro/renew-host', authenticateToken, requireStoreMan
     const hostDiscountedSetting = await prisma.systemSettings.findUnique({ where: { key: 'pro_host_discounted_price' } });
     const amount = parseInt(hostDiscountedSetting?.value || '198000', 10);
 
-    const paymentGateway = await PaymentServiceFactory.getService();
     const baseUrl = getCanonicalAppUrl(req);
-    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=HOST_RENEWAL`;
+    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=HOST_RENEWAL&amount=${amount}`;
 
-    const zibalResult = await paymentGateway.createPayment(
-      amount * 10,
-      `تمدید هاست ۱ ماهه اکانت پرو زوپیت کاربر #${userId}`,
-      callbackUrl
-    );
-
-    res.json({ payLink: zibalResult.payLink, amount });
+    try {
+      const paymentGateway = await PaymentServiceFactory.getService();
+      const zibalResult = await paymentGateway.createPayment(
+        amount * 10,
+        `تمدید هاست ۱ ماهه اکانت پرو زوپیت کاربر #${userId}`,
+        callbackUrl
+      );
+      return res.json({ payLink: zibalResult.payLink, amount });
+    } catch (paymentErr: any) {
+      console.warn('Server Zibal error for renew-host, providing client fallback:', paymentErr.message);
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      return res.json({
+        success: true,
+        clientPaymentRequired: true,
+        amountInRials: amount * 10,
+        merchant: resolvedMerchant,
+        callbackUrl,
+        description: `تمدید هاست ۱ ماهه اکانت پرو زوپیت کاربر #${userId}`,
+        amount
+      });
+    }
   } catch (err: any) {
     console.error('Error in renew-host:', err);
     res.status(500).json({ error: 'خطا در ایجاد درگاه پرداخت تمدید هاست: ' + err.message });
@@ -5891,17 +5926,30 @@ app.post('/api/store-manager/pro/pay-torob', authenticateToken, requireStoreMana
     const torobPriceSetting = await prisma.systemSettings.findUnique({ where: { key: 'pro_torob_price' } });
     const amount = parseInt(torobPriceSetting?.value || '150000', 10);
 
-    const paymentGateway = await PaymentServiceFactory.getService();
     const baseUrl = getCanonicalAppUrl(req);
-    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=TOROB_SETUP`;
+    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=TOROB_SETUP&amount=${amount}`;
 
-    const zibalResult = await paymentGateway.createPayment(
-      amount * 10,
-      `اتصال به ترب - اکانت پرو زوپیت کاربر #${userId}`,
-      callbackUrl
-    );
-
-    res.json({ payLink: zibalResult.payLink, amount });
+    try {
+      const paymentGateway = await PaymentServiceFactory.getService();
+      const zibalResult = await paymentGateway.createPayment(
+        amount * 10,
+        `اتصال به ترب - اکانت پرو زوپیت کاربر #${userId}`,
+        callbackUrl
+      );
+      return res.json({ payLink: zibalResult.payLink, amount });
+    } catch (paymentErr: any) {
+      console.warn('Server Zibal error for pay-torob, providing client fallback:', paymentErr.message);
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      return res.json({
+        success: true,
+        clientPaymentRequired: true,
+        amountInRials: amount * 10,
+        merchant: resolvedMerchant,
+        callbackUrl,
+        description: `اتصال به ترب - اکانت پرو زوپیت کاربر #${userId}`,
+        amount
+      });
+    }
   } catch (err: any) {
     console.error('Error in pay-torob:', err);
     res.status(500).json({ error: 'خطا در ایجاد درگاه پرداخت اتصال به ترب: ' + err.message });
@@ -5912,7 +5960,7 @@ app.post('/api/store-manager/pro/pay-torob', authenticateToken, requireStoreMana
 app.get('/api/public/pro/callback', async (req: any, res: any) => {
   const baseUrl = getCanonicalAppUrl(req);
   try {
-    const { userId, type, trackId, authority } = req.query;
+    const { userId, type, trackId, authority, amount } = req.query;
     const parsedUserId = parseInt(userId as string, 10);
     const resolvedTrackId = trackId || authority;
 
@@ -5946,7 +5994,9 @@ app.get('/api/public/pro/callback', async (req: any, res: any) => {
 
     // Determine expected amount based on type
     let expectedAmountRials = 0;
-    if (type === 'HOST_RENEWAL') {
+    if (amount && !isNaN(parseFloat(amount as string))) {
+      expectedAmountRials = Math.round(parseFloat(amount as string) * 10);
+    } else if (type === 'HOST_RENEWAL') {
       const hostDiscountedSetting = await prisma.systemSettings.findUnique({ where: { key: 'pro_host_discounted_price' } });
       expectedAmountRials = parseInt(hostDiscountedSetting?.value || '198000', 10) * 10;
     } else if (type === 'TOROB_SETUP') {

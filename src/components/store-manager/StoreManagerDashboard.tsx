@@ -313,13 +313,26 @@ export default function StoreManagerDashboard({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
         },
         body: JSON.stringify({ amount: Number(depositAmount) }),
       });
       const data = await res.json();
       if (res.ok && data.payLink) {
-        window.location.href = data.payLink;
+        window.location.assign(data.payLink);
+      } else if (res.ok && data.clientPaymentRequired) {
+        toast("در حال انتقال سریع به درگاه زیبال...", "info");
+        const clientRes = await requestClientSideZibalPayment({
+          amountInRials: data.amountInRials,
+          merchant: data.merchant,
+          callbackUrl: data.callbackUrl,
+          description: data.description,
+        });
+        if (clientRes.success && clientRes.payLink) {
+          window.location.assign(clientRes.payLink);
+        } else {
+          toast(clientRes.error || "خطا در اتصال به درگاه پرداخت زیبال", "error");
+        }
       } else {
         toast(data.error || "خطا در ارتباط با درگاه پرداخت", "error");
       }
