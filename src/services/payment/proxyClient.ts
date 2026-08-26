@@ -284,8 +284,14 @@ export async function executeProxyRequest(
         }
       }
     } catch (proxyErr: any) {
-      proxyErrToLog = proxyErr;
-      console.warn(`[ProxyClient] Attempt failed for ${targetProxyUrl} (${proxyErr.message})`);
+      console.error(`[ProxyClient] Attempt failed for ${targetProxyUrl} (${proxyErr.message})`);
+      return {
+        ok: false,
+        status: 503,
+        text: JSON.stringify({ result: -1, message: 'ارتباط با سرور واسط به دلیل خطا برقرار نشد: ' + proxyErr.message }),
+        data: { result: -1, message: 'ارتباط با سرور واسط به دلیل خطا برقرار نشد: ' + proxyErr.message },
+        durationMs: Date.now() - startTime
+      };
     }
   }
 
