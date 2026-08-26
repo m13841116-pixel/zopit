@@ -174,7 +174,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
 }
 
 async function makeUnifiedRequest(urlStr: string, payloadString: string, secretKey: string | null, timeoutMs: number): Promise<ProxyResponse> {
-  if (false) {
+  if (true) {
     try {
       return await makeFetchRequest(urlStr, payloadString, secretKey, timeoutMs);
     } catch (fetchErr: any) {
@@ -247,6 +247,8 @@ export async function executeProxyRequest(
   // Primary and secondary Iranian Static IP Proxies (for Zibal IP whitelisting)
   let proxyErrToLog: any = null;
   const proxyCandidates = [
+    'https://bankkalaha.ir/zibal-proxy.php',
+    'https://www.bankkalaha.ir/zibal-proxy.php',
     'https://bankkalaha.ir/zibal-proxy.php',
     'https://www.bankkalaha.ir/zibal-proxy.php'
   ];
