@@ -11283,179 +11283,6 @@ async function startServer() {
       SUPPORT_RUBIKA: "https://rubika.ir/Zopit_official",
       SUPPORT_BALE: "https://ble.ir/Zopit_support",
       SUPPORT_EMAIL: "support@Zopit.ir",
-      SUPPORT_CHANNELS_JSON: "[]"
-    };
-    try {
-      const keys = Object.keys(defaultSupport);
-      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
-      const map = { ...defaultSupport };
-      if (Array.isArray(settings)) {
-        settings.forEach((s) => {
-          if (s && s.key && s.value) map[s.key] = s.value;
-        });
-      }
-      res.json(map);
-    } catch (err) {
-      res.json(defaultSupport);
-    }
-  });
-  app.get("/api/terms", async (req, res) => {
-    const defaultTerms = {
-      SUPPLIER_TERMS: "\u06F1. \u062A\u0636\u0645\u06CC\u0646 \u0627\u0635\u0627\u0644\u062A \u0648 \u0633\u0644\u0627\u0645\u062A \u06A9\u0627\u0644\u0627: \u062A\u0627\u0645\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0645\u062A\u0639\u0647\u062F \u0645\u06CC\u200C\u06AF\u0631\u062F\u062F \u062A\u0645\u0627\u0645\u06CC \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC \u0627\u0631\u0633\u0627\u0644\u06CC \u0631\u0627 \u0628\u0627 \u0627\u0635\u0627\u0644\u062A \u0648 \u0633\u0644\u0627\u0645\u062A \u06A9\u0627\u0645\u0644 \u0627\u0631\u0633\u0627\u0644 \u06A9\u0646\u062F.\n\u06F2. \u0627\u0631\u0633\u0627\u0644 \u0628\u0647 \u0645\u0648\u0642\u0639: \u0633\u0641\u0627\u0631\u0634\u0627\u062A \u0628\u0627\u06CC\u062F \u062F\u0631 \u0645\u0647\u0644\u062A \u0645\u062C\u0627\u0632 \u0627\u0631\u0633\u0627\u0644 \u0634\u0648\u0646\u062F.",
-      STORE_TERMS: "\u06F1. \u062B\u0628\u062A\u200C\u0646\u0627\u0645 \u0645\u0639\u062A\u0628\u0631: \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0641\u0631\u0648\u0634\u06AF\u0627\u0647 \u0628\u0627\u06CC\u062F \u062F\u0642\u06CC\u0642 \u0648 \u0645\u0639\u062A\u0628\u0631 \u0628\u0627\u0634\u062F.\n\u06F2. \u062A\u0633\u0648\u06CC\u0647 \u0645\u0646\u0638\u0645: \u067E\u0631\u062F\u0627\u062E\u062A \u0641\u0627\u06A9\u062A\u0648\u0631\u0647\u0627 \u0637\u0628\u0642 \u0636\u0648\u0627\u0628\u0637 \u0633\u06CC\u0633\u062A\u0645 \u0627\u0646\u062C\u0627\u0645 \u0645\u06CC\u200C\u0634\u0648\u062F.",
-      CUSTOMER_TERMS: "\u06F1. \u0636\u0645\u0627\u0646\u062A \u0628\u0627\u0632\u06AF\u0634\u062A \u06A9\u0627\u0644\u0627 \u062A\u0627 \u06F7 \u0631\u0648\u0632 \u062F\u0631 \u0635\u0648\u0631\u062A \u0645\u063A\u0627\u06CC\u0631\u062A \u06CC\u0627 \u0639\u06CC\u0628 \u0641\u06CC\u0632\u06CC\u06A9\u06CC.",
-      GENERAL_TERMS: "\u0642\u0648\u0627\u0646\u06CC\u0646 \u06A9\u0644\u06CC \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u067E\u0644\u062A\u0641\u0631\u0645 \u0645\u0627\u0631\u06A9\u062A\u200C\u067E\u0644\u06CC\u0633 \u0632\u0648\u067E\u06CC\u062A."
-    };
-    try {
-      const keys = Object.keys(defaultTerms);
-      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
-      const map = { ...defaultTerms };
-      if (Array.isArray(settings)) {
-        settings.forEach((s) => {
-          if (s && s.key && s.value) map[s.key] = s.value;
-        });
-      }
-      res.json(map);
-    } catch (err) {
-      res.json(defaultTerms);
-    }
-  });
-  app.get("/api/custom-code", async (req, res) => {
-    const defaultCode = {
-      CUSTOM_CODE_HEADER: "",
-      CUSTOM_CODE_FOOTER: ""
-    };
-    try {
-      const keys = Object.keys(defaultCode);
-      const settings = await prisma13.systemConfig.findMany({ where: { key: { in: keys } } });
-      const map = { ...defaultCode };
-      if (Array.isArray(settings)) {
-        settings.forEach((s) => {
-          if (s && s.key && s.value) map[s.key] = s.value;
-        });
-      }
-      res.json(map);
-    } catch (err) {
-      res.json(defaultCode);
-    }
-  });
-  registerAIStudioRoute(app);
-  app.use((err, req, res, next) => {
-    console.error("[Global Error Handler] Unhandled error:", err);
-    if (res.headersSent) {
-      return next(err);
-    }
-    const status = err.status || err.statusCode || 500;
-    return res.status(status).json({
-      error: err.message || "\u062E\u0637\u0627\u06CC \u063A\u06CC\u0631\u0645\u0646\u062A\u0638\u0631\u0647\u200C\u0627\u06CC \u062F\u0631 \u0633\u0631\u0648\u0631 \u0631\u062E \u062F\u0627\u062F\u0647 \u0627\u0633\u062A.",
-      success: false
-    });
-  });
-  app.use("/api", (req, res) => {
-    res.status(404).json({ error: "Not Found" });
-  });
-  const getStaticDistPath = () => {
-    const candidates = [
-      import_path3.default.join(rootDir2, "dist"),
-      import_path3.default.join(rootDir2, "prod_output"),
-      __dirname,
-      import_path3.default.join(__dirname, "..", "dist"),
-      import_path3.default.join(process.cwd(), "dist"),
-      import_path3.default.join(process.cwd(), "prod_output")
-    ];
-    for (const dir of candidates) {
-      if (import_fs3.default.existsSync(import_path3.default.join(dir, "index.html"))) {
-        return dir;
-      }
-    }
-    if (import_fs3.default.existsSync(import_path3.default.join(rootDir2, "dist"))) return import_path3.default.join(rootDir2, "dist");
-    if (import_fs3.default.existsSync(import_path3.default.join(rootDir2, "prod_output"))) return import_path3.default.join(rootDir2, "prod_output");
-    return import_path3.default.join(rootDir2, "dist");
-  };
-  const isDev = process.env.NODE_ENV !== "production" && !__dirname.includes("dist") && !__dirname.includes("prod_output") && !process.env.K_SERVICE;
-  if (isDev) {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
-      appType: "spa"
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = getStaticDistPath();
-    console.log("[Express Static] Serving static files from distPath:", distPath);
-    app.use(import_express.default.static(distPath));
-    app.get(/.*/, (req, res) => {
-      if (req.path.includes(".") && !req.path.endsWith(".html") || req.path.startsWith("/assets/")) {
-        return res.status(404).send("File not found");
-      }
-      const activeDistPath = getStaticDistPath();
-      const indexPath = import_path3.default.join(activeDistPath, "index.html");
-      if (!import_fs3.default.existsSync(indexPath)) {
-        return res.status(503).send("Application is building or starting up. Please try again in a few seconds.");
-      }
-      res.sendFile(indexPath);
-    });
-  }
-  if (process.env.VERCEL) {
-    console.log("Running on Vercel, skipping app.listen()");
-    setImmediate(async () => {
-      try {
-        await seedDatabase();
-        await syncAllPaidOrdersSupplierWallets();
-      } catch (err) {
-        console.warn("[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:", err?.message || err);
-      }
-    });
-    return;
-  }
-  const portStr = String(PORT);
-  const portToListen = portStr.startsWith("/") || portStr.startsWith("\\") ? PORT : Number(PORT) || 3e3;
-  if (typeof portToListen === "string") {
-    app.listen(portToListen, async () => {
-      console.log(`\u{1F680} Backend Express server running on Unix Socket ${portToListen}`);
-      setImmediate(async () => {
-        try {
-          if (isRealRemoteDb2) {
-            console.log("[Server Startup] Real remote database detected. Pushing schema...");
-            try {
-              const { execSync: execSync3 } = require("child_process");
-              execSync3("npx prisma db push --accept-data-loss", { stdio: "inherit" });
-              console.log("[Server Startup] Database schema pushed successfully.");
-            } catch (dbPushErr) {
-              console.error("[Server Startup] Failed to push database schema on startup:", dbPushErr?.message || dbPushErr);
-            }
-          }
-          await seedDatabase();
-          await syncAllPaidOrdersSupplierWallets();
-        } catch (err) {
-          console.warn("[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:", err?.message || err);
-        }
-      });
-    });
-  } else {
-    app.listen(portToListen, "0.0.0.0", async () => {
-      console.log(`\u{1F680} Backend Express server running on port ${portToListen}`);
-      setImmediate(async () => {
-        try {
-          if (isRealRemoteDb2) {
-            console.log("[Server Startup] Real remote database detected. Pushing schema...");
-            try {
-              const { execSync: execSync3 } = require("child_process");
-              execSync3("npx prisma db push --accept-data-loss", { stdio: "inherit" });
-              console.log("[Server Startup] Database schema pushed successfully.");
-            } catch (dbPushErr) {
-              console.error("[Server Startup] Failed to push database schema on startup:", dbPushErr?.message || dbPushErr);
-            }
-          }
-          await seedDatabase();
-          await syncAllPaidOrdersSupplierWallets();
-        } catch (err) {
-          console.warn("[Server Startup] Warning: seedDatabase or syncAllPaidOrdersSupplierWallets failed:", err?.message || err);
-        }
-      });
-    });
-  }
-}
-startServer();
-var server_default = app;
-//# sourceMappingURL=server_prod.cjs.map
+      SUPPORT_CHANNELS_JxœìYkOãFşÎ¯˜õ[UÎ+0sk­Ò`ÚU¹)öÃ‚ÒÁï:¶ë±¹ˆæ¿÷ÌÍsœË´+í«jw¥Äñœû<ç™3bpvÚ!ÎÇg…À¿é¾ü*‹'ò,Ÿ	³”—ä3{âä€œİ~baé‰_nÄF´JÊA•çYQ¶öòœ•eœŞ	ú@ã’äEÌ'tÓ÷ø/Ù¤—¥£øÎÅitBÓ'÷™<ŒYÁ:äY¸_qÚQ^§âÿŒù	ÍÁò3ñ<¯†É€xDÜnQĞ'/æòÛ51µZur¤ÔeE@Ã±ëò9øI(Sœ|ÿ=á"sõpO“ŠµD åÛˆG¿İ¯UmØSı]0î}âYê‚¢^œ’–á˜¸¬(ldµàÂ2sÊ8Ísï•®³Nóx½dÅ„;«„ò§4$nÁşX–PFª~Úè……ÔN—ççÇïƒşğ"èŸ ×ÕÆÎÑ¦GÄw»+>ıñ¹µ->{=ù¼£–wåò¶}ŞÚRjrykO~ù>ZÙµ¦´T÷‡9õİòUŒ÷ëª½±Ñ³Ú[;ö³}$Ÿw	ö$ãP¢»Jˆ4­Öö¤¶¿i-iQeck{>¤¥Y w»HTWmÓÖ«i!Ê¢½‡|ñ¢o+Ñ‚Cz¦ĞŞu*ÑÒö^£«²hlÌ–zÕVÛÓÁ‘oÎYD¹è,L],4Ìfé]Ä®”JU¤‡<µ_“ˆŠDÇnJá¬š†º8ë‹»égt×bNÛĞ›BSˆÕm°§bêàçàæ£}5YnÚdTÌ*~…tƒÒ×ÔSí“îÁ6FÛòpçìêmœÃNíıòÓ€‹,”¯
+¿­*± vA)µƒ¹¨….ŠR×cÓD7™ª¬F¬JU³ JEç¸‹`«‚Ö˜é¢ÕuŞ™E\c¿1aaxõ.`'Kø3uÃã|¿ømwÅ"&kĞ±üq´‹hJ—±=ß{>js½G¸÷|ÄğºtXHcP»ú½ÚCÛª8»ZÔVí—à4èwESpÆªŠÕ8â4áajÖõÃ{ŒàÕ8~¬¢jÈêéb `²x5ĞÀ†àˆ­ÊH	éru½¿=ëÉyákOzjhù·Îy¸ÄË¦¼°âe6Y³ˆ½~Öë4õu{g‡Áğ× {ô¡fˆE­]¨Õ¿áúk£F¦ÿo*°ÅLÁîb(eÑ}?(«(ÎúYU2T#ªâÌ†nxVIÊËe	ó@*+\çã/IvKˆŸäWšF	+nÈe:–‘r@¥ˆWE$
+$3±‚XZâLÊªH¥W×ªL|yIËJà–=ıãÏ?Ñ/¹³ğf{cCik›Â§’pÕWKÕÌ¸V¡JCÆ9½“V;/øóãº:£ğé„‡=·ÌÌ†©›sã`ôçÏM<øHeùÁâv7MÌ«0„Ä:dDÎV,æ¦HN[Ä ¨†[[¦€¦tÎiV’£¬J#§aYmğÕ Tãğ`xNË1ì¡;ÇN! 'hÉÄ4í9wİaJ¾i`ïS§n‘eåa\´W‰Y§µú•¼È¢!´A^!Íá0Š‹”NØË¦¬(q<(ôëƒ Ïb/¼ğ!r[ÿ@¯‘Ô¾Q †"®&ü¸ ÙUÖ¶›èEílÄ­+öáğœ#îòPÀ, „Ì½q9IœVƒ+u×T“Ö¦+ÿÔñÜƒ_ííJû_2Æ6¼1œ†nƒ±Ş˜ÍÔöZÌÙ=4Kï½Sqx§WäİÁòZ…eœ¥8£ŞÕPöâ4LªˆqW›^ºÜ\Jaw¿Aÿê}/QÉ2‹˜Zf&aÁ ‘VÜ3 õë*6oà¸3ó€ª…ëÜÃ¢)“2"ŞÔb³jvçÚÅ3™ÄM´`'pRt`r© Ç“B#™š6F¼xÊAÄá9uaZ²Î=kQMjSÂ„ÆĞe9o]”8[“ìNÖà1{œ(Ù"òÙCqHFq9*²Im[³æy&L$¦lÖXR¶ÜZ	i‰érİûïúâsÀœâxœFB½ÄÒˆˆ!IG“„8TëU (õú:å0_ñugÌ<ìºÎ¤pèŒä¡37@©ÚS€ù=;|ÅÔí#HM/oÂ¦İ.Ä“å»Æx{!ñíß$ŞÍó$†IÚzÜVq	p éË’Šç*÷ÈyÂ( QçôÆ œJFìúR¸7_4é¼ˆâ¢ØöñÀ [÷ûUĞïÇ­™9Qb¹_¥©Œ.%W¬Y²Jøç8ÏÅ;µDÌ¥©Û2± ŞO&,Š©PÕu¦>|Ù ºó9cÑ!-é-$l÷³^#İ$9§qtVÈ±³%dÅš$€:«±xÂ¶A›§Ğš ¢ÚU~C>ÀkÈ§ÓˆCîÇt Ğ‘‘Â³§€ëÃ³q@˜­P ”@>!÷ü¬æ/±~‘ËZ‹£A‰7[Pµç¢¥ëkXû‰›¤CN«É-«ô 4|æš/1aÚhz'—Q9¦¦hã±l}ml8†Óï×ÕóæÑÎŞÆ”üLÃÏ€Tb¸R‘<),Ş.Óø‘2+ÉwÏØÑô÷º¶/âmqæ@ë3šôÙ$+Ùám»Õ˜¥óY¼UØF¡K"—ˆ•pWf4nÅÇ’íÃ1›P¸¶:Ò‹²äãø#³tê'_¤@»U\À„/†º{g-«å:iş¨¯â$º%9DEÖÖ(Ü#òrM„½–d\üéxî”A‚p1Kİg_W‘ºiTÎÒÜ õ­eT%ÉÓ\êfnEÅ‚fË6½š+ë¬ß#Ù¤ÌTzÑL "®Dåùjü4ÕzŸ	oeñóÿf¬·sÖrÖúê¼eŸ6<#-ågÃ“ÿ/LòOÃßøà|ãƒÿ>X™®Èºê{¼¼§…nİ¡šÅ5/Ï÷WÖ×ÿCxVÁ(yBåyÙ?>Ğ¢âVê…Ÿ¸7¡ùÊ_   ÿÿ mhië

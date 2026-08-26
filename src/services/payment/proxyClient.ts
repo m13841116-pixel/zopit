@@ -174,7 +174,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
 }
 
 async function makeUnifiedRequest(urlStr: string, payloadString: string, secretKey: string | null, timeoutMs: number): Promise<ProxyResponse> {
-  if (typeof globalThis.fetch === 'function') {
+  if (false) {
     try {
       return await makeFetchRequest(urlStr, payloadString, secretKey, timeoutMs);
     } catch (fetchErr: any) {
