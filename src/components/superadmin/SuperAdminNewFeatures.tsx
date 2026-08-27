@@ -1,5 +1,6 @@
 import { toast } from "../GlobalToast";
 import React, { useState, useEffect } from "react";
+import { useUrlQueryState } from "../../utils/routeSync";
 import {
   BookOpen,
   Plus,
@@ -28,9 +29,9 @@ export default function SuperAdminNewFeatures({
 }: {
   showNotification: (msg: string, type: "success" | "error") => void;
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<
+  const [activeSubTab, setActiveSubTab] = useUrlQueryState<
     "info-center" | "login-messages" | "dashboard-messages" | "dynamic-menus"
-  >("info-center");
+  >("featureTab", "info-center");
   return (
     <div className="space-y-6">
       

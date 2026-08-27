@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useUrlQueryState } from "../../utils/routeSync";
 import {
   MessageSquare,
   Send,
@@ -23,8 +24,8 @@ import {
 export default function Tickets() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeDepartment, setActiveDepartment] = useState<"dispute" | "communication">("dispute");
-  const [activeTab, setActiveTab] = useState<"supplier" | "store_manager">("supplier");
+  const [activeDepartment, setActiveDepartment] = useUrlQueryState<"dispute" | "communication">("dept", "dispute");
+  const [activeTab, setActiveTab] = useUrlQueryState<"supplier" | "store_manager">("subtab", "supplier");
   
   // Dispute specific states
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);

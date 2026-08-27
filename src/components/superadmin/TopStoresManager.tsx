@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useUrlQueryState } from "../../utils/routeSync";
 import {
   TrendingUp,
   Crown,
@@ -53,7 +54,7 @@ export default function TopStoresManager({ showNotification }: TopStoresManagerP
     topStoresCount: 0
   });
 
-  const [activeView, setActiveView] = useState<"top" | "all">("top");
+  const [activeView, setActiveView] = useUrlQueryState<"top" | "all">("view", "top");
   const [searchTerm, setSearchTerm] = useState("");
   const [complianceFilter, setComplianceFilter] = useState("ALL"); // ALL, MISSING_TAX, MISSING_ENAMAD, COMPLIANT
 

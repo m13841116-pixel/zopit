@@ -141,6 +141,7 @@ import {
   Legend,
 } from "recharts";
 import { useSyncTabWithUrl } from "../../utils/routeSync";
+import { getPersianStatus } from "../../utils/statusUtils";
 
 export function SupplierDashboard({
   user,
@@ -1072,16 +1073,17 @@ export function SupplierDashboard({
                               <div className="text-left flex flex-col items-end">
                                 
                                 <span
-                                  className={`px-3 py-1.5 rounded-full text-xs font-bold inline-block mb-1 ${order.status === "REQUESTED" ? "bg-warning/20 text-warning" : order.status === "SUPPLIER_APPROVED" ? "bg-blue-100 text-blue-700" : order.status === "PAID" ? "bg-success/20 text-success" : "bg-surface text-secondary"}`}
+                                  className={`px-3 py-1.5 rounded-full text-xs font-bold inline-block mb-1 border shadow-xs ${
+                                    order.status === "REQUESTED" || order.status === "NEW" || order.status === "WAITING_SUPPLIER_CONFIRMATION"
+                                      ? "bg-purple-100 text-purple-800 border-purple-300"
+                                      : order.status === "SUPPLIER_APPROVED" || order.status === "PAID"
+                                        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                        : order.status === "PENDING_PAYMENT" || order.status === "WAITING_FOR_PAYMENT" || order.status === "WAITING_SHIPPING_PAYMENT"
+                                          ? "bg-amber-100 text-amber-800 border-amber-300"
+                                          : "bg-surface text-secondary border-subtle"
+                                  }`}
                                 >
-                                  
-                                  {order.status === "REQUESTED"
-                                    ? "در انتظار تایید شما"
-                                    : order.status === "SUPPLIER_APPROVED"
-                                      ? "تایید شده"
-                                      : order.status === "PAID"
-                                        ? "پرداخت شده"
-                                        : order.status}
+                                  {getPersianStatus(order.status)}
                                 </span>
                                 <p className="text-xs text-muted font-mono mt-1">
                                   
@@ -1689,31 +1691,21 @@ export function SupplierDashboard({
                                       <td className="px-6 py-4">
                                         
                                         <span
-                                          className={`px-2.5 py-1 rounded-full text-xs font-semibold ${order.status === "REQUESTED" ? "bg-warning/20 text-warning" : order.status === "SUPPLIER_APPROVED" ? "bg-blue-100 text-blue-700" : order.status === "WAITING_FOR_PAYMENT" ? "bg-purple-100 text-purple-700" : order.status === "PAID" ? "bg-success/20 text-success" : order.status === "PREPARING" ? "bg-primary-default/20 text-primary-hover" : order.status === "COMPLETED" ? "bg-success/20 text-success" : order.status === "REJECTED" ? "bg-danger/20 text-danger" : order.status === "CANCELLED" ? "bg-surface text-secondary" : "bg-surface text-secondary"}`}
+                                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border shadow-xs ${
+                                            order.status === "REQUESTED" || order.status === "NEW" || order.status === "WAITING_SUPPLIER_CONFIRMATION"
+                                              ? "bg-purple-100 text-purple-800 border-purple-300"
+                                              : order.status === "SUPPLIER_APPROVED" || order.status === "PAID" || order.status === "COMPLETED"
+                                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                                : order.status === "WAITING_FOR_PAYMENT" || order.status === "PENDING_PAYMENT" || order.status === "WAITING_SHIPPING_PAYMENT"
+                                                  ? "bg-amber-100 text-amber-800 border-amber-300"
+                                                  : order.status === "PREPARING" || order.status === "PENDING_POSTAL_LABEL"
+                                                    ? "bg-blue-100 text-blue-800 border-blue-300"
+                                                    : order.status === "REJECTED" || order.status === "CANCELLED"
+                                                      ? "bg-rose-100 text-rose-800 border-rose-300"
+                                                      : "bg-surface text-secondary border-subtle"
+                                          }`}
                                         >
-                                          
-                                          {order.status === "REQUESTED"
-                                            ? "در انتظار تایید شما"
-                                            : order.status ===
-                                                "SUPPLIER_APPROVED"
-                                              ? "تایید شده"
-                                              : order.status ===
-                                                  "WAITING_FOR_PAYMENT"
-                                                ? "در انتظار پرداخت"
-                                                : order.status === "PAID"
-                                                  ? "پرداخت شده"
-                                                  : order.status === "PREPARING"
-                                                    ? "در حال آماده‌سازی"
-                                                    : order.status ===
-                                                        "COMPLETED"
-                                                      ? "تکمیل شده"
-                                                      : order.status ===
-                                                          "REJECTED"
-                                                        ? "رد شده"
-                                                        : order.status ===
-                                                            "CANCELLED"
-                                                          ? "لغو شده"
-                                                          : order.status}
+                                          {getPersianStatus(order.status)}
                                         </span>
                                       </td>
                                       <td className="px-6 py-4 flex flex-col gap-2 min-w-[170px]">

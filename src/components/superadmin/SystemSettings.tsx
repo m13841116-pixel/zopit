@@ -1,5 +1,6 @@
 import { toast } from "../GlobalToast";
 import React, { useState, useEffect } from "react";
+import { useUrlQueryState } from "../../utils/routeSync";
 import {
   Settings,
   Shield,
@@ -50,9 +51,9 @@ interface SystemSettingsProps {
 }
 
 export default function SystemSettings({ initialTab = "core" }: SystemSettingsProps) {
-  const [activeTab, setActiveTab] = useState<
+  const [activeTab, setActiveTab] = useUrlQueryState<
     "core" | "supplier_rules" | "gateways" | "support" | "terms" | "code" | "woocommerce" | "logs" | "health" | "dev_tools"
-  >(initialTab);
+  >("subtab", initialTab);
 
   useEffect(() => {
     if (initialTab) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useUrlQueryState } from "../../utils/routeSync";
 import {
   Image,
   LayoutDashboard,
@@ -64,7 +65,7 @@ export default function SuperAdminDashboard({
   useSyncTabWithUrl("/admin", activeTab, setActiveTab, "overview");
 
   const [showEducationModal, setShowEducationModal] = useState(false);
-  const [activeUserRoleFilter, setActiveUserRoleFilter] = useState("ALL");
+  const [activeUserRoleFilter, setActiveUserRoleFilter] = useUrlQueryState<string>("roleFilter", "ALL");
   const [badges, setBadges] = useState({ orders: 0, tickets: 0, invoices: 0, settlements: 0 });
 
   useEffect(() => {

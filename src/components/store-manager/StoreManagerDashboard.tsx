@@ -128,6 +128,7 @@ const getIconComponent = (iconName: any) => {
 import UserDashboardWidgets from "../UserDashboardWidgets";
 import LatestAnnouncementsWidget from "../LatestAnnouncementsWidget";
 import { useSyncTabWithUrl } from "../../utils/routeSync";
+import { getPersianStatus } from "../../utils/statusUtils";
 
 export default function StoreManagerDashboard({
   user,
@@ -502,11 +503,6 @@ export default function StoreManagerDashboard({
       id: "my_catalog",
       label: "زوپیتی من",
       icon: <CheckCircle className="w-5 h-5" />,
-    },
-    {
-      id: "wallet",
-      label: "کیف پول و اعتبار",
-      icon: <Wallet className="w-5 h-5" />,
     },
     {
       id: "invoices",
@@ -906,14 +902,21 @@ export default function StoreManagerDashboard({
                                   </span>
                                 </span>
                                 <span
-                                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${activity.status === "NEW" || activity.status === "REQUESTED" ? "text-warning bg-warning/10" : activity.status === "PAID" ? "text-success bg-success/10" : "text-muted bg-surface"}`}
+                                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shadow-xs ${
+                                    activity.status === "REQUESTED" || activity.status === "NEW" || activity.status === "WAITING_SUPPLIER_CONFIRMATION"
+                                      ? "text-purple-800 bg-purple-100 border-purple-300"
+                                      : activity.status === "PENDING_PAYMENT" || activity.status === "WAITING_FOR_PAYMENT" || activity.status === "WAITING_SHIPPING_PAYMENT"
+                                        ? "text-amber-800 bg-amber-100 border-amber-300"
+                                        : activity.status === "PAID" || activity.status === "PENDING_POSTAL_LABEL" || activity.status === "PREPARING"
+                                          ? "text-blue-800 bg-blue-100 border-blue-300"
+                                          : activity.status === "SHIPPED" || activity.status === "DELIVERED" || activity.status === "COMPLETED" || activity.status === "SUCCESS"
+                                            ? "text-emerald-800 bg-emerald-100 border-emerald-300"
+                                            : activity.status === "CANCELLED" || activity.status === "REJECTED"
+                                              ? "text-rose-800 bg-rose-100 border-rose-300"
+                                              : "text-slate-800 bg-slate-100 border-slate-300"
+                                  }`}
                                 >
-                                  {activity.status === "NEW" ||
-                                  activity.status === "REQUESTED"
-                                    ? "منتظر تایید"
-                                    : activity.status === "PAID"
-                                      ? "پرداخت شده"
-                                      : activity.status}
+                                  {getPersianStatus(activity.status)}
                                 </span>
                               </div>
                             </div>
@@ -1197,179 +1200,12 @@ export default function StoreManagerDashboard({
                               colSpan={5}
                               className="px-6 py-10 text-center text-muted"
                             >
-                              هیچ صورت‌حسابی یافت نشد.
+                               هیچ صورت‌حسابی یافت نشد.
                             </td>
                           </tr>
                         )}
                       </tbody>
                     </table>
-                  </div>
-                ))}
-              {activeTab === "wallet" &&
-                walletInfo &&
-                (sysConfig["STORE_FINANCIAL_ENABLED"] === false ? (
-                  renderMaintenance("کیف پول و اعتبار")
-                ) : (
-                  <div className="space-y-6 animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-gradient-to-br from-slate-900 to-indigo-950 rounded-3xl p-6 md:p-8 text-inverse shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[220px]">
-                        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-primary-default rounded-full blur-3xl opacity-20"></div>
-                        <div className="relative z-10 flex flex-col h-full w-full">
-                          <p className="text-indigo-200 font-medium mb-1">
-                            موجودی کیف پول (تومان)
-                          </p>
-                          <h2
-                            className={`text-4xl md:text-5xl font-bold tracking-tight mt-2 ${Number(walletInfo.balance || 0) < 0 ? 'text-rose-300' : 'text-white'}`}
-                            dir="ltr"
-                            style={{ textAlign: "right" }}
-                          >
-                            {Number(walletInfo.balance || 0).toLocaleString()}
-                          </h2>
-                          <div className="mt-8 flex gap-3">
-                            <input
-                              type="number"
-                              placeholder="مبلغ شارژ (تومان)"
-                              value={depositAmount}
-                              onChange={(e) => setDepositAmount(e.target.value)}
-                              className="bg-card/10 border border-border-subtle/20 text-inverse placeholder:text-white/50 rounded-xl px-4 py-2 outline-none focus:bg-card/20 focus:border-white/40 transition-all flex-1"
-                            />
-                            <button
-                              onClick={handleDeposit}
-                              className="bg-card text-primary-hover px-6 py-2 rounded-xl font-bold hover:bg-surface transition-colors whitespace-nowrap"
-                            >
-                              
-                              شارژ حساب
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-card rounded-3xl p-6 border border-subtle shadow-sm flex flex-col justify-center text-muted">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className="w-12 h-12 bg-warning/10 text-warning rounded-2xl flex items-center justify-center">
-                            <Wallet className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-primary text-lg">
-                              اعتبار کیف پول
-                            </h3>
-                            <p className="text-sm">جهت تسویه نقدی فاکتورها</p>
-                          </div>
-                        </div>
-                        <p className="text-sm leading-relaxed text-muted mb-4">
-                          شما می‌توانید اعتبار کیف پول خود را شارژ کنید. به این
-                          ترتیب در صورتی که گزینه «پرداخت کارت به کارت / بانکی»
-                          را هنگام پرداخت سفارش انتخاب کنید، مبلغ مستقیماً از
-                          کیف پول شما کسر شده و حساب شما منفی می‌شود. با شارژ
-                          مجدد کیف پول خود می‌توانید موجودی منفی را تسویه
-                          نمایید.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden">
-                      <div className="px-6 py-4 border-b border-subtle bg-background/50">
-                        <h3 className="font-bold text-primary">
-                          تراکنش‌های کیف پول
-                        </h3>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-right text-sm">
-                          <thead className="bg-background border-b border-subtle text-muted font-medium text-xs">
-                            <tr>
-                              <th className="px-6 py-3">تاریخ و زمان</th>
-                              <th className="px-6 py-3">نوع تراکنش</th>
-                              <th className="px-6 py-3">مبلغ (تومان)</th>
-                              <th className="px-6 py-3">وضعیت</th>
-                              <th className="px-6 py-3">توضیحات</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {walletInfo.ledger?.map((entry: any) => (
-                              <tr
-                                key={entry.id}
-                                className="hover:bg-background"
-                              >
-                                <td className="px-6 py-4 text-muted font-mono text-xs whitespace-nowrap">
-                                  {new Date(entry.createdAt).toLocaleString(
-                                    "fa-IR",
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 font-medium whitespace-nowrap">
-                                  {entry.type === "DEPOSIT" && (
-                                    <span className="text-success">
-                                      شارژ حساب
-                                    </span>
-                                  )}
-                                  {entry.type === "WITHDRAWAL" && (
-                                    <span className="text-danger">
-                                      برداشت از حساب
-                                    </span>
-                                  )}
-                                  {entry.type === "ORDER_REVENUE" && (
-                                    <span className="text-primary-default">
-                                      تسویه و پرداخت
-                                    </span>
-                                  )}
-                                  {entry.type !== "DEPOSIT" &&
-                                    entry.type !== "WITHDRAWAL" &&
-                                    entry.type !== "ORDER_REVENUE" && (
-                                      <span>{entry.type}</span>
-                                    )}
-                                </td>
-                                <td
-                                  className="px-6 py-4 font-mono font-bold whitespace-nowrap"
-                                  dir="ltr"
-                                  style={{ textAlign: "right" }}
-                                >
-                                  <span
-                                    className={
-                                      entry.type === "WITHDRAWAL" ||
-                                      entry.amount < 0
-                                        ? "text-danger"
-                                        : "text-success"
-                                    }
-                                  >
-                                    {entry.type === "WITHDRAWAL" ||
-                                    entry.amount < 0
-                                      ? "-"
-                                      : "+"}
-                                    {Math.abs(entry.amount).toLocaleString()}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${entry.status === "COMPLETED" ? "bg-success/20 text-success" : entry.status === "PENDING" ? "bg-warning/20 text-warning" : "bg-danger/20 text-danger"}`}
-                                  >
-                                    {entry.status === "COMPLETED"
-                                      ? "موفق"
-                                      : entry.status === "PENDING"
-                                        ? "در انتظار"
-                                        : "ناموفق"}
-                                  </span>
-                                </td>
-                                <td
-                                  className="px-6 py-4 text-xs text-muted max-w-xs truncate"
-                                  title={entry.description}
-                                >
-                                  {entry.description || "-"}
-                                </td>
-                              </tr>
-                            ))}
-                            {(!walletInfo.ledger ||
-                              walletInfo.ledger.length === 0) && (
-                              <tr>
-                                <td
-                                  colSpan={5}
-                                  className="px-6 py-12 text-center text-muted"
-                                >
-                                  
-                                  هیچ تراکنشی در کیف پول شما ثبت نشده است.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
                   </div>
                 ))}
               {activeTab === "pro_account" && (

@@ -966,7 +966,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       const userRole = data.user?.role;
       if (userRole !== "SUPERADMIN" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
         const userId = data.user?.id || data.user?.username || "default";
-        if (!localStorage.getItem(`terms_accepted_${userId}`)) {
+        const alreadyAccepted =
+          localStorage.getItem(`terms_accepted_${userId}`) === "true" ||
+          localStorage.getItem("zopit_terms_accepted_global") === "true" ||
+          data.user?.termsAccepted;
+        if (!alreadyAccepted) {
           setShowTermsModal(userRole || "GENERAL");
         }
       }
@@ -1039,7 +1043,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       const userRole = data.user?.role;
       if (userRole !== "SUPERADMIN" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
         const userId = data.user?.id || data.user?.username || "default";
-        if (!localStorage.getItem(`terms_accepted_${userId}`)) {
+        const alreadyAccepted =
+          localStorage.getItem(`terms_accepted_${userId}`) === "true" ||
+          localStorage.getItem("zopit_terms_accepted_global") === "true" ||
+          data.user?.termsAccepted;
+        if (!alreadyAccepted) {
           setShowTermsModal(userRole || "GENERAL");
         }
       }
@@ -1179,7 +1187,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       const userRole = data.user?.role;
       if (userRole !== "SUPERADMIN" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
         const userId = data.user?.id || data.user?.username || "default";
-        if (!localStorage.getItem(`terms_accepted_${userId}`)) {
+        const alreadyAccepted =
+          localStorage.getItem(`terms_accepted_${userId}`) === "true" ||
+          localStorage.getItem("zopit_terms_accepted_global") === "true" ||
+          data.user?.termsAccepted;
+        if (!alreadyAccepted) {
           setShowTermsModal(userRole || "GENERAL");
         }
       }
@@ -1259,11 +1271,13 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       sessionStorage.removeItem("supplierStep");
       localStorage.removeItem("supplierDataDraft");
       localStorage.removeItem("supplierStepDraft");
+      const userId = data.user?.id || data.user?.username || "default";
+      localStorage.setItem(`terms_accepted_${userId}`, "true");
+      localStorage.setItem("zopit_terms_accepted_global", "true");
       showNotification(
         "ثبت‌نام شما به عنوان تامین‌کننده با موفقیت انجام شد.",
         "success",
       );
-      setShowTermsModal(data.user?.role || "SUPPLIER");
       window.history.pushState({}, "", "/supplier/dashboard");
       setView("dashboard");
     } catch (err: any) {
@@ -1396,11 +1410,13 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       sessionStorage.removeItem("storeStep");
       localStorage.removeItem("storeDataDraft");
       localStorage.removeItem("storeStepDraft");
+      const userId = data.user?.id || data.user?.username || "default";
+      localStorage.setItem(`terms_accepted_${userId}`, "true");
+      localStorage.setItem("zopit_terms_accepted_global", "true");
       showNotification(
         "ثبت‌نام شما به عنوان مدیر فروشگاه با موفقیت انجام شد.",
         "success",
       );
-      setShowTermsModal(data.user?.role || "STORE_MANAGER");
       setView("dashboard");
     } catch (err: any) {
       showNotification(err.message, "error");
@@ -3919,7 +3935,12 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                 </div>
               </div>
               <button
-                onClick={() => setShowTermsModal(null)}
+                onClick={() => {
+                  const userId = currentUser?.id || currentUser?.username || "default";
+                  localStorage.setItem(`terms_accepted_${userId}`, "true");
+                  localStorage.setItem("zopit_terms_accepted_global", "true");
+                  setShowTermsModal(null);
+                }}
                 className="p-2 hover:bg-surface rounded-full text-muted hover:text-primary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -3979,6 +4000,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                 onClick={() => {
                   const userId = currentUser?.id || currentUser?.username || "default";
                   localStorage.setItem(`terms_accepted_${userId}`, "true");
+                  localStorage.setItem("zopit_terms_accepted_global", "true");
                   setShowTermsModal(null);
                   showNotification("قوانین و ضوابط تایید گردید.", "success");
                 }}

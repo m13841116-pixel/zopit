@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useUrlQueryState } from "../../utils/routeSync";
 import {
   MessageSquare,
   Send,
@@ -19,7 +20,7 @@ export default function StoreTickets() {
   const [loading, setLoading] = useState(true);
   
   // Tab control: "general" or "returns"
-  const [activeCategoryTab, setActiveCategoryTab] = useState<"general" | "returns">("general");
+  const [activeCategoryTab, setActiveCategoryTab] = useUrlQueryState<"general" | "returns">("cat", "general");
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showReturnsModal, setShowReturnsModal] = useState(false);

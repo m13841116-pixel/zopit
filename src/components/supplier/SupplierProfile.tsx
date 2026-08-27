@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useUrlQueryState } from "../../utils/routeSync";
 import { User, Save, Bell, CheckCircle } from "lucide-react";
 export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
-  const [activeSubTab, setActiveSubTab] = useState<"profile" | "notifications">(
+  const [activeSubTab, setActiveSubTab] = useUrlQueryState<"profile" | "notifications">("tab",
     "profile",
   );
   const [formData, setFormData] = useState({
