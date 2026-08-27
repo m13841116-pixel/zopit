@@ -9,6 +9,7 @@ import { StoreCustomers } from "./StoreCustomers";
 import { StoreProAccount } from "./StoreProAccount";
 import InstagramPageSettings from "./InstagramPageSettings";
 import { toast } from "../GlobalToast";
+import { AppLink } from "../AppLink";
 import React, { useState, useEffect } from "react";
 import Announcements from "../Announcements";
 import NotificationBell from "../NotificationBell";
@@ -136,7 +137,15 @@ export default function StoreManagerDashboard({
   showNotification,
   onUpdateUser,
 }: any): React.ReactElement {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path.startsWith("/store/") && path.length > "/store/".length) {
+        return path.replace("/store/", "");
+      }
+    }
+    return "overview";
+  });
   
   // Sync tab with URL
   useSyncTabWithUrl("/store", activeTab, setActiveTab, "overview");
@@ -616,8 +625,7 @@ export default function StoreManagerDashboard({
         </div>
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {getDynamicNavItems().map((item) => (
-            <button
-              key={item.id}
+            <AppLink href={`/store/${item.id}`} key={item.id}
               onClick={() => {
                 setActiveTab(item.id);
                 setMobileMenuOpen(false);
@@ -634,7 +642,7 @@ export default function StoreManagerDashboard({
                   {unansweredQuestionsCount}
                 </span>
               )}
-            </button>
+            </AppLink>
           ))}
         </nav>
         <div className="p-4 border-t border-border-subtle space-y-4">
@@ -645,13 +653,13 @@ export default function StoreManagerDashboard({
             <p className="text-[10px] text-text-muted mb-2 leading-relaxed">
               برای هرگونه سوال، ابهام یا مشکل، لطفاً تیکت پشتیبانی ثبت کنید:
             </p>
-            <button
-              onClick={() => setActiveTab("tickets")}
+            <AppLink href="/store/tickets" 
+               onClick={() => setActiveTab("tickets")} 
               className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 bg-primary-default text-inverse rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm cursor-pointer"
             >
               <Ticket className="w-4 h-4" />
               <span>ارسال تیکت به مدیر کل</span>
-            </button>
+            </AppLink>
           </div>
           <button
             onClick={onLogout}
@@ -739,13 +747,13 @@ export default function StoreManagerDashboard({
                           سفارشات، تراز مالی و محصولات جدید بازار را رصد کنید.
                         </p>
                       </div>
-                      <button
-                        onClick={() => setActiveTab("marketplace")}
+                      <AppLink href="/store/marketplace" 
+                         onClick={() => setActiveTab("marketplace")} 
                         className="bg-white text-primary-default px-6 py-3 rounded-2xl text-sm font-extrabold shadow-md hover:bg-slate-100 transition-all flex items-center gap-2 self-start md:self-auto shrink-0 group active:scale-95 cursor-pointer"
                       >
                         <Layers className="w-4 h-4 transition-transform group-hover:scale-110 text-primary-default" />
                         مشاهده بانک زوپیت (Zopit Bank)
-                      </button>
+                      </AppLink>
                     </div>
                   </div>
 
@@ -771,13 +779,13 @@ export default function StoreManagerDashboard({
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setActiveTab("page_settings")}
+                    <AppLink href="/store/page_settings" 
+                       onClick={() => setActiveTab("page_settings")} 
                       className="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-xs font-black transition-all shrink-0 cursor-pointer shadow-md flex items-center justify-center gap-2"
                     >
                       <Globe className="w-4 h-4" />
                       <span>{user?.storeLink ? "ویرایش لینک وب‌سایت" : "تنظیم لینک وب‌سایت فروشگاه"}</span>
-                    </button>
+                    </AppLink>
                   </div>
                   {/* 3 Stats Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -859,12 +867,12 @@ export default function StoreManagerDashboard({
                         <h3 className="font-bold text-primary text-lg">
                           آخرین سفارشات ثبت شده
                         </h3>
-                        <button
-                          onClick={() => setActiveTab("orders")}
+                        <AppLink href="/store/orders" 
+                           onClick={() => setActiveTab("orders")} 
                           className="text-xs font-bold text-primary-default hover:text-primary-hover transition-colors"
                         >
                           مشاهده همه سفارشات
-                        </button>
+                        </AppLink>
                       </div>
                       {!stats.recentActivity ||
                       stats.recentActivity.length === 0 ? (
@@ -1018,10 +1026,10 @@ export default function StoreManagerDashboard({
                             دسترسی سریع
                           </h3>
                           <div className="space-y-4">
-                            <div
-                              onClick={() => setActiveTab("marketplace")}
+                            <AppLink href="/store/marketplace" 
+                               onClick={() => setActiveTab("marketplace")} 
                               className="p-4 rounded-2xl border border-subtle hover:border-primary-default/20 hover:bg-primary-default/5 cursor-pointer transition-all flex items-center gap-4 group"
-                            >
+                             style={{ display: 'block' }}>
                               <div className="w-12 h-12 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center shrink-0 transition-colors group-hover:bg-primary-hover group-hover:text-white">
                                 <Layers className="w-6 h-6" />
                               </div>
@@ -1034,11 +1042,11 @@ export default function StoreManagerDashboard({
                                   خود
                                 </p>
                               </div>
-                            </div>
-                            <div
-                              onClick={() => setActiveTab("my_catalog")}
+                            </AppLink>
+                            <AppLink href="/store/my_catalog" 
+                               onClick={() => setActiveTab("my_catalog")} 
                               className="p-4 rounded-2xl border border-subtle hover:border-emerald-100 hover:bg-success/10/20 cursor-pointer transition-all flex items-center gap-4 group"
-                            >
+                             style={{ display: 'block' }}>
                               <div className="w-12 h-12 rounded-xl bg-success/10 text-success flex items-center justify-center shrink-0 transition-colors group-hover:bg-success group-hover:text-white">
                                 <CheckCircle className="w-6 h-6" />
                               </div>
@@ -1050,11 +1058,11 @@ export default function StoreManagerDashboard({
                                   کالاهای انتخاب شده خود را مدیریت کنید
                                 </p>
                               </div>
-                            </div>
-                            <div
-                              onClick={() => setActiveTab("invoices")}
+                            </AppLink>
+                            <AppLink href="/store/invoices" 
+                               onClick={() => setActiveTab("invoices")} 
                               className="p-4 rounded-2xl border border-subtle hover:border-amber-100 hover:bg-warning/10/20 cursor-pointer transition-all flex items-center gap-4 group"
-                            >
+                             style={{ display: 'block' }}>
                               <div className="w-12 h-12 rounded-xl bg-warning/10 text-warning flex items-center justify-center shrink-0 transition-colors group-hover:bg-warning group-hover:text-white">
                                 <Wallet className="w-6 h-6" />
                               </div>
@@ -1066,7 +1074,7 @@ export default function StoreManagerDashboard({
                                   پرداخت فاکتورها و تسویه با پلتفرم
                                 </p>
                               </div>
-                            </div>
+                            </AppLink>
                           </div>
                         </div>
                       </div>

@@ -1,4 +1,5 @@
 import { toast } from "../GlobalToast";
+import { AppLink } from "../AppLink";
 import React, { useState } from "react";
 import Announcements from "../Announcements";
 import NotificationBell from "../NotificationBell";
@@ -149,7 +150,15 @@ export function SupplierDashboard({
   showNotification,
   onUpdateUser,
 }: any) {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path.startsWith("/supplier/") && path.length > "/supplier/".length) {
+        return path.replace("/supplier/", "");
+      }
+    }
+    return "overview";
+  });
 
   // Sync tab with URL
   useSyncTabWithUrl("/supplier", activeTab, setActiveTab, "overview");
@@ -737,15 +746,14 @@ export function SupplierDashboard({
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto min-h-0">
           
           {getDynamicNavItems().map((item) => (
-            <button
-              key={item.id}
+            <AppLink href={`/supplier/${item.id}`} key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === item.id ? "bg-primary-default text-white shadow-lg shadow-primary-default/20" : "text-text-secondary hover:bg-surface hover:text-text-primary"}`}
               aria-label={item.label}
             >
               
               <span className={activeTab === item.id ? "text-white" : "text-text-muted"}>{item.icon}</span> {item.label}
-            </button>
+            </AppLink>
           ))}
         </nav>
         <div className="p-4 border-t border-border-subtle space-y-4 shrink-0 bg-card">

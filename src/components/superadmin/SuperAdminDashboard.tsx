@@ -1,3 +1,4 @@
+import { AppLink } from "../AppLink";
 import React, { useState, useEffect } from "react";
 import { useUrlQueryState } from "../../utils/routeSync";
 import {
@@ -59,7 +60,15 @@ export default function SuperAdminDashboard({
   showNotification?: (message: string, type: "success" | "error") => void;
   onImpersonateUser?: (user: any, token?: string) => void;
 }) {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path.startsWith("/admin/") && path.length > "/admin/".length) {
+        return path.replace("/admin/", "");
+      }
+    }
+    return "overview";
+  });
 
   // Sync tab with URL
   useSyncTabWithUrl("/admin", activeTab, setActiveTab, "overview");
@@ -142,8 +151,7 @@ export default function SuperAdminDashboard({
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {menuItems.map((item) => (
-            <button
-              key={item.id}
+            <AppLink href={`/admin/${item.id}`} key={item.id}
               onClick={() => {
                 setActiveTab(item.id);
                 if (item.id === "all-users") setActiveUserRoleFilter("ALL");
@@ -168,7 +176,7 @@ export default function SuperAdminDashboard({
                   {(item as any).badge}
                 </span>
               ) : null}
-            </button>
+            </AppLink>
           ))}
         </nav>
         <div className="p-4 border-t border-border-subtle">

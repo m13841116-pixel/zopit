@@ -268,7 +268,31 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     | "forgot_password"
     | "dashboard"
     | "explore"
-  >("explore");
+  >(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      const hasToken = !!localStorage.getItem("token");
+      if (path.startsWith("/login")) return hasToken ? "dashboard" : "login";
+      if (path.startsWith("/register/store")) return hasToken ? "dashboard" : "store_manager_form";
+      if (path.startsWith("/register/supplier")) return hasToken ? "dashboard" : "supplier_form";
+      if (path.startsWith("/register/customer")) return hasToken ? "dashboard" : "customer_form";
+      if (path.startsWith("/register/referrer")) return hasToken ? "dashboard" : "referrer_form";
+      if (path.startsWith("/register")) return hasToken ? "dashboard" : "role_select";
+      if (path.startsWith("/forgot-password")) return "forgot_password";
+      if (path === "/explore") return "explore";
+      if (path === "/") return hasToken ? "dashboard" : "explore";
+      if (
+        path.startsWith("/store") ||
+        path.startsWith("/supplier") ||
+        path.startsWith("/admin") ||
+        path.startsWith("/customer") ||
+        path.startsWith("/referrer")
+      ) {
+        return hasToken ? "dashboard" : "login";
+      }
+    }
+    return "explore";
+  });
   const [token, setToken] = useState<string | null>(() => {
     return localStorage.getItem("token") || "";
   });
@@ -478,10 +502,20 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     else if (view === "forgot_password") newUrl = "/forgot-password";
     else if (view === "explore") newUrl = "/explore";
 
-    if (window.location.pathname !== newUrl && window.location.pathname !== '/') {
-      window.history.pushState(null, '', newUrl);
-    } else if (window.location.pathname === '/' && view !== 'explore') {
-      window.history.pushState(null, '', newUrl);
+    const path = window.location.pathname;
+    const isDashboardPath =
+      path.startsWith("/store") ||
+      path.startsWith("/supplier") ||
+      path.startsWith("/admin") ||
+      path.startsWith("/customer") ||
+      path.startsWith("/referrer");
+
+    if (!isDashboardPath && path !== newUrl) {
+      if (path === "/" && view === "explore") {
+        // keep '/' as explore
+      } else {
+        window.history.pushState(null, "", newUrl);
+      }
     }
   }, [view]);
 

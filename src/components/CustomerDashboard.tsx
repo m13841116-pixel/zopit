@@ -20,7 +20,15 @@ export function CustomerDashboard({
   showNotification,
   onUpdateUser,
 }: CustomerDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"orders" | "profile">("orders");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path.startsWith("/customer/") && path.length > "/customer/".length) {
+        return path.replace("/customer/", "");
+      }
+    }
+    return "orders";
+  });
 
   // Sync tab with URL
   useSyncTabWithUrl("/customer", activeTab, setActiveTab as any, "orders");

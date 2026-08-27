@@ -22,7 +22,15 @@ export default function ReferrerDashboard({ currentUser, onLogout, showNotificat
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "suppliers" | "terms">("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path.startsWith("/referrer/") && path.length > "/referrer/".length) {
+        return path.replace("/referrer/", "");
+      }
+    }
+    return "overview";
+  });
 
   // Sync tab with URL
   useSyncTabWithUrl("/referrer", activeTab, setActiveTab as any, "overview");
