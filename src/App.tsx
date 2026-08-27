@@ -400,8 +400,33 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     }
   };
 
-  // Auto-login if token exists
+  // Auto-login and URL Routing
   useEffect(() => {
+    // Determine target view from URL path
+    const path = window.location.pathname;
+    let targetView = "explore";
+    let isDashboardPath = false;
+
+    if (path.startsWith("/login")) targetView = "login";
+    else if (path.startsWith("/register/store")) targetView = "store_manager_form";
+    else if (path.startsWith("/register/supplier")) targetView = "supplier_form";
+    else if (path.startsWith("/register/customer")) targetView = "customer_form";
+    else if (path.startsWith("/register/referrer")) targetView = "referrer_form";
+    else if (path.startsWith("/register")) targetView = "role_select";
+    else if (path.startsWith("/forgot-password")) targetView = "forgot_password";
+    else if (path === "/explore") targetView = "explore";
+    else if (path === "/") targetView = "explore";
+    else if (
+      path.startsWith("/store") ||
+      path.startsWith("/supplier") ||
+      path.startsWith("/admin") ||
+      path.startsWith("/customer") ||
+      path.startsWith("/referrer")
+    ) {
+      isDashboardPath = true;
+      targetView = "dashboard";
+    }
+
     if (token) {
       try {
         const storedUser = localStorage.getItem("user");
@@ -409,31 +434,82 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           const parsed = JSON.parse(storedUser);
           if (parsed && parsed.role) {
             setCurrentUser(parsed);
-            setView("dashboard");
+            // If they are logged in but requested a public auth page (login/register), redirect to dashboard
+            if (["login", "role_select", "store_manager_form", "supplier_form", "customer_form", "referrer_form"].includes(targetView)) {
+               setView("dashboard");
+            } else {
+               // Let them see explore if they asked for it, otherwise default to dashboard for root, or keep target if it was dashboard
+               setView(path === "/" ? "dashboard" : (targetView as any));
+            }
           } else {
-            localStorage.removeItem("user");
-            localStorage.removeItem("token");
-            setToken(null);
-            setCurrentUser(null);
-            setView("explore");
+            throw new Error("Invalid user");
           }
         } else {
-          localStorage.removeItem("token");
-          setToken(null);
-          setCurrentUser(null);
-          setView("explore");
+          throw new Error("No user");
         }
       } catch (e) {
         localStorage.removeItem("user");
         localStorage.removeItem("token");
         setToken(null);
         setCurrentUser(null);
-        setView("explore");
+        setView(isDashboardPath ? "explore" : (targetView as any));
       }
     } else {
-      setView("explore");
+      // No token: if they requested dashboard, send to login, otherwise respect their request
+      if (isDashboardPath) {
+        setView("login");
+      } else {
+        setView(targetView as any);
+      }
     }
   }, [token]);
+
+  // Sync state changes to browser URL for main views
+  useEffect(() => {
+    if (view === "dashboard") return; // Handled by individual dashboard components
+    
+    let newUrl = "/explore";
+    if (view === "login") newUrl = "/login";
+    else if (view === "store_manager_form") newUrl = "/register/store";
+    else if (view === "supplier_form") newUrl = "/register/supplier";
+    else if (view === "customer_form") newUrl = "/register/customer";
+    else if (view === "referrer_form") newUrl = "/register/referrer";
+    else if (view === "role_select") newUrl = "/register";
+    else if (view === "forgot_password") newUrl = "/forgot-password";
+    else if (view === "explore") newUrl = "/explore";
+
+    if (window.location.pathname !== newUrl && window.location.pathname !== '/') {
+      window.history.pushState(null, '', newUrl);
+    } else if (window.location.pathname === '/' && view !== 'explore') {
+      window.history.pushState(null, '', newUrl);
+    }
+  }, [view]);
+
+  // Listen for browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path.startsWith("/login")) setView("login");
+      else if (path.startsWith("/register/store")) setView("store_manager_form");
+      else if (path.startsWith("/register/supplier")) setView("supplier_form");
+      else if (path.startsWith("/register/customer")) setView("customer_form");
+      else if (path.startsWith("/register/referrer")) setView("referrer_form");
+      else if (path.startsWith("/register")) setView("role_select");
+      else if (path.startsWith("/forgot-password")) setView("forgot_password");
+      else if (path === "/explore" || path === "/") setView("explore");
+      else if (
+        path.startsWith("/store") ||
+        path.startsWith("/supplier") ||
+        path.startsWith("/admin") ||
+        path.startsWith("/customer") ||
+        path.startsWith("/referrer")
+      ) {
+        setView("dashboard");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const handleExitImpersonation = async () => {
     try {

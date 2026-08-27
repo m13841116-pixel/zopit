@@ -5,6 +5,7 @@ import {
   ChevronUp, MapPin, Phone, Mail, Calendar, Eye, FileText
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useSyncTabWithUrl } from "../utils/routeSync";
 
 interface CustomerDashboardProps {
   user: any;
@@ -20,6 +21,10 @@ export function CustomerDashboard({
   onUpdateUser,
 }: CustomerDashboardProps) {
   const [activeTab, setActiveTab] = useState<"orders" | "profile">("orders");
+
+  // Sync tab with URL
+  useSyncTabWithUrl("/customer", activeTab, setActiveTab as any, "orders");
+
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);

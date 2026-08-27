@@ -127,6 +127,7 @@ const getIconComponent = (iconName: any) => {
 };
 import UserDashboardWidgets from "../UserDashboardWidgets";
 import LatestAnnouncementsWidget from "../LatestAnnouncementsWidget";
+import { useSyncTabWithUrl } from "../../utils/routeSync";
 
 export default function StoreManagerDashboard({
   user,
@@ -135,6 +136,10 @@ export default function StoreManagerDashboard({
   onUpdateUser,
 }: any): React.ReactElement {
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Sync tab with URL
+  useSyncTabWithUrl("/store", activeTab, setActiveTab, "overview");
+
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [unansweredQuestionsCount, setUnansweredQuestionsCount] = useState(0);
   const [sysConfig, setSysConfig] = useState<Record<string, any>>({});

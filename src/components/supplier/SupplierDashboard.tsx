@@ -140,6 +140,8 @@ import {
   Line,
   Legend,
 } from "recharts";
+import { useSyncTabWithUrl } from "../../utils/routeSync";
+
 export function SupplierDashboard({
   user,
   onLogout,
@@ -147,6 +149,10 @@ export function SupplierDashboard({
   onUpdateUser,
 }: any) {
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Sync tab with URL
+  useSyncTabWithUrl("/supplier", activeTab, setActiveTab, "overview");
+
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [sysConfig, setSysConfig] = useState<Record<string, boolean>>({});
   const [products, setProducts] = useState<any[]>([]);

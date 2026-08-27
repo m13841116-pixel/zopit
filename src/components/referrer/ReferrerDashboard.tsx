@@ -16,12 +16,16 @@ import {
   ShieldCheck,
   UserX
 } from "lucide-react";
+import { useSyncTabWithUrl } from "../../utils/routeSync";
 
 export default function ReferrerDashboard({ currentUser, onLogout, showNotification }: any) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "suppliers" | "terms">("overview");
+
+  // Sync tab with URL
+  useSyncTabWithUrl("/referrer", activeTab, setActiveTab as any, "overview");
 
   const fetchStats = async () => {
     setLoading(true);

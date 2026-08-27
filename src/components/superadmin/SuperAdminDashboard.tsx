@@ -45,6 +45,7 @@ import SupplierPenaltyManagement from "./SupplierPenaltyManagement";
 import AdminBanners from "./AdminBanners";
 import CodeEditor from "./CodeEditor";
 import { ZopitLogo } from "../ZopitLogo";
+import { useSyncTabWithUrl } from "../../utils/routeSync";
 
 export default function SuperAdminDashboard({
   user,
@@ -58,6 +59,10 @@ export default function SuperAdminDashboard({
   onImpersonateUser?: (user: any, token?: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Sync tab with URL
+  useSyncTabWithUrl("/admin", activeTab, setActiveTab, "overview");
+
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [activeUserRoleFilter, setActiveUserRoleFilter] = useState("ALL");
   const [badges, setBadges] = useState({ orders: 0, tickets: 0, invoices: 0, settlements: 0 });
