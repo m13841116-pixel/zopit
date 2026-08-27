@@ -445,8 +445,13 @@ export default function StoreOrders({
     return colorMap[status] || "text-muted bg-background";
   };
   const isOrderPayable = (order: any) => {
-    const paidStatuses = ["PAID", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED", "COMPLETED", "CANCELLED", "REJECTED"];
-    if (paidStatuses.includes(order.status)) return false;
+    // طبق منطق پلتفرم، تنها سفارش‌هایی که توسط تامین‌کننده تایید شده و در وضعیت «در انتظار پرداخت» قرار دارند قابل پرداخت هستند
+    const payableStatuses = [
+      "PENDING_PAYMENT",
+      "WAITING_FOR_PAYMENT",
+      "WAITING_SHIPPING_PAYMENT"
+    ];
+    if (!payableStatuses.includes(order.status)) return false;
     return order.storeInvoiceId === null || order.storeInvoice?.status === "PENDING";
   };
 

@@ -4841,12 +4841,13 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
 
     const storeId = req.user.userId;
 
-    // Verify all orders belong to this store and are unpaid
+    // Verify all orders belong to this store, are approved by supplier and waiting for payment
+    const payableStatuses = ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT', 'SUPPLIER_APPROVED'];
     const ordersToPay = await prisma.order.findMany({
       where: {
         id: { in: orderIds },
         storeId,
-        status: { notIn: ['PAID', 'COMPLETED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REJECTED'] },
+        status: { in: payableStatuses },
         OR: [
           { storeInvoiceId: null },
           { invoice: { status: 'PENDING' } }
@@ -4855,7 +4856,7 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
     });
 
     if (ordersToPay.length !== orderIds.length) {
-      return res.status(400).json({ error: 'برخی از سفارشات انتخاب شده نامعتبر، لغو شده یا قبلاً به طور کامل پرداخت شده‌اند.' });
+      return res.status(400).json({ error: 'برخی از سفارشات انتخاب شده هنوز توسط تأمین‌کننده تأیید نشده‌اند یا قبلاً پرداخت شده‌اند.' });
     }
 
     const totalAmount = ordersToPay.reduce((acc, o) => acc + o.totalAmount, 0);
