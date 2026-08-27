@@ -45,12 +45,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [cartItems]);
 
   const addItem = (product: any) => {
-    const pSupplierId = product.supplierId || product.supplier?.id || product.supplierId || 0;
+    const rawSupId = product.supplierId || product.supplier?.id || product.supplier_id || 0;
+    const pSupplierId = Number(rawSupId) || 0;
     const pSupplierName = product.supplier?.companyName || product.supplierName || product.supplier?.user?.name || "";
 
-    if (cartItems.length > 0) {
-      const currentSupplierId = cartItems[0].supplierId;
-      if (currentSupplierId && pSupplierId && currentSupplierId !== pSupplierId) {
+    if (cartItems.length > 0 && pSupplierId > 0) {
+      const currentSupplierId = Number(cartItems[0].supplierId) || 0;
+      if (currentSupplierId > 0 && currentSupplierId !== pSupplierId) {
         return {
           success: false,
           error: "امکان افزودن کالاهای چند تامین‌کننده مختلف در یک سفارش وجود ندارد. طبق سیاست پلتفرم زوپیت جهت محاسبه و ارسال دقیق مرسوله پستی، تمامی کالاهای یک سفارش باید از یک تامین‌کننده باشند."

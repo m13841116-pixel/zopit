@@ -8,6 +8,7 @@ import StoreQuestions from "./StoreQuestions";
 import { StoreCustomers } from "./StoreCustomers";
 import { StoreProAccount } from "./StoreProAccount";
 import InstagramPageSettings from "./InstagramPageSettings";
+import { Skeleton, CardSkeleton, TableSkeleton } from "../Skeleton";
 import { toast } from "../GlobalToast";
 import { AppLink } from "../AppLink";
 import React, { useState, useEffect } from "react";
@@ -147,8 +148,27 @@ export default function StoreManagerDashboard({
     return "overview";
   });
   
+  const validStoreTabs = [
+    "overview",
+    "pro_account",
+    "pro",
+    "orders",
+    "marketplace",
+    "my_catalog",
+    "invoices",
+    "tickets",
+    "questions",
+    "customers",
+    "announcements",
+    "page_settings",
+    "profile",
+    "settings",
+    "wallet",
+    "connection"
+  ];
+
   // Sync tab with URL
-  useSyncTabWithUrl("/store", activeTab, setActiveTab, "overview");
+  useSyncTabWithUrl("/store", activeTab, setActiveTab, "overview", validStoreTabs);
 
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [unansweredQuestionsCount, setUnansweredQuestionsCount] = useState(0);
@@ -723,8 +743,14 @@ export default function StoreManagerDashboard({
         />
         <div className="flex-1 overflow-auto p-4 lg:p-8 relative">
           {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <RefreshCw className="w-8 h-8 text-success animate-spin" />
+            <div className="space-y-6 animate-pulse">
+              <div className="h-36 bg-slate-200 dark:bg-slate-700/60 rounded-3xl w-full" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <CardSkeleton rows={3} />
+                <CardSkeleton rows={3} />
+                <CardSkeleton rows={3} />
+              </div>
+              <TableSkeleton cols={5} rows={5} />
             </div>
           ) : (
             <>

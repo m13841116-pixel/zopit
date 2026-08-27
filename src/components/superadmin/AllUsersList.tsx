@@ -247,11 +247,15 @@ export default function AllUsersList({
       const username = (u.username || "").toLowerCase();
       const mobile = (u.mobile || "").toLowerCase();
       const brand = (u.brandName || "").toLowerCase();
+      const supplierCode = `sup-${1000 + u.id}`.toLowerCase();
+      const idStr = String(u.id);
       return (
         fullName.includes(q) ||
         username.includes(q) ||
         mobile.includes(q) ||
-        brand.includes(q)
+        brand.includes(q) ||
+        supplierCode.includes(q) ||
+        idStr === q
       );
     }
     return true;
@@ -422,8 +426,17 @@ export default function AllUsersList({
                     </td>
 
                     {/* Username */}
-                    <td className="p-4 font-mono font-bold text-primary">
-                      {u.username}
+                    <td className="p-4">
+                      <div className="font-mono font-bold text-primary">
+                        {u.username}
+                      </div>
+                      {u.role === "SUPPLIER" && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-mono text-[11px] font-extrabold border border-indigo-500/20">
+                            کد تامین: SUP-{1000 + u.id} (#{u.id})
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Full Name */}

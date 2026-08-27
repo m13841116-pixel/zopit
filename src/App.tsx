@@ -58,6 +58,7 @@ import {
   Key,
   Send,
   Clock,
+  Play,
   ShieldAlert,
 } from "lucide-react";
 import { CustomCodeInjector } from "./components/CustomCodeInjector";
@@ -302,6 +303,9 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [loginPublicAnnouncementsOpen, setLoginPublicAnnouncementsOpen] = useState(false);
+  const [loginIntroVideoOpen, setLoginIntroVideoOpen] = useState(false);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [termsTab, setTermsTab] = useState<"store" | "supplier" | "privacy">("store");
 
 
 
@@ -779,6 +783,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   const [showTermsModal, setShowTermsModal] = useState<string | null>(null);
   const [supplierTermsText, setSupplierTermsText] = useState("");
   const [storeTermsText, setStoreTermsText] = useState("");
+  const [privacyTermsText, setPrivacyTermsText] = useState("");
   useEffect(() => {
     fetch("/api/config")
       .then((res) => {
@@ -791,6 +796,9 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
         }
         if (data && data.STORE_RULES) {
           setStoreTermsText(data.STORE_RULES);
+        }
+        if (data && data.PRIVACY_POLICY) {
+          setPrivacyTermsText(data.PRIVACY_POLICY);
         }
       })
       .catch(() => {});
@@ -1700,14 +1708,23 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                       </p>
                     </div>
 
-                    <div className="relative z-10 my-6 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+                    <div 
+                      onClick={() => setLoginIntroVideoOpen(true)}
+                      className="relative z-10 my-6 rounded-2xl overflow-hidden border border-white/10 shadow-2xl cursor-pointer group/vid"
+                    >
                       <img
                         src={heroImage}
                         alt="Zopit B2B E-commerce Platform"
                         referrerPolicy="no-referrer"
-                        className="w-full h-52 object-cover transform group-hover:scale-105 transition-transform duration-700"
+                        className="w-full h-52 object-cover transform group-hover/vid:scale-105 transition-transform duration-700 brightness-95"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-4">
+                      {/* Play Button Overlay */}
+                      <div className="absolute inset-0 bg-black/35 group-hover/vid:bg-black/20 transition-colors flex items-center justify-center">
+                        <div className="w-13 h-13 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow-lg shadow-rose-600/50 group-hover/vid:scale-115 transition-transform duration-300 border-2 border-white/40">
+                          <Play className="w-5 h-5 fill-current text-white translate-x-[-1px]" />
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-4 pointer-events-none">
                         <div className="flex items-center justify-between w-full text-[11px] font-extrabold text-white">
                           <span className="flex items-center gap-1.5">
                             <Truck className="w-4 h-4 text-emerald-400" /> ارسال مستقیم مرسوله
@@ -1832,7 +1849,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               </button>
                             </div>
 
-                            <div className="text-center pt-2">
+                            <div className="text-center pt-2 space-y-2">
                               <button
                                 type="button"
                                 onClick={() => setLoginMode("password")}
@@ -1840,6 +1857,34 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               >
                                 ورود با رمز عبور ثابت
                               </button>
+
+                              <p className="text-[11px] text-text-muted text-center leading-relaxed font-medium pt-1">
+                                با ورود و یا ثبت‌نام در زوپیت،{" "}
+                                <button
+                                  type="button"
+                                  onClick={() => { setTermsTab("store"); setTermsModalOpen(true); }}
+                                  className="text-primary-default font-black hover:underline inline-block cursor-pointer"
+                                >
+                                  قوانین خریداران
+                                </button>
+                                {" "}،{" "}
+                                <button
+                                  type="button"
+                                  onClick={() => { setTermsTab("supplier"); setTermsModalOpen(true); }}
+                                  className="text-indigo-600 dark:text-indigo-400 font-black hover:underline inline-block cursor-pointer"
+                                >
+                                  قوانین تامین‌کنندگان
+                                </button>
+                                {" "}و{" "}
+                                <button
+                                  type="button"
+                                  onClick={() => { setTermsTab("privacy"); setTermsModalOpen(true); }}
+                                  className="text-purple-600 dark:text-purple-400 font-black hover:underline inline-block cursor-pointer"
+                                >
+                                  حریم خصوصی
+                                </button>
+                                {" "}را می‌پذیرید.
+                              </p>
                             </div>
                           </form>
                         ) : (
@@ -2025,7 +2070,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                           </button>
                         </div>
 
-                        <div className="text-center pt-2">
+                        <div className="text-center pt-2 space-y-2">
                           <button
                             type="button"
                             onClick={() => setLoginMode("otp")}
@@ -2033,6 +2078,34 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                           >
                             ورود بدون رمز با کد تایید پیامکی (OTP)
                           </button>
+
+                          <p className="text-[11px] text-text-muted text-center leading-relaxed font-medium pt-1">
+                            با ورود و یا ثبت‌نام در زوپیت،{" "}
+                            <button
+                              type="button"
+                              onClick={() => { setTermsTab("store"); setTermsModalOpen(true); }}
+                              className="text-primary-default font-black hover:underline inline-block cursor-pointer"
+                            >
+                              قوانین خریداران
+                            </button>
+                            {" "}،{" "}
+                            <button
+                              type="button"
+                              onClick={() => { setTermsTab("supplier"); setTermsModalOpen(true); }}
+                              className="text-indigo-600 dark:text-indigo-400 font-black hover:underline inline-block cursor-pointer"
+                            >
+                              قوانین تامین‌کنندگان
+                            </button>
+                            {" "}و{" "}
+                            <button
+                              type="button"
+                              onClick={() => { setTermsTab("privacy"); setTermsModalOpen(true); }}
+                              className="text-purple-600 dark:text-purple-400 font-black hover:underline inline-block cursor-pointer"
+                            >
+                              حریم خصوصی
+                            </button>
+                            {" "}را می‌پذیرید.
+                          </p>
                         </div>
                       </form>
                     )}
@@ -2071,6 +2144,89 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                 </div>
               </div>
               )}
+
+              {/* Login Video Intro Modal */}
+              {loginIntroVideoOpen && (
+                <div 
+                  className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+                  onClick={() => setLoginIntroVideoOpen(false)}
+                >
+                  <div 
+                    className="relative w-full max-w-3xl bg-zinc-950 border border-white/15 rounded-3xl overflow-hidden shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                    dir="rtl"
+                  >
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-zinc-900/60">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                        <h3 className="text-sm font-black text-white">معرفی نحوه همکاری و تامین کالا برای فروشگاه‌ها</h3>
+                      </div>
+                      <button 
+                        onClick={() => setLoginIntroVideoOpen(false)}
+                        className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+                      {sysConfigState?.LOGIN_VIDEO_URL ? (
+                        sysConfigState.LOGIN_VIDEO_URL.includes("aparat.com") || sysConfigState.LOGIN_VIDEO_URL.includes("youtube.com") ? (
+                          <iframe
+                            src={sysConfigState.LOGIN_VIDEO_URL.includes("aparat.com/v/") 
+                              ? sysConfigState.LOGIN_VIDEO_URL.replace("/v/", "/video/video/embed/videohash/") 
+                              : sysConfigState.LOGIN_VIDEO_URL}
+                            className="w-full h-full border-0"
+                            allowFullScreen
+                            title="ویدیوی معرفی صفحه ورود"
+                          />
+                        ) : (
+                          <video
+                            src={sysConfigState.LOGIN_VIDEO_URL}
+                            controls
+                            autoPlay
+                            className="w-full h-full object-contain bg-black"
+                          />
+                        )
+                      ) : (
+                        <>
+                          <img 
+                            src={heroImage} 
+                            alt="معرفی زوپیت" 
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover brightness-60"
+                          />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-white space-y-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+                            <div className="w-16 h-16 rounded-2xl bg-rose-600/30 border border-rose-500/50 flex items-center justify-center">
+                              <Store className="w-8 h-8 text-rose-400" />
+                            </div>
+                            <div className="space-y-1.5 max-w-lg">
+                              <h4 className="text-lg md:text-xl font-black">پلتفرم B2B تامین کالا برای فروشگاه‌داران</h4>
+                              <p className="text-xs md:text-sm text-zinc-300 leading-relaxed">
+                                ویدیوی معرفی صفحه ورود هنوز آپلود نشده است. مدیر ارشد سیستم می‌تواند از بخش «تنظیمات کلی سیستم ⬅️ ویدیوی معرفی ورود»، فایل ویدیو را آپلود یا لینک مستقیم آن را ثبت کند.
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="p-4 bg-zinc-900/80 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                      <div className="text-zinc-400 flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-indigo-400" />
+                        <span>زوپیت؛ حلقه اتصال زنجیره تامین و فروشگاه‌های اینترنتی</span>
+                      </div>
+                      <button
+                        onClick={() => setLoginIntroVideoOpen(false)}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition-all cursor-pointer"
+                      >
+                        بستن و ورود به حساب
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Forgot Password View */}
               {view === "forgot_password" && (
                 <div
@@ -2760,7 +2916,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                       </div>
                     </div>
                     
-                    <div className="flex gap-3 justify-between items-center mt-6">
+                    <div className="space-y-3 mt-6">
                       <button
                         type="button"
                         onClick={handleCustomerRegister}
@@ -2776,6 +2932,18 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                           "تایید و ثبت نام"
                         )}
                       </button>
+
+                      <p className="text-[11px] text-muted text-center leading-relaxed font-medium">
+                        ثبت‌نام در زوپیت به منزله پذیرش{" "}
+                        <button
+                          type="button"
+                          onClick={() => setTermsModalOpen(true)}
+                          className="text-primary-default font-extrabold hover:underline inline-block cursor-pointer"
+                        >
+                          قوانین و مقررات
+                        </button>{" "}
+                        است.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -3449,29 +3617,43 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                           {supplierErrors.confirmPassword && <p className="text-[10px] text-danger font-semibold">{supplierErrors.confirmPassword}</p>}
                         </div>
 
-                        <div className="flex gap-3 justify-between items-center mt-6">
-                          <button
-                            type="button"
-                            onClick={() => setSupplierStep(2)}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all text-xs cursor-pointer font-bold"
-                          >
-                            مرحله قبل
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleSupplierRegister}
-                            disabled={loading}
-                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md shadow-emerald-500/20"
-                          >
-                            {loading ? "در حال پردازش..." : "تکمیل ثبت‌نام و درخواست عضویت"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={saveSupplierDraft}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer"
-                          >
-                            <Database className="w-4 h-4" /> ذخیره پیش‌نویس
-                          </button>
+                        <div className="space-y-3 mt-6">
+                          <div className="flex gap-3 justify-between items-center">
+                            <button
+                              type="button"
+                              onClick={() => setSupplierStep(2)}
+                              className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all text-xs cursor-pointer font-bold"
+                            >
+                              مرحله قبل
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSupplierRegister}
+                              disabled={loading}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md shadow-emerald-500/20"
+                            >
+                              {loading ? "در حال پردازش..." : "تکمیل ثبت‌نام و درخواست عضویت"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={saveSupplierDraft}
+                              className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer"
+                            >
+                              <Database className="w-4 h-4" /> ذخیره پیش‌نویس
+                            </button>
+                          </div>
+
+                          <p className="text-[11px] text-muted text-center leading-relaxed font-medium">
+                            ثبت‌نام به عنوان تامین‌کننده در زوپیت به منزله پذیرش{" "}
+                            <button
+                              type="button"
+                              onClick={() => setTermsModalOpen(true)}
+                              className="text-primary-default font-extrabold hover:underline inline-block cursor-pointer"
+                            >
+                              قوانین و مقررات
+                            </button>{" "}
+                            است.
+                          </p>
                         </div>
                       </div>
                     )}
@@ -4122,6 +4304,255 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition cursor-pointer text-xs"
               >
                 متوجه شدم و بستن
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms and Conditions Modal */}
+      {termsModalOpen && (
+        <div
+          className="fixed inset-0 z-[9990] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setTermsModalOpen(false)}
+          dir="rtl"
+        >
+          <div
+            className="bg-card border border-subtle w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-subtle bg-surface/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary-default/10 text-primary-default flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-primary">قوانین، مقررات و حریم خصوصی زوپیت</h3>
+                  <p className="text-[11px] text-muted font-medium">پلتفرم B2B ایجاد زیرساخت زنجیره تامین و فروشگاه‌سازی</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTermsModalOpen(false)}
+                className="text-muted hover:text-primary hover:bg-surface p-2 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex bg-surface/80 p-2 border-b border-subtle gap-1 overflow-x-auto text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setTermsTab("store")}
+                className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 ${
+                  termsTab === "store"
+                    ? "bg-primary-default text-white shadow-md shadow-primary-default/20"
+                    : "text-muted hover:text-primary hover:bg-background/50"
+                }`}
+              >
+                <Store className="w-4 h-4" />
+                <span>قوانین خریداران و فروشگاه‌ها</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTermsTab("supplier")}
+                className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 ${
+                  termsTab === "supplier"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                    : "text-muted hover:text-primary hover:bg-background/50"
+                }`}
+              >
+                <Truck className="w-4 h-4" />
+                <span>قوانین تامین‌کنندگان</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTermsTab("privacy")}
+                className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 ${
+                  termsTab === "privacy"
+                    ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                    : "text-muted hover:text-primary hover:bg-background/50"
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>حریم خصوصی</span>
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 overflow-y-auto space-y-5 text-xs text-secondary leading-relaxed font-medium">
+              {/* STORE / BUYER RULES */}
+              {termsTab === "store" && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-900 dark:text-emerald-200 font-bold space-y-1">
+                    <p className="text-sm font-black flex items-center gap-2">
+                      <Store className="w-4 h-4 text-emerald-600" /> شرایط و ضوابط خریداران و مدیران فروشگاه
+                    </p>
+                    <p className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
+                      این قوانین شامل ضوابط ثبت سفارش عمده، پرداخت‌ها، تحویل کالا و پشتیبانی فروشگاه‌داران می‌باشد.
+                    </p>
+                  </div>
+
+                  {storeTermsText ? (
+                    <div className="p-4 bg-background border border-subtle rounded-2xl whitespace-pre-line text-primary leading-loose">
+                      {storeTermsText}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          ۱. ثبت‌نام و احراز هویت
+                        </h4>
+                        <p className="text-muted pr-4">
+                          تمامی مدیران فروشگاه‌ها ملزم به ارائه اطلاعات حقیقی، کد ملی و مشخصات تماس معتبر جهت فعالیت و صدور فاکتور رسمی در پلتفرم می‌باشند.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          ۲. ثبت سفارش عمده و فاکتورها
+                        </h4>
+                        <p className="text-muted pr-4">
+                          خریدهای ثبت شده به عنوان سفارش قطعی تلقی شده و تسویه حساب آنلاین یا ثبت فیش واریزی باید حداکثر ظرف مهلت مقرر انجام پذیرد.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          ۳. سیاست تست و مرجوعی کالا
+                        </h4>
+                        <p className="text-muted pr-4">
+                          در صورت وجود عدم تطابق کالا، نقص فیزیکی یا عدم اصالت، خریدار می‌تواند ظرف مهلت مجاز تست سفارش خود را ثبت شکایت نماید.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SUPPLIER RULES */}
+              {termsTab === "supplier" && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-900 dark:text-indigo-200 font-bold space-y-1">
+                    <p className="text-sm font-black flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-indigo-600" /> آیین‌نامه و تعهدنامه تامین‌کنندگان کالا (عمده)
+                    </p>
+                    <p className="text-[11px] font-medium text-indigo-800 dark:text-indigo-300">
+                      شامل تعهدات تامین اصالت کالا، بسته‌بندی، ارسال به موقع پستی و تسویه حساب کیف پول تامین‌کننده.
+                    </p>
+                  </div>
+
+                  {supplierTermsText ? (
+                    <div className="p-4 bg-background border border-subtle rounded-2xl whitespace-pre-line text-primary leading-loose">
+                      {supplierTermsText}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                          ۱. تضمین اصالت و کیفیت کالا
+                        </h4>
+                        <p className="text-muted pr-4">
+                          تامین‌کننده متعهد می‌گردد تمامی کالاهای ثبت شده منطبق بر اصالت، کیفیت توصیف‌شده و سلامت کامل فیزیکی باشند.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                          ۲. زمان‌بندی بسته‌بندی و ارسال
+                        </h4>
+                        <p className="text-muted pr-4">
+                          سفارشات تایید شده باید ظرف مهلت تعیین شده (حداکثر ۴۸ ساعت کاری) بسته‌بندی شده و تحویل اداره پست یا نماینده ارسال شوند.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                          ۳. کمیسیون و تسویه‌حساب کیف پول
+                        </h4>
+                        <p className="text-muted pr-4">
+                          تسویه‌حساب فروش پس از تایید تحویل سفارش توسط خریدار و منقضی شدن مهلت مرجوعی، به صورت خودکار انجام می‌گردد.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PRIVACY POLICY */}
+              {termsTab === "privacy" && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl text-purple-900 dark:text-purple-200 font-bold space-y-1">
+                    <p className="text-sm font-black flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-purple-600" /> سیاست حفظ حریم خصوصی و امنیت داده‌ها
+                    </p>
+                    <p className="text-[11px] font-medium text-purple-800 dark:text-purple-300">
+                      نحوه جمع‌آوری، محافظت و عدم افشای اطلاعات هویتی و تراکنش‌های مالی کاربران در پلتفرم زوپیت.
+                    </p>
+                  </div>
+
+                  {privacyTermsText ? (
+                    <div className="p-4 bg-background border border-subtle rounded-2xl whitespace-pre-line text-primary leading-loose">
+                      {privacyTermsText}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                          ۱. صیانت از داده‌های شخصی
+                        </h4>
+                        <p className="text-muted pr-4">
+                          اطلاعات تماس، آدرس‌ها، شماره‌های حساب و مدارک بارگذاری شده نزد زوپیت امانت بوده و با بالاترین استانداردهای امنیتی نگهداری می‌شوند.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                          ۲. عدم افشا به اشخاص ثالث
+                        </h4>
+                        <p className="text-muted pr-4">
+                          داده‌های کاربران تحت هیچ شرایطی فروخته یا در اختیار اشخاص و شرکت‌های ثالث تجاری قرار نخواهد گرفت.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 p-3 bg-surface/50 rounded-xl border border-subtle">
+                        <h4 className="font-black text-sm text-primary flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                          ۳. درگاه‌های امن بانکی
+                        </h4>
+                        <p className="text-muted pr-4">
+                          تمامی پرداخت‌های آنلاین از طریق پروتکل‌های رمزنگاری شده SSL و درگاه‌های رسمی شاپرک انجام می‌پذیرد.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-subtle bg-surface/50 flex justify-between items-center">
+              <span className="text-[11px] text-muted font-medium hidden sm:inline">
+                ثبت‌نام و ورود به منزله مطالعه و تایید این قوانین است.
+              </span>
+              <button
+                type="button"
+                onClick={() => setTermsModalOpen(false)}
+                className="px-6 py-2.5 bg-primary-default hover:bg-primary-hover text-white rounded-xl font-bold text-xs transition cursor-pointer shadow-md shadow-primary-default/20"
+              >
+                متوجه شدم و تایید می‌کنم
               </button>
             </div>
           </div>

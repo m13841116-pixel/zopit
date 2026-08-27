@@ -28,6 +28,7 @@ import {
   Building2
 } from "lucide-react";
 import { toast } from "../GlobalToast";
+import { ProAccountMediaShowcase } from "./ProAccountMediaShowcase";
 import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
 
 interface StoreProAccountProps {
@@ -672,6 +673,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           </div>
         </div>
       </div>
+
+      {/* Dedicated Audio Podcast Showcase for Pro Account */}
+      <ProAccountMediaShowcase audioUrl={settings?.audioUrl} />
 
       {/* IF ALREADY APPROVED / ACTIVE PRO ACCOUNT */}
       {isProApproved ? (

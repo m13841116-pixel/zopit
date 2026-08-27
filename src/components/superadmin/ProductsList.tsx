@@ -2,6 +2,7 @@ import { toast } from "../GlobalToast";
 import React, { useState, useEffect } from "react";
 import { getValidProductImageUrl } from "../../utils/productUtils";
 import DigikalaProductModal from "../DigikalaProductModal";
+import { Skeleton, TableSkeleton } from "../Skeleton";
 import {
   DollarSign,
   X,
@@ -722,8 +723,9 @@ export default function ProductsList() {
 
       {subTab === "all" ? (
         loading ? (
-          <div className="text-center p-12 text-muted bg-card rounded-2xl border border-subtle shadow-sm">
-            در حال بارگذاری کالاها...
+          <div className="space-y-4 animate-pulse">
+            <div className="h-16 bg-slate-200 dark:bg-slate-700/60 rounded-2xl w-full" />
+            <TableSkeleton cols={7} rows={7} />
           </div>
         ) : (
         <div className="space-y-4">

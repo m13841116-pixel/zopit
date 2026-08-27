@@ -169,11 +169,15 @@ export default function ManualInvoices() {
                       {invoice.totalAmount.toLocaleString()}
                     </td>
                     <td className="px-6 py-4">
-                      
                       <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${invoice.status === "PAID" ? "bg-success/20 text-success" : invoice.status === "FAILED" ? "bg-danger/20 text-danger" : "bg-warning/20 text-warning"}`}
+                        className={`px-3 py-1 rounded-lg text-xs font-black border ${
+                          invoice.status === "PAID"
+                            ? "bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-100"
+                            : invoice.status === "FAILED"
+                              ? "bg-rose-100 text-rose-950 border-rose-300 dark:bg-rose-950 dark:text-rose-100"
+                              : "bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-950 dark:text-amber-100"
+                        }`}
                       >
-                        
                         {invoice.status === "PAID"
                           ? "پرداخت شده"
                           : invoice.status === "FAILED"
@@ -182,23 +186,25 @@ export default function ManualInvoices() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      
                       {invoice.receiptUrl ? (
                         <div className="flex flex-col gap-1.5 text-right">
-                          
                           <button
                             onClick={() =>
                               setSelectedReceipt(invoice.receiptUrl)
                             }
-                            className="text-primary-default hover:text-primary-hover font-bold text-xs cursor-pointer text-right flex items-center gap-1 bg-primary-default/10 hover:bg-primary-default/20 px-2 py-1 rounded-lg w-max transition-colors"
+                            className="text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 font-bold text-xs cursor-pointer text-right flex items-center gap-1 bg-indigo-100 dark:bg-indigo-950/80 hover:bg-indigo-200 px-2.5 py-1 rounded-lg w-max transition-colors border border-indigo-200 dark:border-indigo-800"
                           >
-                            
                             <Eye className="w-3.5 h-3.5" /> مشاهده فیش
                           </button>
                           <span
-                            className={`px-2 py-0.5 inline-block text-center w-max rounded-full text-[10px] font-bold ${invoice.receiptStatus === "APPROVED" ? "bg-success/20 text-success" : invoice.receiptStatus === "REJECTED" ? "bg-danger/20 text-danger" : "bg-warning/20 text-warning"}`}
+                            className={`px-2.5 py-0.5 inline-block text-center w-max rounded-lg text-[11px] font-black border ${
+                              invoice.receiptStatus === "APPROVED"
+                                ? "bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-100"
+                                : invoice.receiptStatus === "REJECTED"
+                                  ? "bg-rose-100 text-rose-950 border-rose-300 dark:bg-rose-950 dark:text-rose-100"
+                                  : "bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-950 dark:text-amber-100"
+                            }`}
                           >
-                            
                             {invoice.receiptStatus === "APPROVED"
                               ? "تایید شده"
                               : invoice.receiptStatus === "REJECTED"

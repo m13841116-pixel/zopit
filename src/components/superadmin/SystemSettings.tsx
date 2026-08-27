@@ -39,6 +39,8 @@ import {
   Send,
   ExternalLink,
   Ticket,
+  Video,
+  Volume2,
 } from "lucide-react";
 import PaymentSmsSettings from "./PaymentSmsSettings";
 import SystemLogs from "./SystemLogs";
@@ -108,11 +110,16 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
     EDUCATION_YOUTUBE: "https://www.youtube.com",
     EDUCATION_TELEGRAM: "https://t.me",
 
+    // Login Video
+    LOGIN_VIDEO_URL: "",
+
     // Terms
     SUPPLIER_RULES:
       "۱. تضمین اصالت و سلامت کالا: تامین‌کننده متعهد می‌گردد تمامی کالاهای ارسالی را منطبق بر اصالت، کیفیت توصیف‌شده و سلامت فیزیکی کامل تأمین و ارسال کند.\n۲. درج قیمت رقابتی و واقعی: درج قیمت‌های غیرواقعی، موجودی کاذب یا قیمت‌گذاری خارج از چارچوب بازار آزاد ممنوع بوده و منجر به تعلیق موقت پنل خواهد شد.\n۳. زمان‌بندی دقیق ارسال سفارش: تامین‌کننده موظف است سفارشات پذیرفته شده را حداکثر ظرف مهلت مجاز ارسال (SLA) بسته‌بندی کرده و تحویل نمایندگان پستی یا ارسال مستقیم دهد.\n۴. جرایم تاخیر و لغو سفارش: هرگونه تاخیر غیرموجه در ارسال یا لغو سفارشات تایید شده، مشمول کسر امتیاز عملکرد و اعمال جریمه نقدی روزانه خواهد شد.\n۵. کمیسیون و تسویه مالی: کارمزد توافق‌شده پلتفرم به صورت خودکار از هر فروش کسر گردیده و تسویه حساب پس از تایید تحویل کالا توسط خریدار و منقضی شدن مهلت مرجوعی انجام می‌گردد.",
     STORE_RULES:
       "۱. ثبت‌نام و احراز هویت: تمامی مدیران فروشگاه‌ها ملزم به ارائه پروانه کسب معتبر، کد ملی و اطلاعات تماس حقیقی جهت فعالیت در پلتفرم می‌باشند.\n۲. خرید عمده و فاکتورها: خریدهای ثبت شده به عنوان سفارش قطعی تلقی شده و پرداخت فیش بانکی یا درگاه آنلاین باید حداکثر ظرف مدت ۲۴ ساعت نهایی شود.\n۳. سیاست مرجوعی کالا: امکان مرجوعی کالا تنها در صورت مغایرت مشخصات، آسیب فیزیکی یا عدم تطابق اصالت کالا تا ۷ روز پس از تحویل میسر است.\n۴. تسویه حساب و فاکتور رسمی: فاکتورهای رسمی خرید توسط سیستم صادر شده و هرگونه ادعا پس از تسویه نهایی پذیرفته نخواهد شد.\n۵. حفظ محرمانگی: اطلاعات قیمت‌های همکاری و فاکتورهای دریافتی کاملاً محرمانه بوده و اشتراک‌گذاری آن‌ها با اشخاص ثالث ممنوع است.",
+    PRIVACY_POLICY:
+      "۱. حفظ و نگهداری اطلاعات: زوپیت متعهد می‌شود از تمامی اطلاعات هویتی، آدرس‌ها، شماره‌های تماس و اسناد بارگذاری شده کاربران با بالاترین ضوابط امنیتی حفاظت نماید.\n۲. عدم افشای اطلاعات به اشخاص ثالث: اطلاعات حساب و فعالیت کاربران تحت هیچ شرایطی مگر با حکم صریح مراجع ذی‌صلاح قضایی کشور در اختیار هیچ شخص یا سازمانی قرار نخواهد گرفت.\n۳. امنیت تراکنش‌های مالی: تمامی تراکنش‌ها و پرداخت‌های صورت گرفته در پلتفرم از طریق درگاه‌های بانکی رسمی و پروتکل‌های رمزنگاری شده امن صورت می‌پذیرد.\n۴. کوکی‌ها و اطلاعات فنی: جهت بهبود تجربه کاربری و حفظ نشست‌های فعال، داده‌های فنی استاندارد به صورت ناشناس ذخیره می‌گردند.",
 
     // Custom Code Injection
     CUSTOM_CODE_HEADER: "",
@@ -752,7 +759,8 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
                     EDUCATION_APARAT: config.EDUCATION_APARAT,
                     EDUCATION_YOUTUBE: config.EDUCATION_YOUTUBE,
                     EDUCATION_TELEGRAM: config.EDUCATION_TELEGRAM,
-                  }, "اطلاعات پشتیبانی با موفقیت ذخیره شد.");
+                    LOGIN_VIDEO_URL: config.LOGIN_VIDEO_URL,
+                  }, "اطلاعات پشتیبانی و ویدیوی ورود با موفقیت ذخیره شد.");
                 }}
                 className="px-5 py-2.5 bg-primary-default hover:bg-primary-hover text-white font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-all"
               >
@@ -866,6 +874,73 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
                 </div>
               </div>
             </div>
+
+            {/* Login Page Intro Video Section */}
+            <div className="pt-6 border-t border-border space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="font-bold text-xs text-text-primary flex items-center gap-2">
+                    <Video className="w-4 h-4 text-rose-500" /> ویدیوی معرفی صفحه ورود / لاگین (Login Page Video)
+                  </h4>
+                  <p className="text-[11px] text-text-muted mt-0.5">
+                    این ویدیو هنگامی که کاربر روی بنر صفحه ورود کلیک می‌کند پخش می‌شود. می‌توانید لینک مستقیم یا فایل ویدیو از کامپیوتر آپلود کنید.
+                  </p>
+                </div>
+
+                {/* File Upload Button for Video */}
+                <label className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-all self-start sm:self-auto shrink-0">
+                  <Upload className="w-4 h-4" />
+                  <span>انتخاب و آپلود ویدیو از کامپیوتر</span>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 50 * 1024 * 1024) {
+                        toast("حجم ویدیو نباید بیشتر از ۵۰ مگابایت باشد.", "error");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        if (event.target?.result) {
+                          handleInputChange("LOGIN_VIDEO_URL", event.target.result as string);
+                          toast("فایل ویدیویی با موفقیت آپلود شد. لطفا دکمه ذخیره را بزنید.", "success");
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={config.LOGIN_VIDEO_URL?.startsWith("data:video") ? "فایل ویدیویی از سیستم بارگذاری شده است (Base64)" : (config.LOGIN_VIDEO_URL || "")}
+                  onChange={(e) => handleInputChange("LOGIN_VIDEO_URL", e.target.value)}
+                  disabled={config.LOGIN_VIDEO_URL?.startsWith("data:video")}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs text-text-primary dir-ltr focus:border-primary-default focus:outline-none"
+                  placeholder="https://.../intro.mp4 یا لینک آپارات/یوتیوب"
+                />
+
+                {config.LOGIN_VIDEO_URL && (
+                  <div className="flex items-center justify-between bg-zinc-900 text-white p-3 rounded-2xl border border-zinc-700 text-xs">
+                    <span className="truncate max-w-md font-mono text-[11px] text-zinc-300 dir-ltr">
+                      {config.LOGIN_VIDEO_URL.startsWith("data:video") ? "ویدیو ذخیره‌شده از سیستم" : config.LOGIN_VIDEO_URL}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange("LOGIN_VIDEO_URL", "")}
+                      className="text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> حذف ویدیو
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -887,8 +962,9 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
                   saveBulkSettings({
                     STORE_RULES: config.STORE_RULES,
                     SUPPLIER_RULES: config.SUPPLIER_RULES,
+                    PRIVACY_POLICY: config.PRIVACY_POLICY,
                     TERMS_AND_CONDITIONS: config.SUPPLIER_RULES,
-                  }, "متن قوانین با موفقیت در دیتابیس بروزرسانی شد.");
+                  }, "متن قوانین و حریم خصوصی با موفقیت در دیتابیس بروزرسانی شد.");
                 }}
                 className="px-5 py-2.5 bg-primary-default hover:bg-primary-hover text-white font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-all"
               >
@@ -896,9 +972,9 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-text-primary block">قوانین و تعهدنامه مدیران فروشگاه</label>
+                <label className="text-xs font-bold text-text-primary block">قوانین خریداران و مدیران فروشگاه</label>
                 <textarea
                   value={config.STORE_RULES || ""}
                   onChange={(e) => handleInputChange("STORE_RULES", e.target.value)}
@@ -909,13 +985,24 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-text-primary block">قوانین و تعهدنامه تامین‌کنندگان کالا</label>
+                <label className="text-xs font-bold text-text-primary block">قوانین تامین‌کنندگان کالا (عمده)</label>
                 <textarea
                   value={config.SUPPLIER_RULES || ""}
                   onChange={(e) => handleInputChange("SUPPLIER_RULES", e.target.value)}
                   rows={14}
                   className="w-full bg-background border border-border rounded-2xl p-4 text-xs text-text-primary leading-relaxed focus:ring-1 focus:ring-primary-default focus:border-primary-default focus:outline-none"
                   placeholder="متن کامل قوانین تامین‌کننده..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-text-primary block">سیاست حریم خصوصی و امنیت اطلاعات</label>
+                <textarea
+                  value={config.PRIVACY_POLICY || ""}
+                  onChange={(e) => handleInputChange("PRIVACY_POLICY", e.target.value)}
+                  rows={14}
+                  className="w-full bg-background border border-border rounded-2xl p-4 text-xs text-text-primary leading-relaxed focus:ring-1 focus:ring-primary-default focus:border-primary-default focus:outline-none"
+                  placeholder="متن کامل سیاست حریم خصوصی..."
                 />
               </div>
             </div>

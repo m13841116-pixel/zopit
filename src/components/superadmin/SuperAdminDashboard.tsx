@@ -70,8 +70,31 @@ export default function SuperAdminDashboard({
     return "overview";
   });
 
-  // Sync tab with URL
-  useSyncTabWithUrl("/admin", activeTab, setActiveTab, "overview");
+  // Valid superadmin tab IDs for route fallback protection
+  const validAdminTabs = [
+    "overview",
+    "all-users",
+    "products",
+    "orders",
+    "settlements",
+    "tickets",
+    "top-stores",
+    "pro-accounts",
+    "announcements",
+    "manual-invoices",
+    "settings",
+    "financial",
+    "categories",
+    "notifications",
+    "banners",
+    "logs",
+    "health",
+    "dev-tools",
+    "penalty-management"
+  ];
+
+  // Sync tab with URL with fallback protection
+  useSyncTabWithUrl("/admin", activeTab, setActiveTab, "overview", validAdminTabs);
 
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [activeUserRoleFilter, setActiveUserRoleFilter] = useUrlQueryState<string>("roleFilter", "ALL");
@@ -103,13 +126,13 @@ export default function SuperAdminDashboard({
     { id: "all-users", label: "کل کاربران", icon: Users },
     { id: "products", label: "محصولات", icon: Package },
     { id: "orders", label: "سفارشات", icon: ShoppingCart, badge: badges.orders },
-    { id: "settlements", label: "درخواست تسویه", icon: Wallet, badge: badges.settlements },
+    { id: "settlements", label: "تسویه حساب", icon: Wallet, badge: badges.settlements },
+    { id: "pro-accounts", label: "اکانت‌های پرو", icon: Crown },
     { id: "tickets", label: "تیکت‌ها", icon: MessageSquare, badge: badges.tickets },
     { id: "top-stores", label: "فروشندگان برتر و VIP", icon: Award },
-    { id: "pro-accounts", label: "اکانت‌های پرو", icon: Crown },
     { id: "announcements", label: "مدیریت اعلانات", icon: Megaphone },
-    { id: "manual-invoices", label: "تایید فیش‌ها", icon: DollarSign, badge: badges.invoices },
     { id: "settings", label: "تنظیمات کلی سیستم", icon: Settings },
+    { id: "manual-invoices", label: "فیش‌های واریزی", icon: DollarSign, badge: badges.invoices },
   ];
 
   const handleNavigateTab = (tab: string, roleFilter?: string) => {

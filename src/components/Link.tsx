@@ -6,15 +6,17 @@ interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
 
 export function Link({ href, children, onClick, ...props }: LinkProps) {
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0 || props.target === '_blank') {
       return; // Let browser handle it
     }
     
     // Only intercept local links
-    if (href.startsWith('/')) {
+    if (href.startsWith('/') && !href.startsWith('//')) {
       e.preventDefault();
-      window.history.pushState(null, '', href);
-      window.dispatchEvent(new Event('popstate'));
+      if (window.location.pathname !== href) {
+        window.history.pushState(null, '', href);
+        window.dispatchEvent(new Event('popstate'));
+      }
     }
     
     if (onClick) {
@@ -28,3 +30,6 @@ export function Link({ href, children, onClick, ...props }: LinkProps) {
     </a>
   );
 }
+
+export const AppLink = Link;
+export default Link;

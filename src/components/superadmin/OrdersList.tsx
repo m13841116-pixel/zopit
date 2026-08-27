@@ -26,6 +26,7 @@ import {
   Sliders,
 } from "lucide-react";
 import { printOrderInvoice } from "../../utils/printLabel";
+import { Skeleton, TableSkeleton } from "../Skeleton";
 
 export default function OrdersList() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -615,9 +616,8 @@ export default function OrdersList() {
 
       {/* Unified Orders Table */}
       {loading ? (
-        <div className="py-20 text-center bg-card rounded-3xl border border-border-subtle shadow-sm text-text-muted">
-          <div className="w-8 h-8 border-4 border-primary-default border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm font-bold">در حال بارگذاری لیست کامل سفارشات...</p>
+        <div className="space-y-4 animate-pulse">
+          <TableSkeleton cols={6} rows={7} />
         </div>
       ) : filteredOrders.length === 0 ? (
         <div className="py-16 text-center bg-card rounded-3xl border border-border-subtle shadow-sm text-text-muted space-y-2">

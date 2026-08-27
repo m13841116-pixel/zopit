@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useUrlQueryState } from "../utils/routeSync";
 import { 
   Heart, 
   MessageCircle, 
@@ -31,6 +32,7 @@ import { toast } from "./GlobalToast";
 import { useCart } from "./CartContext";
 import { PROVINCES } from "../data/provinces";
 import { getValidProductImageUrl } from "../utils/productUtils";
+import { IntroVideoBanner } from "./IntroVideoBanner";
 
 export default function Explore({ onBack }: { onBack?: () => void } = {}) {
   const [products, setProducts] = useState<any[]>([]);
@@ -53,7 +55,7 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
   const [stats, setStats] = useState({ likesCount: 0, commentsCount: 0, isLiked: false });
   const [comments, setComments] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"comments" | "qa">("comments");
+  const [activeTab, setActiveTab] = useUrlQueryState<"comments" | "qa">("subtab", "comments");
   const [showComments, setShowComments] = useState(false);
   const [commentName, setCommentName] = useState("");
   const [commentText, setCommentText] = useState("");
@@ -453,6 +455,11 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
           ))}
         </div>
       </div>
+
+      {/* B2B Video Teaser Banner */}
+      {!searchQuery && selectedCategory === null && (
+        <IntroVideoBanner />
+      )}
 
       {/* Instagram Mosaic Staggered Grid without Borders */}
       <main className="px-0.5 py-0.5">

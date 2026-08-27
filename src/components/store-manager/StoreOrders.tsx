@@ -20,6 +20,7 @@ import {
   FileText,
   XCircle,
   Printer, Clock,
+  Trash2,
 } from "lucide-react";
 import { printOrderInvoice } from "../../utils/printLabel";
 import { Bell, BellRing, Volume2, Play } from "lucide-react";
@@ -38,6 +39,17 @@ export default function StoreOrders({
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [selectedVariantId, setSelectedVariantId] = useState<string>("");
+  const [orderItems, setOrderItems] = useState<Array<{
+    productId: number;
+    productName: string;
+    variantId: number | null;
+    variantName?: string;
+    quantity: number;
+    price: number;
+    supplierId: number;
+    supplierName: string;
+    image?: string;
+  }>>([]);
 
   useEffect(() => {
     setSelectedVariantId("");
@@ -227,15 +239,119 @@ export default function StoreOrders({
       console.error(err);
     }
   };
-  const handleCreateOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddItemToOrder = () => {
     if (!selectedProduct) {
-      setError("لطفاً یک محصول را انتخاب کنید");
+      setError("لطفاً ابتدا یک کالا را انتخاب کنید");
       return;
     }
+    const selObj = myCatalog.find((sel) => sel.productId.toString() === selectedProduct);
+    if (!selObj || !selObj.product) {
+      setError("کالای انتخاب شده معتبر نیست");
+      return;
+    }
+    const prod = selObj.product;
+    const prodSupId = Number(prod.supplierId || prod.supplier?.id || 0);
+
+    // Check supplier consistency
+    if (orderItems.length > 0) {
+      const existingSupId = Number(orderItems[0].supplierId);
+      if (existingSupId > 0 && prodSupId > 0 && existingSupId !== prodSupId) {
+        setError("تمامی کالاهای یک سفارش باید از یک تامین‌کننده باشند. جهت ثبت سفارش از تامین‌کننده دیگر، سفارش مجزا ثبت کنید.");
+        return;
+      }
+    }
+
+    let variantName = "";
+    let finalPrice = prod.finalPrice || prod.supplierBasePrice || 0;
+    let vIdParsed: number | null = null;
+
+    if (selectedVariantId) {
+      vIdParsed = parseInt(selectedVariantId);
+      const variantObj = prod.variants?.find((v: any) => v.id === vIdParsed);
+      if (variantObj) {
+        if (variantObj.finalPrice) finalPrice = variantObj.finalPrice;
+        try {
+          const parsedAttrs = typeof variantObj.attributes === "string" ? JSON.parse(variantObj.attributes) : variantObj.attributes;
+          variantName = Object.entries(parsedAttrs || {}).map(([k, val]) => `${k}: ${val}`).join(" | ");
+        } catch (e) {}
+      }
+    } else if (prod.variants && prod.variants.length > 0) {
+      setError("این کالا دارای تنوع/متغیر است. لطفاً یک متغیر را انتخاب کنید.");
+      return;
+    }
+
     setError(null);
-    let finalAddress = "";
-    // Validation for shipping details removed and moved to the next step
+    setOrderItems((prev) => {
+      const existingIdx = prev.findIndex((i) => i.productId === prod.id && i.variantId === vIdParsed);
+      if (existingIdx >= 0) {
+        const copy = [...prev];
+        copy[existingIdx].quantity += quantity;
+        return copy;
+      }
+      return [
+        ...prev,
+        {
+          productId: prod.id,
+          productName: prod.name,
+          variantId: vIdParsed,
+          variantName,
+          quantity,
+          price: finalPrice,
+          supplierId: prodSupId,
+          supplierName: prod.supplier?.companyName || prod.supplierName || `تامین‌کننده SUP-${1000 + prodSupId}`,
+          image: prod.images && prod.images[0]?.url,
+        },
+      ];
+    });
+
+    setSelectedProduct("");
+    setSelectedVariantId("");
+    setQuantity(1);
+  };
+
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    let finalItems = [...orderItems];
+
+    if (finalItems.length === 0 && selectedProduct) {
+      const selObj = myCatalog.find((sel) => sel.productId.toString() === selectedProduct);
+      if (selObj && selObj.product) {
+        const prod = selObj.product;
+        const prodSupId = Number(prod.supplierId || prod.supplier?.id || 0);
+        let vIdParsed: number | null = selectedVariantId ? parseInt(selectedVariantId) : null;
+        let finalPrice = prod.finalPrice || prod.supplierBasePrice || 0;
+        let variantName = "";
+        if (vIdParsed) {
+          const variantObj = prod.variants?.find((v: any) => v.id === vIdParsed);
+          if (variantObj) {
+            if (variantObj.finalPrice) finalPrice = variantObj.finalPrice;
+            try {
+              const parsedAttrs = typeof variantObj.attributes === "string" ? JSON.parse(variantObj.attributes) : variantObj.attributes;
+              variantName = Object.entries(parsedAttrs || {}).map(([k, val]) => `${k}: ${val}`).join(" | ");
+            } catch (e) {}
+          }
+        }
+        finalItems.push({
+          productId: prod.id,
+          productName: prod.name,
+          variantId: vIdParsed,
+          variantName,
+          quantity: quantity || 1,
+          price: finalPrice,
+          supplierId: prodSupId,
+          supplierName: prod.supplier?.companyName || prod.supplierName || "",
+          image: prod.images && prod.images[0]?.url,
+        });
+      }
+    }
+
+    if (finalItems.length === 0) {
+      setError("لطفاً حداقل یک کالا را به سفارش اضافه کنید.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/store-manager/orders", {
@@ -246,12 +362,15 @@ export default function StoreOrders({
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
         body: JSON.stringify({
-          productId: parseInt(selectedProduct),
-          variantId: selectedVariantId ? parseInt(selectedVariantId) : null,
-          quantity,
+          items: finalItems.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            quantity: item.quantity,
+            notes,
+          })),
           notes,
           shippingAddressType: "OTHER_ADDRESS",
-          shippingAddress: finalAddress,
+          shippingAddress: "",
           shippingMethod: "PLATFORM_PANEL",
           postalLabel: null,
         }),
@@ -259,18 +378,11 @@ export default function StoreOrders({
       const data = await res.json();
       if (res.ok) {
         setShowModal(false);
+        setOrderItems([]);
         setSelectedProduct("");
         setSelectedVariantId("");
         setQuantity(1);
         setNotes("");
-        setShippingAddress("");
-        setShippingProvince("");
-        setShippingCity("");
-        setShippingPostalCode("");
-        setShippingRecipientName("");
-        setShippingRecipientPhone("");
-        setShippingAddressDetail("");
-        setPostalLabelUrl("");
         fetchOrders();
       } else {
         setError(data.error || "خطا در ثبت سفارش");
@@ -699,13 +811,61 @@ export default function StoreOrders({
               </button>
             </div>
             <form onSubmit={handleCreateOrder} className="space-y-6">
-              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 p-3 rounded-xl text-xs leading-relaxed font-bold text-right">
-                🚚 نکته هزینه ارسال: محصولاتی که از یک تامین‌کننده یکسان خریداری شوند، هزینه ارسال مشترک و تجمیعی خواهند داشت و در قالب یک مرسوله گروهی فرستاده می‌شوند.
+              <div className="bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-100 p-3 rounded-xl text-xs leading-relaxed font-bold text-right">
+                🚚 نکته ارسال: تمامی محصولاتی که از یک تامین‌کننده انتخاب می‌کنید در یک سفارش گروهی ثبت و با یک هزینه ارسال مشترک فرستاده می‌شوند.
               </div>
+
+              {/* Added Items List */}
+              {orderItems.length > 0 && (
+                <div className="bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between text-xs font-black text-indigo-950 dark:text-indigo-200">
+                    <span className="flex items-center gap-1.5">
+                      <ShoppingCart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      اقلام اضافه شده به این سفارش ({orderItems.length} کالا)
+                    </span>
+                    <span className="text-[11px] font-mono font-extrabold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/80 px-2 py-0.5 rounded-lg">
+                      {orderItems[0]?.supplierName}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-indigo-100 dark:divide-indigo-900/50 max-h-48 overflow-y-auto">
+                    {orderItems.map((item, idx) => (
+                      <div key={idx} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {item.image ? (
+                            <img src={item.image} className="w-9 h-9 rounded-lg object-cover shrink-0 border border-indigo-200" alt="" />
+                          ) : (
+                            <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
+                              <ShoppingCart className="w-4 h-4 text-indigo-600" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-bold text-primary truncate">{item.productName}</p>
+                            {item.variantName && (
+                              <p className="text-[10px] text-muted font-medium truncate">{item.variantName}</p>
+                            )}
+                            <p className="text-[10px] text-indigo-700 dark:text-indigo-300 font-bold mt-0.5">
+                              {item.price?.toLocaleString()} تومان × {item.quantity} عدد = {(item.price * item.quantity)?.toLocaleString()} تومان
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-rose-600 hover:text-rose-700 dark:text-rose-400 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer shrink-0 transition-colors"
+                          title="حذف کالا"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Product Search and Selector */}
               <div>
                 <label className="block text-sm font-bold text-secondary mb-2">
-                  ۱. انتخاب محصول از زوپیت
+                  انتخاب کالا از کاتالوگ فروشگاه
                 </label>
                 {/* Search Box */}
                 <div className="relative mb-3">
@@ -720,7 +880,7 @@ export default function StoreOrders({
                     <span className="text-xs">🔍</span>
                   </div>
                 </div>
-                <div className="max-h-52 overflow-y-auto space-y-2 border border-subtle p-2 rounded-xl bg-background">
+                <div className="max-h-48 overflow-y-auto space-y-2 border border-subtle p-2 rounded-xl bg-background">
                   {myCatalog.length === 0 && (
                     <div className="text-center py-6 text-xs text-muted">
                       زوپیتی شما خالی است
@@ -785,7 +945,7 @@ export default function StoreOrders({
                                 SKU: {sel.product.sku || "-"}
                               </span>
                               <span className="text-[10px] text-primary-default font-bold bg-primary-default/10 px-1.5 py-0.5 rounded">
-                                موجودی: {sel.product.inventory}
+                                تامین‌کننده: {sel.product.supplier?.companyName || sel.product.supplierName || `SUP-${1000 + (sel.product.supplierId || sel.product.supplier?.id || 0)}`}
                               </span>
                             </div>
                           </div>
@@ -799,6 +959,7 @@ export default function StoreOrders({
                     })}
                 </div>
               </div>
+
               {/* Variant Selector */}
               {(() => {
                 const selectedProdObj = myCatalog.find(
@@ -816,7 +977,6 @@ export default function StoreOrders({
                       className="w-full bg-background border border-subtle rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary font-bold"
                       value={selectedVariantId}
                       onChange={(e) => setSelectedVariantId(e.target.value)}
-                      required
                     >
                       <option value="">-- لطفاً یک متغیر انتخاب کنید --</option>
                       {selectedProdObj.variants.map((v: any) => {
@@ -841,26 +1001,36 @@ export default function StoreOrders({
                   </div>
                 );
               })()}
-              {/* Quantity */}
-              <div className="grid grid-cols-1 gap-4">
-                <div>
+
+              {/* Quantity & Add Button */}
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
                   <label className="block text-sm font-bold text-secondary mb-2">
-                    ۲. تعداد سفارش
+                    تعداد سفارش
                   </label>
                   <input
                     type="number"
                     min="1"
-                    className="w-full bg-background border border-subtle rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none"
+                    className="w-full bg-background border border-subtle rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
                     value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value))}
-                    required
+                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={handleAddItemToOrder}
+                  disabled={!selectedProduct}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-md shadow-indigo-600/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>افزودن به اقلام این سفارش</span>
+                </button>
               </div>
+
               {/* Order Notes */}
               <div>
                 <label className="block text-sm font-bold text-secondary mb-2">
-                  ۳. یادداشت برای تامین‌کننده (اختیاری)
+                  یادداشت برای تامین‌کننده (اختیاری)
                 </label>
                 <textarea
                   className="w-full bg-background border border-subtle rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none"

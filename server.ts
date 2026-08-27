@@ -5732,7 +5732,9 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
             'pro_host_discounted_price',
             'pro_torob_price',
             'pro_promo_code',
-            'pro_terms_content'
+            'pro_terms_content',
+            'pro_video_url',
+            'pro_audio_url'
           ]
         }
       }
@@ -5752,7 +5754,9 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
         hostDiscountedPrice: parseInt(settingsMap['pro_host_discounted_price'] || '198000', 10),
         torobPrice: parseInt(settingsMap['pro_torob_price'] || '150000', 10),
         promoCode: settingsMap['pro_promo_code'] || 'ZOPIT-PRO-198',
-        termsContent: settingsMap['pro_terms_content'] || ''
+        termsContent: settingsMap['pro_terms_content'] || '',
+        videoUrl: settingsMap['pro_video_url'] || '',
+        audioUrl: settingsMap['pro_audio_url'] || ''
       }
     });
   } catch (err: any) {
@@ -6160,7 +6164,9 @@ app.get('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async (
             'pro_host_discounted_price',
             'pro_torob_price',
             'pro_promo_code',
-            'pro_terms_content'
+            'pro_terms_content',
+            'pro_video_url',
+            'pro_audio_url'
           ]
         }
       }
@@ -6176,7 +6182,9 @@ app.get('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async (
       hostDiscountedPrice: map['pro_host_discounted_price'] || '198000',
       torobPrice: map['pro_torob_price'] || '150000',
       promoCode: map['pro_promo_code'] || 'ZOPIT-PRO-198',
-      termsContent: map['pro_terms_content'] || ''
+      termsContent: map['pro_terms_content'] || '',
+      videoUrl: map['pro_video_url'] || '',
+      audioUrl: map['pro_audio_url'] || ''
     });
   } catch (err: any) {
     res.status(500).json({ error: 'خطا در دریافت تنظیمات عمومی پرو' });
@@ -6193,7 +6201,9 @@ app.post('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async 
       hostDiscountedPrice,
       torobPrice,
       promoCode,
-      termsContent
+      termsContent,
+      videoUrl,
+      audioUrl
     } = req.body;
 
     const updates = [
@@ -6203,7 +6213,9 @@ app.post('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async 
       { key: 'pro_host_discounted_price', value: String(hostDiscountedPrice ?? '198000') },
       { key: 'pro_torob_price', value: String(torobPrice ?? '150000') },
       { key: 'pro_promo_code', value: String(promoCode ?? 'ZOPIT-PRO-198') },
-      { key: 'pro_terms_content', value: String(termsContent ?? '') }
+      { key: 'pro_terms_content', value: String(termsContent ?? '') },
+      { key: 'pro_video_url', value: String(videoUrl ?? '') },
+      { key: 'pro_audio_url', value: String(audioUrl ?? '') }
     ];
 
     for (const item of updates) {

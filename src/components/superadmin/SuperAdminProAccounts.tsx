@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useUrlQueryState } from "../../utils/routeSync";
 import {
   Crown,
   CheckCircle2,
@@ -20,7 +21,10 @@ import {
   ToggleLeft,
   ToggleRight,
   ShieldAlert,
-  X
+  X,
+  Upload,
+  Trash2,
+  Volume2
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 import SuperAdminDiscountCodes from "./SuperAdminDiscountCodes";
@@ -30,7 +34,7 @@ interface SuperAdminProAccountsProps {
 }
 
 export default function SuperAdminProAccounts({ showNotification }: SuperAdminProAccountsProps) {
-  const [activeTab, setActiveTab] = useState<"accounts" | "settings" | "discounts">("accounts");
+  const [activeTab, setActiveTab] = useUrlQueryState<"accounts" | "settings" | "discounts">("subtab", "accounts");
   const [loading, setLoading] = useState(true);
   const [proAccounts, setProAccounts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,6 +60,8 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
   const [torobPrice, setTorobPrice] = useState("150000");
   const [promoCode, setPromoCode] = useState("ZOPIT-PRO-198");
   const [termsContent, setTermsContent] = useState("");
+  const [proVideoUrl, setProVideoUrl] = useState("");
+  const [proAudioUrl, setProAudioUrl] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
@@ -96,6 +102,8 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
         setTorobPrice(data.torobPrice || "150000");
         setPromoCode(data.promoCode || "ZOPIT-PRO-198");
         setTermsContent(data.termsContent || "");
+        setProVideoUrl(data.videoUrl || "");
+        setProAudioUrl(data.audioUrl || "");
       }
     } catch (err) {
       console.error("Error fetching pro settings:", err);
@@ -176,7 +184,9 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
           hostDiscountedPrice,
           torobPrice,
           promoCode,
-          termsContent
+          termsContent,
+          videoUrl: proVideoUrl,
+          audioUrl: proAudioUrl
         })
       });
 
@@ -373,7 +383,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                           <button
                             type="button"
                             onClick={() => handleOpenAccountModal(acc)}
-                            className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-700 hover:text-slate-950 font-bold rounded-xl border border-emerald-500/20 transition-all text-xs inline-flex items-center gap-1.5"
+                            className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-slate-950 dark:hover:text-slate-950 font-bold rounded-xl border border-emerald-500/20 transition-all text-xs inline-flex items-center gap-1.5 cursor-pointer"
                           >
                             <Edit className="w-3.5 h-3.5" />
                             <span>مدیریت دسترسی‌ها</span>
@@ -415,8 +425,8 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
               <button
                 type="button"
                 onClick={() => setAutoApprove(!autoApprove)}
-                className={`p-2 rounded-2xl font-bold text-xs transition-all flex items-center gap-2 ${
-                  autoApprove ? "bg-emerald-500 text-slate-950" : "bg-zinc-200 text-zinc-700"
+                className={`p-2 rounded-2xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+                  autoApprove ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20" : "bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
                 }`}
               >
                 {autoApprove ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
@@ -492,6 +502,78 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
               />
             </div>
 
+            {/* Media URLs Section Header */}
+            <div className="col-span-1 sm:col-span-2 pt-4 border-t border-border-subtle">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                <div>
+                  <h3 className="text-xs font-black text-primary flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-emerald-400" />
+                    <span>فایل صوتی و پادکست اختصاصی راهنمای اکانت پرو:</span>
+                  </h3>
+                  <p className="text-[11px] text-muted mt-0.5">
+                    این فایل صوتی در پنل مدیران فروشگاه جهت راهنمایی ثبت دامنه، نماد و درگاه پرو پخش می‌شود. می‌توانید لینک مستقیم MP3 وارد کنید یا فایل را از سیستم آپلود نمایید.
+                  </p>
+                </div>
+
+                {/* Audio File Upload Button */}
+                <label className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/20 transition-all self-start sm:self-auto shrink-0">
+                  <Upload className="w-4 h-4" />
+                  <span>انتخاب و آپلود فایل صوتی از دستگاه</span>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 30 * 1024 * 1024) {
+                        toast("حجم فایل صوتی نباید بیشتر از ۳۰ مگابایت باشد.", "error");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        if (event.target?.result) {
+                          setProAudioUrl(event.target.result as string);
+                          toast("فایل صوتی با موفقیت انتخاب شد. لطفاً دکمه ذخیره تنظیمات را بزنید.", "success");
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Pro Audio Input & Controls */}
+            <div className="col-span-1 sm:col-span-2 space-y-2">
+              <label className="block text-xs font-bold text-secondary">
+                لینک یا فایل ذخیره‌شده صوتی (MP3/WAV/DataURL):
+              </label>
+              <input
+                type="text"
+                value={proAudioUrl?.startsWith("data:audio") ? "فایل صوتی از سیستم بارگذاری شده است (Base64)" : proAudioUrl}
+                onChange={(e) => setProAudioUrl(e.target.value)}
+                disabled={proAudioUrl?.startsWith("data:audio")}
+                placeholder="https://.../podcast.mp3"
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left dir-ltr focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+
+              {proAudioUrl && (
+                <div className="flex items-center justify-between bg-slate-900 text-white p-3 rounded-2xl border border-slate-800 text-xs dir-rtl">
+                  <span className="truncate max-w-md font-mono text-[11px] text-emerald-300 dir-ltr">
+                    {proAudioUrl.startsWith("data:audio") ? "فایل صوتی بارگذاری‌شده از سیستم" : proAudioUrl}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setProAudioUrl("")}
+                    className="text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> حذف فایل صوتی
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* DEDICATED DISCOUNT CODE CUSTOMIZATION FOR PRO PACKAGE */}
             <div className="col-span-1 sm:col-span-2 pt-6 border-t border-border-subtle space-y-4">
               <div className="bg-surface/80 p-5 sm:p-6 rounded-3xl border border-emerald-500/20 space-y-4">
@@ -514,7 +596,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                   <button
                     type="button"
                     onClick={() => setActiveTab("discounts")}
-                    className="px-3.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-700 hover:text-slate-950 font-bold rounded-xl border border-emerald-500/20 transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                    className="px-3.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-slate-950 dark:hover:text-slate-950 font-bold rounded-xl border border-emerald-500/20 transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
                   >
                     <BadgePercent className="w-3.5 h-3.5" />
                     <span>مدیریت کامل کوپن‌ها</span>

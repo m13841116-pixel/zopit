@@ -190,8 +190,8 @@ export default function SuperAdminDiscountCodes() {
             <Ticket className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-white">مدیریت کدهای تخفیف اکانت پرو (کوپن)</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <h2 className="text-lg font-black text-primary">مدیریت کدهای تخفیف اکانت پرو (کوپن)</h2>
+            <p className="text-xs text-muted mt-0.5">
               تعریف کوپن‌های تخفیف درصدی و مبلغ ثابت برای ثبت‌نام اولیه اکانت پرو با محدودیت تعداد و زمان
             </p>
           </div>

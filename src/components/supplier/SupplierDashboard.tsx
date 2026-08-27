@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Announcements from "../Announcements";
 import NotificationBell from "../NotificationBell";
 import OrderTimeline from "../OrderTimeline";
+import { Skeleton, CardSkeleton, TableSkeleton } from "../Skeleton";
 import { useEffect } from "react";
 import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
 import {
@@ -160,8 +161,21 @@ export function SupplierDashboard({
     return "overview";
   });
 
+  // Valid supplier tabs for routing fallback
+  const validSupplierTabs = [
+    "overview",
+    "products",
+    "add-product",
+    "orders",
+    "wallet",
+    "performance",
+    "tickets",
+    "announcements",
+    "profile"
+  ];
+
   // Sync tab with URL
-  useSyncTabWithUrl("/supplier", activeTab, setActiveTab, "overview");
+  useSyncTabWithUrl("/supplier", activeTab, setActiveTab, "overview", validSupplierTabs);
 
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [sysConfig, setSysConfig] = useState<Record<string, boolean>>({});
@@ -819,9 +833,14 @@ export function SupplierDashboard({
         <div className="flex-1 overflow-auto p-8 relative">
           
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-default"></div>
+            <div className="space-y-6 animate-pulse">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <CardSkeleton rows={2} />
+                <CardSkeleton rows={2} />
+                <CardSkeleton rows={2} />
+                <CardSkeleton rows={2} />
+              </div>
+              <TableSkeleton cols={6} rows={6} />
             </div>
           ) : (
             <>
