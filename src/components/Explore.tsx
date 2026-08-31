@@ -32,7 +32,6 @@ import { toast } from "./GlobalToast";
 import { useCart } from "./CartContext";
 import { PROVINCES } from "../data/provinces";
 import { getValidProductImageUrl } from "../utils/productUtils";
-import { IntroVideoBanner } from "./IntroVideoBanner";
 
 export default function Explore({ onBack }: { onBack?: () => void } = {}) {
   const [products, setProducts] = useState<any[]>([]);
@@ -455,11 +454,6 @@ export default function Explore({ onBack }: { onBack?: () => void } = {}) {
           ))}
         </div>
       </div>
-
-      {/* B2B Video Teaser Banner */}
-      {!searchQuery && selectedCategory === null && (
-        <IntroVideoBanner />
-      )}
 
       {/* Instagram Mosaic Staggered Grid without Borders */}
       <main className="px-0.5 py-0.5">

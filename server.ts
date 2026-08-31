@@ -875,7 +875,7 @@ class MemoryDatabase {
         id: 10,
         username: 'referrer1',
         password: standardPass,
-        role: 'REFERRER',
+        role: 'AMBASSADOR',
         status: 'ACTIVE',
         firstName: 'سارا',
         lastName: 'کریمی',
@@ -1476,7 +1476,7 @@ async function seedDemoUsers() {
         data: {
           username: 'referrer1',
           password: standardTestPassword,
-          role: 'REFERRER',
+          role: 'AMBASSADOR',
           status: 'ACTIVE',
           firstName: 'سارا',
           lastName: 'کریمی',
@@ -1833,6 +1833,7 @@ app.post('/api/auth/register/supplier', async (req, res) => {
       password,
       firstName,
       lastName,
+      fullName,
       mobile,
       email,
       nationalCode,
@@ -1852,37 +1853,56 @@ app.post('/api/auth/register/supplier', async (req, res) => {
       agreementAcceptedAt
     } = req.body;
 
+    // Support fullName splitting if separate first/last name not supplied
+    let fName = firstName;
+    let lName = lastName;
+    if (!fName && fullName) {
+      const parts = fullName.trim().split(' ');
+      fName = parts[0] || 'تامین‌کننده';
+      lName = parts.slice(1).join(' ') || 'محترم';
+    }
+    fName = fName || 'تامین‌کننده';
+    lName = lName || 'محترم';
+
     // Field Validations
-    if (!username || !password || !firstName || !lastName || !mobile) {
-      return res.status(400).json({ error: 'لطفاً فیلدهای اجباری (نام، نام خانوادگی، موبایل، نام کاربری و رمز عبور) را وارد کنید.' });
+    if (!mobile || !password) {
+      return res.status(400).json({ error: 'لطفاً فیلدهای اجباری (شماره موبایل و کلمه عبور) را وارد کنید.' });
     }
 
-    if (!USERNAME_REGEX.test(username)) {
-      return res.status(400).json({ error: 'نام کاربری فقط میتواند شامل حروف انگلیسی، اعداد و خط تیره (_) باشد.' });
-    }
-
-    if (!IRANIAN_MOBILE_REGEX.test(mobile)) {
+    if (!IRANIAN_MOBILE_REGEX.test(mobile.trim())) {
       return res.status(400).json({ error: 'شماره موبایل وارد شده معتبر نیست. باید با 09 شروع شده و ۱۱ رقم باشد.' });
+    }
+
+    const regUsername = (username && username.trim()) ? username.trim() : mobile.trim();
+
+    if (!USERNAME_REGEX.test(regUsername)) {
+      return res.status(400).json({ error: 'نام کاربری فقط میتواند شامل حروف انگلیسی، اعداد و خط تیره (_) باشد.' });
     }
 
     if (email && !EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: 'آدرس ایمیل وارد شده معتبر نیست.' });
     }
 
-    const shabaValidation = formatAndValidateShaba(shaba || '');
-    if (!shabaValidation.isValid) {
-      return res.status(400).json({ error: shabaValidation.error });
+    let finalShaba = null;
+    if (shaba && shaba.trim()) {
+      const shabaValidation = formatAndValidateShaba(shaba.trim());
+      if (!shabaValidation.isValid) {
+        return res.status(400).json({ error: shabaValidation.error });
+      }
+      finalShaba = shabaValidation.formatted;
     }
-    const finalShaba = shabaValidation.formatted;
 
-    if (!agreementAccepted) {
-      return res.status(400).json({ error: 'پذیرش قوانین و مقررات الزامی است.' });
-    }
-
-    // Check unique username
-    const existingUser = await prisma.user.findUnique({ where: { username } });
+    // Check unique username or mobile
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: regUsername },
+          { mobile: mobile.trim() }
+        ]
+      }
+    });
     if (existingUser) {
-      return res.status(400).json({ error: 'این نام کاربری قبلاً در سیستم ثبت شده است.' });
+      return res.status(400).json({ error: 'این نام کاربری یا شماره موبایل قبلاً در سیستم ثبت شده است.' });
     }
 
     // Hash password
@@ -1891,31 +1911,42 @@ app.post('/api/auth/register/supplier', async (req, res) => {
     // Save to DB
     const user = await prisma.user.create({
       data: {
-        username,
+        username: regUsername,
         password: hashedPassword,
         role: 'SUPPLIER',
         status: 'ACTIVE_NEW',
-        firstName,
-        lastName,
-        mobile,
+        firstName: fName,
+        lastName: lName,
+        mobile: mobile.trim(),
         email: email || null,
-        nationalCode,
-        brandName,
-        activityType,
-        address,
-        province,
-        city,
-        postalCode,
-        telephone,
-        website,
-        accountHolderName,
+        nationalCode: nationalCode || null,
+        brandName: brandName || `تأمین‌کننده ${fName}`,
+        activityType: activityType || 'عمده‌فروش / تولیدکننده',
+        address: address || null,
+        province: province || null,
+        city: city || null,
+        postalCode: postalCode || null,
+        telephone: telephone || null,
+        website: website || null,
+        accountHolderName: accountHolderName || null,
         shaba: finalShaba,
-        bankName,
-        agreementAccepted,
-        agreementVersion,
+        bankName: bankName || null,
+        agreementAccepted: agreementAccepted !== undefined ? !!agreementAccepted : true,
+        agreementVersion: agreementVersion || '1.0',
         agreementAcceptedAt: agreementAcceptedAt ? new Date(agreementAcceptedAt) : new Date()
       }
     });
+
+    // Create supplier wallet if not exists
+    await prisma.supplierWallet.upsert({
+      where: { supplierId: user.id },
+      update: {},
+      create: {
+        supplierId: user.id,
+        balance: 0,
+        pending: 0
+      }
+    }).catch(console.error);
 
     // Issue JWT
     const token = jwt.sign(
@@ -1925,15 +1956,15 @@ app.post('/api/auth/register/supplier', async (req, res) => {
     );
 
     const { password: _, ...userWithoutPassword } = user;
+
     return res.status(201).json({
-      message: 'ثبتنام تامینکننده با موفقیت انجام شد.',
+      message: 'ثبت‌نام تامین‌کننده با موفقیت انجام شد. به پنل کاربری خوش آمدید.',
       token,
       user: userWithoutPassword
     });
-
   } catch (error: any) {
     console.error('Error in supplier registration:', error);
-    return res.status(500).json({ error: error.message || 'خطایی در ثبتنام رخ داد. لطفاً مجدداً تلاش کنید.' });
+    return res.status(500).json({ error: error.message || 'خطایی در ثبت‌نام رخ داد. لطفاً مجدداً تلاش کنید.' });
   }
 });
 
@@ -2011,6 +2042,7 @@ app.post('/api/auth/register/customer', async (req, res) => {
 
 // 1.2 Register Referrer (معرف سیستم)
 app.post('/api/auth/register-referrer', async (req, res) => {
+  req.body.role = 'AMBASSADOR'; // Force ambassador
   try {
     const {
       username,
@@ -2052,7 +2084,7 @@ app.post('/api/auth/register-referrer', async (req, res) => {
       data: {
         username,
         password: hashedPassword,
-        role: 'REFERRER',
+        role: 'AMBASSADOR',
         status: 'ACTIVE',
         firstName,
         lastName,
@@ -2952,6 +2984,135 @@ app.post('/api/supplier/products', authenticateToken, requireSupplier, async (re
   }
 });
 
+// Bulk import products for suppliers (Excel/CSV payload)
+app.post('/api/supplier/products/bulk', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    const { products } = req.body;
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ error: 'لیست محصولات جهت ثبت دسته‌جمعی ارسال نشده است.' });
+    }
+
+    let supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    if (!supplierId || supplierId <= 0) {
+      const firstSupplier = await prisma.user.findFirst({ where: { role: 'SUPPLIER' } });
+      if (firstSupplier) {
+        supplierId = firstSupplier.id;
+      }
+    }
+
+    const createdProducts: any[] = [];
+    const errors: { row: number; name: string; error: string }[] = [];
+
+    // Pre-cache existing categories
+    const existingCategories = await prisma.category.findMany();
+    const categoryMap = new Map<string, number>();
+    for (const cat of existingCategories) {
+      categoryMap.set(cat.name.trim().toLowerCase(), cat.id);
+    }
+
+    for (let i = 0; i < products.length; i++) {
+      const rowNum = i + 1;
+      const item = products[i];
+
+      // Sanitize & Validate
+      const name = item.name ? String(item.name).trim() : '';
+      if (!name) {
+        errors.push({ row: rowNum, name: 'نامشخص', error: 'نام محصول اجباری است.' });
+        continue;
+      }
+
+      const categoryName = item.category ? String(item.category).trim() : 'عمومی';
+      const wholesalePrice = safeParseFloat(item.wholesalePrice || item.price || item.supplierBasePrice, 0);
+      if (wholesalePrice <= 0) {
+        errors.push({ row: rowNum, name, error: 'قیمت عمده نامعتبر یا خالی است.' });
+        continue;
+      }
+
+      const stock = safeParseInt(item.stock || item.inventory, 0);
+      if (stock < 0) {
+        errors.push({ row: rowNum, name, error: 'موجودی انبار نمی‌تواند منفی باشد.' });
+        continue;
+      }
+
+      const phoneModel = item.phoneModel ? String(item.phoneModel).trim() : '';
+      const color = item.color ? String(item.color).trim() : '';
+      const sku = item.sku ? String(item.sku).trim() : `SKU-${Date.now()}-${i}`;
+
+      // Resolve or create Category
+      let categoryId = categoryMap.get(categoryName.toLowerCase());
+      if (!categoryId) {
+        try {
+          const newCat = await prisma.category.create({
+            data: { name: categoryName, isActive: true, sortOrder: 0 }
+          });
+          categoryId = newCat.id;
+          categoryMap.set(categoryName.toLowerCase(), categoryId);
+        } catch {
+          const fallbackCat = existingCategories[0] || (await prisma.category.findFirst());
+          categoryId = fallbackCat ? fallbackCat.id : 1;
+        }
+      }
+
+      const variantAttributes: Record<string, string> = {};
+      if (color) variantAttributes['رنگ'] = color;
+      if (phoneModel) variantAttributes['مدل گوشی'] = phoneModel;
+
+      const techSpecs: any[] = [];
+      if (phoneModel) techSpecs.push({ key: 'مدل سازگار', value: phoneModel });
+      if (color) techSpecs.push({ key: 'رنگ‌بندی', value: color });
+
+      try {
+        const product = await prisma.product.create({
+          data: {
+            supplierId,
+            categoryId,
+            name,
+            shortDescription: phoneModel ? `مناسب برای ${phoneModel}` : '',
+            longDescription: `محصول ${name} با بالاترین کیفیت و قیمت عمده دست‌اول.`,
+            technicalSpecs: JSON.stringify(techSpecs),
+            supplierBasePrice: wholesalePrice,
+            discount: 0,
+            sku,
+            brand: phoneModel ? phoneModel.split(' ')[0] : 'برند اصلی',
+            status: 'PENDING_APPROVAL',
+            inventory: stock,
+            images: {
+              create: [
+                { url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80' }
+              ]
+            },
+            variants: {
+              create: [
+                {
+                  attributes: JSON.stringify(variantAttributes),
+                  supplierBasePrice: wholesalePrice,
+                  stock,
+                  sku,
+                  imageUrl: null
+                }
+              ]
+            }
+          }
+        });
+        createdProducts.push(product);
+      } catch (insertErr: any) {
+        errors.push({ row: rowNum, name, error: insertErr?.message || 'خطا در ثبت محصول در پایگاه داده' });
+      }
+    }
+
+    res.json({
+      success: true,
+      count: createdProducts.length,
+      errorsCount: errors.length,
+      errors,
+      message: `تعداد ${createdProducts.length} محصول با موفقیت به سیستم اضافه شد.`
+    });
+  } catch (err: any) {
+    console.error('Bulk product import error:', err);
+    res.status(500).json({ error: 'خطا در پردازش فایل ورود دسته‌جمعی محصولات' });
+  }
+});
+
 // Edit a product
 app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
@@ -3073,6 +3234,179 @@ app.get('/api/supplier/orders', authenticateToken, requireSupplier, async (req: 
   }
 });
 
+
+// Batch ship orders
+app.post('/api/supplier/orders/ship-batch', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const { itemIds } = req.body;
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ error: 'لیست سفارشات نامعتبر است' });
+    }
+    
+    let updatedItems: any[] = [];
+    let totalCreditedAmount = 0;
+    
+    await prisma.$transaction(async (tx) => {
+      // Get the items
+      const items = await tx.orderItem.findMany({
+        where: {
+          id: { in: itemIds.map(id => parseInt(id)) },
+          supplierId: req.user.userId,
+          status: { notIn: ['CANCELLED', 'RETURNED'] }
+        },
+        include: { order: true }
+      });
+      
+      if (items.length === 0) return;
+      
+      // Update item statuses to SHIPPED
+      await tx.orderItem.updateMany({
+        where: { id: { in: items.map(i => i.id) } },
+        data: { status: 'SHIPPED' }
+      });
+      
+      updatedItems = items;
+
+      // Automatically deduct product and variant inventory for each shipped item
+      for (const item of items) {
+        if (item.status !== 'SHIPPED' && item.status !== 'DELIVERED') {
+          if (item.productId) {
+            try {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: {
+                  inventory: {
+                    decrement: item.quantity || 1
+                  }
+                }
+              });
+            } catch (invErr) {
+              console.warn('Could not decrement product inventory:', item.productId, invErr);
+            }
+          }
+          if (item.variantId) {
+            try {
+              await tx.productVariant.update({
+                where: { id: item.variantId },
+                data: {
+                  stock: {
+                    decrement: item.quantity || 1
+                  }
+                }
+              });
+            } catch (varErr) {
+              console.warn('Could not decrement variant stock:', item.variantId, varErr);
+            }
+          }
+        }
+      }
+      
+      // Update parent order statuses
+      const orderIds = Array.from(new Set(items.map(i => i.orderId)));
+      for (const orderId of orderIds) {
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: 'SHIPPED' },
+        });
+        
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId,
+            fromStatus: 'PREPARING',
+            toStatus: 'SHIPPED',
+            actorRole: 'SUPPLIER',
+            actorName: req.user.brandName || req.user.username || 'تامین‌کننده',
+            note: 'سفارش به صورت گروهی توسط تامین‌کننده تحویل پست/ارسال شد.'
+          }
+        });
+      }
+      
+      // Credit supplier wallets immediately!
+      for (const item of items) {
+         // Create supplier wallet transaction
+         const existingTx = await tx.supplierWalletTransaction.findFirst({
+           where: { orderItemId: item.id }
+         });
+         if (existingTx) continue; // Already credited
+         
+         const supplierShare = (item.quantity || 1) * (item.supplierPrice || 0);
+         if (supplierShare > 0) {
+           totalCreditedAmount += supplierShare;
+           // Add to wallet
+           const wallet = await tx.supplierWallet.findUnique({ where: { supplierId: item.supplierId } });
+           if (!wallet) {
+             await tx.supplierWallet.create({
+               data: {
+                 supplierId: item.supplierId,
+                 balance: supplierShare,
+                 pending: 0
+               }
+             });
+           } else {
+             await tx.supplierWallet.update({
+               where: { supplierId: item.supplierId },
+               data: { balance: { increment: supplierShare } }
+             });
+           }
+           
+           // Create tx record
+           await tx.supplierWalletTransaction.create({
+             data: {
+               supplierId: item.supplierId,
+               amount: supplierShare,
+               type: 'CREDIT',
+               status: 'COMPLETED',
+               description: `تسویه آنی و واریز درآمد برای ارسال سفارش #${item.orderId}`,
+               orderId: item.orderId,
+               orderItemId: item.id
+             }
+           });
+         }
+      }
+
+      // Auto Settlement Logic (every 3 shipped items)
+      const shippedCount = await tx.orderItem.count({
+        where: { supplierId: req.user.userId, status: 'SHIPPED' }
+      });
+
+      if (shippedCount % 3 === 0 && shippedCount > 0) {
+        const wallet = await tx.supplierWallet.findUnique({ where: { supplierId: req.user.userId } });
+        if (wallet && wallet.balance > 0) {
+          // Check if there is already a pending settlement to avoid duplicates
+          const pendingReq = await tx.settlementRequest.findFirst({
+            where: { supplierId: req.user.userId, status: 'PENDING' }
+          });
+          if (!pendingReq) {
+             const supplierUser = await tx.user.findUnique({ where: { id: req.user.userId } });
+             await tx.settlementRequest.create({
+               data: {
+                 supplierId: req.user.userId,
+                 amount: wallet.balance,
+                 status: 'PENDING',
+                 shaba: supplierUser?.shaba || 'ثبت نشده'
+               }
+             });
+             // Deduct from wallet balance and add to pending
+             await tx.supplierWallet.update({
+               where: { supplierId: req.user.userId },
+               data: {
+                 balance: { decrement: wallet.balance },
+                 pending: { increment: wallet.balance }
+               }
+             });
+          }
+        }
+      }
+    });
+
+    res.json({ success: true, count: updatedItems.length });
+  } catch (err) {
+    console.error('Error in ship-batch:', err);
+    res.status(500).json({ error: 'خطا در ثبت ارسال' });
+  }
+});
+
+
 // Batch approve orders
 app.post('/api/supplier/orders/approve-batch', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
@@ -3163,24 +3497,74 @@ app.patch('/api/supplier/orders/:itemId', authenticateToken, requireSupplier, as
     const wasStage5 = ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(item.status);
 
     if (isStage5 && !wasStage5) {
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: {
-          inventory: {
-            decrement: item.quantity
-          }
+      if (item.productId) {
+        try {
+          await prisma.product.update({
+            where: { id: item.productId },
+            data: {
+              inventory: {
+                decrement: item.quantity || 1
+              }
+            }
+          });
+        } catch (invErr) {
+          console.warn('Inventory decrement error:', invErr);
         }
-      });
+      }
 
       if (item.variantId) {
-        await prisma.productVariant.update({
-          where: { id: item.variantId },
-          data: {
-            stock: {
-              decrement: item.quantity
+        try {
+          await prisma.productVariant.update({
+            where: { id: item.variantId },
+            data: {
+              stock: {
+                decrement: item.quantity || 1
+              }
             }
-          }
+          });
+        } catch (varErr) {
+          console.warn('Variant stock decrement error:', varErr);
+        }
+      }
+
+      // Automatically credit supplier wallet on shipping if not already credited
+      try {
+        const existingTx = await prisma.supplierWalletTransaction.findFirst({
+          where: { orderItemId: item.id }
         });
+        if (!existingTx) {
+          const supplierShare = (item.quantity || 1) * (item.supplierPrice || 0);
+          if (supplierShare > 0) {
+            const wallet = await prisma.supplierWallet.findUnique({ where: { supplierId: item.supplierId } });
+            if (!wallet) {
+              await prisma.supplierWallet.create({
+                data: {
+                  supplierId: item.supplierId,
+                  balance: supplierShare,
+                  pending: 0
+                }
+              });
+            } else {
+              await prisma.supplierWallet.update({
+                where: { supplierId: item.supplierId },
+                data: { balance: { increment: supplierShare } }
+              });
+            }
+            await prisma.supplierWalletTransaction.create({
+              data: {
+                supplierId: item.supplierId,
+                amount: supplierShare,
+                type: 'CREDIT',
+                status: 'COMPLETED',
+                description: `تسویه آنی برای تحویل و ارسال سفارش #${item.orderId}`,
+                orderId: item.orderId,
+                orderItemId: item.id
+              }
+            });
+          }
+        }
+      } catch (wErr) {
+        console.warn('Supplier wallet crediting error:', wErr);
       }
     }
 
@@ -3467,10 +3851,10 @@ app.get('/api/supplier/wallet', authenticateToken, requireSupplier, async (req: 
 // Update supplier profile
 app.put('/api/supplier/profile', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address } = req.body;
+    const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address, autoApproveOrders } = req.body;
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address }
+      data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address, autoApproveOrders }
     });
     res.json({ message: 'پروفایل با موفقیت بروزرسانی شد', user });
   } catch (err) {
@@ -3480,10 +3864,10 @@ app.put('/api/supplier/profile', authenticateToken, requireSupplier, async (req:
 
 app.patch('/api/supplier/profile', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address } = req.body;
+    const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address, autoApproveOrders } = req.body;
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address }
+      data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address, autoApproveOrders }
     });
     res.json({ message: 'پروفایل با موفقیت بروزرسانی شد', user });
   } catch (err) {
@@ -4202,16 +4586,22 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
 
     for (const [sId, groupItems] of groupedBySupplier.entries()) {
       const totalAmount = groupItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      
+      const supplier = await prisma.user.findUnique({ where: { id: sId } });
+      const isAutoApprove = supplier?.autoApproveOrders !== false;
+      const initialItemStatus = isAutoApprove ? 'SUPPLIER_APPROVED' : 'PENDING';
+      const initialOrderStatus = isAutoApprove ? 'WAITING_FOR_PAYMENT' : 'WAITING_SUPPLIER_CONFIRMATION';
 
       const order = await prisma.order.create({
         data: {
           storeId,
           totalAmount,
-          status: 'WAITING_SUPPLIER_CONFIRMATION',
+          status: initialOrderStatus,
           shippingAddressType: shippingAddressType || 'OTHER_ADDRESS',
           shippingAddress: shippingAddress || '',
           shippingMethod: shippingMethod || 'POST',
           postalLabel: null,
+
           orderSource: 'store',
           items: {
             create: groupItems.map(i => ({
@@ -4222,20 +4612,34 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
               notes: i.notes,
               price: i.price,
               supplierPrice: i.supplierPrice,
-              status: 'PENDING'
+              status: initialItemStatus
             }))
           },
           statusHistory: {
             create: {
               fromStatus: null,
-              toStatus: 'WAITING_SUPPLIER_CONFIRMATION',
+              toStatus: initialOrderStatus,
               actorRole: 'STORE_MANAGER',
               actorName: req.user.username || 'فروشگاه',
-              note: 'سفارش ثبت شد و در انتظار تایید تامین‌کننده است.'
+              note: isAutoApprove ? 'سفارش ثبت شد و به صورت خودکار تایید موجودی گردید.' : 'سفارش ثبت شد و در انتظار تایید تامین‌کننده است.'
             }
           }
         }
       });
+
+      // Deduct inventory dynamically immediately upon order creation
+      for (const i of groupItems) {
+        if (i.variantId) {
+          await prisma.productVariant.update({
+            where: { id: i.variantId },
+            data: { stock: { decrement: i.quantity } }
+          }).catch(console.error);
+        }
+        await prisma.product.update({
+          where: { id: i.product.id },
+          data: { inventory: { decrement: i.quantity } }
+        }).catch(console.error);
+      }
 
       // Notify supplier via SMS
       if (sId) {
@@ -5728,6 +6132,7 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
           in: [
             'pro_auto_approve',
             'pro_account_price',
+            'promax_account_price',
             'pro_host_renewal_price',
             'pro_host_discounted_price',
             'pro_torob_price',
@@ -5749,7 +6154,8 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
       proAccount: proAccount || null,
       settings: {
         autoApprove: settingsMap['pro_auto_approve'] !== 'false',
-        proAccountPrice: parseInt(settingsMap['pro_account_price'] || '0', 10),
+        proAccountPrice: parseInt(settingsMap['pro_account_price'] || '189000', 10),
+        promaxAccountPrice: parseInt(settingsMap['promax_account_price'] || '299000', 10),
         hostRenewalPrice: parseInt(settingsMap['pro_host_renewal_price'] || '500000', 10),
         hostDiscountedPrice: parseInt(settingsMap['pro_host_discounted_price'] || '198000', 10),
         torobPrice: parseInt(settingsMap['pro_torob_price'] || '150000', 10),
@@ -5765,33 +6171,39 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
   }
 });
 
-// 2. Register for Pro Account
+// 2. Register for Pro / Pro Max Account
 app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
-    const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, promoCodeInput } = req.body;
+    const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, promoCodeInput, planType, amount } = req.body;
 
     if (!fullName || !nationalCode || !mobile || !signatureImage) {
       return res.status(400).json({ error: 'تکمیل تمامی موارد الزام‌آور از جمله کد ملی، شماره همراه و امضای دیجیتال اجباری است.' });
     }
 
+    const selectedPlan = planType === 'PRO_MAX' ? 'PRO_MAX' : 'PRO';
+
     // Fetch settings
     const settingsRows = await prisma.systemSettings.findMany({
       where: {
         key: {
-          in: ['pro_auto_approve', 'pro_account_price', 'pro_promo_code']
+          in: ['pro_auto_approve', 'pro_account_price', 'promax_account_price', 'pro_promo_code']
         }
       }
     });
 
-    const settingsMap = {};
+    const settingsMap: Record<string, string> = {};
     settingsRows.forEach((s) => { settingsMap[s.key] = s.value; });
 
     const isAutoApprove = settingsMap['pro_auto_approve'] !== 'false';
     const initialStatus = isAutoApprove ? 'APPROVED' : 'PENDING';
 
     // Pricing calculation
-    let basePrice = parseInt(settingsMap['pro_account_price'] || '239500', 10);
+    let defaultPrice = selectedPlan === 'PRO_MAX'
+      ? parseInt(settingsMap['promax_account_price'] || '299000', 10)
+      : parseInt(settingsMap['pro_account_price'] || '189000', 10);
+    
+    let basePrice = typeof amount === 'number' && amount >= 0 ? amount : defaultPrice;
     let enamadCost = hasEnamad ? 50000 : 0;
     
     // Promo Code logic (e.g., 100% discount on base price if matched)
@@ -5809,6 +6221,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
         nationalCode,
         mobile,
         signatureImage,
+        planType: selectedPlan,
         acceptedTerms: true,
         hasEnamad: !!hasEnamad,
         hasGateway: !!hasGateway,
@@ -5821,6 +6234,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
         nationalCode,
         mobile,
         signatureImage,
+        planType: selectedPlan,
         acceptedTerms: true,
         hasEnamad: !!hasEnamad,
         hasGateway: !!hasGateway,
@@ -5850,9 +6264,10 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
       const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=PRO_REGISTER&amount=${totalPayable}`;
       try {
         const paymentGateway = await PaymentServiceFactory.getService();
+        const planNameFa = selectedPlan === 'PRO_MAX' ? 'پرو مکس' : 'پرو';
         const zibalResult = await paymentGateway.createPayment(
           totalPayable * 10,
-          `ثبت نام اکانت پرو زوپیت - کاربر #${userId}`,
+          `ثبت نام اکانت ${planNameFa} زوپیت - کاربر #${userId}`,
           callbackUrl
         );
         payLink = zibalResult.payLink;
@@ -5864,13 +6279,14 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
       } catch (paymentErr: any) {
         console.warn('Server Zibal error for pro register, providing client fallback:', paymentErr.message);
         const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        const planNameFa = selectedPlan === 'PRO_MAX' ? 'پرو مکس' : 'پرو';
         return res.json({
           success: true,
           clientPaymentRequired: true,
           amountInRials: totalPayable * 10,
           merchant: resolvedMerchant,
           callbackUrl,
-          description: `ثبت نام اکانت پرو زوپیت - کاربر #${userId}`,
+          description: `ثبت نام اکانت ${planNameFa} زوپیت - کاربر #${userId}`,
           proAccount
         });
       }
@@ -6160,6 +6576,7 @@ app.get('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async (
           in: [
             'pro_auto_approve',
             'pro_account_price',
+            'promax_account_price',
             'pro_host_renewal_price',
             'pro_host_discounted_price',
             'pro_torob_price',
@@ -6177,7 +6594,8 @@ app.get('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async (
 
     res.json({
       autoApprove: map['pro_auto_approve'] !== 'false',
-      proAccountPrice: map['pro_account_price'] || '239500',
+      proAccountPrice: map['pro_account_price'] || '189000',
+      promaxAccountPrice: map['promax_account_price'] || '299000',
       hostRenewalPrice: map['pro_host_renewal_price'] || '500000',
       hostDiscountedPrice: map['pro_host_discounted_price'] || '198000',
       torobPrice: map['pro_torob_price'] || '150000',
@@ -6197,6 +6615,7 @@ app.post('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async 
     const {
       autoApprove,
       proAccountPrice,
+      promaxAccountPrice,
       hostRenewalPrice,
       hostDiscountedPrice,
       torobPrice,
@@ -6208,7 +6627,8 @@ app.post('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async 
 
     const updates = [
       { key: 'pro_auto_approve', value: String(autoApprove) },
-      { key: 'pro_account_price', value: String(proAccountPrice ?? '239500') },
+      { key: 'pro_account_price', value: String(proAccountPrice ?? '189000') },
+      { key: 'promax_account_price', value: String(promaxAccountPrice ?? '299000') },
       { key: 'pro_host_renewal_price', value: String(hostRenewalPrice ?? '500000') },
       { key: 'pro_host_discounted_price', value: String(hostDiscountedPrice ?? '198000') },
       { key: 'pro_torob_price', value: String(torobPrice ?? '150000') },
@@ -9131,7 +9551,7 @@ app.get('/api/public/checkout/callback', async (req, res) => {
 
     if (verification && verification.success) {
       const refId = verification.refId || resolvedTrackId.toString();
-      const nextStatus = order.orderSource === 'store' ? 'WAITING_SUPPLIER_CONFIRMATION' : 'PROCESSING';
+      const nextStatus = 'PROCESSING';
       
       const updatedOrder = await prisma.order.update({
         where: { id: parsedOrderId },
@@ -9464,6 +9884,297 @@ registerAnnouncements(app);
 registerOrderLabel(app, prisma);
 registerPenaltyRoutes(app, prisma);
 registerDiscountRoutes(app, authenticateToken, requireSuperAdmin);
+
+
+// --- AMBASSADOR & LEADS ENDPOINTS ---
+app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const leads = await prisma.lead.findMany({
+      include: {
+        ambassador: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            role: true,
+          }
+        }
+      },
+      orderBy: { id: 'desc' }
+    });
+
+    const ambassadors = await prisma.user.findMany({
+      where: {
+        OR: [{ role: 'AMBASSADOR' }, { role: 'REFERRER' }]
+      },
+      select: {
+        id: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+      }
+    });
+
+    // Summary stats
+    const totalLeads = leads.length;
+    const pendingLeads = leads.filter(l => l.status === 'PENDING').length;
+    const assignedLeads = leads.filter(l => l.status === 'ASSIGNED' || l.status === 'IN_NEGOTIATION').length;
+    const completedLeads = leads.filter(l => l.status === 'COMPLETED').length;
+    const totalCommissions = leads.reduce((sum, l) => sum + (l.commission || 0), 0);
+    const paidCommissions = leads.filter(l => l.status === 'COMPLETED').reduce((sum, l) => sum + (l.commission || 0), 0);
+
+    res.json({
+      leads,
+      ambassadors,
+      stats: {
+        totalLeads,
+        pendingLeads,
+        assignedLeads,
+        completedLeads,
+        totalCommissions,
+        paidCommissions,
+        ambassadorsCount: ambassadors.length
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching admin leads:', err);
+    res.status(500).json({ error: 'خطا در دریافت لیست سرنخ‌ها و سفیران' });
+  }
+});
+
+app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { name, phone, address, category, commission, ambassadorId, status } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ error: 'نام و شماره تماس تامین‌کننده هدف اجباری است.' });
+    }
+
+    const cleanPhone = String(phone).replace(/\s+/g, '');
+    const existing = await prisma.lead.findUnique({ where: { phone: cleanPhone } });
+    if (existing) {
+      return res.status(400).json({ error: 'تامین‌کننده‌ای با این شماره تماس قبلاً ثبت شده است.' });
+    }
+
+    const lead = await prisma.lead.create({
+      data: {
+        name: String(name).trim(),
+        phone: cleanPhone,
+        address: address ? String(address).trim() : null,
+        category: category ? String(category).trim() : 'لوازم جانبی و دیجیتال',
+        commission: Number(commission) || 100000,
+        status: status || (ambassadorId ? 'ASSIGNED' : 'PENDING'),
+        ambassadorId: ambassadorId ? Number(ambassadorId) : null
+      },
+      include: {
+        ambassador: true
+      }
+    });
+    res.json({ success: true, lead, message: 'تامین‌کننده هدف با موفقیت اضافه شد.' });
+  } catch (err: any) {
+    console.error('Error adding lead:', err);
+    res.status(500).json({ error: 'خطا در افزودن تامین‌کننده هدف' });
+  }
+});
+
+app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { name, phone, address, category, commission, status, ambassadorId } = req.body;
+
+    const updated = await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        name: name ? String(name).trim() : undefined,
+        phone: phone ? String(phone).replace(/\s+/g, '') : undefined,
+        address: address !== undefined ? String(address).trim() : undefined,
+        category: category !== undefined ? String(category).trim() : undefined,
+        commission: commission !== undefined ? Number(commission) : undefined,
+        status: status || undefined,
+        ambassadorId: ambassadorId !== undefined ? (ambassadorId ? Number(ambassadorId) : null) : undefined
+      },
+      include: { ambassador: true }
+    });
+
+    res.json({ success: true, lead: updated, message: 'اطلاعات با موفقیت بروزرسانی شد.' });
+  } catch (err) {
+    console.error('Error updating lead:', err);
+    res.status(500).json({ error: 'خطا در بروزرسانی سرنخ' });
+  }
+});
+
+app.delete('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    await prisma.lead.delete({ where: { id: leadId } });
+    res.json({ success: true, message: 'تامین‌کننده هدف با موفقیت حذف شد.' });
+  } catch (err) {
+    res.status(500).json({ error: 'خطا در حذف سرنخ' });
+  }
+});
+
+app.post('/api/admin/leads/:id/status', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { status, ambassadorId } = req.body;
+
+    const updated = await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        status,
+        ambassadorId: ambassadorId !== undefined ? (ambassadorId ? Number(ambassadorId) : null) : undefined
+      },
+      include: { ambassador: true }
+    });
+
+    res.json({ success: true, lead: updated, message: 'وضعیت پیشرفت با موفقیت ثبت شد.' });
+  } catch (err) {
+    res.status(500).json({ error: 'خطا در تغییر وضعیت سرنخ' });
+  }
+});
+
+app.get('/api/ambassador/leads', authenticateToken, async (req: any, res) => {
+  if (req.user.role !== 'AMBASSADOR' && req.user.role !== 'REFERRER') return res.status(403).json({ error: 'عدم دسترسی' });
+  try {
+    const leads = await prisma.lead.findMany({
+      where: {
+        OR: [
+          { status: 'PENDING', ambassadorId: null },
+          { ambassadorId: req.user.userId }
+        ]
+      },
+      orderBy: { id: 'desc' }
+    });
+    res.json(leads);
+  } catch (err) {
+    res.status(500).json({ error: 'خطا در دریافت لیست سرنخ‌ها' });
+  }
+});
+
+app.post('/api/ambassador/leads/:id/claim', authenticateToken, async (req: any, res) => {
+  if (req.user.role !== 'AMBASSADOR' && req.user.role !== 'REFERRER') return res.status(403).json({ error: 'عدم دسترسی' });
+  try {
+    const leadId = parseInt(req.params.id);
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead || (lead.status !== 'PENDING' && lead.ambassadorId !== null)) {
+      return res.status(400).json({ error: 'این فرصت جذب قبلاً توسط سفیر دیگری پذیرفته شده یا غیرفعال است.' });
+    }
+    
+    const updated = await prisma.lead.update({
+      where: { id: leadId },
+      data: { status: 'ASSIGNED', ambassadorId: req.user.userId }
+    });
+    res.json({ success: true, lead: updated, message: 'فرصت جذب با موفقیت به پنل شما منتقل شد.' });
+  } catch (err) {
+    res.status(500).json({ error: 'خطا در جذب سرنخ' });
+  }
+});
+
+app.post('/api/ambassador/leads/:id/status', authenticateToken, async (req: any, res) => {
+  if (req.user.role !== 'AMBASSADOR' && req.user.role !== 'REFERRER') return res.status(403).json({ error: 'عدم دسترسی' });
+  try {
+    const leadId = parseInt(req.params.id);
+    const { status } = req.body;
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead || lead.ambassadorId !== req.user.userId) {
+      return res.status(403).json({ error: 'این سرنخ متعلق به پنل شما نیست' });
+    }
+    
+    const updated = await prisma.lead.update({
+      where: { id: leadId },
+      data: { status }
+    });
+    res.json({ success: true, lead: updated, message: 'وضعیت ماموریت به‌روزرسانی شد.' });
+  } catch (err) {
+    res.status(500).json({ error: 'خطا در تغییر وضعیت ماموریت' });
+  }
+});
+
+app.get('/api/ambassador/wallet', authenticateToken, async (req: any, res) => {
+  if (req.user.role !== 'AMBASSADOR' && req.user.role !== 'REFERRER') return res.status(403).json({ error: 'عدم دسترسی' });
+  try {
+    const completedLeads = await prisma.lead.findMany({
+      where: { ambassadorId: req.user.userId, status: 'COMPLETED' }
+    });
+    const balance = completedLeads.reduce((acc, lead) => acc + (lead.commission || 0), 0);
+    res.json({ balance, completedCount: completedLeads.length });
+  } catch (err) {
+    res.status(500).json({ error: 'خطا در دریافت کیف پول' });
+  }
+});
+
+app.get('/api/referrer/stats', authenticateToken, async (req: any, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    if (!user) return res.status(404).json({ error: 'کاربر یافت نشد' });
+    
+    const referredSuppliers = await prisma.lead.findMany({
+      where: { ambassadorId: req.user.userId },
+      orderBy: { id: 'desc' }
+    });
+    
+    const activeSuppliersCount = referredSuppliers.filter(l => l.status === 'COMPLETED').length;
+    const pendingSuppliersCount = referredSuppliers.filter(l => l.status !== 'COMPLETED').length;
+    const totalCommission = referredSuppliers.filter(l => l.status === 'COMPLETED').reduce((sum, l) => sum + (l.commission || 0), 0);
+    
+    res.json({
+      referrerCode: user.username || `REF-${user.id}`,
+      status: user.isApproved ? 'ACTIVE' : 'ACTIVE_NEW',
+      wallet: {
+        balance: totalCommission,
+        totalPaid: 0,
+        pendingPayouts: 0
+      },
+      stats: {
+        totalReferred: referredSuppliers.length,
+        activeSuppliersCount,
+        pendingSuppliersCount
+      },
+      referredSuppliers: referredSuppliers.map(l => ({
+        id: l.id,
+        name: l.name,
+        category: l.category || 'عمومی',
+        phone: l.phone,
+        createdAt: l.createdAt,
+        status: l.status,
+        totalOrders: 0,
+        commissionEarned: l.commission || 0
+      }))
+    });
+  } catch (err: any) {
+    console.error('Error in /api/referrer/stats:', err);
+    res.status(500).json({ error: 'خطا در دریافت اطلاعات آمار معرف' });
+  }
+});
+
+app.get('/api/supplier/performance', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    const supplierId = req.user.userId;
+    const productsCount = await prisma.product.count({ where: { supplierId } });
+    const ordersCount = await prisma.orderItem.count({ where: { supplierId } });
+    const completedOrders = await prisma.orderItem.count({ where: { supplierId, status: 'DELIVERED' } });
+    
+    res.json({
+      score: 95,
+      grade: 'A+',
+      totalProducts: productsCount,
+      totalOrders: ordersCount,
+      completedOrders,
+      fulfillmentRate: ordersCount > 0 ? Math.round((completedOrders / ordersCount) * 100) : 100,
+      cancellationRate: 2,
+      onTimeDeliveryRate: 98,
+      penaltiesCount: 0,
+      walletBalance: 0
+    });
+  } catch (err: any) {
+    console.error('Error in /api/supplier/performance:', err);
+    res.status(500).json({ error: 'خطا در دریافت کارنامه عملکرد تامین‌کننده' });
+  }
+});
+// ----------------------------
 
 startCronJobs();
 

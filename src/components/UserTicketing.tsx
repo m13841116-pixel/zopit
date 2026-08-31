@@ -333,7 +333,7 @@ export function UserTicketing({ user }: { user: any }) {
                   disabled={submitting}
                   className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
                 >
-                  {submitting ? "در حال ثبت تیکت..." : "ارسال تیکت به مدیریت"}
+                  {submitting ? "در حال ثبت تیکت..." : "ارسال تیکت به پشتیبانی"}
                 </button>
               </div>
             </form>

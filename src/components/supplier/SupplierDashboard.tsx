@@ -57,7 +57,13 @@ import {
   Layers,
   Store,
   GraduationCap,
-  Ticket
+  Ticket,
+  Calendar,
+  Filter,
+  Square,
+  ArrowUpDown,
+  CheckCheck,
+  Menu
 } from "lucide-react";
 import { EducationModal } from "../EducationModal";
 import { ZopitLogo } from "../ZopitLogo";
@@ -153,6 +159,11 @@ export function SupplierDashboard({
 }: any) {
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
+      const initialTab = sessionStorage.getItem("supplier_initial_tab");
+      if (initialTab) {
+        sessionStorage.removeItem("supplier_initial_tab");
+        return initialTab;
+      }
       const path = window.location.pathname;
       if (path.startsWith("/supplier/") && path.length > "/supplier/".length) {
         return path.replace("/supplier/", "");
@@ -178,6 +189,7 @@ export function SupplierDashboard({
   useSyncTabWithUrl("/supplier", activeTab, setActiveTab, "overview", validSupplierTabs);
 
   const [showEducationModal, setShowEducationModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [sysConfig, setSysConfig] = useState<Record<string, boolean>>({});
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -276,6 +288,10 @@ export function SupplierDashboard({
   const [loading, setLoading] = useState(true);
   const [productToEdit, setProductToEdit] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [isBulkShipping, setIsBulkShipping] = useState(false);
+  const [orderDateFilter, setOrderDateFilter] = useState<string>("all");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
+  const [orderSearchQuery, setOrderSearchQuery] = useState<string>("");
   const [changingOrder, setChangingOrder] = useState<any>(null);
   const [changeStatus, setChangeStatus] = useState<string>("");
   const [changeTracking, setChangeTracking] = useState<string>("");
@@ -318,7 +334,7 @@ export function SupplierDashboard({
       o.totalAmount || 0,
       o.status === "REQUESTED"
         ? "در انتظار تایید"
-        : o.status === "SUPPLIER_APPROVED"
+        : o.status === "SHIPPED"
           ? "تایید شده"
           : o.status === "PAID"
             ? "پرداخت شده"
@@ -508,6 +524,41 @@ export function SupplierDashboard({
       .catch(console.error);
     fetchData();
   }, []);
+  
+  const handleBulkShip = async () => {
+    if (selectedItems.length === 0) return;
+    setIsBulkShipping(true);
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/supplier/orders/ship-batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ itemIds: selectedItems }),
+      });
+      if (res.ok) {
+        if (showNotification) {
+          showNotification("وضعیت سفارشات با موفقیت به ارسال‌شده تغییر یافت و مبلغ به کیف پول شما واریز شد.", "success");
+        }
+        setSelectedItems([]);
+        fetchData();
+      } else {
+        if (showNotification) {
+          showNotification("خطا در ثبت ارسال گروهی.", "error");
+        }
+      }
+    } catch (err) {
+      if (showNotification) {
+        showNotification("خطای ارتباط با سرور", "error");
+      }
+    } finally {
+      setIsBulkShipping(false);
+    }
+  };
+
+
   const updateOrderStatus = async (itemId: number, newStatus: string) => {
     try {
       const token = localStorage.getItem("token") || "";
@@ -649,7 +700,7 @@ export function SupplierDashboard({
         setOrders(
           orders.map((o) =>
             selectedItems.includes(o.id)
-              ? { ...o, status: "SUPPLIER_APPROVED" }
+              ? { ...o, status: "SHIPPED" }
               : o,
           ),
         );
@@ -739,41 +790,59 @@ export function SupplierDashboard({
   return (
     <div
       id="view-dashboard-supplier"
-      className="flex h-screen bg-background w-full"
+      className="flex h-screen bg-background w-full relative overflow-hidden"
       dir="rtl"
     >
-      
-      {/* Sidebar */}
-      <aside className="w-64 shrink-0 bg-card border-l border-border-subtle text-text-primary flex flex-col h-screen sticky top-0 shadow-xl z-20">
-        
-        <div className="p-6 border-b border-border-subtle bg-surface/30 shrink-0">
-          <div className="mb-3">
-            <ZopitLogo size="md" />
+      {/* Mobile Drawer Backdrop Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+        />
+      )}
+
+      {/* Sidebar (Desktop static / Mobile slide-over drawer) */}
+      <aside
+        className={`fixed inset-y-0 right-0 z-50 w-64 bg-card border-l border-border-subtle text-text-primary flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 lg:shadow-xl lg:z-20 shrink-0 ${
+          isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="p-4 sm:p-6 border-b border-border-subtle bg-surface/30 shrink-0 flex items-center justify-between">
+          <div>
+            <div className="mb-2">
+              <ZopitLogo size="md" />
+            </div>
+            <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+              <Package className="text-primary-default w-5 h-5" /> پنل تامین‌کننده
+            </h2>
+            <p className="text-text-muted text-xs mt-1 truncate max-w-[180px]">
+              {user?.firstName} {user?.lastName} ({user?.brandName})
+            </p>
           </div>
-          <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
-            <Package className="text-primary-default w-5 h-5" /> پنل تامین‌کننده
-          </h2>
-          <p className="text-text-muted text-xs mt-1 truncate max-w-[200px]">
-            {user?.firstName} {user?.lastName} ({user?.brandName})
-          </p>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="lg:hidden p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface"
+            aria-label="بستن منو"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto min-h-0">
-          
           {getDynamicNavItems().map((item) => (
             <AppLink href={`/supplier/${item.id}`} key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                setIsMobileMenuOpen(false);
+              }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === item.id ? "bg-primary-default text-white shadow-lg shadow-primary-default/20" : "text-text-secondary hover:bg-surface hover:text-text-primary"}`}
               aria-label={item.label}
             >
-              
               <span className={activeTab === item.id ? "text-white" : "text-text-muted"}>{item.icon}</span> {item.label}
             </AppLink>
           ))}
         </nav>
         <div className="p-4 border-t border-border-subtle space-y-4 shrink-0 bg-card">
-          
           <div className="bg-surface/50 p-4 rounded-xl text-center border border-border-default">
-            
             <p className="text-xs text-text-primary font-medium mb-2">
               نیاز به راهنمایی دارید؟
             </p>
@@ -781,11 +850,14 @@ export function SupplierDashboard({
               برای هرگونه سوال، ابهام یا مشکل، لطفاً تیکت پشتیبانی ثبت کنید:
             </p>
             <button
-              onClick={() => setActiveTab("tickets")}
+              onClick={() => {
+                setActiveTab("tickets");
+                setIsMobileMenuOpen(false);
+              }}
               className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 bg-primary-default text-inverse rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm cursor-pointer"
             >
               <Ticket className="w-4 h-4" />
-              <span>ارسال تیکت به مدیر کل</span>
+              <span>ارسال تیکت به پشتیبانی</span>
             </button>
           </div>
           <button
@@ -793,29 +865,39 @@ export function SupplierDashboard({
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-danger hover:bg-danger/10 transition-colors"
             aria-label="خروج از حساب کاربری"
           >
-            
             <LogOut className="w-5 h-5" /> خروج از حساب
           </button>
         </div>
       </aside>
+
       {/* Main Content */}
-      <main className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
-        
+      <main className="flex-1 min-w-0 flex flex-col h-full overflow-hidden w-full">
         {/* Header */}
-        <header className="bg-card px-8 py-5 flex items-center justify-between border-b border-subtle shadow-sm relative z-40">
-          <h1 className="text-2xl font-bold text-primary">
-            {getDynamicNavItems().find((i) => i.id === activeTab)?.label}
-          </h1>
-          <div className="flex items-center gap-4">
-            <div className="bg-surface text-muted text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-success" /> حساب فعال
+        <header className="bg-card px-4 sm:px-8 py-3.5 sm:py-5 flex items-center justify-between border-b border-subtle shadow-sm relative z-30 shrink-0">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded-xl bg-surface text-text-secondary hover:text-text-primary border border-border-default cursor-pointer"
+              aria-label="باز کردن منو"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg sm:text-2xl font-bold text-primary truncate">
+              {getDynamicNavItems().find((i) => i.id === activeTab)?.label}
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="bg-surface text-muted text-[11px] sm:text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+              <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-success" /> 
+              <span className="hidden xs:inline">حساب فعال</span>
             </div>
             <button
               onClick={() => setShowEducationModal(true)}
               className="p-2 bg-surface hover:bg-emerald-500/10 text-muted hover:text-emerald-600 rounded-xl transition-all duration-200 border border-subtle hover:border-emerald-200 cursor-pointer flex items-center justify-center gap-1.5"
               title="مرکز آموزش و ویدیوهای راهنما"
             >
-              <GraduationCap className="w-5 h-5 text-emerald-500" />
+              <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
               <span className="text-[11px] font-bold text-emerald-600 hidden md:inline-block">آموزش</span>
             </button>
             <NotificationBell
@@ -1071,7 +1153,7 @@ export function SupplierDashboard({
                               <div className="flex items-center gap-4">
                                 
                                 <div
-                                  className={`p-3 rounded-xl ${order.status === "REQUESTED" ? "bg-warning/20 text-warning animate-pulse" : order.status === "SUPPLIER_APPROVED" ? "bg-blue-100 text-blue-600" : order.status === "PAID" ? "bg-success/20 text-success" : "bg-surface text-muted"}`}
+                                  className={`p-3 rounded-xl ${order.status === "REQUESTED" ? "bg-warning/20 text-warning animate-pulse" : order.status === "SHIPPED" ? "bg-blue-100 text-blue-600" : order.status === "PAID" ? "bg-success/20 text-success" : "bg-surface text-muted"}`}
                                 >
                                   
                                   <Clock className="w-5 h-5" />
@@ -1103,7 +1185,7 @@ export function SupplierDashboard({
                                   className={`px-3 py-1.5 rounded-full text-xs font-bold inline-block mb-1 border shadow-xs ${
                                     order.status === "REQUESTED" || order.status === "NEW" || order.status === "WAITING_SUPPLIER_CONFIRMATION"
                                       ? "bg-purple-100 text-purple-800 border-purple-300"
-                                      : order.status === "SUPPLIER_APPROVED" || order.status === "PAID"
+                                      : order.status === "SHIPPED" || order.status === "PAID"
                                         ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                                         : order.status === "PENDING_PAYMENT" || order.status === "WAITING_FOR_PAYMENT" || order.status === "WAITING_SHIPPING_PAYMENT"
                                           ? "bg-amber-100 text-amber-800 border-amber-300"
@@ -1478,87 +1560,296 @@ export function SupplierDashboard({
                   if (sysConfig["SUPPLIER_ORDERS_ENABLED"] === false) {
                     return renderMaintenance("سفارشات");
                   }
-                  const approvableOrders = orders.filter(
-                    (o) => o.status === "REQUESTED" || o.status === "PENDING",
+                  
+                  const filteredOrders = orders.filter((order) => {
+                    // Date filter
+                    if (orderDateFilter !== "all" && order.order?.createdAt) {
+                      const orderTime = new Date(order.order.createdAt).getTime();
+                      const now = Date.now();
+                      const oneDay = 24 * 60 * 60 * 1000;
+                      if (orderDateFilter === "today" && (now - orderTime) > oneDay) return false;
+                      if (orderDateFilter === "week" && (now - orderTime) > 7 * oneDay) return false;
+                      if (orderDateFilter === "month" && (now - orderTime) > 30 * oneDay) return false;
+                    }
+                    // Status filter
+                    if (orderStatusFilter !== "all") {
+                      if (orderStatusFilter === "PENDING" && !["REQUESTED", "PENDING", "NEW", "WAITING_SUPPLIER_CONFIRMATION"].includes(order.status)) return false;
+                      if (orderStatusFilter === "CONFIRMED" && !["CONFIRMED", "PREPARING", "PENDING_POSTAL_LABEL", "PROCESSING", "PAID"].includes(order.status)) return false;
+                      if (orderStatusFilter === "SHIPPED" && !["SHIPPED", "DELIVERED", "COMPLETED"].includes(order.status)) return false;
+                      if (orderStatusFilter === "CANCELLED" && !["CANCELLED", "REJECTED"].includes(order.status)) return false;
+                    }
+                    // Search
+                    if (orderSearchQuery.trim()) {
+                      const q = orderSearchQuery.trim().toLowerCase();
+                      const matchId = String(order.id).toLowerCase().includes(q) || String(order.orderId || "").toLowerCase().includes(q);
+                      const matchName = (order.product?.name || "").toLowerCase().includes(q);
+                      const matchSku = (order.product?.sku || "").toLowerCase().includes(q);
+                      const matchStore = (order.order?.store?.storeName || order.order?.store?.username || "").toLowerCase().includes(q);
+                      if (!matchId && !matchName && !matchSku && !matchStore) return false;
+                    }
+                    return true;
+                  });
+
+                  const approvableOrders = filteredOrders.filter(
+                    (o) => o.status === "REQUESTED" || o.status === "PENDING" || o.status === "NEW" || o.status === "WAITING_SUPPLIER_CONFIRMATION",
                   );
+
+                  const allFilteredIds = filteredOrders.map((o) => o.id);
+                  const isAllFilteredSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selectedItems.includes(id));
+                  const isAllApprovableSelected = approvableOrders.length > 0 && approvableOrders.every((o) => selectedItems.includes(o.id));
+
                   return (
                     <div className="space-y-6 animate-fade-in">
-                      
-                      <div className="flex items-center justify-between">
-                        
-                        <h2 className="text-xl font-bold text-primary">
-                          مدیریت سفارشات دریافتی
-                        </h2>
-                        <button
-                          onClick={handleExportCSV}
-                          className="bg-success/10 text-success hover:bg-success/20 px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 border border-emerald-200 cursor-pointer shadow-sm shadow-emerald-50"
-                        >
-                          
-                          <FileText className="w-5 h-5" /> خروجی اکسل (CSV)
-                        </button>
+                      {/* Top Header & Export */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-xl font-bold text-primary flex items-center gap-2">
+                            <ShoppingCart className="w-6 h-6 text-primary-default" />
+                            مدیریت سفارشات دریافتی
+                          </h2>
+                          <p className="text-xs text-text-muted mt-1">
+                            بررسی، تایید و ارسال سفارشات فروشگاه‌ها
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleExportCSV}
+                            className="bg-success/10 text-success hover:bg-success/20 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-emerald-200 cursor-pointer shadow-sm shadow-emerald-50"
+                          >
+                            <FileText className="w-4 h-4" /> خروجی اکسل (CSV)
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Filters and Search Bar */}
+                      <div className="bg-card border border-subtle rounded-2xl p-4 space-y-4 shadow-sm">
+                        {/* Status Filter Tabs */}
+                        <div className="flex flex-wrap gap-2 border-b border-subtle pb-3">
+                          <button
+                            onClick={() => setOrderStatusFilter("all")}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              orderStatusFilter === "all"
+                                ? "bg-primary-default text-white shadow-md shadow-primary-default/20"
+                                : "bg-surface text-secondary hover:bg-border/60"
+                            }`}
+                          >
+                            همه سفارشات ({orders.length})
+                          </button>
+                          <button
+                            onClick={() => setOrderStatusFilter("PENDING")}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              orderStatusFilter === "PENDING"
+                                ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                                : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                            }`}
+                          >
+                            در انتظار تایید ({orders.filter(o => ["REQUESTED", "PENDING", "NEW", "WAITING_SUPPLIER_CONFIRMATION"].includes(o.status)).length})
+                          </button>
+                          <button
+                            onClick={() => setOrderStatusFilter("CONFIRMED")}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              orderStatusFilter === "CONFIRMED"
+                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                                : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                            }`}
+                          >
+                            تایید شده / در حال آماده‌سازی ({orders.filter(o => ["CONFIRMED", "PREPARING", "PENDING_POSTAL_LABEL", "PROCESSING", "PAID"].includes(o.status)).length})
+                          </button>
+                          <button
+                            onClick={() => setOrderStatusFilter("SHIPPED")}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              orderStatusFilter === "SHIPPED"
+                                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            }`}
+                          >
+                            ارسال شده ({orders.filter(o => ["SHIPPED", "DELIVERED", "COMPLETED"].includes(o.status)).length})
+                          </button>
+                          <button
+                            onClick={() => setOrderStatusFilter("CANCELLED")}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              orderStatusFilter === "CANCELLED"
+                                ? "bg-rose-600 text-white shadow-md shadow-rose-600/20"
+                                : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                            }`}
+                          >
+                            لغو / رد شده ({orders.filter(o => ["CANCELLED", "REJECTED"].includes(o.status)).length})
+                          </button>
+                        </div>
+
+                        {/* Search and Date Filter Controls */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                          {/* Search Input */}
+                          <div className="md:col-span-6 relative">
+                            <input
+                              type="text"
+                              placeholder="جستجو بر اساس شماره سفارش، نام کالا، SKU، نام فروشگاه..."
+                              value={orderSearchQuery}
+                              onChange={(e) => setOrderSearchQuery(e.target.value)}
+                              className="w-full pl-8 pr-10 py-2.5 bg-background border border-subtle rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-default/20 focus:border-primary-default transition-all"
+                            />
+                            <Search className="w-4 h-4 text-text-muted absolute right-3.5 top-3" />
+                            {orderSearchQuery && (
+                              <button
+                                onClick={() => setOrderSearchQuery("")}
+                                className="absolute left-3 top-3 text-text-muted hover:text-text-primary"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Date Range Filter */}
+                          <div className="md:col-span-6 flex items-center justify-end gap-2">
+                            <span className="text-xs text-text-muted flex items-center gap-1 shrink-0">
+                              <Calendar className="w-3.5 h-3.5" /> فیلتر تاریخ:
+                            </span>
+                            <div className="flex bg-surface rounded-xl p-1 border border-subtle text-xs gap-1">
+                              <button
+                                onClick={() => setOrderDateFilter("all")}
+                                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                                  orderDateFilter === "all" ? "bg-primary-default text-white" : "text-text-muted hover:text-text-primary"
+                                }`}
+                              >
+                                همه
+                              </button>
+                              <button
+                                onClick={() => setOrderDateFilter("today")}
+                                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                                  orderDateFilter === "today" ? "bg-primary-default text-white" : "text-text-muted hover:text-text-primary"
+                                }`}
+                              >
+                                امروز
+                              </button>
+                              <button
+                                onClick={() => setOrderDateFilter("week")}
+                                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                                  orderDateFilter === "week" ? "bg-primary-default text-white" : "text-text-muted hover:text-text-primary"
+                                }`}
+                              >
+                                ۷ روز اخیر
+                              </button>
+                              <button
+                                onClick={() => setOrderDateFilter("month")}
+                                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                                  orderDateFilter === "month" ? "bg-primary-default text-white" : "text-text-muted hover:text-text-primary"
+                                }`}
+                              >
+                                ۳۰ روز اخیر
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Fast Select All Action Buttons */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-subtle text-xs">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isAllFilteredSelected) {
+                                  setSelectedItems([]);
+                                } else {
+                                  setSelectedItems(allFilteredIds);
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-surface hover:bg-border/60 border border-subtle rounded-xl font-bold text-text-primary flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              {isAllFilteredSelected ? (
+                                <CheckSquare className="w-4 h-4 text-primary-default" />
+                              ) : (
+                                <Square className="w-4 h-4 text-text-muted" />
+                              )}
+                              <span>انتخاب همه موارد این لیست ({filteredOrders.length})</span>
+                            </button>
+
+                            {approvableOrders.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isAllApprovableSelected) {
+                                    setSelectedItems([]);
+                                  } else {
+                                    setSelectedItems(approvableOrders.map(o => o.id));
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-xl font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <CheckCheck className="w-4 h-4" />
+                                <span>انتخاب فقط سفارشات در انتظار تایید ({approvableOrders.length})</span>
+                              </button>
+                            )}
+
+                            {selectedItems.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedItems([])}
+                                className="px-2.5 py-1.5 text-rose-600 hover:underline font-bold cursor-pointer"
+                              >
+                                لغو انتخاب‌ها
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="text-text-muted">
+                            نمایش <span className="font-bold text-text-primary font-mono">{filteredOrders.length}</span> از <span className="font-bold text-text-primary font-mono">{orders.length}</span> سفارش
+                            {selectedItems.length > 0 && (
+                              <span className="mr-2 text-primary-default font-black">
+                                ({selectedItems.length} مورد انتخاب شده)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Selected Items Batch Floating Banner */}
                       {selectedItems.length > 0 && (
-                        <div className="bg-surface border border-blue-200/50 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in shadow-sm">
-                          
+                        <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in shadow-xl shadow-indigo-950/20 border border-indigo-700/40">
                           <div className="flex items-center gap-3">
-                            
-                            <div className="p-3 bg-primary-default text-inverse rounded-xl">
-                              
+                            <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-inner">
                               <ShoppingCart className="w-5 h-5" />
                             </div>
                             <div>
-                              
-                              <p className="font-bold text-primary-hover text-sm">
-                                
-                                تعداد {selectedItems.length} سفارش برای تایید
-                                گروهی انتخاب شده است.
+                              <p className="font-black text-white text-sm">
+                                تعداد {selectedItems.length} سفارش برای عملیات گروهی انتخاب شده است.
                               </p>
-                              <p className="text-xs text-primary-hover mt-0.5">
-                                
-                                می‌توانید تمام این سفارشات را با یک کلیک تایید
-                                کنید.
+                              <p className="text-xs text-slate-200 mt-0.5 font-medium">
+                                می‌توانید تمام سفارشات انتخاب شده را به صورت یکجا تایید و آماده ارسال کنید.
                               </p>
                             </div>
                           </div>
-                          <button
-                            onClick={approveBatchOrders}
-                            className="w-full md:w-auto bg-primary-default text-inverse px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 shadow-md shadow-indigo-100"
-                          >
-                            
-                            تایید گروهی سفارشات ({selectedItems.length})
-                          </button>
+                          <div className="flex items-center gap-2 w-full md:w-auto">
+                            <button
+                              onClick={approveBatchOrders}
+                              className="flex-1 md:flex-initial bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-95"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              تایید گروهی سفارشات ({selectedItems.length})
+                            </button>
+                          </div>
                         </div>
                       )}
+
+                      {/* Orders Table */}
                       <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden">
-                        
-                        {orders.length > 0 ? (
+                        {filteredOrders.length > 0 ? (
                           <div className="overflow-x-auto">
-                            
                             <table className="w-full text-right text-sm">
-                              
                               <thead className="bg-background border-b border-subtle text-muted font-medium">
-                                
                                 <tr>
-                                  
                                   <th className="px-6 py-4 w-12 text-center">
-                                    
                                     <input
                                       type="checkbox"
                                       className="rounded border-default text-primary-default focus:ring-primary-default w-4 h-4 cursor-pointer"
-                                      checked={
-                                        approvableOrders.length > 0 &&
-                                        selectedItems.length ===
-                                          approvableOrders.length
-                                      }
+                                      checked={isAllFilteredSelected}
                                       onChange={(e) => {
                                         if (e.target.checked) {
-                                          setSelectedItems(
-                                            approvableOrders.map((o) => o.id),
-                                          );
+                                          setSelectedItems(allFilteredIds);
                                         } else {
                                           setSelectedItems([]);
                                         }
                                       }}
+                                      title="انتخاب همه"
                                     />
                                   </th>
                                   <th className="px-6 py-4">سفارش</th>
@@ -1570,57 +1861,48 @@ export function SupplierDashboard({
                                   <th className="px-6 py-4">عملیات</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                
-                                {orders.map((order) => {
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {filteredOrders.map((order) => {
                                   const isApprovable =
                                     order.status === "REQUESTED" ||
-                                    order.status === "PENDING";
+                                    order.status === "PENDING" ||
+                                    order.status === "NEW" ||
+                                    order.status === "WAITING_SUPPLIER_CONFIRMATION";
                                   const isSelected = selectedItems.includes(
                                     order.id,
                                   );
                                   return (
                                     <tr
                                       key={order.id}
-                                      className={`hover:bg-background transition-colors ${isSelected ? "bg-primary-default/10/30" : ""}`}
+                                      className={`hover:bg-background/80 transition-colors ${isSelected ? "bg-primary-default/10/30" : ""}`}
                                     >
-                                      
                                       <td className="px-6 py-4 text-center">
-                                        
-                                        {isApprovable ? (
-                                          <input
-                                            type="checkbox"
-                                            className="rounded border-default text-primary-default focus:ring-primary-default w-4 h-4 cursor-pointer"
-                                            checked={isSelected}
-                                            onChange={(e) => {
-                                              if (e.target.checked) {
-                                                setSelectedItems([
-                                                  ...selectedItems,
-                                                  order.id,
-                                                ]);
-                                              } else {
-                                                setSelectedItems(
-                                                  selectedItems.filter(
-                                                    (id) => id !== order.id,
-                                                  ),
-                                                );
-                                              }
-                                            }}
-                                          />
-                                        ) : (
-                                          <span className="text-inverse text-xs">
-                                            -
-                                          </span>
-                                        )}
+                                        <input
+                                          type="checkbox"
+                                          className="rounded border-default text-primary-default focus:ring-primary-default w-4 h-4 cursor-pointer"
+                                          checked={isSelected}
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setSelectedItems([
+                                                ...selectedItems,
+                                                order.id,
+                                              ]);
+                                            } else {
+                                              setSelectedItems(
+                                                selectedItems.filter(
+                                                  (id) => id !== order.id,
+                                                ),
+                                              );
+                                            }
+                                          }}
+                                        />
                                       </td>
                                       <td className="px-6 py-4">
-                                        
-                                        <div className="font-mono font-medium text-primary-default">
+                                        <div className="font-mono font-bold text-primary-default">
                                           #{order.id}
                                         </div>
                                         {order.order?.createdAt && (
                                           <div className="text-xs text-muted mt-1">
-                                            
                                             {new Date(
                                               order.order.createdAt,
                                             ).toLocaleDateString("fa-IR")}
@@ -1628,7 +1910,6 @@ export function SupplierDashboard({
                                         )}
                                       </td>
                                       <td className="px-6 py-4">
-                                        
                                         <div className="text-primary font-medium">
                                           {order.product?.name}
                                         </div>
@@ -1681,30 +1962,24 @@ export function SupplierDashboard({
                                         </div>
                                         {order.status === "REQUESTED" && (
                                           <div className="mt-2 p-2 bg-warning/10 rounded-lg border border-amber-200/50 text-xs text-amber-800 max-w-[280px]">
-                                            
                                             <div className="font-bold flex items-center gap-1 mb-1">
-                                              
                                               <span className="inline-block w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
                                               درخواست تأیید کالا
                                             </div>
-                                            انتظار درخواست برای محصول
-                                            <span className="font-semibold text-primary-hover">
+                                            انتظار تایید برای محصول
+                                            <span className="font-semibold text-primary-hover mr-1">
                                               {order.product?.name}
                                             </span>
-                                            را داریم.
                                           </div>
                                         )}
                                       </td>
                                       <td className="px-6 py-4 text-primary font-bold">
-                                        
                                         {order.quantity || 1}
                                       </td>
                                       <td className="px-6 py-4">
-                                        
                                         <span
                                           className={`font-bold ${order.product?.inventory >= order.quantity ? "text-success" : "text-danger"}`}
                                         >
-                                          
                                           {order.product?.inventory}
                                         </span>
                                       </td>
@@ -1712,16 +1987,14 @@ export function SupplierDashboard({
                                         className="px-6 py-4 text-xs text-muted max-w-[150px] truncate"
                                         title={order.notes}
                                       >
-                                        
                                         {order.notes || "-"}
                                       </td>
                                       <td className="px-6 py-4">
-                                        
                                         <span
                                           className={`px-2.5 py-1 rounded-full text-xs font-semibold border shadow-xs ${
                                             order.status === "REQUESTED" || order.status === "NEW" || order.status === "WAITING_SUPPLIER_CONFIRMATION"
                                               ? "bg-purple-100 text-purple-800 border-purple-300"
-                                              : order.status === "SUPPLIER_APPROVED" || order.status === "PAID" || order.status === "COMPLETED"
+                                              : order.status === "SHIPPED" || order.status === "PAID" || order.status === "COMPLETED"
                                                 ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                                                 : order.status === "WAITING_FOR_PAYMENT" || order.status === "PENDING_PAYMENT" || order.status === "WAITING_SHIPPING_PAYMENT"
                                                   ? "bg-amber-100 text-amber-800 border-amber-300"
@@ -1763,18 +2036,16 @@ export function SupplierDashboard({
                                             {(order.status === "REQUESTED" ||
                                               order.status === "PENDING") && (
                                               <>
-                                                
                                                 <button
                                                   onClick={() =>
                                                     updateOrderStatus(
                                                       order.id,
-                                                      "SUPPLIER_APPROVED",
+                                                      "SHIPPED",
                                                     )
                                                   }
                                                   className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-success hover:bg-emerald-700 active:scale-95 text-inverse text-xs font-bold rounded-xl transition-all duration-300 shadow-sm shadow-emerald-600/10 hover:shadow-emerald-600/25 hover:shadow-md cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-success"
                                                   aria-label={`تایید سفارش شماره ${order.id}`}
                                                 >
-                                                  
                                                   <CheckCircle className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
                                                   تایید سفارش
                                                 </button>
@@ -1788,14 +2059,23 @@ export function SupplierDashboard({
                                                   className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-danger hover:bg-rose-700 active:scale-95 text-inverse text-xs font-bold rounded-xl transition-all duration-300 shadow-sm shadow-rose-600/10 hover:shadow-rose-600/25 hover:shadow-md cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-500"
                                                   aria-label={`رد سفارش شماره ${order.id}`}
                                                 >
-                                                  
                                                   <XCircle className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
                                                   رد سفارش
                                                 </button>
                                               </>
                                             )}
                                             {/* Change Order details button with RefreshCw */}
-                                            {["PAID", "PREPARING", "SHIPPED"].includes(order.status) ? (
+                                            {["PAID", "PREPARING"].includes(order.status) && (
+                                              <button
+                                                onClick={() => updateOrderStatus(order.id, "SHIPPED")}
+                                                className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 text-xs font-black rounded-xl transition-all duration-300 shadow-sm shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:shadow-md cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500"
+                                                aria-label="تایید و ارسال"
+                                              >
+                                                <Truck className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+                                                ثبت ارسال کالا
+                                              </button>
+                                            )}
+                                            {["SHIPPED"].includes(order.status) ? (
                                               <button
                                                 onClick={() => {
                                                   setChangingOrder(order);
@@ -1826,13 +2106,12 @@ export function SupplierDashboard({
                           </div>
                         ) : (
                           <div className="text-center py-16 text-muted">
-                            
-                            <ShoppingCart className="w-16 h-16 mx-auto text-muted mb-4" />
+                            <ShoppingCart className="w-16 h-16 mx-auto text-muted mb-4 opacity-50" />
                             <p className="text-lg font-medium text-secondary mb-1">
-                              سفارشی ندارید
+                              سفارشی مطابق فیلتر یافت نشد
                             </p>
-                            <p className="text-sm">
-                              هنوز سفارشی برای محصولات شما ثبت نشده است.
+                            <p className="text-xs text-text-muted">
+                              می‌توانید فیلترهای جستجو یا تاریخ را تغییر دهید.
                             </p>
                           </div>
                         )}
@@ -1857,7 +2136,7 @@ export function SupplierDashboard({
                           
                           <div>
                             
-                            <p className="text-indigo-200 font-medium mb-1">
+                            <p className="text-slate-200 font-bold mb-1">
                               موجودی قابل تسویه (تومان)
                             </p>
                             <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white">
@@ -1866,7 +2145,7 @@ export function SupplierDashboard({
                                 walletInfo.balance || 0,
                               ).toLocaleString()}
                             </h2>
-                            <div className="flex flex-col gap-1.5 mt-4 text-xs text-indigo-200">
+                            <div className="flex flex-col gap-1.5 mt-4 text-xs text-slate-200">
                               
                               <div className="flex items-center gap-2">
                                 
@@ -2821,7 +3100,7 @@ export function SupplierDashboard({
                       onChange={(e) => setChangeStatus(e.target.value)}
                       className="w-full bg-background text-primary border border-subtle rounded-xl px-4 py-3 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all font-medium"
                     >
-                      <option value="SUPPLIER_APPROVED">
+                      <option value="SHIPPED">
                         تایید موجودی کالا (آماده پرداخت)
                       </option>
                       <option value="REJECTED">عدم موجودی کالا (رد سفارش)</option>

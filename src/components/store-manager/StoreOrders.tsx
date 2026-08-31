@@ -811,39 +811,39 @@ export default function StoreOrders({
               </button>
             </div>
             <form onSubmit={handleCreateOrder} className="space-y-6">
-              <div className="bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-100 p-3 rounded-xl text-xs leading-relaxed font-bold text-right">
+              <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-3.5 rounded-xl text-xs leading-relaxed font-bold text-right shadow-xs">
                 🚚 نکته ارسال: تمامی محصولاتی که از یک تامین‌کننده انتخاب می‌کنید در یک سفارش گروهی ثبت و با یک هزینه ارسال مشترک فرستاده می‌شوند.
               </div>
 
               {/* Added Items List */}
               {orderItems.length > 0 && (
-                <div className="bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 p-4 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between text-xs font-black text-indigo-950 dark:text-indigo-200">
+                <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between text-xs font-black text-slate-900 dark:text-white">
                     <span className="flex items-center gap-1.5">
                       <ShoppingCart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                       اقلام اضافه شده به این سفارش ({orderItems.length} کالا)
                     </span>
-                    <span className="text-[11px] font-mono font-extrabold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/80 px-2 py-0.5 rounded-lg">
+                    <span className="text-[11px] font-mono font-extrabold text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-lg">
                       {orderItems[0]?.supplierName}
                     </span>
                   </div>
-                  <div className="divide-y divide-indigo-100 dark:divide-indigo-900/50 max-h-48 overflow-y-auto">
+                  <div className="divide-y divide-slate-200 dark:divide-slate-700 max-h-48 overflow-y-auto">
                     {orderItems.map((item, idx) => (
                       <div key={idx} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2.5 min-w-0">
                           {item.image ? (
-                            <img src={item.image} className="w-9 h-9 rounded-lg object-cover shrink-0 border border-indigo-200" alt="" />
+                            <img src={item.image} className="w-9 h-9 rounded-lg object-cover shrink-0 border border-slate-300 dark:border-slate-600" alt="" />
                           ) : (
-                            <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
-                              <ShoppingCart className="w-4 h-4 text-indigo-600" />
+                            <div className="w-9 h-9 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center shrink-0">
+                              <ShoppingCart className="w-4 h-4 text-slate-700 dark:text-slate-300" />
                             </div>
                           )}
                           <div className="min-w-0">
-                            <p className="font-bold text-primary truncate">{item.productName}</p>
+                            <p className="font-bold text-slate-900 dark:text-white truncate">{item.productName}</p>
                             {item.variantName && (
-                              <p className="text-[10px] text-muted font-medium truncate">{item.variantName}</p>
+                              <p className="text-[10px] text-slate-600 dark:text-slate-400 font-medium truncate">{item.variantName}</p>
                             )}
-                            <p className="text-[10px] text-indigo-700 dark:text-indigo-300 font-bold mt-0.5">
+                            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold mt-0.5">
                               {item.price?.toLocaleString()} تومان × {item.quantity} عدد = {(item.price * item.quantity)?.toLocaleString()} تومان
                             </p>
                           </div>
@@ -1435,8 +1435,8 @@ export default function StoreOrders({
                     </div>
                     {selectedOrderForDetails.status === "WAITING_STORE_ADDRESS" || selectedOrderForDetails.status === "WAITING_SHIPPING_COST" ? (
                       !selectedOrderForDetails.shippingAddress ? (
-                        <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col items-center justify-center gap-3">
-                          <p className="text-amber-700 text-xs font-bold text-center">
+                        <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex flex-col items-center justify-center gap-3">
+                          <p className="text-slate-900 dark:text-white text-xs font-bold text-center">
                             جهت برآورد هزینه پستی توسط مدیریت مجموعه، ابتدا آدرس مقصد و روش ارسال مورد نظر خود را ثبت نمایید.
                           </p>
                           <button
@@ -1444,17 +1444,17 @@ export default function StoreOrders({
                               setSelectedShippingOrder(selectedOrderForDetails);
                               setShowShippingModal(true);
                             }}
-                            className="bg-primary-default text-inverse px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors cursor-pointer"
+                            className="bg-primary-default text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors cursor-pointer"
                           >
                             تکمیل مشخصات پستی و روش ارسال
                           </button>
                         </div>
                       ) : (
-                        <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex flex-col gap-2.5">
-                          <p className="text-blue-700 text-xs font-bold text-center">
+                        <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex flex-col gap-2.5">
+                          <p className="text-slate-900 dark:text-white text-xs font-bold text-center">
                             مشخصات پستی با موفقیت ثبت شد. در انتظار محاسبه و ثبت هزینه پستی (کرایه) توسط مدیر کل پلتفرم.
                           </p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs border-t border-blue-500/10 pt-2 text-muted">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs border-t border-slate-200 dark:border-slate-700 pt-2 text-text-muted">
                             <div>
                               <span className="text-muted block mb-0.5">نشانی گیرنده:</span>
                               <span className="font-bold text-primary">{selectedOrderForDetails.shippingAddress}</span>
@@ -1661,9 +1661,9 @@ export default function StoreOrders({
                           </div>
                         ) : (
                           selectedOrderForDetails.shippingMethod === "PLATFORM_PANEL" && (
-                            <div className="pt-2 border-t border-primary-default/20/30 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl text-center">
-                              <p className="text-[11px] font-bold text-amber-700 flex items-center justify-center gap-1">
-                                <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                            <div className="pt-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-center">
+                              <p className="text-[11px] font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-1.5">
+                                <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
                                 در انتظار صدور و بارگذاری لیبل پستی توسط مدیریت مجموعه
                               </p>
                             </div>

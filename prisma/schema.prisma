@@ -9,6 +9,7 @@ datasource db {
 }
 
 model User {
+  leads                  Lead[]   @relation("AmbassadorLeads")
   id                     Int                     @id @default(autoincrement())
   username               String                  @unique
   password               String
@@ -38,6 +39,7 @@ model User {
   storeUrl               String?
   storeLink              String?
   avatarUrl              String?
+  autoApproveOrders      Boolean?  @default(true)
   platformType           String?
   fieldOfActivity        String?
   productCount           Int?
@@ -75,6 +77,7 @@ model User {
 model ProAccount {
   id                Int      @id @default(autoincrement())
   userId            Int      @unique
+  planType          String?  @default("PRO")
   status            String   @default("PENDING")
   acceptedTerms     Boolean  @default(true)
   signatureImage    String?
@@ -797,4 +800,20 @@ model PaymentLog {
   @@index([requestId])
   @@index([createdAt])
   @@index([status])
+}
+
+
+model Lead {
+  id             Int      @id @default(autoincrement())
+  name           String
+  phone          String   @unique
+  address        String?
+  category       String?
+  commission     Float    @default(100000)
+  status         String   @default("PENDING") // PENDING, ASSIGNED, COMPLETED
+  ambassadorId   Int?
+  supplierId     Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ambassador     User?    @relation("AmbassadorLeads", fields: [ambassadorId], references: [id])
 }

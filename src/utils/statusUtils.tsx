@@ -112,16 +112,16 @@ export function HighContrastStatusBadge({
 
   if (["ACTIVE", "PUBLISHED", "APPROVED", "SUCCESS", "COMPLETED", "PAID", "DELIVERED", "SETTLED", "VERIFIED"].includes(norm)) {
     // Vibrant Emerald / Success
-    styleClasses = "bg-emerald-50 text-emerald-900 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700 shadow-sm";
+    styleClasses = "bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-50 dark:border-emerald-700 shadow-xs";
   } else if (["PENDING", "PENDING_APPROVAL", "WAITING_FOR_APPROVAL", "REQUESTED", "NEW", "WAITING_SHIPPING_COST", "PENDING_PAYMENT", "WAITING_FOR_PAYMENT", "WAITING_SHIPPING_PAYMENT", "UNDER_REVIEW", "WARNING", "SUSPENDED"].includes(norm)) {
-    // Vibrant Amber / Warning
-    styleClasses = "bg-amber-50 text-amber-950 border-amber-300 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700 shadow-sm";
+    // High-Contrast Amber / Warning
+    styleClasses = "bg-amber-400 text-slate-950 border-amber-500 dark:bg-amber-400 dark:text-slate-950 dark:border-amber-300 shadow-xs font-black";
   } else if (["REJECTED", "FAILED", "CANCELLED", "BLOCKED", "TEMPORARILY_SUSPENDED", "OUT_OF_STOCK"].includes(norm)) {
     // Vibrant Crimson / Danger
-    styleClasses = "bg-rose-50 text-rose-950 border-rose-300 dark:bg-rose-950/80 dark:text-rose-200 dark:border-rose-700 shadow-sm";
+    styleClasses = "bg-rose-100 text-rose-950 border-rose-300 dark:bg-rose-900 dark:text-rose-50 dark:border-rose-700 shadow-xs";
   } else if (["PROCESSING", "PREPARING", "SHIPPED", "SUPPLIER_APPROVED", "PENDING_POSTAL_LABEL", "IN_ESCROW"].includes(norm)) {
     // Vibrant Indigo / Process
-    styleClasses = "bg-blue-50 text-blue-950 border-blue-300 dark:bg-blue-950/80 dark:text-blue-200 dark:border-blue-700 shadow-sm";
+    styleClasses = "bg-blue-100 text-blue-950 border-blue-300 dark:bg-blue-900 dark:text-blue-50 dark:border-blue-700 shadow-xs";
   }
 
   const sizeClasses = size === "sm" 

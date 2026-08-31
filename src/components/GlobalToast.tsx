@@ -29,9 +29,22 @@ class ToastManager {
   }
 }
 
-export const toast = (message: string, type: ToastType = "info") => {
+export interface ToastFunction {
+  (message: string, type?: ToastType): void;
+  success: (message: string) => void;
+  error: (message: string) => void;
+  info: (message: string) => void;
+}
+
+const baseToast = ((message: string, type: ToastType = "info") => {
   ToastManager.show(message, type);
-};
+}) as ToastFunction;
+
+baseToast.success = (message: string) => ToastManager.show(message, "success");
+baseToast.error = (message: string) => ToastManager.show(message, "error");
+baseToast.info = (message: string) => ToastManager.show(message, "info");
+
+export const toast = baseToast;
 
 export const GlobalToast = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -59,8 +72,8 @@ export const GlobalToast = () => {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`pointer-events-auto flex items-center justify-between p-3.5 rounded-2xl shadow-2xl border backdrop-blur-md animate-slide-up bg-white/95 dark:bg-zinc-900/95
-            ${t.type === "success" ? "border-emerald-500/30 text-emerald-800 dark:text-emerald-200" : t.type === "error" ? "border-red-500/30 text-red-800 dark:text-red-200" : "border-indigo-500/30 text-indigo-800 dark:text-indigo-200"}`}
+          className={`pointer-events-auto flex items-center justify-between p-3.5 rounded-2xl shadow-2xl border backdrop-blur-md animate-slide-up bg-white dark:bg-zinc-900 text-slate-900 dark:text-white
+            ${t.type === "success" ? "border-emerald-500/40" : t.type === "error" ? "border-red-500/40" : "border-indigo-500/40"}`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             {t.type === "success" && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}

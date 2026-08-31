@@ -17,6 +17,8 @@ import { useTheme } from "./components/ThemeProvider";
 import { ThemeToggleFloating } from "./components/ThemeToggleFloating";
 import { GlobalToast } from "./components/GlobalToast";
 import { GlobalModals } from "./components/GlobalModals";
+import { SupplierRegisterForm } from "./components/auth/SupplierRegisterForm";
+import { StoreManagerRegisterForm } from "./components/auth/StoreManagerRegisterForm";
 
 import {
   User,
@@ -64,6 +66,7 @@ import {
 import { CustomCodeInjector } from "./components/CustomCodeInjector";
 import { SupplierDashboard } from "./components/supplier/SupplierDashboard";
 import ReferrerDashboard from "./components/referrer/ReferrerDashboard";
+import AmbassadorDashboard from "./components/ambassador/AmbassadorDashboard";
 import { CustomerDashboard } from "./components/CustomerDashboard";
 import { PROVINCES } from "./data/provinces";
 
@@ -264,8 +267,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     | "role_select"
     | "supplier_form"
     | "store_manager_form"
-    | "customer_form"
-    | "referrer_form"
+    | "ambassador_form"
+    | "ambassador_form"
     | "forgot_password"
     | "dashboard"
     | "explore"
@@ -276,8 +279,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       if (path.startsWith("/login")) return hasToken ? "dashboard" : "login";
       if (path.startsWith("/register/store")) return hasToken ? "dashboard" : "store_manager_form";
       if (path.startsWith("/register/supplier")) return hasToken ? "dashboard" : "supplier_form";
-      if (path.startsWith("/register/customer")) return hasToken ? "dashboard" : "customer_form";
-      if (path.startsWith("/register/referrer")) return hasToken ? "dashboard" : "referrer_form";
+      if (path.startsWith("/register/customer")) return hasToken ? "dashboard" : "ambassador_form";
+      if (path.startsWith("/register/referrer")) return hasToken ? "dashboard" : "ambassador_form";
       if (path.startsWith("/register")) return hasToken ? "dashboard" : "role_select";
       if (path.startsWith("/forgot-password")) return "forgot_password";
       if (path === "/explore") return "explore";
@@ -438,8 +441,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     if (path.startsWith("/login")) targetView = "login";
     else if (path.startsWith("/register/store")) targetView = "store_manager_form";
     else if (path.startsWith("/register/supplier")) targetView = "supplier_form";
-    else if (path.startsWith("/register/customer")) targetView = "customer_form";
-    else if (path.startsWith("/register/referrer")) targetView = "referrer_form";
+    else if (path.startsWith("/register/customer")) targetView = "ambassador_form";
+    else if (path.startsWith("/register/referrer")) targetView = "ambassador_form";
     else if (path.startsWith("/register")) targetView = "role_select";
     else if (path.startsWith("/forgot-password")) targetView = "forgot_password";
     else if (path === "/explore") targetView = "explore";
@@ -463,7 +466,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           if (parsed && parsed.role) {
             setCurrentUser(parsed);
             // If they are logged in but requested a public auth page (login/register), redirect to dashboard
-            if (["login", "role_select", "store_manager_form", "supplier_form", "customer_form", "referrer_form"].includes(targetView)) {
+            if (["login", "role_select", "store_manager_form", "supplier_form", "ambassador_form", "ambassador_form"].includes(targetView)) {
                setView("dashboard");
             } else {
                // Let them see explore if they asked for it, otherwise default to dashboard for root, or keep target if it was dashboard
@@ -500,8 +503,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     if (view === "login") newUrl = "/login";
     else if (view === "store_manager_form") newUrl = "/register/store";
     else if (view === "supplier_form") newUrl = "/register/supplier";
-    else if (view === "customer_form") newUrl = "/register/customer";
-    else if (view === "referrer_form") newUrl = "/register/referrer";
+    else if (view === "ambassador_form") newUrl = "/register/ambassador";
     else if (view === "role_select") newUrl = "/register";
     else if (view === "forgot_password") newUrl = "/forgot-password";
     else if (view === "explore") newUrl = "/explore";
@@ -530,8 +532,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       if (path.startsWith("/login")) setView("login");
       else if (path.startsWith("/register/store")) setView("store_manager_form");
       else if (path.startsWith("/register/supplier")) setView("supplier_form");
-      else if (path.startsWith("/register/customer")) setView("customer_form");
-      else if (path.startsWith("/register/referrer")) setView("referrer_form");
+      else if (path.startsWith("/register/customer")) setView("ambassador_form");
+      else if (path.startsWith("/register/referrer")) setView("ambassador_form");
       else if (path.startsWith("/register")) setView("role_select");
       else if (path.startsWith("/forgot-password")) setView("forgot_password");
       else if (path === "/explore" || path === "/") setView("explore");
@@ -1468,13 +1470,10 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   };
   const handleReferrerRegister = async () => {
     if (
-      !refForm.username ||
-      !refForm.password ||
-      !refForm.firstName ||
-      !refForm.lastName ||
-      !refForm.mobile
+      !refForm.mobile ||
+      !refForm.password
     ) {
-      showNotification("لطفاً تمامی فیلدهای اجباری را تکمیل نمایید.", "error");
+      showNotification("لطفاً شماره موبایل و رمز عبور را وارد نمایید.", "error");
       return;
     }
     setLoading(true);
@@ -1493,7 +1492,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       setCurrentUser(data.user);
 
       showNotification(
-        "ثبت‌نام شما به عنوان معرف با موفقیت انجام شد.",
+        "ثبت‌نام شما به عنوان تأمین‌یاب با موفقیت انجام شد.",
         "success",
       );
       setView("dashboard");
@@ -1556,12 +1555,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           }}
         />
       );
-    } else if (currentUser?.role === "REFERRER") {
+    } else if (currentUser?.role === "REFERRER" || currentUser?.role === "AMBASSADOR") {
       return (
-        <ReferrerDashboard
-          currentUser={currentUser}
+        <AmbassadorDashboard
+          user={currentUser}
           onLogout={logout}
-          showNotification={showNotification}
         />
       );
     } else if (currentUser?.role === "CUSTOMER") {
@@ -1687,23 +1685,23 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           <main className="flex-1 flex flex-col relative z-10 p-4 md:p-8 lg:p-12 items-center justify-center bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] dark:bg-[radial-gradient(#1e293b_1.2px,transparent_1.2px)] [background-size:24px_24px]">
             {" "}
             <div
-              className={`w-full perspective-1000 ${view === "login" ? "max-w-5xl" : "max-w-[540px]"}`}
+              className={`w-full perspective-1000 ${view === "login" ? "max-w-5xl" : view === "supplier_form" || view === "store_manager_form" ? "max-w-3xl" : "max-w-[540px]"}`}
             >
               {" "}
               {/* Login View */}
               {view === "login" && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch" dir="rtl">
                   {/* B2B Hero Showcase Card */}
-                  <div className="hidden lg:flex lg:col-span-5 flex-col justify-between bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white rounded-[2.5rem] p-8 border border-indigo-500/20 shadow-2xl relative overflow-hidden group">
+                  <div className="hidden lg:flex lg:col-span-5 flex-col justify-between bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-[2.5rem] p-8 border border-indigo-500/20 shadow-2xl relative overflow-hidden group">
                     <div className="relative z-10 space-y-4">
-                      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-xs font-black text-indigo-200">
+                      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-xs font-black text-amber-300">
                         <Sparkles className="w-4 h-4 text-amber-400" />
                         پلتفرم هوشمند B2B و زنجیره تامین
                       </div>
                       <h1 className="text-2xl font-black leading-snug text-white">
                         اتصال مستقیم فروشگاه‌ها به شبکه تامین‌کنندگان زوپیت
                       </h1>
-                      <p className="text-xs text-indigo-200/90 leading-relaxed">
+                      <p className="text-xs text-slate-200 leading-relaxed font-medium">
                         مدیریت هوشمند سفارشات عمده، تسویه خودکار کیف پول تامین‌کنندگان، صادر نمودن لیبل پستی و ارسال مستقیم به سراسر کشور.
                       </p>
                     </div>
@@ -1736,7 +1734,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                       </div>
                     </div>
 
-                    <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-indigo-200 font-bold">
+                    <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-200 font-bold">
                       <span>شبکه قدرتمند تجارت B2B</span>
                       <span className="font-mono text-emerald-400 font-extrabold">🚀 بیش از ۱,۰۰۰ غرفه فعال</span>
                     </div>
@@ -1749,15 +1747,26 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
 
                       <div className="flex items-center justify-between mb-8">
                         <ZopitLogo size="lg" />
-                        <button
-                          type="button"
-                          onClick={() => setLoginPublicAnnouncementsOpen(true)}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 rounded-xl text-xs font-black transition-all cursor-pointer"
-                          title="مشاهده اطلاعیه‌های همگانی"
-                        >
-                          <Megaphone className="w-4 h-4 text-indigo-600" />
-                          <span>اطلاعیه‌های عمومی</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setLoginIntroVideoOpen(true)}
+                            className="lg:hidden flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-black transition-all cursor-pointer"
+                            title="مشاهده ویدیو معرفی"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>ویدیو معرفی</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLoginPublicAnnouncementsOpen(true)}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-black transition-all cursor-pointer"
+                            title="مشاهده اطلاعیه‌های همگانی"
+                          >
+                            <Megaphone className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                            <span>اطلاعیه‌ها</span>
+                          </button>
+                        </div>
                       </div>
 
                     <div className="mb-6 text-right">
@@ -1914,10 +1923,10 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               <button
                                 type="button"
                                 onClick={() => setLoginOtpCode(loginSimulatedCode)}
-                                className="w-full p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-800 dark:text-amber-300 font-bold flex items-center justify-between cursor-pointer hover:bg-amber-500/20 transition-colors text-right"
+                                className="w-full p-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-bold flex items-center justify-between cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-right"
                               >
-                                <span>کد تست شبیه‌سازی‌شده: <strong className="font-mono text-sm">{loginSimulatedCode}</strong></span>
-                                <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded">کلیک جهت درج خودکار</span>
+                                <span>کد تست شبیه‌سازی‌شده: <strong className="font-mono text-sm text-indigo-600 dark:text-indigo-400">{loginSimulatedCode}</strong></span>
+                                <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded font-bold">کلیک جهت درج خودکار</span>
                               </button>
                             )}
 
@@ -2110,16 +2119,49 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                       </form>
                     )}
 
-                    <div className="mt-6 border-t border-border-default/50 dark:border-border-subtle/50 pt-4 space-y-3">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-text-muted">حساب کاربری ندارید؟</span>
+                    <div className="mt-6 border-t border-border-default/50 dark:border-border-subtle/50 pt-5 space-y-3.5">
+                      {/* PROMINENT Supplier Registration Box */}
+                      <div className="p-4 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white border border-slate-800 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl shadow-slate-950/15">
+                        <div className="text-right w-full sm:w-auto">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-amber-300">
+                            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                            <span>تولیدکننده یا عمده‌فروش هستید؟</span>
+                          </div>
+                          <p className="text-[11px] text-slate-200 mt-1 font-medium leading-relaxed">
+                            محصولات خود را سریع ثبت کنید و به فروشگاه‌ها در سراسر کشور بفروشید
+                          </p>
+                        </div>
                         <button
                           type="button"
-                          onClick={() => setView("role_select")}
-                          className="text-primary-default font-extrabold hover:underline cursor-pointer"
+                          onClick={() => setView("supplier_form")}
+                          className="w-full sm:w-auto px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95 group"
                         >
-                          ثبت‌نام سریع
+                          <Building2 className="w-4 h-4 text-slate-950" />
+                          <span className="text-slate-950">ثبت‌نام سریع تأمین‌کننده</span>
+                          <ArrowLeft className="w-4 h-4 text-slate-950 group-hover:-translate-x-1 transition-transform" />
                         </button>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs px-1">
+                        <span className="text-text-muted">صاحب فروشگاه هستید یا نوع حساب دیگری می‌خواهید؟</span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setView("store_manager_form")}
+                            className="text-emerald-600 dark:text-emerald-400 font-extrabold hover:underline cursor-pointer flex items-center gap-1"
+                          >
+                            <Store className="w-3.5 h-3.5" />
+                            ثبت‌نام فروشگاه
+                          </button>
+                          <span className="text-border-default">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setView("role_select")}
+                            className="text-primary-default font-extrabold hover:underline cursor-pointer"
+                          >
+                            همه نقش‌ها
+                          </button>
+                        </div>
                       </div>
 
                       {/* Download PWA App Button */}
@@ -2298,7 +2340,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                     {/* Tab 1: Direct SMS Login */}
                     {forgotTab === "sms_login" && (
                       <form onSubmit={handleForgotOtpDirectLogin} className="space-y-4">
-                        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs text-indigo-700 dark:text-indigo-300">
+                        <div className="p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-medium leading-relaxed">
                           با وارد کردن شماره همراه، کد تایید برای شما پیامک شده و می‌توانید بدون نیاز به رمز وارد حساب خود شوید.
                         </div>
 
@@ -2325,7 +2367,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               type="button"
                               onClick={() => handleSendForgotOtp()}
                               disabled={loading || forgotOtpTimer > 0}
-                              className="px-4 py-3 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+                              className="px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
                             >
                               {forgotOtpTimer > 0 ? (
                                 <span className="font-mono">{Math.floor(forgotOtpTimer / 60)}:{(forgotOtpTimer % 60).toString().padStart(2, '0')}</span>
@@ -2419,7 +2461,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               type="button"
                               onClick={() => handleSendForgotOtp()}
                               disabled={loading || forgotOtpTimer > 0}
-                              className="px-4 py-3 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+                              className="px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
                             >
                               {forgotOtpTimer > 0 ? (
                                 <span className="font-mono">{Math.floor(forgotOtpTimer / 60)}:{(forgotOtpTimer % 60).toString().padStart(2, '0')}</span>
@@ -2751,35 +2793,13 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                       <ArrowLeft className="w-5 h-5 text-text-muted group-hover:text-success group-hover:-translate-x-1 transition-all duration-300 shrink-0" />
                     </button>
 
-                    {/* 3. Customer */}
+                    
+                    {/* 3. TaminYab */}
                     <button
                       type="button"
-                      onClick={() => setView("customer_form")}
-                      className="w-full group bg-card border border-border-default/80 dark:border-border-subtle/40 p-4.5 rounded-2xl hover:border-blue-500 hover:bg-blue-500/[0.02] hover:shadow-xl hover:shadow-blue-500/5 transition-all text-right relative overflow-hidden flex items-center justify-between gap-4 cursor-pointer"
-                      aria-label="ثبت نام به عنوان مشتری خریدار"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 text-blue-500">
-                          <User className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-extrabold text-text-primary group-hover:text-blue-500 transition-colors">
-                            مشتری (خریدار)
-                          </h3>
-                          <p className="text-xs text-text-muted mt-1 leading-relaxed font-medium">
-                            ثبت‌نام برای خرید محصولات، پیگیری سفارشات و پشتیبانی
-                          </p>
-                        </div>
-                      </div>
-                      <ArrowLeft className="w-5 h-5 text-text-muted group-hover:text-blue-500 group-hover:-translate-x-1 transition-all duration-300 shrink-0" />
-                    </button>
-
-                    {/* 4. Referrer */}
-                    <button
-                      type="button"
-                      onClick={() => setView("referrer_form")}
+                      onClick={() => setView("ambassador_form")}
                       className="w-full group bg-card border border-border-default/80 dark:border-border-subtle/40 p-4.5 rounded-2xl hover:border-indigo-500 hover:bg-indigo-500/[0.02] hover:shadow-xl hover:shadow-indigo-500/5 transition-all text-right relative overflow-hidden flex items-center justify-between gap-4 cursor-pointer"
-                      aria-label="ثبت نام به عنوان معرف سیستم"
+                      aria-label="ثبت نام به عنوان تأمین‌یاب"
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-indigo-500 group-hover:text-white transition-all duration-300 text-indigo-500">
@@ -2787,1348 +2807,130 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                         </div>
                         <div>
                           <h3 className="text-base font-extrabold text-text-primary group-hover:text-indigo-500 transition-colors">
-                            همکار معرف (Referrer)
+                            تأمین‌یاب (معرف تأمین‌کنندگان)
                           </h3>
                           <p className="text-xs text-text-muted mt-1 leading-relaxed font-medium">
-                            کسب سود همیشگی از معرفی تامین‌کنندگان و فروشندگان جدید
+                            کسب پاداش نقدی از جذب و معرفی تامین‌کنندگان کالا به زوپیت
                           </p>
                         </div>
                       </div>
                       <ArrowLeft className="w-5 h-5 text-text-muted group-hover:text-indigo-500 group-hover:-translate-x-1 transition-all duration-300 shrink-0" />
                     </button>
+  
                   </div>
                 </div>
               )}
             </div>{" "}
             <div className="w-full max-w-[800px]">
-              {" "}
-              {/* 3. SUPPLIER MULTI-STEP FORM */}
-              
-              {/* Customer Registration View */}
-                {view === "customer_form" && (
-                <div
-                  id="view-customer"
-                  className="bg-card/95 backdrop-blur-xl p-8 rounded-[2rem] shadow-2xl border animate-fade-in text-center relative"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setView("role_select")}
-                    className="absolute top-6 right-6 text-muted hover:text-primary transition-colors bg-surface rounded-full p-2 cursor-pointer"
-                    aria-label="بازگشت به انتخاب نقش"
-                  >
-                    <ArrowRight className="w-5 h-5" />
-                  </button>
-                  <div className="flex justify-center mb-6">
-                    <ZopitLogo size="xl" />
-                  </div>
-                  <h2 className="text-2xl font-black text-primary mb-2">ثبت نام مشتری</h2>
-                  <p className="text-primary text-sm mb-8">اطلاعات خود را وارد کنید</p>
-                  
-                  <div className="space-y-4 animate-fade-in text-right">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">نام *</label>
-                        <input
-                          type="text"
-                          required
-                          value={customerData.firstName}
-                          onChange={(e) => setCustomerData({ ...customerData, firstName: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                        />
-                        {customerErrors.firstName && <p className="text-[10px] text-danger mt-1 font-semibold">{customerErrors.firstName}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">نام خانوادگی *</label>
-                        <input
-                          type="text"
-                          required
-                          value={customerData.lastName}
-                          onChange={(e) => setCustomerData({ ...customerData, lastName: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                        />
-                        {customerErrors.lastName && <p className="text-[10px] text-danger mt-1 font-semibold">{customerErrors.lastName}</p>}
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">موبایل *</label>
-                        <input
-                          type="tel"
-                          required
-                          value={customerData.mobile}
-                          onChange={(e) => setCustomerData({ ...customerData, mobile: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
-                          dir="ltr"
-                          placeholder="09........."
-                        />
-                        {customerErrors.mobile && <p className="text-[10px] text-danger mt-1 font-semibold">{customerErrors.mobile}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">ایمیل (اختیاری)</label>
-                        <input
-                          type="email"
-                          value={customerData.email}
-                          onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
-                          dir="ltr"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-black text-secondary mb-1.5">نام کاربری (انگلیسی) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={customerData.username}
-                        onChange={(e) => setCustomerData({ ...customerData, username: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
-                        dir="ltr"
-                      />
-                      {customerErrors.username && <p className="text-[10px] text-danger mt-1 font-semibold">{customerErrors.username}</p>}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">کلمه عبور *</label>
-                        <input
-                          type="password"
-                          required
-                          value={customerData.password}
-                          onChange={(e) => setCustomerData({ ...customerData, password: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
-                          dir="ltr"
-                        />
-                        {customerErrors.password && <p className="text-[10px] text-danger mt-1 font-semibold">{customerErrors.password}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">تکرار کلمه عبور *</label>
-                        <input
-                          type="password"
-                          required
-                          value={customerData.confirmPassword}
-                          onChange={(e) => setCustomerData({ ...customerData, password: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
-                          dir="ltr"
-                        />
-                        {customerErrors.confirmPassword && <p className="text-[10px] text-danger mt-1 font-semibold">{customerErrors.confirmPassword}</p>}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-3 mt-6">
-                      <button
-                        type="button"
-                        onClick={handleCustomerRegister}
-                        disabled={loading}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
-                      >
-                        {loading ? (
-                          <span className="flex items-center gap-2">
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            در حال ایجاد حساب...
-                          </span>
-                        ) : (
-                          "تایید و ثبت نام"
-                        )}
-                      </button>
-
-                      <p className="text-[11px] text-muted text-center leading-relaxed font-medium">
-                        ثبت‌نام در زوپیت به منزله پذیرش{" "}
-                        <button
-                          type="button"
-                          onClick={() => setTermsModalOpen(true)}
-                          className="text-primary-default font-extrabold hover:underline inline-block cursor-pointer"
-                        >
-                          قوانین و مقررات
-                        </button>{" "}
-                        است.
-                      </p>
-                    </div>
-                  </div>
+              {/* 1. SUPPLIER REGISTRATION FORM */}
+              {view === "supplier_form" && (
+                <div className="w-full animate-fade-in">
+                  <SupplierRegisterForm
+                    onSuccess={(user, token) => {
+                      localStorage.setItem("user", JSON.stringify(user));
+                      localStorage.setItem("token", token);
+                      setToken(token);
+                      setCurrentUser(user);
+                      showNotification("ثبت‌نام تأمین‌کننده با موفقیت انجام شد.", "success");
+                      setView("dashboard");
+                    }}
+                    onBackToLogin={() => setView("login")}
+                    onBackToRoleSelect={() => setView("role_select")}
+                    showNotification={showNotification}
+                  />
                 </div>
               )}
 
-              {view === "supplier_form" && (
-                <div
-                  id="view-supplier-form"
-                  className="space-y-6 animate-fade-in text-right"
-                >
-                  {" "}
-                  <div className="bg-card/95 backdrop-blur-xl p-6 md:p-10 rounded-[2rem] shadow-2xl border">
-                    <div className="flex justify-center mb-4 pb-4 border-b border-subtle">
-                      <ZopitLogo size="md" />
-                    </div>
-                    {" "}
-                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-subtle">
-                      {" "}
-                      <div>
-                        {" "}
-                        <h2 className="text-2xl font-black text-primary flex items-center gap-3">
-                          <ZopitLogo size="sm" />
-                          ثبت‌نام تامین‌کننده{" "}
-                        </h2>{" "}
-                        <p className="text-muted text-sm mt-2 mr-1">
-                          مرحله {supplierStep} از ۳:{" "}
-                          {supplierStep === 1
-                            ? "اطلاعات فردی و شناسنامه‌ای"
-                            : supplierStep === 2
-                            ? "اطلاعات کسب‌وکار و مالی"
-                            : "تعیین نام کاربری و کلمه عبور"}
-                        </p>{" "}
-                      </div>{" "}
-                      <div className="flex items-center gap-3">
-                        {" "}
-                        <button
-                          onClick={() => setView("role_select")}
-                          className="text-muted hover:text-secondary bg-surface p-2.5 rounded-full transition-colors cursor-pointer"
-                          title="بازگشت"
-                        >
-                          {" "}
-                          <ArrowRight className="w-5 h-5" />{" "}
-                        </button>{" "}
-                      </div>{" "}
-                    </div>{" "}
-
-                    {/* Stepper Bar for Supplier */}
-                    <div className="mb-8 px-2">
-                      <div className="flex items-center justify-between max-w-md mx-auto relative">
-                        <div className="absolute top-4 left-6 right-6 h-1 bg-subtle z-0" />
-                        <div
-                          className="absolute top-4 left-6 h-1 bg-primary-default z-0 transition-all duration-300"
-                          style={{
-                            width: supplierStep === 1 ? "0%" : supplierStep === 2 ? "50%" : "100%",
-                          }}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => handleSupplierStepChange(1)}
-                          className="relative z-10 flex flex-col items-center gap-1.5 cursor-pointer"
-                        >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                            supplierStep >= 1 ? "bg-primary-default text-white shadow-md shadow-primary-default/30" : "bg-surface border text-muted"
-                          }`}>۱</div>
-                          <span className={`text-[11px] font-bold ${supplierStep === 1 ? "text-primary" : "text-muted"}`}>اطلاعات فردی</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSupplierStepChange(2)}
-                          className="relative z-10 flex flex-col items-center gap-1.5 cursor-pointer"
-                        >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                            supplierStep >= 2 ? "bg-primary-default text-white shadow-md shadow-primary-default/30" : "bg-surface border text-muted"
-                          }`}>۲</div>
-                          <span className={`text-[11px] font-bold ${supplierStep === 2 ? "text-primary" : "text-muted"}`}>کسب‌وکار و مالی</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSupplierStepChange(3)}
-                          className="relative z-10 flex flex-col items-center gap-1.5 cursor-pointer"
-                        >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                            supplierStep >= 3 ? "bg-primary-default text-white shadow-md shadow-primary-default/30" : "bg-surface border text-muted"
-                          }`}>۳</div>
-                          <span className={`text-[11px] font-bold ${supplierStep === 3 ? "text-primary" : "text-muted"}`}>حساب کاربری</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Supplier Draft Restore Banner */}
-                    {localStorage.getItem("supplierDataDraft") && (
-                      <div className="mb-6 p-4 bg-primary-default/10 border border-primary-default/30 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-3 animate-fade-in text-primary-hover text-xs">
-                        {" "}
-                        <div className="flex items-center gap-2">
-                          {" "}
-                          <Info className="w-4 h-4 shrink-0 text-primary-default" />{" "}
-                          <span>
-                            یک پیش‌نویس ذخیره‌شده از ثبت‌نام قبلی شما یافت شد.
-                            آیا مایل به بازیابی اطلاعات قبلی هستید؟
-                          </span>{" "}
-                        </div>{" "}
-                        <div className="flex gap-2 shrink-0">
-                          {" "}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const savedData =
-                                localStorage.getItem("supplierDataDraft");
-                              const savedStep =
-                                localStorage.getItem("supplierStepDraft");
-                              if (savedData) {
-                                try {
-                                  setSupplierData(JSON.parse(savedData));
-                                } catch (e) {
-                                  console.error("Failed to parse supplier draft:", e);
-                                }
-                              }
-                              if (savedStep) {
-                                const parsed = parseInt(savedStep, 10);
-                                setSupplierStep(parsed > 2 || isNaN(parsed) ? 1 : parsed);
-                              }
-                              showNotification(
-                                "پیش‌نویس قبلی شما با موفقیت بازیابی شد.",
-                                "success",
-                              );
-                            }}
-                            className="px-3 py-1.5 bg-primary-default hover:bg-primary-hover text-white font-bold rounded-lg transition-colors cursor-pointer"
-                          >
-                            {" "}
-                            بازیابی پیش‌نویس{" "}
-                          </button>{" "}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              localStorage.removeItem("supplierDataDraft");
-                              localStorage.removeItem("supplierStepDraft");
-                              showNotification(
-                                "پیش‌نویس ذخیره‌شده حذف گردید.",
-                                "success",
-                              );
-                            }}
-                            className="px-3 py-1.5 border hover:bg-surface text-secondary font-bold rounded-lg transition-colors cursor-pointer"
-                          >
-                            {" "}
-                            حذف{" "}
-                          </button>{" "}
-                        </div>{" "}
-                      </div>
-                    )}
-                    {/* STEP 1: Personal Info */}
-                    {supplierStep === 1 && (
-                      <div className="space-y-4 animate-fade-in text-right">
-                        {" "}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {" "}
-                          <div>
-                            {" "}
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              نام *
-                            </label>{" "}
-                            <input
-                              type="text"
-                              required
-                              value={supplierData.firstName}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  firstName: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all"
-                            />{" "}
-                            {supplierErrors.firstName && (
-                              <p className="text-[10px] text-danger mt-1 font-semibold">
-                                {supplierErrors.firstName}
-                              </p>
-                            )}
-                          </div>{" "}
-                          <div>
-                            {" "}
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              نام خانوادگی *
-                            </label>{" "}
-                            <input
-                              type="text"
-                              required
-                              value={supplierData.lastName}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  lastName: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all"
-                            />{" "}
-                            {supplierErrors.lastName && (
-                              <p className="text-[10px] text-danger mt-1 font-semibold">
-                                {supplierErrors.lastName}
-                              </p>
-                            )}
-                          </div>{" "}
-                        </div>{" "}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {" "}
-                          <div>
-                            {" "}
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              شماره موبایل *
-                            </label>{" "}
-                            <input
-                              type="tel"
-                              required
-                              value={supplierData.mobile}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  mobile: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all font-mono"
-                              style={{
-                                direction: "ltr",
-                              }}
-                            />{" "}
-                            {supplierErrors.mobile && (
-                              <p className="text-[10px] text-danger mt-1 font-semibold">
-                                {supplierErrors.mobile}
-                              </p>
-                            )}
-                          </div>{" "}
-                          <div>
-                            {" "}
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              کد ملی *
-                            </label>{" "}
-                            <input
-                              type="text"
-                              required
-                              value={supplierData.nationalCode}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  nationalCode: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all font-mono"
-                              style={{
-                                direction: "ltr",
-                              }}
-                            />{" "}
-                            {supplierErrors.nationalCode && (
-                              <p className="text-[10px] text-danger mt-1 font-semibold">
-                                {supplierErrors.nationalCode}
-                              </p>
-                            )}
-                          </div>{" "}
-                        </div>{" "}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              ایمیل (اختیاری)
-                            </label>{" "}
-                            <input
-                              type="email"
-                              value={supplierData.email}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  email: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all font-mono"
-                              style={{
-                                direction: "ltr",
-                              }}
-                            />{" "}
-                          </div>{" "}
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              کد معرف (اختیاری)
-                            </label>{" "}
-                            <input
-                              type="text"
-                              value={supplierData.referralCode}
-                              onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, "");
-                                setSupplierData({
-                                  ...supplierData,
-                                  referralCode: val,
-                                });
-                              }}
-                              placeholder="مثال: 123456"
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all font-mono"
-                              style={{
-                                direction: "ltr",
-                              }}
-                            />{" "}
-                          </div>{" "}
-                        </div>{" "}
-
-                        <div className="flex gap-3 justify-between items-center mt-6">
-                          <button
-                            type="button"
-                            onClick={() => handleSupplierStepChange(2)}
-                            className="flex-1 bg-primary-default hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
-                          >
-                            ادامه و مرحله بعد <ArrowLeft className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={saveSupplierDraft}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer"
-                          >
-                            <Database className="w-4 h-4" /> ذخیره پیش‌نویس
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {/* STEP 2: Business & Financial Info */}
-                    {supplierStep === 2 && (
-                      <div className="space-y-4 animate-fade-in text-right">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              نام برند / نام تجاری *
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={supplierData.brandName}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  brandName: e.target.value,
-                                })
-                              }
-                              placeholder="نام تجاری کسب‌وکار"
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all"
-                            />
-                            {supplierErrors.brandName && (
-                              <p className="text-[10px] text-danger mt-1 font-semibold">
-                                {supplierErrors.brandName}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              نوع فعالیت اصلی *
-                            </label>
-                            <select
-                              value={supplierData.activityType}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  activityType: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-default"
-                            >
-                              <option value="PRODUCER">تولیدکننده</option>
-                              <option value="WHOLESALER">
-                                عمده‌فروش / بنکدار
-                              </option>
-                              <option value="IMPORTER">واردکننده مستقیم</option>
-                              <option value="OTHER">سایر</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <SearchableSelect
-                            label="استان *"
-                            placeholder="انتخاب استان..."
-                            value={supplierData.province}
-                            onChange={(val) =>
-                              setSupplierData({
-                                ...supplierData,
-                                province: val,
-                                city: "",
-                              })
-                            }
-                            options={PROVINCES.map((p) => p.name)}
-                          />
-                          <SearchableSelect
-                            label="شهر *"
-                            placeholder="انتخاب شهر..."
-                            value={supplierData.city}
-                            onChange={(val) =>
-                              setSupplierData({ ...supplierData, city: val })
-                            }
-                            options={getCitiesForProvince(
-                              supplierData.province,
-                            )}
-                            disabled={!supplierData.province}
-                          />
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              کد پستی *
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={supplierData.postalCode}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  postalCode: e.target.value,
-                                })
-                              }
-                              placeholder="کد پستی ۱۰ رقمی"
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all font-mono"
-                              style={{
-                                direction: "ltr",
-                              }}
-                            />
-                            {supplierErrors.postalCode && (
-                              <p className="text-[10px] text-danger mt-1 font-semibold">
-                                {supplierErrors.postalCode}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-black text-secondary mb-1.5">
-                            نشانی دقیق دفتر مرکزی یا انبار *
-                          </label>
-                          <textarea
-                            rows={2}
-                            value={supplierData.address}
-                            onChange={(e) =>
-                              setSupplierData({
-                                ...supplierData,
-                                address: e.target.value,
-                              })
-                            }
-                            placeholder="مثال: تهران، خیابان شریعتی، بن‌بست الوند، پلاک ۲، واحد ۴"
-                            className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all"
-                          />
-                          {supplierErrors.address && (
-                            <p className="text-[10px] text-danger mt-1 font-semibold">
-                              {supplierErrors.address}
-                            </p>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              تلفن ثابت فروشگاه/شرکت *
-                            </label>
-                            <input
-                              type="tel"
-                              required
-                              value={supplierData.telephone}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  telephone: e.target.value,
-                                })
-                              }
-                              placeholder="مثال: 02188888888"
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all font-mono"
-                              style={{
-                                direction: "ltr",
-                              }}
-                            />
-                            {supplierErrors.telephone && (
-                              <p className="text-[10px] text-danger mt-1 font-semibold">
-                                {supplierErrors.telephone}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              آدرس وب‌سایت یا کانال فروش (اختیاری)
-                            </label>
-                            <input
-                              type="url"
-                              value={supplierData.website}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  website: e.target.value,
-                                })
-                              }
-                              placeholder="https://mybrand.ir"
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all font-mono"
-                              style={{
-                                direction: "ltr",
-                              }}
-                            />
-                          </div>
-                        </div>
-                        {/* --- FINANCIAL FIELDS --- */}
-                        <div className="p-4 bg-warning/10 border border-amber-200 rounded-xl flex gap-3 text-amber-900 text-xs text-right mt-6">
-                          <Info className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-bold block mb-1">
-                              دقت در وارد کردن اطلاعات شبا
-                            </span>
-                            جهت تسویه حساب و واریز اتوماتیک سهم تامین‌کننده،
-                            حتماً شبا بانکی معتبر متعلق به نام صاحب کسب‌وکار را
-                            وارد نمایید.
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <label className="block text-xs font-black text-secondary mb-1.5">
-                            نام و نام خانوادگی صاحب حساب *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={supplierData.accountHolderName}
-                            onChange={(e) =>
-                              setSupplierData({
-                                ...supplierData,
-                                accountHolderName: e.target.value,
-                              })
-                            }
-                            placeholder="نام کامل ثبت شده در بانک"
-                            className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all"
-                          />
-                          {supplierErrors.accountHolderName && (
-                            <p className="text-[10px] text-danger mt-1 font-semibold">
-                              {supplierErrors.accountHolderName}
-                            </p>
-                          )}
-                        </div>
-                        <div className="mt-4">
-                          <div className="flex justify-between items-center mb-1.5">
-                            <label className="block text-xs font-black text-secondary">
-                              شماره شبا (IBAN) *
-                            </label>
-                            {supplierData.shaba.length >= 24 && (
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${formatAndValidateShaba(supplierData.shaba).isValid ? "bg-success/20 text-emerald-800" : "bg-danger/20 text-rose-800"}`}
-                              >
-                                {formatAndValidateShaba(supplierData.shaba).isValid
-                                  ? "✓ شبا معتبر است"
-                                  : "✗ شبا نامعتبر است"}
-                              </span>
-                            )}
-                          </div>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              required
-                              value={supplierData.shaba}
-                              onChange={(e) =>
-                                setSupplierData({
-                                  ...supplierData,
-                                  shaba: e.target.value,
-                                })
-                              }
-                              maxLength={30}
-                              placeholder="IR000000000000000000000000"
-                              className={`w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left font-mono focus:outline-none focus:ring-2 focus:bg-card dark:focus:bg-surface/50 transition-all ${supplierData.shaba.length >= 24 ? (formatAndValidateShaba(supplierData.shaba).isValid ? "border-emerald-300 focus:ring-success" : "border-rose-300 focus:ring-rose-500") : " focus:ring-primary-default"}`}
-                              style={{
-                                direction: "ltr",
-                              }}
-                            />
-                          </div>
-                          {supplierErrors.shaba && (
-                            <p className="text-[10px] text-danger mt-1 font-semibold">
-                              {supplierErrors.shaba}
-                            </p>
-                          )}
-                          <p className="text-[10px] text-muted mt-1">
-                            با یا بدون پیشوند IR و فاصله قابل قبول است.
-                          </p>
-                        </div>
-                        <div className="mt-4">
-                          <label className="block text-xs font-black text-secondary mb-1.5">
-                            نام بانک صادرکننده کارت/حساب *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={supplierData.bankName}
-                            onChange={(e) =>
-                              setSupplierData({
-                                ...supplierData,
-                                bankName: e.target.value,
-                              })
-                            }
-                            placeholder="مثال: بانک ملی، ملت، سامان و ..."
-                            className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-default dark:focus:ring-primary-default focus:bg-card dark:focus:bg-surface/50 transition-all"
-                          />
-                          {supplierErrors.bankName && (
-                            <p className="text-[10px] text-danger mt-1 font-semibold">
-                              {supplierErrors.bankName}
-                            </p>
-                          )}
-                        </div>
-                        {/* --- END FINANCIAL FIELDS --- */}
-                        <div className="flex gap-3 justify-between items-center mt-6">
-                          <button
-                            type="button"
-                            onClick={() => setSupplierStep(1)}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all text-xs cursor-pointer font-bold"
-                          >
-                            مرحله قبل
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSupplierStepChange(3)}
-                            className="flex-1 bg-primary-default hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
-                          >
-                            ادامه و مرحله بعد <ArrowLeft className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={saveSupplierDraft}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer"
-                          >
-                            <Database className="w-4 h-4" /> ذخیره پیش‌نویس
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* STEP 3: Account Credentials */}
-                    {supplierStep === 3 && (
-                      <div className="space-y-4 animate-fade-in text-right">
-                        <div className="p-4 bg-surface/60 border border-subtle rounded-2xl space-y-4">
-                          <h4 className="text-xs font-bold text-primary flex items-center gap-2 border-b border-subtle pb-2">
-                            <Lock className="w-4 h-4 text-primary-default" /> اطلاعات حساب کاربری (جهت ورود به سامانه)
-                          </h4>
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">
-                              نام کاربری اختصاصی (Username) *
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={supplierData.username}
-                              onChange={(e) => setSupplierData({ ...supplierData, username: e.target.value })}
-                              placeholder="مثال: supplier_sam"
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left font-mono focus:outline-none focus:ring-2 focus:ring-primary-default"
-                              style={{ direction: "ltr" }}
-                            />
-                            {supplierErrors.username && <p className="text-[10px] text-danger mt-1 font-semibold">{supplierErrors.username}</p>}
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">کلمه عبور *</label>
-                              <input
-                                type="password"
-                                required
-                                value={supplierData.password}
-                                onChange={(e) => setSupplierData({ ...supplierData, password: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default"
-                                style={{ direction: "ltr" }}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">تکرار کلمه عبور *</label>
-                              <input
-                                type="password"
-                                required
-                                value={supplierData.confirmPassword}
-                                onChange={(e) => setSupplierData({ ...supplierData, confirmPassword: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm text-primary text-left focus:outline-none focus:ring-2 focus:ring-primary-default"
-                                style={{ direction: "ltr" }}
-                              />
-                            </div>
-                          </div>
-                          {supplierErrors.password && <p className="text-[10px] text-danger font-semibold">{supplierErrors.password}</p>}
-                          {supplierErrors.confirmPassword && <p className="text-[10px] text-danger font-semibold">{supplierErrors.confirmPassword}</p>}
-                        </div>
-
-                        <div className="space-y-3 mt-6">
-                          <div className="flex gap-3 justify-between items-center">
-                            <button
-                              type="button"
-                              onClick={() => setSupplierStep(2)}
-                              className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all text-xs cursor-pointer font-bold"
-                            >
-                              مرحله قبل
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleSupplierRegister}
-                              disabled={loading}
-                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md shadow-emerald-500/20"
-                            >
-                              {loading ? "در حال پردازش..." : "تکمیل ثبت‌نام و درخواست عضویت"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={saveSupplierDraft}
-                              className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer"
-                            >
-                              <Database className="w-4 h-4" /> ذخیره پیش‌نویس
-                            </button>
-                          </div>
-
-                          <p className="text-[11px] text-muted text-center leading-relaxed font-medium">
-                            ثبت‌نام به عنوان تامین‌کننده در زوپیت به منزله پذیرش{" "}
-                            <button
-                              type="button"
-                              onClick={() => setTermsModalOpen(true)}
-                              className="text-primary-default font-extrabold hover:underline inline-block cursor-pointer"
-                            >
-                              قوانین و مقررات
-                            </button>{" "}
-                            است.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-</div>
-</div>
-)}
-{view === "store_manager_form" && (
-              <div className="max-w-2xl mx-auto py-12 px-4 animate-fade-in text-right">
-                <div className="bg-card border border-border-subtle p-8 rounded-3xl shadow-xl shadow-primary-default/5 relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-6 pb-6 border-b border-subtle">
-                    <div>
-                      <h2 className="text-2xl font-black text-primary flex items-center gap-3">
-                        <ZopitLogo size="sm" />
-                        ثبت‌نام مدیر فروشگاه
-                      </h2>
-                      <p className="text-xs text-muted mt-1">
-                        مرحله {storeStep} از ۳:{" "}
-                        {storeStep === 1
-                          ? "مشخصات فردی مدیر فروشگاه"
-                          : storeStep === 2
-                          ? "اطلاعات فروشگاه و کسب‌وکار"
-                          : "تنظیم حساب کاربری و کلمه عبور"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setView("role_select")}
-                      className="p-2 bg-surface hover:bg-border text-secondary rounded-full transition-colors cursor-pointer"
-                    >
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Stepper Bar for Store Manager */}
-                  <div className="mb-8 px-2">
-                    <div className="flex items-center justify-between max-w-md mx-auto relative">
-                      <div className="absolute top-4 left-6 right-6 h-1 bg-subtle z-0" />
-                      <div
-                        className="absolute top-4 left-6 h-1 bg-primary-default z-0 transition-all duration-300"
-                        style={{
-                          width: storeStep === 1 ? "0%" : storeStep === 2 ? "50%" : "100%",
-                        }}
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => handleStoreStepChange(1)}
-                        className="relative z-10 flex flex-col items-center gap-1.5 cursor-pointer"
-                      >
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                          storeStep >= 1 ? "bg-primary-default text-white shadow-md shadow-primary-default/30" : "bg-surface border text-muted"
-                        }`}>۱</div>
-                        <span className={`text-[11px] font-bold ${storeStep === 1 ? "text-primary" : "text-muted"}`}>اطلاعات فردی</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleStoreStepChange(2)}
-                        className="relative z-10 flex flex-col items-center gap-1.5 cursor-pointer"
-                      >
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                          storeStep >= 2 ? "bg-primary-default text-white shadow-md shadow-primary-default/30" : "bg-surface border text-muted"
-                        }`}>۲</div>
-                        <span className={`text-[11px] font-bold ${storeStep === 2 ? "text-primary" : "text-muted"}`}>اطلاعات فروشگاه</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleStoreStepChange(3)}
-                        className="relative z-10 flex flex-col items-center gap-1.5 cursor-pointer"
-                      >
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                          storeStep >= 3 ? "bg-primary-default text-white shadow-md shadow-primary-default/30" : "bg-surface border text-muted"
-                        }`}>۳</div>
-                        <span className={`text-[11px] font-bold ${storeStep === 3 ? "text-primary" : "text-muted"}`}>حساب کاربری</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <form onSubmit={(e) => { e.preventDefault(); if (storeStep === 3) handleStoreManagerRegister(); }} className="space-y-6">
-                    
-                    {/* Step 1: Personal Info */}
-                    {storeStep === 1 && (
-                      <div className="space-y-4 animate-fade-in">
-                        <div className="p-4 bg-surface/50 border border-subtle rounded-2xl space-y-4">
-                          <h3 className="text-xs font-bold text-primary flex items-center gap-2 border-b border-subtle pb-2">
-                            <User className="w-4 h-4 text-primary-default" /> مشخصات فردی مدیر فروشگاه
-                          </h3>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">نام *</label>
-                              <input
-                                type="text"
-                                required
-                                value={storeData.firstName}
-                                onChange={(e) => setStoreData({ ...storeData, firstName: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default"
-                              />
-                              {storeErrors.firstName && <p className="text-[10px] text-danger mt-1">{storeErrors.firstName}</p>}
-                            </div>
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">نام خانوادگی *</label>
-                              <input
-                                type="text"
-                                required
-                                value={storeData.lastName}
-                                onChange={(e) => setStoreData({ ...storeData, lastName: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default"
-                              />
-                              {storeErrors.lastName && <p className="text-[10px] text-danger mt-1">{storeErrors.lastName}</p>}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">شماره موبایل *</label>
-                              <input
-                                type="tel"
-                                required
-                                placeholder="09123456789"
-                                value={storeData.mobile}
-                                onChange={(e) => setStoreData({ ...storeData, mobile: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                                style={{ direction: "ltr" }}
-                              />
-                              {storeErrors.mobile && <p className="text-[10px] text-danger mt-1">{storeErrors.mobile}</p>}
-                            </div>
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">کد ملی *</label>
-                              <input
-                                type="text"
-                                required
-                                maxLength={10}
-                                placeholder="10 رقم بدون خط تیره"
-                                value={storeData.nationalCode}
-                                onChange={(e) => setStoreData({ ...storeData, nationalCode: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                                style={{ direction: "ltr" }}
-                              />
-                              {storeErrors.nationalCode && <p className="text-[10px] text-danger mt-1">{storeErrors.nationalCode}</p>}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">ایمیل (اختیاری)</label>
-                            <input
-                              type="email"
-                              value={storeData.email}
-                              onChange={(e) => setStoreData({ ...storeData, email: e.target.value })}
-                              placeholder="example@domain.com"
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                              style={{ direction: "ltr" }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex gap-3 justify-between items-center mt-6">
-                          <button
-                            type="button"
-                            onClick={() => handleStoreStepChange(2)}
-                            className="flex-1 bg-primary-default hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
-                          >
-                            ادامه و مرحله بعد <ArrowLeft className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={saveStoreDraft}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer"
-                          >
-                            <Database className="w-4 h-4" /> ذخیره پیش‌نویس
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Step 2: Store & Business Info */}
-                    {storeStep === 2 && (
-                      <div className="space-y-4 animate-fade-in">
-                        <div className="p-4 bg-surface/50 border border-subtle rounded-2xl space-y-4">
-                          <h3 className="text-xs font-bold text-primary flex items-center gap-2 border-b border-subtle pb-2">
-                            <Store className="w-4 h-4 text-primary-default" /> اطلاعات فروشگاه و کسب‌وکار
-                          </h3>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">نام فروشگاه / مجموعه *</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="مثال: فروشگاه کالای دیجیتال آریا"
-                                value={storeData.storeName}
-                                onChange={(e) => setStoreData({ ...storeData, storeName: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default"
-                              />
-                              {storeErrors.storeName && <p className="text-[10px] text-danger mt-1">{storeErrors.storeName}</p>}
-                            </div>
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">نوع پلتفرم فروشگاه</label>
-                              <select
-                                value={storeData.platformType}
-                                onChange={(e) => setStoreData({ ...storeData, platformType: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default"
-                              >
-                                <option value="WOOCOMMERCE">فروشگاه ووکامرس (WooCommerce)</option>
-                                <option value="INSTAGRAM">پیج زوپیت‌گرام (ZoombitGram)</option>
-                                <option value="CUSTOM_SITE">وب‌سایت اختصاصی</option>
-                                <option value="PHYSICAL_OTHER">فروشگاه حضوری / سایر</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">لینک وب‌سایت / فروشگاه اینترنتی</label>
-                              <input
-                                type="url"
-                                placeholder="https://mystore.ir"
-                                value={storeData.storeUrl || storeData.storeLink}
-                                onChange={(e) => setStoreData({ ...storeData, storeUrl: e.target.value, storeLink: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                                style={{ direction: "ltr" }}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">حوزه فعالیت</label>
-                              <input
-                                type="text"
-                                placeholder="مثال: لوازم خانگی، پوشاک، کالای دیجیتال..."
-                                value={storeData.fieldOfActivity}
-                                onChange={(e) => setStoreData({ ...storeData, fieldOfActivity: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">آدرس دقیق فروشگاه / دفتر</label>
-                            <textarea
-                              rows={2}
-                              placeholder="استان، شهر، خیابان اصلی، پلاک، واحد..."
-                              value={storeData.storeAddress}
-                              onChange={(e) => setStoreData({ ...storeData, storeAddress: e.target.value })}
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default leading-relaxed"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex gap-3 justify-between items-center mt-6">
-                          <button
-                            type="button"
-                            onClick={() => setStoreStep(1)}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all text-xs cursor-pointer font-bold"
-                          >
-                            مرحله قبل
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStoreStepChange(3)}
-                            className="flex-1 bg-primary-default hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
-                          >
-                            ادامه و مرحله بعد <ArrowLeft className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={saveStoreDraft}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer"
-                          >
-                            <Database className="w-4 h-4" /> ذخیره پیش‌نویس
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Step 3: Credentials */}
-                    {storeStep === 3 && (
-                      <div className="space-y-4 animate-fade-in">
-                        <div className="p-4 bg-surface/50 border border-subtle rounded-2xl space-y-4">
-                          <h3 className="text-xs font-bold text-primary flex items-center gap-2 border-b border-subtle pb-2">
-                            <Lock className="w-4 h-4 text-primary-default" /> اطلاعات حساب کاربری (جهت ورود)
-                          </h3>
-
-                          <div>
-                            <label className="block text-xs font-black text-secondary mb-1.5">نام کاربری اختصاصی (Username) *</label>
-                            <input
-                              type="text"
-                              required
-                              value={storeData.username}
-                              onChange={(e) => setStoreData({ ...storeData, username: e.target.value })}
-                              placeholder="مثال: store_arya"
-                              className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                              style={{ direction: "ltr" }}
-                            />
-                            {storeErrors.username && <p className="text-[10px] text-danger mt-1">{storeErrors.username}</p>}
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">کلمه عبور *</label>
-                              <input
-                                type="password"
-                                required
-                                value={storeData.password}
-                                onChange={(e) => setStoreData({ ...storeData, password: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                                style={{ direction: "ltr" }}
-                              />
-                              {storeErrors.password && <p className="text-[10px] text-danger mt-1">{storeErrors.password}</p>}
-                            </div>
-                            <div>
-                              <label className="block text-xs font-black text-secondary mb-1.5">تکرار کلمه عبور *</label>
-                              <input
-                                type="password"
-                                required
-                                value={storeData.confirmPassword}
-                                onChange={(e) => setStoreData({ ...storeData, confirmPassword: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                                style={{ direction: "ltr" }}
-                              />
-                              {storeErrors.confirmPassword && <p className="text-[10px] text-danger mt-1">{storeErrors.confirmPassword}</p>}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-3 justify-between items-center mt-6">
-                          <button
-                            type="button"
-                            onClick={() => setStoreStep(2)}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all text-xs cursor-pointer font-bold"
-                          >
-                            مرحله قبل
-                          </button>
-                          <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer text-sm disabled:opacity-50"
-                          >
-                            {loading ? "در حال پردازش..." : "تکمیل ثبت‌نام و فعال‌سازی فروشگاه"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={saveStoreDraft}
-                            className="px-4 py-3 border hover:bg-surface text-secondary font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer"
-                          >
-                            <Database className="w-4 h-4" /> ذخیره پیش‌نویس
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </form>
+              {/* 2. STORE MANAGER REGISTRATION FORM */}
+              {view === "store_manager_form" && (
+                <div className="w-full animate-fade-in">
+                  <StoreManagerRegisterForm
+                    onSuccess={(user, token) => {
+                      localStorage.setItem("user", JSON.stringify(user));
+                      localStorage.setItem("token", token);
+                      setToken(token);
+                      setCurrentUser(user);
+                      showNotification("ثبت‌نام فروشگاه با موفقیت انجام شد.", "success");
+                      setView("dashboard");
+                    }}
+                    onBackToLogin={() => setView("login")}
+                    onBackToRoleSelect={() => setView("role_select")}
+                    showNotification={showNotification}
+                  />
                 </div>
-              </div>
-            )}
-            
-            {view === "referrer_form" && (
-              <div className="max-w-2xl mx-auto py-12 px-4 animate-fade-in text-right">
-                <div className="bg-card border border-border-subtle p-8 rounded-3xl shadow-xl shadow-primary-default/5 relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-8 pb-6 border-b border-subtle">
-                    <div>
-                      <h2 className="text-2xl font-black text-primary flex items-center gap-3">
-                        <ZopitLogo size="sm" />
-                        ثبت‌نام بازاریاب (معرف)
-                      </h2>
-                    </div>
-                    <button
-                      onClick={() => setView("role_select")}
-                      className="p-2 bg-surface hover:bg-border text-secondary rounded-full transition-colors"
-                    >
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <form onSubmit={handleReferrerRegister} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              )}
+
+              {/* 3. TAMINYAB REGISTRATION FORM */}
+              {view === "ambassador_form" && (
+                <div className="max-w-md mx-auto py-12 px-4 animate-fade-in text-right">
+                  <div className="bg-card border border-border-default/80 dark:border-border-subtle/50 p-8 rounded-3xl shadow-xl shadow-slate-950/5 relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-border-subtle">
                       <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">نام *</label>
+                        <h2 className="text-2xl font-black text-text-primary flex items-center gap-3">
+                          <ZopitLogo size="sm" />
+                          ثبت‌نام تأمین‌یاب
+                        </h2>
+                        <p className="text-xs text-text-muted mt-2 font-medium">عضویت سریع و آسان به عنوان تأمین‌یاب زوپیت</p>
+                      </div>
+                      <button
+                        onClick={() => setView("role_select")}
+                        className="p-2.5 bg-surface hover:bg-border-default text-text-muted hover:text-text-primary rounded-2xl transition-colors cursor-pointer"
+                      >
+                        <ArrowRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <form onSubmit={handleReferrerRegister} className="space-y-5">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">نام و نام خانوادگی (اختیاری)</label>
                         <input
                           type="text"
-                          required
                           value={refForm.firstName}
                           onChange={(e) => setRefForm({ ...refForm, firstName: e.target.value })}
-                          className="w-full px-4 py-2 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default"
+                          className="w-full px-4 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                          placeholder="مثال: علی احمدی"
                         />
                       </div>
+                      
                       <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">نام خانوادگی *</label>
+                        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">شماره موبایل (نام کاربری) *</label>
                         <input
-                          type="text"
+                          type="tel"
                           required
-                          value={refForm.lastName}
-                          onChange={(e) => setRefForm({ ...refForm, lastName: e.target.value })}
-                          className="w-full px-4 py-2 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default"
+                          value={refForm.mobile}
+                          onChange={(e) => setRefForm({ ...refForm, mobile: e.target.value, username: e.target.value })}
+                          className="w-full px-4 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-left font-bold"
+                          placeholder="0912..."
+                          dir="ltr"
                         />
                       </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-black text-secondary mb-1.5">شماره موبایل *</label>
-                      <input
-                        type="tel"
-                        required
-                        value={refForm.mobile}
-                        onChange={(e) => setRefForm({ ...refForm, mobile: e.target.value })}
-                        className="w-full px-4 py-2 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                        style={{ direction: "ltr" }}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-black text-secondary mb-1.5">ایمیل *</label>
-                      <input
-                        type="email"
-                        required
-                        value={refForm.email}
-                        onChange={(e) => setRefForm({ ...refForm, email: e.target.value })}
-                        className="w-full px-4 py-2 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                        style={{ direction: "ltr" }}
-                      />
-                    </div>
-
-                    <hr className="my-6 border-t border-border-subtle" />
-
-                    <div>
-                      <label className="block text-xs font-black text-secondary mb-1.5">نام کاربری اختصاصی (Username) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={refForm.username}
-                        onChange={(e) => setRefForm({ ...refForm, username: e.target.value })}
-                        className="w-full px-4 py-2 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                        style={{ direction: "ltr" }}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      
                       <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">کلمه عبور *</label>
+                        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">رمز عبور *</label>
                         <input
                           type="password"
                           required
                           value={refForm.password}
                           onChange={(e) => setRefForm({ ...refForm, password: e.target.value })}
-                          className="w-full px-4 py-2 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                          style={{ direction: "ltr" }}
+                          className="w-full px-4 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-left font-bold"
+                          dir="ltr"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs font-black text-secondary mb-1.5">تکرار کلمه عبور *</label>
-                        <input
-                          type="password"
-                          required
-                          value={refForm.password}
-                          onChange={(e) => setRefForm({ ...refForm, password: e.target.value })}
-                          className="w-full px-4 py-2 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary-default font-mono text-left"
-                          style={{ direction: "ltr" }}
-                        />
-                      </div>
-                    </div>
 
-                    <div className="pt-4">
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-primary-default hover:bg-primary-hover text-inverse font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2"
+                        className="w-full py-3.5 mt-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black transition-all shadow-lg shadow-indigo-600/25 flex justify-center items-center cursor-pointer"
                       >
-                        {loading ? "در حال پردازش..." : "ثبت‌نام به عنوان بازاریاب (معرف)"}
+                        {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "ثبت‌نام و ورود"}
                       </button>
-                    </div>
-                  </form>
+                    </form>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          {/* Discreet Footer with Logo and subtle Enamad at bottom of dotted canvas */}
-          <EnamadBadge variant="subtle_footer" />
-        </main>
+              )}
+            </div>
+            {/* Discreet Footer with Logo and subtle Enamad at bottom of dotted canvas */}
+            <EnamadBadge variant="subtle_footer" />
+          </main>
         )}
       </div>
 
@@ -4440,11 +3242,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
               {/* SUPPLIER RULES */}
               {termsTab === "supplier" && (
                 <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-900 dark:text-indigo-200 font-bold space-y-1">
+                  <div className="p-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white font-bold space-y-1">
                     <p className="text-sm font-black flex items-center gap-2">
-                      <Truck className="w-4 h-4 text-indigo-600" /> آیین‌نامه و تعهدنامه تامین‌کنندگان کالا (عمده)
+                      <Truck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> آیین‌نامه و تعهدنامه تامین‌کنندگان کالا (عمده)
                     </p>
-                    <p className="text-[11px] font-medium text-indigo-800 dark:text-indigo-300">
+                    <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
                       شامل تعهدات تامین اصالت کالا، بسته‌بندی، ارسال به موقع پستی و تسویه حساب کیف پول تامین‌کننده.
                     </p>
                   </div>

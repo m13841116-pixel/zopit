@@ -25,7 +25,9 @@ import {
   PenTool,
   BadgePercent,
   Ticket,
-  Building2
+  Building2,
+  ShieldCheck,
+  Info
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 import { ProAccountMediaShowcase } from "./ProAccountMediaShowcase";
@@ -40,9 +42,11 @@ interface StoreProAccountProps {
 export function StoreProAccount({ user, showNotification, onNavigateTab }: StoreProAccountProps) {
   const [loading, setLoading] = useState(true);
   const [proAccount, setProAccount] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<"PRO" | "PRO_MAX">("PRO_MAX");
   const [settings, setSettings] = useState<any>({
     autoApprove: true,
-    proAccountPrice: 239500,
+    proAccountPrice: 189000,
+    promaxAccountPrice: 299000,
     hostRenewalPrice: 500000,
     hostDiscountedPrice: 198000,
     torobPrice: 150000,
@@ -106,7 +110,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       }
 
       // Calculate applied discount amount
-      const basePrice = parseInt(settings.proAccountPrice || '239500', 10);
+      const basePrice = selectedPlan === 'PRO_MAX'
+        ? parseInt(settings.promaxAccountPrice || '299000', 10)
+        : parseInt(settings.proAccountPrice || '189000', 10);
       const adminServicesCost = hasEnamad ? 50000 : 0;
       const totalCost = basePrice + adminServicesCost;
       
@@ -225,6 +231,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       if (res.ok) {
         const data = await res.json();
         setProAccount(data.proAccount);
+        if (data.proAccount?.planType) {
+          setSelectedPlan(data.proAccount.planType === 'PRO' ? 'PRO' : 'PRO_MAX');
+        }
         if (data.settings) {
           setSettings(data.settings);
         }
@@ -375,7 +384,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     const canvas = canvasRef.current;
     const signatureImage = canvas ? canvas.toDataURL("image/png") : "";
 
-    const basePrice = parseInt(settings.proAccountPrice || '239500', 10);
+    const basePrice = selectedPlan === 'PRO_MAX'
+      ? parseInt(settings.promaxAccountPrice || '299000', 10)
+      : parseInt(settings.proAccountPrice || '189000', 10);
     const adminServicesCost = hasEnamad ? 50000 : 0;
     const calculatedAmount = Math.max(0, basePrice + adminServicesCost - appliedDiscount);
 
@@ -399,7 +410,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           hasPostalPanel,
           hasCustomLogo,
           logoDescription,
-          domainProposals: domainProposals.map(d => d.trim()).filter(Boolean),
+          planType: selectedPlan,
+          domainProposals: selectedPlan === 'PRO_MAX' ? domainProposals.map(d => d.trim()).filter(Boolean) : [],
           amount: calculatedAmount,
           discountCodeText: isDiscountApplied ? discountCodeText : undefined
         })
@@ -645,7 +657,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               <span>اشتراک طلایی مدیران فروشگاه زوپیت</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white leading-tight">
-              اکانت پرو زوپیت (Zopit Pro Account)
+              اشتراک پرو و پرومکس زوپیت (Zopit Pro & Pro Max)
             </h1>
             <p className="text-amber-100/90 text-xs md:text-sm max-w-2xl leading-relaxed">
               مجموعه‌ای کامل از ۱۲ خدمت و پکیج کلیدی به ارزش بیش از ۱۴,۹۵۰,۰۰۰ تومان جهت راه‌اندازی، تجهیز و جهش فروش آنلاین فروشگاه شما
@@ -653,21 +665,21 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           </div>
 
           <div className="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-amber-500/40 text-center shrink-0 w-full md:w-auto shadow-lg">
-            <span className="text-xs text-amber-200/80 block mb-2 font-bold">پکیج طلایی مدیران (ویژه)</span>
+            <span className="text-xs text-amber-200/80 block mb-2 font-bold">پکیج تخصصی مدیران فروشگاه</span>
             
             <div className="flex flex-col items-center justify-center">
               <div className="flex items-center gap-1.5 text-xs text-slate-300 mb-1">
-                <span className="text-slate-400">ارزش کل ۱۲ خدمت:</span>
+                <span className="text-slate-400">ارزش کل خدمات:</span>
                 <span className="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-lg border border-rose-500/30 font-sans font-bold text-xs">
                   <span className="line-through decoration-rose-400 decoration-1">۱۴,۹۵۸,۰۰۰ تومان</span>
                 </span>
               </div>
               <div className="text-2xl md:text-3xl font-black text-amber-400 flex items-center justify-center gap-1.5 drop-shadow-md my-1">
-                <span>{parseInt(settings.proAccountPrice || '239500').toLocaleString('fa-IR')}</span>
+                <span>{selectedPlan === 'PRO_MAX' ? parseInt(settings.promaxAccountPrice || '299000').toLocaleString('fa-IR') : parseInt(settings.proAccountPrice || '189000').toLocaleString('fa-IR')}</span>
                 <span className="text-xs text-amber-200">تومان</span>
               </div>
               <div className="text-[11px] text-amber-200/90 mt-1 font-bold bg-amber-500/15 px-3 py-1 rounded-full border border-amber-500/30 text-center">
-                هزینه راه‌اندازی اولیه و پشتیبانی (۱۲ خدمت فوق به عنوان هدیه پرو)
+                {selectedPlan === 'PRO_MAX' ? 'اشتراک پرومکس (با ۵ اولویت انتخاب دامنه)' : 'اشتراک پرو (با دامنه رندوم زوپیت)'}
               </div>
             </div>
           </div>
@@ -989,6 +1001,184 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
             </div>
           )}
 
+          {/* PLAN SELECTION CARDS (PRO vs PRO MAX) */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-xl font-black text-primary flex items-center gap-2">
+                  <Crown className="w-6 h-6 text-amber-500" />
+                  <span>انتخاب نوع اشتراک اکانت پرو زوپیت</span>
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  سطح اشتراک مدنظر خود را بر اساس امکانات و نیازهای فروشگاه انتخاب کنید:
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* CARD 1: PRO PLAN */}
+              <div
+                onClick={() => setSelectedPlan("PRO")}
+                className={`relative cursor-pointer rounded-3xl p-6 transition-all duration-300 border-2 flex flex-col justify-between space-y-6 ${
+                  selectedPlan === "PRO"
+                    ? "bg-card border-emerald-500 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-500/20"
+                    : "bg-surface border-subtle hover:border-emerald-500/40 opacity-80 hover:opacity-100"
+                }`}
+              >
+                {selectedPlan === "PRO" && (
+                  <div className="absolute -top-3 right-6 bg-emerald-500 text-slate-950 text-[11px] font-black px-3 py-1 rounded-full shadow-md flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>پلان انتخاب شده</span>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      مقرون‌به‌صرفه و اقتصادی
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-black text-primary">اشتراک پرو (Zopit Pro)</h3>
+                    <p className="text-xs text-muted mt-1 leading-relaxed">
+                      پکیج پایه راه‌اندازی فروشگاه اینترنتی همراه با تخصیص دامنه رندوم اختصاصی زوپیت
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex items-baseline gap-1.5">
+                    <span className="text-3xl font-black text-primary font-sans">
+                      {parseInt(settings.proAccountPrice || '189000').toLocaleString('fa-IR')}
+                    </span>
+                    <span className="text-xs text-muted font-bold">تومان</span>
+                  </div>
+
+                  <div className="space-y-2.5 pt-4 border-t border-subtle text-xs text-secondary">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>قالب اختصاصی و مدرن زوپیت</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>هاست ابری ۱ ماهه پرسرعت</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>پکیج کاربردی افزونه‌های وردپرس</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>پنل پستی و لجستیک اختصاصی</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold">
+                      <Info className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span>تخصیص دامنه رندوم اختصاصی زوپیت</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted">
+                      <X className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span>فاقد پچ استارتاپ‌های آینده</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className={`w-full py-3 rounded-2xl font-black text-xs transition-all ${
+                    selectedPlan === "PRO"
+                      ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
+                      : "bg-surface text-primary border border-subtle hover:bg-subtle"
+                  }`}
+                >
+                  {selectedPlan === "PRO" ? "انتخاب شده" : "انتخاب اشتراک پرو (۱۸۹,۰۰۰ تومان)"}
+                </button>
+              </div>
+
+              {/* CARD 2: PRO MAX PLAN */}
+              <div
+                onClick={() => setSelectedPlan("PRO_MAX")}
+                className={`relative cursor-pointer rounded-3xl p-6 transition-all duration-300 border-2 flex flex-col justify-between space-y-6 ${
+                  selectedPlan === "PRO_MAX"
+                    ? "bg-gradient-to-b from-amber-950/20 via-card to-card border-amber-500 shadow-2xl shadow-amber-500/20 ring-2 ring-amber-500/30"
+                    : "bg-surface border-subtle hover:border-amber-500/40 opacity-80 hover:opacity-100"
+                }`}
+              >
+                <div className="absolute -top-3 right-6 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-[11px] font-black px-3.5 py-1 rounded-full shadow-lg flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>پیشنهادی و ویژه 🔥</span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
+                      <Crown className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      پکیج کامل خدمات
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-black text-primary flex items-center gap-2">
+                      <span>اشتراک پرومکس (Zopit Pro Max)</span>
+                      <span className="text-xs bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-md">PRO MAX</span>
+                    </h3>
+                    <p className="text-xs text-muted mt-1 leading-relaxed">
+                      پکیج جامع با قابلیت پیشنهاد ۵ نام دامنه اختصاصی دلخواه، دسترسی به استارتاپ‌های آینده و پشتیبانی VIP
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex items-baseline gap-1.5">
+                    <span className="text-3xl font-black text-amber-500 font-sans">
+                      {parseInt(settings.promaxAccountPrice || '299000').toLocaleString('fa-IR')}
+                    </span>
+                    <span className="text-xs text-muted font-bold">تومان</span>
+                  </div>
+
+                  <div className="space-y-2.5 pt-4 border-t border-subtle text-xs text-secondary">
+                    <div className="flex items-center gap-2 font-bold text-amber-600 dark:text-amber-400">
+                      <Globe className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span>ثبت ۵ اولویت انتخاب نام دامنه اختصاصی (.ir)</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-bold text-purple-600 dark:text-purple-400">
+                      <Crown className="w-4 h-4 text-purple-500 shrink-0" />
+                      <span>پچ طلایی استارتاپ‌های آینده زوپیت</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>تمامی امکانات قالب، هاست و افزونه‌های وردپرس</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>طراحی لوگوی اختصاصی برند فروشگاه</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>اتصال به موتورهای جستجوی کالا (ترب و ایمالز)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>پشتیبانی و مشاوره تخصصی اولویت‌دار</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className={`w-full py-3 rounded-2xl font-black text-xs transition-all ${
+                    selectedPlan === "PRO_MAX"
+                      ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
+                      : "bg-surface text-primary border border-subtle hover:bg-subtle"
+                  }`}
+                >
+                  {selectedPlan === "PRO_MAX" ? "انتخاب شده (پیشنهادی)" : "انتخاب اشتراک پرومکس (۲۹۹,۰۰۰ تومان)"}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-500/30 rounded-3xl p-6 text-right space-y-2">
             <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-black text-base">
               <TrendingUp className="w-5 h-5 shrink-0" />
@@ -1158,39 +1348,51 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 </div>
               </div>
 
-              {/* 5 Domain Proposals Section */}
-              <div className="bg-surface/80 border border-emerald-500/30 rounded-2xl p-5 space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-black text-primary flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-emerald-500" />
-                    <span>پیشنهاد نام دامنه (.ir) به ترتیب اولویت (تا ۵ مورد به حروف لاتین)</span>
-                  </h3>
+              {/* Domain Proposals Section */}
+              {selectedPlan === 'PRO_MAX' ? (
+                <div className="bg-surface/80 border border-emerald-500/30 rounded-2xl p-5 space-y-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black text-primary flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-amber-500" />
+                      <span>پیشنهاد نام دامنه (.ir) به ترتیب اولویت (تا ۵ مورد به حروف لاتین - هدیه پرومکس)</span>
+                    </h3>
+                    <p className="text-xs text-muted leading-relaxed">
+                      لطفاً حداکثر ۵ نام دامنه پیشنهادی با حروف لاتین وارد کنید. ما به ترتیب اولویت آزاد بودن دامنه‌ها را بررسی کرده و اولین مورد آزاد را ثبت می‌کنیم.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    {[1, 2, 3, 4, 5].map((idx) => (
+                      <div key={idx} className="space-y-1">
+                        <label className="text-[11px] font-bold text-secondary block">
+                          اولویت {idx.toLocaleString('fa-IR')}:
+                        </label>
+                        <input
+                          type="text"
+                          value={domainProposals[idx - 1] || ''}
+                          onChange={(e) => {
+                            const updated = [...domainProposals];
+                            updated[idx - 1] = e.target.value;
+                            setDomainProposals(updated);
+                          }}
+                          placeholder={`domain${idx}.ir`}
+                          className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono dir-ltr text-left focus:ring-2 focus:ring-amber-500 outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-surface/80 border border-amber-500/30 rounded-2xl p-5 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-sm">
+                    <Info className="w-5 h-5 shrink-0" />
+                    <span>تخصیص دامنه رندوم اختصاصی در اشتراک پرو</span>
+                  </div>
                   <p className="text-xs text-muted leading-relaxed">
-                    لطفاً حداکثر ۵ نام دامنه پیشنهادی با حروف لاتین وارد کنید. ما به ترتیب اولویت آزاد بودن (Availability) دامنه‌ها را بررسی کرده و اولین مورد آزاد را به صورت رایگان برای شما ثبت می‌کنیم. در صورتی که هیچ‌یک از ۵ نام پیشنهادی آزاد نباشد، یک دامنه رندوم مرتبط برای شما ثبت خواهد شد و حق اعتراضی وجود نخواهد داشت (به دلیل اعطای دامنه به صورت هدیه رایگان).
+                    در اشتراک پرو (۱۸۹,۰۰۰ تومان)، دامنه اختصاصی به صورت رندوم توسط پشتیبانی زوپیت ثبت و متصل می‌گردد. در صورتی که تمایل دارید نام دامنه اختصاصی دلخواه خود را پیشنهاد دهید، لطفاً اشتراک <button type="button" onClick={() => setSelectedPlan("PRO_MAX")} className="text-amber-500 font-black underline cursor-pointer">پرومکس (۲۹۹,۰۰۰ تومان)</button> را انتخاب کنید.
                   </p>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  {[1, 2, 3, 4, 5].map((idx) => (
-                    <div key={idx} className="space-y-1">
-                      <label className="text-[11px] font-bold text-secondary block">
-                        اولویت {idx.toLocaleString('fa-IR')}:
-                      </label>
-                      <input
-                        type="text"
-                        value={domainProposals[idx - 1] || ''}
-                        onChange={(e) => {
-                          const updated = [...domainProposals];
-                          updated[idx - 1] = e.target.value;
-                          setDomainProposals(updated);
-                        }}
-                        placeholder={`domain${idx}.ir`}
-                        className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono dir-ltr text-left focus:ring-2 focus:ring-emerald-500 outline-none"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              )}
 
               {/* Additional Options Checkboxes */}
               {/* Administrative & Legal Services Section (Optional) */}
@@ -1363,70 +1565,76 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               </div>
 
               {/* Bottom Payable Amount & Discount Code Box Section */}
-              <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border-2 border-emerald-500/50 rounded-2xl p-5 text-white shadow-xl space-y-4">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-emerald-500/30 rounded-2xl p-6 text-white shadow-2xl relative overflow-hidden space-y-5">
+                {/* Decorative Background Elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none"></div>
+
+                <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
                   {/* Price display with high contrast font */}
-                  <div className="text-right space-y-1">
-                    <span className="text-xs text-emerald-300/90 font-bold block">مبلغ نهایی راه‌اندازی و فعال‌سازی اکانت پرو:</span>
+                  <div className="text-right w-full lg:w-auto space-y-2">
+                    <span className="text-xs text-emerald-300 font-black tracking-wide block uppercase">
+                      مبلغ نهایی فعال‌سازی ({selectedPlan === 'PRO_MAX' ? 'اشتراک پرومکس' : 'اشتراک پرو'})
+                    </span>
                     <div className="flex items-center gap-3">
                       {(isDiscountApplied || hasEnamad) && (
-                        <span className="text-xs font-sans font-bold text-slate-400 line-through">
-                          {(parseInt(settings.proAccountPrice || '239500', 10) + (hasEnamad ? 50000 : 0)).toLocaleString("fa-IR")} تومان
+                        <span className="text-sm font-sans font-bold text-slate-400 line-through decoration-rose-500/50 decoration-2">
+                          {((selectedPlan === 'PRO_MAX' ? parseInt(settings.promaxAccountPrice || '299000', 10) : parseInt(settings.proAccountPrice || '189000', 10)) + (hasEnamad ? 50000 : 0)).toLocaleString("fa-IR")}
                         </span>
                       )}
-                      <div className="text-2xl md:text-3xl font-black text-emerald-400 font-sans tracking-wide flex items-center gap-1.5 bg-emerald-500/10 px-4 py-1.5 rounded-xl border border-emerald-500/30">
-                        <span>{Math.max(0, parseInt(settings.proAccountPrice || '239500', 10) + (hasEnamad ? 50000 : 0) - appliedDiscount).toLocaleString("fa-IR")}</span>
-                        <span className="text-xs font-sans text-emerald-200">تومان</span>
+                      <div className="text-3xl md:text-4xl font-black text-white font-sans tracking-tight flex items-baseline gap-1.5 drop-shadow-md">
+                        <span>{Math.max(0, (selectedPlan === 'PRO_MAX' ? parseInt(settings.promaxAccountPrice || '299000', 10) : parseInt(settings.proAccountPrice || '189000', 10)) + (hasEnamad ? 50000 : 0) - appliedDiscount).toLocaleString("fa-IR")}</span>
+                        <span className="text-sm font-bold text-emerald-400 tracking-normal">تومان</span>
                       </div>
                     </div>
                     {hasEnamad && (
-                      <span className="text-[11px] text-amber-300/90 font-bold block pt-0.5">
+                      <span className="text-[11px] text-amber-300 font-bold block pt-1 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
                         (شامل ۵۰,۰۰۰ تومان کارمزد ثبت ای‌نماد)
                       </span>
                     )}
                   </div>
 
                   {/* Discount Code Input Box */}
-                  <div className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
-                      <input
-                        type="text"
-                        value={discountCodeText}
-                        onChange={(e) => setDiscountCodeText(e.target.value)}
-                        placeholder="کد تخفیف (مثال: ZOPIT-PRO)"
-                        className="w-full px-4 py-2.5 bg-slate-800/90 border border-emerald-500/40 rounded-xl text-xs text-white placeholder-slate-400 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400 dir-ltr text-center"
-                      />
-                    </div>
+                  <div className="w-full lg:w-auto bg-slate-950/50 p-1.5 rounded-2xl border border-slate-700/50 flex items-center shadow-inner">
+                    <input
+                      type="text"
+                      value={discountCodeText}
+                      onChange={(e) => setDiscountCodeText(e.target.value)}
+                      placeholder="کد تخفیف (مثال: ZOPIT-PRO)"
+                      className="flex-1 w-full lg:w-64 px-4 py-3 bg-transparent text-sm text-white placeholder-slate-500 font-mono focus:outline-none dir-ltr text-center font-bold tracking-widest uppercase"
+                    />
                     <button
                       type="button"
                       onClick={handleApplyDiscountCode}
-                      className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all shrink-0 cursor-pointer shadow-md shadow-emerald-500/20"
+                      className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all shrink-0 cursor-pointer shadow-lg shadow-emerald-500/20"
                     >
                       اعمال کد
                     </button>
                   </div>
                 </div>
+
                 {isDiscountApplied && (
-                  <div className="text-xs text-emerald-300 font-bold flex items-center gap-1.5 pt-1 border-t border-emerald-500/20">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>کد تخفیف ویژه با موفقیت اعمال گردید ({appliedDiscount.toLocaleString("fa-IR")} تومان تخفیف).</span>
+                  <div className="relative z-10 text-xs text-emerald-400 font-black flex items-center gap-2 pt-4 border-t border-slate-700/50 bg-emerald-500/5 p-3 rounded-xl">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <span>کد تخفیف ویژه با موفقیت اعمال گردید ({appliedDiscount.toLocaleString("fa-IR")} تومان کسر شد).</span>
                   </div>
                 )}
               </div>
 
               {/* Submit Button */}
-              <div className="pt-2 text-center">
+              <div className="pt-4 pb-2 text-center">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 mx-auto disabled:opacity-50 cursor-pointer"
+                  className="w-full md:w-[80%] mx-auto py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/30 transition-all flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer transform hover:scale-[1.01]"
                 >
                   {submitting ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <RefreshCw className="w-6 h-6 animate-spin" />
                   ) : (
-                    <Zap className="w-5 h-5 fill-slate-950" />
+                    <Zap className="w-6 h-6 fill-slate-950" />
                   )}
-                  <span>ثبت و فعال‌سازی فوری اکانت پرو زوپیت</span>
+                  <span>پرداخت و فعال‌سازی فوری اکانت پرو</span>
                 </button>
               </div>
             </form>

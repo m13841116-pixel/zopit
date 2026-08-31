@@ -224,6 +224,9 @@ export default function AllUsersList({
 
   // Filtering
   const filteredUsers = users.filter((u) => {
+    // Hide customer users from B2B ecosystem
+    if (u.role === "CUSTOMER" || u.role === "CUSTOMERS") return false;
+
     // Role Filter
     if (roleFilter && roleFilter !== "ALL") {
       const uRole = (u.role || "").toUpperCase();
@@ -232,10 +235,8 @@ export default function AllUsersList({
         if (uRole !== "STORE_MANAGER" && uRole !== "STORE") return false;
       } else if (rFilter === "SUPPLIER" || rFilter === "SUPPLIERS") {
         if (uRole !== "SUPPLIER" && uRole !== "SUPPLIERS") return false;
-      } else if (rFilter === "CUSTOMER" || rFilter === "CUSTOMERS") {
-        if (uRole !== "CUSTOMER" && uRole !== "CUSTOMERS") return false;
-      } else if (rFilter === "REFERRER" || rFilter === "REFERRERS") {
-        if (uRole !== "REFERRER" && uRole !== "REFERRERS") return false;
+      } else if (rFilter === "AMBASSADOR" || rFilter === "REFERRER" || rFilter === "TAMINYAB") {
+        if (uRole !== "AMBASSADOR" && uRole !== "REFERRER") return false;
       } else if (uRole !== rFilter) {
         return false;
       }
@@ -262,19 +263,21 @@ export default function AllUsersList({
   });
 
   const getRoleBadge = (role: string) => {
-    switch (role) {
+    const r = (role || "").toUpperCase();
+    switch (r) {
       case "SUPPLIER":
         return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">تامین‌کننده</span>;
       case "STORE_MANAGER":
+      case "STORE":
         return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">مدیر فروشگاه</span>;
-      case "CUSTOMER":
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">مشتری</span>;
+      case "AMBASSADOR":
       case "REFERRER":
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">معرف / همکار</span>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">تأمین‌یاب</span>;
       case "SUPER_ADMIN":
+      case "ADMIN":
         return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">مدیر ارشد</span>;
       default:
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-500/10 text-slate-600 border border-slate-500/20">{role}</span>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-500/10 text-slate-600 border border-slate-500/20">کاربر سامانه</span>;
     }
   };
 
@@ -305,8 +308,7 @@ export default function AllUsersList({
               { id: "ALL", label: "همه کاربران" },
               { id: "SUPPLIER", label: "تامین‌کنندگان" },
               { id: "STORE_MANAGER", label: "فروشگاه‌ها" },
-              { id: "CUSTOMER", label: "مشتریان" },
-              { id: "REFERRER", label: "معرف‌ها" },
+              { id: "AMBASSADOR", label: "تأمین‌یاب‌ها" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -390,12 +392,12 @@ export default function AllUsersList({
                   <th className="p-4">نام و نام خانوادگی</th>
                   <th className="p-4">نقش</th>
 
-                  {/* Dynamic Columns for Referrers */}
-                  {roleFilter === "REFERRER" ? (
+                  {/* Dynamic Columns for TaminYabs */}
+                  {roleFilter === "AMBASSADOR" || roleFilter === "REFERRER" ? (
                     <>
                       <th className="p-4">شماره تماس</th>
-                      <th className="p-4 text-center">تعداد معرفی‌های موفق</th>
-                      <th className="p-4 text-center">مجموع پورسانت دریافتی</th>
+                      <th className="p-4 text-center">تعداد جذب‌های موفق</th>
+                      <th className="p-4 text-center">مجموع پاداش دریافتی</th>
                     </>
                   ) : (
                     <>
@@ -432,8 +434,8 @@ export default function AllUsersList({
                       </div>
                       {u.role === "SUPPLIER" && (
                         <div className="mt-1">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-mono text-[11px] font-extrabold border border-indigo-500/20">
-                            کد تامین: SUP-{1000 + u.id} (#{u.id})
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold text-xs border border-indigo-500/20">
+                            کد تامین: {(1000 + u.id).toLocaleString('fa-IR')}
                           </span>
                         </div>
                       )}
@@ -450,7 +452,7 @@ export default function AllUsersList({
                     <td className="p-4">{getRoleBadge(u.role)}</td>
 
                     {/* Dynamic Columns */}
-                    {roleFilter === "REFERRER" ? (
+                    {roleFilter === "AMBASSADOR" || roleFilter === "REFERRER" ? (
                       <>
                         <td className="p-4 font-mono text-secondary" dir="ltr">
                           {u.mobile || "---"}
@@ -825,8 +827,7 @@ export default function AllUsersList({
                   >
                     <option value="STORE_MANAGER">مدیر فروشگاه</option>
                     <option value="SUPPLIER">تامین‌کننده</option>
-                    <option value="CUSTOMER">مشتری</option>
-                    <option value="REFERRER">معرف / همکار</option>
+                    <option value="AMBASSADOR">تأمین‌یاب</option>
                     <option value="SUPER_ADMIN">مدیر ارشد</option>
                   </select>
                 </div>

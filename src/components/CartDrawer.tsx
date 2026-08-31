@@ -102,10 +102,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
               ) : (
                 <>
-                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 flex items-start space-x-2">
+                  <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-900 dark:text-white flex items-start space-x-2">
                     <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-semibold">B2B Trade Protection:</span> All bulk orders include secure escrow settlement and verified supplier guarantees.
+                      <span className="font-bold text-slate-950 dark:text-white">B2B Trade Protection:</span> All bulk orders include secure escrow settlement and verified supplier guarantees.
                     </div>
                   </div>
 

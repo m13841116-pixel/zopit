@@ -54,7 +54,8 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
 
   // Global Pro Settings states
   const [autoApprove, setAutoApprove] = useState(true);
-  const [proAccountPrice, setProAccountPrice] = useState("239500");
+  const [proAccountPrice, setProAccountPrice] = useState("189000");
+  const [promaxAccountPrice, setPromaxAccountPrice] = useState("299000");
   const [hostRenewalPrice, setHostRenewalPrice] = useState("500000");
   const [hostDiscountedPrice, setHostDiscountedPrice] = useState("198000");
   const [torobPrice, setTorobPrice] = useState("150000");
@@ -96,7 +97,8 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
       if (res.ok) {
         const data = await res.json();
         setAutoApprove(data.autoApprove !== false);
-        setProAccountPrice(data.proAccountPrice || "239500");
+        setProAccountPrice(data.proAccountPrice || "189000");
+        setPromaxAccountPrice(data.promaxAccountPrice || "299000");
         setHostRenewalPrice(data.hostRenewalPrice || "500000");
         setHostDiscountedPrice(data.hostDiscountedPrice || "198000");
         setTorobPrice(data.torobPrice || "150000");
@@ -180,6 +182,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
         body: JSON.stringify({
           autoApprove,
           proAccountPrice,
+          promaxAccountPrice,
           hostRenewalPrice,
           hostDiscountedPrice,
           torobPrice,
@@ -258,7 +261,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>تنظیمات و قوانین پکیج پرو</span>
+            <span>تنظیمات و قوانین اشتراک پرو و پرو مکس</span>
           </button>
           <button
             onClick={() => setActiveTab("discounts")}
@@ -437,16 +440,31 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
             {/* Pro Account Price */}
             <div>
               <label className="block text-xs font-bold text-secondary mb-1.5">
-                هزینه اولیه ثبت‌نام اکانت پرو (تومان):
+                هزینه ثبت‌نام اکانت پرو (تومان):
               </label>
               <input
                 type="number"
                 value={proAccountPrice}
                 onChange={(e) => setProAccountPrice(e.target.value)}
-                placeholder="0 برای رایگان"
+                placeholder="189000"
                 className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
               />
-              <span className="text-[10px] text-muted mt-1 block">(در حال حاضر 0/رایگان است)</span>
+              <span className="text-[10px] text-muted mt-1 block">پکیج پایه با دامنه رندوم اختصاصی زوپیت (پیش‌فرض: ۱۸۹,۰۰۰ تومان)</span>
+            </div>
+
+            {/* Pro Max Account Price */}
+            <div>
+              <label className="block text-xs font-bold text-secondary mb-1.5">
+                هزینه ثبت‌نام اکانت پرومکس (تومان):
+              </label>
+              <input
+                type="number"
+                value={promaxAccountPrice}
+                onChange={(e) => setPromaxAccountPrice(e.target.value)}
+                placeholder="299000"
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+              <span className="text-[10px] text-muted mt-1 block">پکیج کامل با ۵ اولویت انتخاب دامنه و پچ استارتاپ‌ها (پیش‌فرض: ۲۹۹,۰۰۰ تومان)</span>
             </div>
 
             {/* Promo Code for Host Renewal */}

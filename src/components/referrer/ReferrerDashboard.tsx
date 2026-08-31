@@ -43,7 +43,7 @@ export default function ReferrerDashboard({ currentUser, onLogout, showNotificat
         credentials: "include",
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
+      if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
         const result = await res.json();
         setData(result);
       } else {

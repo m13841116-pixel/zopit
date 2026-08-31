@@ -21,7 +21,8 @@ import {
   Megaphone,
   Sliders,
   Scale,
-  GraduationCap
+  GraduationCap,
+  Target
 } from "lucide-react";
 import NotificationBell from "../NotificationBell";
 import { EducationModal } from "../EducationModal";
@@ -39,6 +40,7 @@ import SystemHealth from "./SystemHealth";
 import Notifications from "./Notifications";
 import ManualInvoices from "./ManualInvoices";
 import AdminAnnouncements from "./AdminAnnouncements";
+import LeadsManager from "./LeadsManager";
 import SuperAdminNewFeatures from "./SuperAdminNewFeatures";
 import SuperAdminProAccounts from "./SuperAdminProAccounts";
 import TopStoresManager from "./TopStoresManager";
@@ -77,6 +79,7 @@ export default function SuperAdminDashboard({
     "products",
     "orders",
     "settlements",
+    "leads",
     "tickets",
     "top-stores",
     "pro-accounts",
@@ -124,10 +127,11 @@ export default function SuperAdminDashboard({
   const menuItems = [
     { id: "overview", label: "پیشخوان", icon: LayoutDashboard },
     { id: "all-users", label: "کل کاربران", icon: Users },
+    { id: "leads", label: "تأمین‌یاب‌ها", icon: Target },
     { id: "products", label: "محصولات", icon: Package },
     { id: "orders", label: "سفارشات", icon: ShoppingCart, badge: badges.orders },
     { id: "settlements", label: "تسویه حساب", icon: Wallet, badge: badges.settlements },
-    { id: "pro-accounts", label: "اکانت‌های پرو", icon: Crown },
+    { id: "pro-accounts", label: "اکانت پرو و پرو مکس", icon: Crown },
     { id: "tickets", label: "تیکت‌ها", icon: MessageSquare, badge: badges.tickets },
     { id: "top-stores", label: "فروشندگان برتر و VIP", icon: Award },
     { id: "announcements", label: "مدیریت اعلانات", icon: Megaphone },
@@ -268,6 +272,7 @@ export default function SuperAdminDashboard({
           )}
           {activeTab === "penalty-management" && <SystemSettings initialTab="supplier_rules" />}
           {activeTab === "products" && <ProductsList />}
+          {activeTab === "leads" && <LeadsManager />}
           {activeTab === "orders" && <OrdersList />}
           {activeTab === "financial" && <Financial />}
           {activeTab === "manual-invoices" && <ManualInvoices />}

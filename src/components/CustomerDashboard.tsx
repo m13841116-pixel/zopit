@@ -110,25 +110,25 @@ export function CustomerDashboard({
     switch (status) {
       case "NEW":
       case "REQUESTED":
-        return { text: "در انتظار تایید", color: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800" };
+        return { text: "در انتظار تایید", color: "bg-blue-100 text-blue-950 border-blue-300 dark:bg-blue-900 dark:text-blue-50 dark:border-blue-700 font-bold" };
       case "PENDING":
-        return { text: "در انتظار پرداخت", color: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800" };
+        return { text: "در انتظار پرداخت", color: "bg-amber-400 text-slate-950 border-amber-500 dark:bg-amber-400 dark:text-slate-950 dark:border-amber-300 font-black" };
       case "SUPPLIER_APPROVED":
-        return { text: "تایید شده غرفه‌دار", color: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800" };
+        return { text: "تایید شده غرفه‌دار", color: "bg-cyan-100 text-cyan-950 border-cyan-300 dark:bg-cyan-900 dark:text-cyan-50 dark:border-cyan-700 font-bold" };
       case "PREPARING":
       case "PROCESSING":
-        return { text: "در حال آماده‌سازی", color: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800" };
+        return { text: "در حال آماده‌سازی", color: "bg-indigo-100 text-indigo-950 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-50 dark:border-indigo-700 font-bold" };
       case "SHIPPED":
-        return { text: "ارسال شده", color: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800" };
+        return { text: "ارسال شده", color: "bg-purple-100 text-purple-950 border-purple-300 dark:bg-purple-900 dark:text-purple-50 dark:border-purple-700 font-bold" };
       case "COMPLETED":
       case "DELIVERED":
-        return { text: "تکمیل شده", color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800" };
+        return { text: "تکمیل شده", color: "bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-50 dark:border-emerald-700 font-bold" };
       case "CANCELLED":
-        return { text: "لغو شده", color: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800" };
+        return { text: "لغو شده", color: "bg-rose-100 text-rose-950 border-rose-300 dark:bg-rose-900 dark:text-rose-50 dark:border-rose-700 font-bold" };
       case "REJECTED":
-        return { text: "رد شده", color: "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900" };
+        return { text: "رد شده", color: "bg-rose-200 text-rose-950 border-rose-400 dark:bg-rose-900 dark:text-white dark:border-rose-600 font-bold" };
       default:
-        return { text: status, color: "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800" };
+        return { text: status, color: "bg-slate-100 text-slate-900 border-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 font-bold" };
     }
   };
 

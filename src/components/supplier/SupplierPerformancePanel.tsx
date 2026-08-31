@@ -19,7 +19,10 @@ export default function SupplierPerformancePanel() {
     fetch("/api/supplier/performance", { credentials: "include",
       headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` },
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok || !res.headers.get("content-type")?.includes("application/json")) return null;
+        return res.json();
+      })
       .then((resData) => {
         if (resData && !resData.error) {
           setData(resData);

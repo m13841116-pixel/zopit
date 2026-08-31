@@ -18,6 +18,7 @@ export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
     bankName: user?.bankName || "",
     accountHolderName: user?.accountHolderName || "",
     address: user?.address || "",
+    autoApproveOrders: user?.autoApproveOrders ?? true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   /* Notification states persisted in localStorage */ const [
@@ -298,6 +299,25 @@ export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
                 {isSubmitting ? "در حال ذخیره..." : "ذخیره تغییرات"}
               </button>
             </div>
+          
+            <div className="md:col-span-2 bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-sm text-indigo-900">تایید خودکار سفارشات</h4>
+                <p className="text-xs text-indigo-700/70 mt-1">
+                  در صورت فعال بودن، موجودی کالاها به محض ثبت سفارش کسر شده و مستقیماً وارد مرحله "در انتظار پرداخت" می‌شود.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.autoApproveOrders}
+                  onChange={(e) => setFormData({ ...formData, autoApproveOrders: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
           </form>
         ) : (
           /* Notification Settings Form */ <form

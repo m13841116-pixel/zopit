@@ -26,7 +26,13 @@ import {
   List,
   X,
   ImagePlus,
-  Eye
+  Eye,
+  FileSpreadsheet,
+  Download,
+  AlertCircle,
+  CheckCircle2,
+  FileUp,
+  Check
 } from "lucide-react";
 
 export function SupplierAddProduct({
@@ -37,6 +43,232 @@ export function SupplierAddProduct({
 }: any) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Bulk Product Import State
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [isBulkImporting, setIsBulkImporting] = useState(false);
+  const [bulkFeedback, setBulkFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+    details?: string[];
+  } | null>(null);
+  const [previewProducts, setPreviewProducts] = useState<any[]>([]);
+  const [showBulkPreviewModal, setShowBulkPreviewModal] = useState(false);
+
+  // Function to download predefined Sample CSV Template
+  const handleDownloadSampleCsv = () => {
+    // UTF-8 BOM for perfect Excel Persian display
+    const BOM = "\uFEFF";
+    const csvContent =
+      BOM +
+      "نام محصول,دسته‌بندی,مدل گوشی,رنگ,قیمت عمده,موجودی\r\n" +
+      "قاب سیلیکونی مات اورجینال,لوازم جانبی موبایل,iPhone 13 Pro,مشکی,145000,50\r\n" +
+      "گلس سرامیکی تمام صفحه ضد ضربه,لوازم جانبی موبایل,Samsung Galaxy A54,شفاف,65000,120\r\n" +
+      "هندزفری بلوتوثی پرو پلاس,صوتی و دیجیتال,Universal,سفید,480000,30\r\n" +
+      "کابل شارژ سریع تایپ سی به لایتنینگ,کابل و تبدیل,iPhone 14 / 13 / 12,طوسی,95000,80\r\n";
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "Zupit_Products_Sample_Template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("فایل اکسل نمونه با موفقیت دانلود شد.");
+  };
+
+  // Function to parse uploaded CSV / Excel file
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset feedback
+    setBulkFeedback(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        if (!text) {
+          setBulkFeedback({
+            type: "error",
+            message: "فایل بارگذاری شده خالی است.",
+          });
+          return;
+        }
+
+        // Clean UTF-8 BOM and split lines
+        const cleanText = text.replace(/^\uFEFF/, "");
+        const lines = cleanText
+          .split(/\r\n|\n|\r/)
+          .map((l) => l.trim())
+          .filter((l) => l.length > 0);
+
+        if (lines.length <= 1) {
+          setBulkFeedback({
+            type: "error",
+            message: "فایل بارگذاری شده شامل ردیف اطلاعات محصول نیست یا فقط سطر عناوین دارد.",
+          });
+          return;
+        }
+
+        // Auto-detect delimiter: comma, semicolon, tab
+        const header = lines[0];
+        let delimiter = ",";
+        if (header.includes(";") && !header.includes(",")) delimiter = ";";
+        else if (header.includes("\t") && !header.includes(",")) delimiter = "\t";
+
+        const parsedList: any[] = [];
+        const errors: string[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const rowNum = i + 1;
+          const line = lines[i];
+
+          // Parse CSV line with quotes support
+          const regex = new RegExp(`(?:^|${delimiter})(?:"([^"]*)"|([^${delimiter}]*))`, "g");
+          const cols: string[] = [];
+          let match;
+          while ((match = regex.exec(line)) !== null) {
+            cols.push((match[1] !== undefined ? match[1] : match[2] || "").trim());
+          }
+
+          const finalCols = cols.length >= 2 ? cols : line.split(delimiter).map((c) => c.trim().replace(/^"|"$/g, ""));
+          if (finalCols.length < 2 || finalCols.every((c) => !c)) continue; // skip blank rows
+
+          // Expected columns:
+          // Column A: نام محصول (Required)
+          // Column B: دسته‌بندی (Required)
+          // Column C: مدل گوشی (Optional)
+          // Column D: رنگ (Optional)
+          // Column E: قیمت عمده (Required)
+          // Column F: موجودی (Required)
+          const name = (finalCols[0] || "").trim();
+          const category = (finalCols[1] || "").trim();
+          const phoneModel = (finalCols[2] || "").trim();
+          const color = (finalCols[3] || "").trim();
+          const rawPrice = toEnglishDigits(finalCols[4] || "");
+          const rawStock = toEnglishDigits(finalCols[5] || "");
+
+          const wholesalePrice = parseFloat(rawPrice.replace(/[,]/g, ""));
+          const stock = parseInt(rawStock.replace(/[,]/g, ""));
+
+          if (!name) {
+            errors.push(`ردیف ${rowNum}: نام محصول الزامی است و خالی می‌باشد.`);
+            continue;
+          }
+          if (!category) {
+            errors.push(`ردیف ${rowNum} (${name}): فیلد دسته‌بندی الزامی است.`);
+            continue;
+          }
+          if (isNaN(wholesalePrice) || wholesalePrice <= 0) {
+            errors.push(`ردیف ${rowNum} (${name}): فیلد قیمت عمده نامعتبر یا خالی است.`);
+            continue;
+          }
+          if (isNaN(stock) || stock < 0) {
+            errors.push(`ردیف ${rowNum} (${name}): فیلد موجودی نامعتبر یا خالی است.`);
+            continue;
+          }
+
+          parsedList.push({
+            rowNum,
+            name,
+            category,
+            phoneModel,
+            color,
+            wholesalePrice,
+            stock,
+          });
+        }
+
+        if (errors.length > 0 && parsedList.length === 0) {
+          setBulkFeedback({
+            type: "error",
+            message: `خطا در پردازش فایل اکسل: هیچ ردیف معتبری یافت نشد.`,
+            details: errors,
+          });
+          return;
+        }
+
+        if (errors.length > 0) {
+          setBulkFeedback({
+            type: "error",
+            message: `تعداد ${errors.length} ردیف دارای نقص اطلاعاتی بودند:`,
+            details: errors,
+          });
+        }
+
+        setPreviewProducts(parsedList);
+        setShowBulkPreviewModal(true);
+      } catch (err: any) {
+        setBulkFeedback({
+          type: "error",
+          message: "خطا در خواندن فایل. لطفاً از قالب استاندارد اکسل/CSV استفاده نمایید.",
+        });
+      } finally {
+        if (e.target) e.target.value = "";
+      }
+    };
+
+    reader.readAsText(file, "UTF-8");
+  };
+
+  // Submit parsed bulk products to server
+  const handleConfirmBulkUpload = async () => {
+    if (previewProducts.length === 0) return;
+    setIsBulkImporting(true);
+    setBulkFeedback(null);
+
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/supplier/products/bulk", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ products: previewProducts }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShowBulkPreviewModal(false);
+        setPreviewProducts([]);
+        const successText = `تعداد ${data.count} محصول با موفقیت به سیستم اضافه شد.`;
+        setBulkFeedback({
+          type: "success",
+          message: successText,
+        });
+        toast.success(successText);
+        if (showNotification) showNotification(successText, "success");
+        if (onSuccess) {
+          setTimeout(() => {
+            onSuccess();
+          }, 1800);
+        }
+      } else {
+        const errorList = Array.isArray(data.errors)
+          ? data.errors.map((e: any) => `ردیف ${e.row} (${e.name}): ${e.error}`)
+          : [];
+        setBulkFeedback({
+          type: "error",
+          message: data.error || "خطا در ثبت دسته‌جمعی محصولات",
+          details: errorList.length > 0 ? errorList : undefined,
+        });
+        toast.error("خطا در ثبت برخی محصولات فایل اکسل");
+      }
+    } catch (err) {
+      setBulkFeedback({
+        type: "error",
+        message: "خطا در برقراری ارتباط با سرور جهت ثبت دسته‌جمعی.",
+      });
+      toast.error("خطا در ارتباط با سرور");
+    } finally {
+      setIsBulkImporting(false);
+    }
+  };
   const [categories, setCategories] = useState<any[]>([
     { id: 1, name: "موبایل" },
     { id: 2, name: "لپ‌تاپ" },
@@ -321,14 +553,161 @@ export function SupplierAddProduct({
   return (
     <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in max-w-4xl mx-auto my-8">
       
-      <div className="bg-background border-b border-subtle p-6">
-        <h2 className="text-xl font-bold text-primary">
-          {initialData?.id ? "ویرایش محصول" : "افزودن محصول جدید"}
-        </h2>
-        <p className="text-sm text-secondary mt-1">
-          تمام اطلاعات محصول خود را در یک فرم یکپارچه وارد کنید
-        </p>
+      <div className="bg-background border-b border-subtle p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-primary">
+            {initialData?.id ? "ویرایش محصول" : "افزودن محصول جدید"}
+          </h2>
+          <p className="text-xs text-secondary mt-1">
+            تمام اطلاعات محصول خود را در این فرم وارد نمایید
+          </p>
+        </div>
+
+        {/* Compact Excel Import Tool in Header */}
+        {!initialData?.id && (
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+            />
+            
+            <button
+              type="button"
+              onClick={handleDownloadSampleCsv}
+              title="دانلود فایل اکسل نمونه"
+              className="px-3 py-2 bg-surface hover:bg-border-subtle text-text-secondary hover:text-text-primary border border-border-default rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Download className="w-3.5 h-3.5 text-primary-default" />
+              <span>فایل اکسل نمونه</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3.5 py-2 bg-primary-default hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-primary-default/20 cursor-pointer"
+            >
+              <FileUp className="w-3.5 h-3.5" />
+              <span>ورود دسته‌جمعی با اکسل</span>
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Success / Error Feedback Alert Bar if any */}
+      {bulkFeedback && (
+        <div className="mx-6 mt-4 p-3.5 rounded-xl border text-xs font-bold transition-all bg-surface border-border-default">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {bulkFeedback.type === "success" ? (
+                <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-danger shrink-0" />
+              )}
+              <span className={bulkFeedback.type === "success" ? "text-success font-black text-xs" : "text-danger font-black text-xs"}>
+                {bulkFeedback.message}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBulkFeedback(null)}
+              className="text-text-muted hover:text-text-primary p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {bulkFeedback.details && bulkFeedback.details.length > 0 && (
+            <ul className="mt-2 mr-6 list-disc space-y-1 text-[11px] font-bold text-danger">
+              {bulkFeedback.details.slice(0, 5).map((err, idx) => (
+                <li key={idx}>{err}</li>
+              ))}
+              {bulkFeedback.details.length > 5 && (
+                <li>و {bulkFeedback.details.length - 5} ردیف دیگر...</li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Bulk Upload Preview Modal */}
+      {showBulkPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-3xl w-full shadow-2xl space-y-5 animate-scale-up text-slate-900 dark:text-white" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-base font-black text-slate-950 dark:text-white">
+                  پیش‌نمایش محصولات استخراج‌شده از اکسل ({previewProducts.length} محصول)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkPreviewModal(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-slate-100 dark:bg-slate-800 font-extrabold text-slate-700 dark:text-slate-300 sticky top-0">
+                  <tr>
+                    <th className="p-3">ردیف</th>
+                    <th className="p-3">نام محصول</th>
+                    <th className="p-3">دسته‌بندی</th>
+                    <th className="p-3">مدل گوشی</th>
+                    <th className="p-3">رنگ</th>
+                    <th className="p-3">قیمت عمده (تومان)</th>
+                    <th className="p-3">موجودی</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {previewProducts.map((p, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <td className="p-3 font-mono">{p.rowNum || idx + 1}</td>
+                      <td className="p-3 font-bold text-slate-950 dark:text-white">{p.name}</td>
+                      <td className="p-3">{p.category}</td>
+                      <td className="p-3">{p.phoneModel || "-"}</td>
+                      <td className="p-3">{p.color || "-"}</td>
+                      <td className="p-3 font-black text-emerald-600 dark:text-emerald-400">
+                        {Number(p.wholesalePrice).toLocaleString("fa-IR")}
+                      </td>
+                      <td className="p-3 font-bold">{p.stock}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+              <span className="text-xs text-slate-500 font-bold">
+                تمام این اقلام با وضعیت اولیه ثبت و پس از تایید در سیستم فعال خواهند شد.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkPreviewModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="button"
+                  disabled={isBulkImporting}
+                  onClick={handleConfirmBulkUpload}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isBulkImporting ? "در حال ثبت اقلام..." : `تایید و افزودن ${previewProducts.length} محصول`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="p-8 space-y-12 min-h-[400px]">
         

@@ -216,9 +216,9 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
     <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 text-zinc-800 font-sans shadow-sm" dir="rtl" id="order-timeline-container">
       {/* Stuck warning banner */}
       {isStuck && (
-        <div className="mb-4 flex items-center gap-2.5 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl animate-pulse text-xs">
+        <div className="mb-4 flex items-center gap-2.5 p-3.5 bg-slate-100 border border-slate-300 text-slate-950 rounded-xl text-xs">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-600" />
-          <div className="font-semibold">
+          <div className="font-extrabold">
             این سفارش بیش از ۱۲ ساعت در انتظار تایید است.
           </div>
         </div>

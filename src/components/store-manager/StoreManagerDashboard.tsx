@@ -295,16 +295,23 @@ export default function StoreManagerDashboard({
 
   useEffect(() => {
     fetch("/api/config")
-      .then((r) => r.json())
-      .then(setSysConfig);
+      .then((r) => {
+        if (!r.ok || !r.headers.get("content-type")?.includes("application/json")) return {};
+        return r.json();
+      })
+      .then(setSysConfig)
+      .catch((err) => console.error("Error fetching config:", err));
     fetch("/api/menus/STORE_MANAGER")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok || !r.headers.get("content-type")?.includes("application/json")) return [];
+        return r.json();
+      })
       .then((data) => {
         if (Array.isArray(data)) {
           setCustomMenu(data.filter((item: any) => !item.hidden));
         }
       })
-      .catch(console.error);
+      .catch((err) => console.error("Error fetching menus:", err));
     fetchData();
   }, [activeTab]);
 
@@ -678,7 +685,7 @@ export default function StoreManagerDashboard({
               className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 bg-primary-default text-inverse rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm cursor-pointer"
             >
               <Ticket className="w-4 h-4" />
-              <span>ارسال تیکت به مدیر کل</span>
+              <span>ارسال تیکت به پشتیبانی</span>
             </AppLink>
           </div>
           <button
