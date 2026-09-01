@@ -5674,6 +5674,42 @@ async function authenticateStoreApiKey(req: any, res: any, next: any) {
   }
 }
 
+// Plugin File Download Routes
+app.get('/zopit-woo-connector.zip', (req: any, res: any) => {
+  try {
+    const zipPath = path.join(process.cwd(), 'public', 'zopit-woo-connector.zip');
+    if (fs.existsSync(zipPath)) {
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', 'attachment; filename="zopit-woo-connector.zip"');
+      return res.sendFile(zipPath);
+    }
+    const phpPath = path.join(process.cwd(), 'public', 'zopit-woo-connector.php');
+    if (fs.existsSync(phpPath)) {
+      const phpContent = fs.readFileSync(phpPath, 'utf8');
+      const zip = new AdmZip();
+      zip.addFile('zopit-woo-connector/zopit-woo-connector.php', Buffer.from(phpContent, 'utf8'));
+      const buffer = zip.toBuffer();
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', 'attachment; filename="zopit-woo-connector.zip"');
+      return res.send(buffer);
+    }
+    res.status(404).send('فایل افزونه یافت نشد');
+  } catch (err: any) {
+    console.error('Error serving zip:', err);
+    res.status(500).send('خطا در دانلود فایل زیپ');
+  }
+});
+
+app.get('/zopit-woo-connector.php', (req: any, res: any) => {
+  const phpPath = path.join(process.cwd(), 'public', 'zopit-woo-connector.php');
+  if (fs.existsSync(phpPath)) {
+    res.setHeader('Content-Type', 'application/x-httpd-php');
+    res.setHeader('Content-Disposition', 'attachment; filename="zopit-woo-connector.php"');
+    return res.sendFile(phpPath);
+  }
+  res.status(404).send('فایل افزونه یافت نشد');
+});
+
 // API Endpoint 1: GET /api/v1/store/products
 // Returns published products with selling price calculated according to store manager's margin formula
 app.get('/api/v1/store/products', authenticateStoreApiKey, async (req: any, res: any) => {
@@ -5691,7 +5727,15 @@ app.get('/api/v1/store/products', authenticateStoreApiKey, async (req: any, res:
 
     const selections = await prisma.storeProductSelection.findMany({
       where: { storeId: storeManager.id },
-      select: { productId: true }
+      select: { productId: true, customPrice: true, customProfit: true }
+    });
+
+    const selectionMap = new Map<number, { customPrice: number | null; customProfit: number | null }>();
+    selections.forEach(s => {
+      selectionMap.set(s.productId, {
+        customPrice: (s as any).customPrice ?? null,
+        customProfit: (s as any).customProfit ?? null,
+      });
     });
 
     let productFilter: any = { status: 'PUBLISHED' };
@@ -5718,7 +5762,16 @@ app.get('/api/v1/store/products', authenticateStoreApiKey, async (req: any, res:
 
     const formattedProducts = products.map(p => {
       const basePrice = p.supplierBasePrice || 0;
-      const sellingPrice = calculateSellingPrice(basePrice);
+      const sel = selectionMap.get(p.id);
+
+      let sellingPrice = basePrice;
+      if (sel && sel.customPrice !== null && sel.customPrice !== undefined && sel.customPrice > 0) {
+        sellingPrice = sel.customPrice;
+      } else if (sel && sel.customProfit !== null && sel.customProfit !== undefined && sel.customProfit > 0) {
+        sellingPrice = basePrice + sel.customProfit;
+      } else {
+        sellingPrice = calculateSellingPrice(basePrice);
+      }
 
       return {
         id: p.id,
@@ -5734,7 +5787,14 @@ app.get('/api/v1/store/products', authenticateStoreApiKey, async (req: any, res:
         images: p.images.map(img => img.url),
         variants: p.variants.map(v => {
           const vBasePrice = v.supplierBasePrice || basePrice;
-          const vSellingPrice = calculateSellingPrice(vBasePrice);
+          let vSellingPrice = vBasePrice;
+          if (sel && sel.customPrice !== null && sel.customPrice !== undefined && sel.customPrice > 0) {
+            vSellingPrice = sel.customPrice;
+          } else if (sel && sel.customProfit !== null && sel.customProfit !== undefined && sel.customProfit > 0) {
+            vSellingPrice = vBasePrice + sel.customProfit;
+          } else {
+            vSellingPrice = calculateSellingPrice(vBasePrice);
+          }
           return {
             id: v.id,
             sku: v.sku || `ZOP-${p.id}-${v.id}`,

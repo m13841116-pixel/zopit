@@ -154,12 +154,12 @@ export default function StoreConnection({ showNotification }: { showNotification
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <a
-              href="/zopit-woo-connector.php"
-              download="zopit-woo-connector.php"
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-3 rounded-2xl transition-all shadow-lg flex items-center gap-2 text-xs md:text-sm border border-indigo-400/30"
+              href="/zopit-woo-connector.zip"
+              download="zopit-woo-connector.zip"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-3 rounded-2xl transition-all shadow-lg flex items-center gap-2 text-xs md:text-sm border border-emerald-400/30"
             >
               <Download className="w-4 h-4" />
-              <span>دانلود فایل افزونه ووکامرس</span>
+              <span>دانلود فایل زیپ افزونه (ZIP)</span>
             </a>
             <button
               onClick={() => setShowCodeModal(true)}
@@ -177,194 +177,110 @@ export default function StoreConnection({ showNotification }: { showNotification
           در حال بارگذاری تنظیمات اتصال...
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Section 1: API Key & Endpoints */}
-          <div className="bg-card border border-subtle rounded-3xl p-6 md:p-8 shadow-xl space-y-6 flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 border-b border-subtle pb-4">
+        <div className="space-y-8">
+          {/* Main Card: API Key & Endpoints & Guidance */}
+          <div className="bg-card border border-subtle rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-subtle pb-4">
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-xl flex items-center justify-center font-bold">
                   <Key className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-black text-primary">کلید اختصاصی API Key</h2>
-                  <p className="text-xs text-muted">احراز هویت درخواست‌های افزونه وردپرس با زوپیت</p>
+                  <h2 className="text-base font-black text-primary">کلید اختصاصی API Key و آدرس‌های اتوماتیک</h2>
+                  <p className="text-xs text-muted">احراز هویت درخواست‌های افزونه وردپرس با سرور زوپیت</p>
                 </div>
               </div>
 
+              <div className="bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
+                <Zap className="w-4 h-4 text-blue-500 shrink-0" />
+                <span>قیمت‌گذاری محصولات در بخش «زوپیتی من» مدیریت می‌شود</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* API Key Box */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-secondary">کلید فعال شما (API Key):</label>
-                {apiKey ? (
-                  <div className="flex items-center gap-2 bg-surface p-3 rounded-2xl border border-subtle dir-ltr">
-                    <span className="font-mono text-xs text-indigo-600 dark:text-indigo-400 font-bold truncate flex-1">
-                      {apiKey}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(apiKey, "key")}
-                      className="bg-card hover:bg-subtle p-2 rounded-xl border border-subtle text-secondary transition-all shrink-0"
-                      title="کپی کلید"
-                    >
-                      {copiedKey ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-2xl text-xs font-bold">
-                    هنوز کلید API تولید نکرده‌اید. روی دکمه زیر کلیک کنید.
-                  </div>
-                )}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-secondary">کلید فعال شما (API Key):</label>
+                  {apiKey ? (
+                    <div className="flex items-center gap-2 bg-surface p-3 rounded-2xl border border-subtle dir-ltr">
+                      <span className="font-mono text-xs text-indigo-600 dark:text-indigo-400 font-bold truncate flex-1">
+                        {apiKey}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(apiKey, "key")}
+                        className="bg-card hover:bg-subtle p-2 rounded-xl border border-subtle text-secondary transition-all shrink-0"
+                        title="کپی کلید"
+                      >
+                        {copiedKey ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-2xl text-xs font-bold">
+                      هنوز کلید API تولید نکرده‌اید. روی دکمه زیر کلیک کنید.
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={generatingKey}
+                  onClick={handleGenerateApiKey}
+                  className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-2xl transition-all text-xs flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${generatingKey ? "animate-spin" : ""}`} />
+                  <span>{apiKey ? "تولید مجدد کلید API جدید" : "تولید اولین کلید API"}</span>
+                </button>
               </div>
 
-              <button
-                type="button"
-                disabled={generatingKey}
-                onClick={handleGenerateApiKey}
-                className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-2xl transition-all text-xs flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${generatingKey ? "animate-spin" : ""}`} />
-                <span>{apiKey ? "تولید مجدد کلید API جدید" : "تولید اولین کلید API"}</span>
-              </button>
-
-              {/* Endpoints listing */}
-              <div className="pt-4 border-t border-subtle space-y-4">
-                <h3 className="text-xs font-black text-primary flex items-center gap-2">
-                  <ExternalLink className="w-4 h-4 text-indigo-500" />
-                  <span>آدرس‌های API اختصاصی ووکامرس (Endpoints):</span>
-                </h3>
-
-                {/* GET Products Endpoint */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-secondary">
-                    <span>۱. همگام‌سازی محصولات (GET):</span>
-                    <button
-                      onClick={() => copyToClipboard(productsEndpoint, "endpoint", "products")}
-                      className="text-indigo-500 hover:underline text-[11px] flex items-center gap-1"
-                    >
-                      {copiedEndpoint === "products" ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      <span>کپی لینک</span>
-                    </button>
-                  </div>
-                  <div className="bg-surface p-2.5 rounded-xl border border-subtle dir-ltr font-mono text-[11px] text-slate-700 dark:text-slate-300 truncate">
-                    {productsEndpoint}
+              {/* Endpoints listing with explanation */}
+              <div className="space-y-4">
+                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-3.5 text-xs text-indigo-600 dark:text-indigo-300 leading-relaxed font-bold flex items-start gap-2">
+                  <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-black block mb-0.5">توضیح آدرس‌های زیر:</span>
+                    نیازی به وارد کردن یا پر کردن دستی این آدرس‌ها توسط شما نیست! این ۲ آدرس به طور اتوماتیک توسط افزونه زوپیت در وردپرس فراخوانی می‌شوند. شما فقط آدرس دامنه سرور (https://zopit.ir) و کلید API بالا را در وردپرس وارد می‌کنید.
                   </div>
                 </div>
 
-                {/* POST Orders Endpoint */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-secondary">
-                    <span>۲. وب‌هوک ثبت سفارش (POST):</span>
-                    <button
-                      onClick={() => copyToClipboard(ordersEndpoint, "endpoint", "orders")}
-                      className="text-indigo-500 hover:underline text-[11px] flex items-center gap-1"
-                    >
-                      {copiedEndpoint === "orders" ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      <span>کپی لینک</span>
-                    </button>
+                <div className="space-y-3">
+                  {/* GET Products Endpoint */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-secondary">
+                      <span>۱. آدرس همگام‌سازی محصولات (GET):</span>
+                      <button
+                        onClick={() => copyToClipboard(productsEndpoint, "endpoint", "products")}
+                        className="text-indigo-500 hover:underline text-[11px] flex items-center gap-1"
+                      >
+                        {copiedEndpoint === "products" ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                        <span>کپی آدرس</span>
+                      </button>
+                    </div>
+                    <div className="bg-surface p-2.5 rounded-xl border border-subtle dir-ltr font-mono text-[11px] text-slate-700 dark:text-slate-300 truncate">
+                      {productsEndpoint}
+                    </div>
                   </div>
-                  <div className="bg-surface p-2.5 rounded-xl border border-subtle dir-ltr font-mono text-[11px] text-slate-700 dark:text-slate-300 truncate">
-                    {ordersEndpoint}
+
+                  {/* POST Orders Endpoint */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-secondary">
+                      <span>۲. آدرس وب‌هوک ثبت سفارشات (POST):</span>
+                      <button
+                        onClick={() => copyToClipboard(ordersEndpoint, "endpoint", "orders")}
+                        className="text-indigo-500 hover:underline text-[11px] flex items-center gap-1"
+                      >
+                        {copiedEndpoint === "orders" ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                        <span>کپی آدرس</span>
+                      </button>
+                    </div>
+                    <div className="bg-surface p-2.5 rounded-xl border border-subtle dir-ltr font-mono text-[11px] text-slate-700 dark:text-slate-300 truncate">
+                      {ordersEndpoint}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Section 2: Profit Margin Formula */}
-          <div className="bg-card border border-subtle rounded-3xl p-6 md:p-8 shadow-xl space-y-6 flex flex-col justify-between">
-            <form onSubmit={handleSaveProfitMargin} className="space-y-6">
-              <div className="flex items-center gap-3 border-b border-subtle pb-4">
-                <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center font-bold">
-                  <Calculator className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-black text-primary">تعیین فرمول سوددهی اختصاصی شما</h2>
-                  <p className="text-xs text-muted">سود شما به قیمت تامین‌کنندگان اضافه شده و در ووکامرس ثبت می‌شود</p>
-                </div>
-              </div>
-
-              {/* Margin Type Radio Select */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-secondary">نوع سوددهی روی کالاها:</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setProfitMarginType("percent")}
-                    className={`p-3.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      profitMarginType === "percent"
-                        ? "bg-indigo-500/10 border-indigo-500 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                        : "bg-surface border-subtle text-secondary hover:bg-subtle"
-                    }`}
-                  >
-                    <Percent className="w-4 h-4" />
-                    <span>درصدی (Percent)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setProfitMarginType("fixed")}
-                    className={`p-3.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      profitMarginType === "fixed"
-                        ? "bg-indigo-500/10 border-indigo-500 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                        : "bg-surface border-subtle text-secondary hover:bg-subtle"
-                    }`}
-                  >
-                    <DollarSign className="w-4 h-4" />
-                    <span>مبلغ ثابت (تومان)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Margin Value Input */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-secondary">
-                  {profitMarginType === "percent" ? "درصد سود (مثال: ۲۰ برای ۲۰ درصد):" : "مبلغ سود ثابت به تومان (مثال: ۵۰۰۰۰):"}
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    step={profitMarginType === "percent" ? "0.1" : "1000"}
-                    value={profitMarginValue}
-                    onChange={(e) => setProfitMarginValue(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="w-full bg-background border border-subtle rounded-2xl px-4 py-3 text-sm font-bold text-primary focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder={profitMarginType === "percent" ? "۲۰" : "۵۰۰۰۰"}
-                  />
-                  <span className="absolute left-4 top-3 text-xs font-bold text-muted">
-                    {profitMarginType === "percent" ? "%" : "تومان"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Live Preview Box */}
-              <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl space-y-2 text-xs">
-                <div className="font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>پیش‌نمایش فرمول سود شما:</span>
-                </div>
-                <div className="text-secondary leading-relaxed space-y-1">
-                  <div className="flex justify-between">
-                    <span>قیمت پایه تامین‌کننده:</span>
-                    <span className="font-bold">{sampleBasePrice.toLocaleString()} تومان</span>
-                  </div>
-                  <div className="flex justify-between text-indigo-600 dark:text-indigo-400 font-bold">
-                    <span>سود خالص شما:</span>
-                    <span>+{sampleProfit.toLocaleString()} تومان</span>
-                  </div>
-                  <div className="flex justify-between pt-1 border-t border-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-black text-sm">
-                    <span>قیمت نهایی درج در ووکامرس:</span>
-                    <span>{sampleSellingPrice.toLocaleString()} تومان</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={savingMargin}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-2xl transition-all text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
-              >
-                {savingMargin ? "در حال ذخیره..." : "ذخیره تنظیمات سوددهی"}
-              </button>
-            </form>
           </div>
         </div>
       )}

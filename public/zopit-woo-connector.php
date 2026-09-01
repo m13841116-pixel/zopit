@@ -139,7 +139,8 @@ class Zopit_Woo_Connector {
                 'X-API-KEY' => $api_key,
                 'Content-Type' => 'application/json'
             ),
-            'timeout' => 45
+            'timeout' => 60,
+            'sslverify' => false
         ));
 
         if (is_wp_error($response)) {
@@ -280,7 +281,8 @@ class Zopit_Woo_Connector {
                 'Content-Type' => 'application/json'
             ),
             'body' => json_encode($payload),
-            'timeout' => 30
+            'timeout' => 60,
+            'sslverify' => false
         ));
 
         delete_post_meta($order_id, '_zopit_syncing');
