@@ -63,7 +63,8 @@ import {
   Square,
   ArrowUpDown,
   CheckCheck,
-  Menu
+  Menu,
+  Play
 } from "lucide-react";
 import { EducationModal } from "../EducationModal";
 import { SupplierOnboardingWidget } from "./SupplierOnboardingWidget";
