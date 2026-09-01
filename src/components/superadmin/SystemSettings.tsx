@@ -49,12 +49,12 @@ import CodeEditor from "./CodeEditor";
 import SupplierPenaltyManagement from "./SupplierPenaltyManagement";
 
 interface SystemSettingsProps {
-  initialTab?: "core" | "supplier_rules" | "gateways" | "support" | "terms" | "code" | "woocommerce" | "logs" | "health" | "dev_tools";
+  initialTab?: "core" | "supplier_rules" | "gateways" | "support" | "terms" | "code" | "woocommerce" | "media_plugins" | "logs" | "health" | "dev_tools";
 }
 
 export default function SystemSettings({ initialTab = "core" }: SystemSettingsProps) {
   const [activeTab, setActiveTab] = useUrlQueryState<
-    "core" | "supplier_rules" | "gateways" | "support" | "terms" | "code" | "woocommerce" | "logs" | "health" | "dev_tools"
+    "core" | "supplier_rules" | "gateways" | "support" | "terms" | "code" | "woocommerce" | "media_plugins" | "logs" | "health" | "dev_tools"
   >("subtab", initialTab);
 
   useEffect(() => {
@@ -135,6 +135,14 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
     WOOCOMMERCE_CONSUMER_SECRET: "",
     WOOCOMMERCE_AUTO_IMPORT_ORDERS: false,
     WOOCOMMERCE_SYNC_INTERVAL_MINS: 15,
+
+    // Pro Plugins Package & 60-second Automation/Tutorial Videos
+    PRO_PLUGINS_PACKAGE_URL: "https://dl.zopit.ir/plugins/zopit-pro-plugins-pack.zip",
+    PRO_PLUGINS_PACKAGE_TITLE: "پکیج کامل افزونه‌های پریمیوم و کاربردی ووکامرس (حجم ۲۵۴ مگابایت)",
+    PRO_PLUGINS_PACKAGE_DESC: "شامل ۵۰+ افزونه ضروری امنیت، سئو پیشرفته، پیامک، درگاه زیبال، شتاب‌دهنده سرعت و قالب وودمارت با لایسنس مادام‌العمر",
+    STORE_AUTOMATION_VIDEO: "",
+    SUPPLIER_AUTOMATION_VIDEO: "",
+    AUTOMATION_VIDEO_THUMBNAIL: "",
   });
 
   const [loading, setLoading] = useState(true);
@@ -365,6 +373,7 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
             { id: "terms", label: "شرایط و قوانین", icon: FileText },
             { id: "code", label: "کدهای سفارشی", icon: Code },
             { id: "woocommerce", label: "اتصال ووکامرس", icon: ShoppingBag },
+            { id: "media_plugins", label: "پکیج افزونه‌ها و ویدیوهای آموزشی", icon: Video },
             { id: "logs", label: "لاگ‌های سیستم", icon: Activity },
             { id: "health", label: "سلامت سیستم", icon: ShieldCheck },
             { id: "dev_tools", label: "کد پلتفرم", icon: Code },
@@ -1376,6 +1385,164 @@ export default function SystemSettings({ initialTab = "core" }: SystemSettingsPr
                     {wcTesting ? "در حال تست..." : "تست اتصال به API ووکامرس"}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB MEDIA & PLUGINS PACKAGE */}
+      {activeTab === "media_plugins" && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Section 1: Pro Plugins Package */}
+          <div className="bg-card p-6 rounded-3xl border border-border shadow-xs space-y-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-border">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
+                <Paperclip className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-text-primary text-sm">
+                  لینک دانلود مستقیم پکیج افزونه‌ها (مخصوص کاربران پرو و پرو مکس)
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  فایل پکیج zip را در فضای ابری (مانند هاست دانلود، ArvanCloud، یا S3) آپلود کرده و لینک مستقیم آن را در این بخش قرار دهید.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-primary flex items-center gap-2">
+                  <span>لینک مستقیم دانلود فایل ZIP پکیج (روی هاست ابری) *</span>
+                </label>
+                <input
+                  type="url"
+                  value={config.PRO_PLUGINS_PACKAGE_URL || ""}
+                  onChange={(e) => handleInputChange("PRO_PLUGINS_PACKAGE_URL", e.target.value)}
+                  placeholder="https://dl.yourdomain.com/plugins/zopit-pro-plugins-254mb.zip"
+                  dir="ltr"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-mono focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                <p className="text-[11px] text-text-muted">
+                  به دلیل حجم ۲۵۴ مگابایتی (و احتمالا بیشتر در آینده)، فایل در فضای ابری شما میزبانی می‌شود و کاربر پرو با یک کلیک مستقیماً آن را دریافت می‌کند.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-text-primary">عنوان پکیج افزونه‌ها</label>
+                  <input
+                    type="text"
+                    value={config.PRO_PLUGINS_PACKAGE_TITLE || ""}
+                    onChange={(e) => handleInputChange("PRO_PLUGINS_PACKAGE_TITLE", e.target.value)}
+                    placeholder="پکیج کامل افزونه‌های کاربردی و وودمارت"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-text-primary">توضیحات و مشخصات پکیج (حجم و نسخه)</label>
+                  <input
+                    type="text"
+                    value={config.PRO_PLUGINS_PACKAGE_DESC || ""}
+                    onChange={(e) => handleInputChange("PRO_PLUGINS_PACKAGE_DESC", e.target.value)}
+                    placeholder="حجم فایل: ۲۵۴ مگابایت - شامل کامل‌ترین افزونه‌های ضروری"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => saveBulkSettings({
+                    PRO_PLUGINS_PACKAGE_URL: config.PRO_PLUGINS_PACKAGE_URL,
+                    PRO_PLUGINS_PACKAGE_TITLE: config.PRO_PLUGINS_PACKAGE_TITLE,
+                    PRO_PLUGINS_PACKAGE_DESC: config.PRO_PLUGINS_PACKAGE_DESC,
+                  }, "لینک و تنظیمات پکیج افزونه‌ها با موفقیت ذخیره شد.")}
+                  disabled={saving}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-xs"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>ذخیره تنظیمات پکیج افزونه‌ها</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: 60-second Automation & Tutorial Videos */}
+          <div className="bg-card p-6 rounded-3xl border border-border shadow-xs space-y-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-border">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center border border-indigo-500/20">
+                <Video className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-text-primary text-sm">
+                  ویدیوهای آموزش ۶۰ ثانیه‌ای (پخش مستقیم HTML5 در سایت)
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  لینک مستقیم فایل MP4 ویدیوهای ۶۰ ثانیه‌ای آموزش اتوماسیون را وارد کنید تا مستقیماً و بدون ورود به سایت‌های دیگر در درون سایت زوپیت پخش شوند.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-primary">
+                  لینک مستقیم MP4 ویدیو آموزش ۶۰ ثانیه‌ای مدیران فروشگاه *
+                </label>
+                <input
+                  type="url"
+                  value={config.STORE_AUTOMATION_VIDEO || ""}
+                  onChange={(e) => handleInputChange("STORE_AUTOMATION_VIDEO", e.target.value)}
+                  placeholder="https://dl.yourdomain.com/videos/store-60s-tutorial.mp4"
+                  dir="ltr"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-mono focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-primary">
+                  لینک مستقیم MP4 ویدیو آموزش ۶۰ ثانیه‌ای تأمین‌کنندگان *
+                </label>
+                <input
+                  type="url"
+                  value={config.SUPPLIER_AUTOMATION_VIDEO || ""}
+                  onChange={(e) => handleInputChange("SUPPLIER_AUTOMATION_VIDEO", e.target.value)}
+                  placeholder="https://dl.yourdomain.com/videos/supplier-60s-tutorial.mp4"
+                  dir="ltr"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-mono focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-primary">
+                  تصویر پوستر / کاور پیش‌نمایش ویدیوها (Poster Image URL)
+                </label>
+                <input
+                  type="url"
+                  value={config.AUTOMATION_VIDEO_THUMBNAIL || ""}
+                  onChange={(e) => handleInputChange("AUTOMATION_VIDEO_THUMBNAIL", e.target.value)}
+                  placeholder="https://yourdomain.com/images/video-cover.jpg"
+                  dir="ltr"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-mono focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => saveBulkSettings({
+                    STORE_AUTOMATION_VIDEO: config.STORE_AUTOMATION_VIDEO,
+                    SUPPLIER_AUTOMATION_VIDEO: config.SUPPLIER_AUTOMATION_VIDEO,
+                    AUTOMATION_VIDEO_THUMBNAIL: config.AUTOMATION_VIDEO_THUMBNAIL,
+                  }, "لینک‌های ویدیوهای آموزش ۶۰ ثانیه‌ای با موفقیت ذخیره شدند.")}
+                  disabled={saving}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-xs"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>ذخیره تنظیمات ویدیوها</span>
+                </button>
               </div>
             </div>
           </div>

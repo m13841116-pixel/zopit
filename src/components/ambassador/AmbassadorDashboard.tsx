@@ -9,6 +9,12 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
   const [wallet, setWallet] = useState({ balance: 0 });
   const [loading, setLoading] = useState(false);
 
+  // Phone Mismatch Modal State
+  const [selectedLeadForMismatch, setSelectedLeadForMismatch] = useState<any | null>(null);
+  const [mismatchNewPhone, setMismatchNewPhone] = useState("");
+  const [mismatchNotes, setMismatchNotes] = useState("");
+  const [submittingMismatch, setSubmittingMismatch] = useState(false);
+
   useEffect(() => {
     fetchLeads();
     fetchWallet();
@@ -58,7 +64,7 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
     }
   };
 
-  const updateLeadStatus = async (id: number, status: string) => {
+  const updateLeadStatus = async (id: number, status: string, leadObj?: any) => {
     try {
       const res = await fetch(`/api/ambassador/leads/${id}/status`, {
         method: "POST",
@@ -68,15 +74,53 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
         },
         body: JSON.stringify({ status })
       });
+      const data = await res.json();
       if (res.ok) {
         toast.success(status === "COMPLETED" ? "تبریک! جذب تامین‌کننده تایید نهایی و پورسانت به کیف پول شما اضافه شد." : "وضعیت مذاکره به‌روزرسانی شد.");
         fetchLeads();
         fetchWallet();
       } else {
-        toast.error("خطا در به‌روزرسانی وضعیت");
+        toast.error(data.error || "خطا در به‌روزرسانی وضعیت");
+        if (data.requiresPhoneVerification && leadObj) {
+          setSelectedLeadForMismatch(leadObj);
+          setMismatchNewPhone("");
+          setMismatchNotes("");
+        }
       }
     } catch (err) {
       toast.error("خطا در ارتباط با سرور");
+    }
+  };
+
+  const handleSendPhoneMismatchTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLeadForMismatch || !mismatchNewPhone) return;
+
+    setSubmittingMismatch(true);
+    try {
+      const res = await fetch(`/api/ambassador/leads/${selectedLeadForMismatch.id}/ticket-phone-mismatch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+          newPhone: mismatchNewPhone,
+          notes: mismatchNotes
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "تیکت استعلام با موفقیت ارسال شد.");
+        setSelectedLeadForMismatch(null);
+        fetchLeads();
+      } else {
+        toast.error(data.error || "خطا در ارسال تیکت استعلام");
+      }
+    } catch (err) {
+      toast.error("خطا در ارتباط با سرور");
+    } finally {
+      setSubmittingMismatch(false);
     }
   };
 
@@ -335,12 +379,20 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
 
                           {/* Contact Details for Ambassador */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                            <div className="flex items-center gap-2">
-                              <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                              <span className="text-slate-500 dark:text-slate-400">شماره تماس تامین‌کننده:</span>
-                              <a href={`tel:${lead.phone}`} className="font-mono font-bold text-slate-900 dark:text-white hover:text-emerald-600 dir-ltr text-right">
-                                {lead.phone}
-                              </a>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span className="text-slate-500 dark:text-slate-400">شماره اصلی تامین‌کننده:</span>
+                                <a href={`tel:${lead.phone}`} className="font-mono font-bold text-slate-900 dark:text-white hover:text-emerald-600 dir-ltr text-right">
+                                  {lead.phone}
+                                </a>
+                              </div>
+                              {lead.additionalPhones && (
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono pr-6" dir="ltr">
+                                  <span className="font-sans text-[10px] text-amber-600 dark:text-amber-400 font-bold ml-1">شماره‌های بیشتر:</span>
+                                  <span>{lead.additionalPhones}</span>
+                                </div>
+                              )}
                             </div>
 
                             {lead.address && (
@@ -366,11 +418,23 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
                               )}
 
                               <button
-                                onClick={() => updateLeadStatus(lead.id, "COMPLETED")}
+                                onClick={() => updateLeadStatus(lead.id, "COMPLETED", lead)}
                                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-emerald-600/20 cursor-pointer flex items-center gap-1.5"
                               >
                                 <CheckCircle className="w-3.5 h-3.5" />
                                 <span>تایید هماهنگی و ثبت جذب موفق (دریافت پاداش)</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setSelectedLeadForMismatch(lead);
+                                  setMismatchNewPhone("");
+                                  setMismatchNotes("");
+                                }}
+                                className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-amber-500/10 hover:text-amber-600 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>شماره تماس متفاوت ثبت شده؟</span>
                               </button>
                             </div>
                           )}
@@ -404,6 +468,77 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
           )}
         </main>
       </div>
+
+      {/* Phone Mismatch Inquiry Modal */}
+      {selectedLeadForMismatch && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2 text-amber-500">
+                <AlertCircle className="w-5 h-5" />
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">استعلام تغییر شماره تامین‌کننده</h3>
+              </div>
+              <button
+                onClick={() => setSelectedLeadForMismatch(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+              >
+                انصراف
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              اگر تامین‌کننده محترم «<strong className="text-slate-900 dark:text-white">{selectedLeadForMismatch.name}</strong>» با شماره‌ای غیر از شماره ثبت‌شده اولیه در پرونده ({selectedLeadForMismatch.phone}) در زوپیت ثبت‌نام کرده است، شماره جدید او را وارد کنید تا تیکت استعلام فوری برای مدیریت ارسال شود.
+            </p>
+
+            <form onSubmit={handleSendPhoneMismatchTicket} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                  شماره جدیدی که تامین‌کننده با آن ثبت‌نام کرده است *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="09123456789"
+                  value={mismatchNewPhone}
+                  onChange={(e) => setMismatchNewPhone(e.target.value)}
+                  dir="ltr"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 dark:text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                  توضیحات تکمیلی (اختیاری)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="مثلا: تامین‌کننده با شماره شخصی/مغازه ثبت‌نام کرده است..."
+                  value={mismatchNotes}
+                  onChange={(e) => setMismatchNotes(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:border-amber-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLeadForMismatch(null)}
+                  className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingMismatch || !mismatchNewPhone}
+                  className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {submittingMismatch ? "در حال ارسال تیکت..." : "ارسال تیکت استعلام شماره"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

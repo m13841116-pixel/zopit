@@ -31,21 +31,32 @@ export const SupplierOnboardingWidget: React.FC<SupplierOnboardingWidgetProps> =
   showNotification,
   onGoToSettings
 }) => {
-  // Determine completion statuses
+  // Determine completion statuses - If shaba is filled once, do not show onboarding
+  const [isDismissed, setIsDismissed] = useState<boolean>(() => {
+    if (!user?.id) return false;
+    return localStorage.getItem(`dismissed_onboarding_${user.id}`) === "true";
+  });
+
   const hasBankInfo = Boolean(
-    user?.shaba && 
-    user.shaba.replace(/\s/g, '').length >= 24 &&
-    user?.accountHolderName
+    (user?.shaba && user.shaba.replace(/\D/g, '').length >= 16) ||
+    (user?.shebaNumber && user.shebaNumber.replace(/\D/g, '').length >= 16) ||
+    (user?.cardNumber && user.cardNumber.replace(/\D/g, '').length >= 16)
   );
 
   const hasAddressInfo = Boolean(
     user?.address && 
-    user.address.trim().length >= 5 &&
-    (user?.postalCode || user?.telephone)
+    user.address.trim().length >= 3
   );
 
-  // If both are completely fulfilled, the onboarding widget is dismissed
-  const isFullyCompleted = hasBankInfo && hasAddressInfo;
+  const handleDismiss = () => {
+    if (user?.id) {
+      localStorage.setItem(`dismissed_onboarding_${user.id}`, "true");
+    }
+    setIsDismissed(true);
+  };
+
+  // If bank info is already provided (or both fulfilled or dismissed), the widget is not displayed
+  const isFullyCompleted = hasBankInfo || isDismissed;
 
   // Active step in the accordion: "bank" | "address" | null
   const [activeStep, setActiveStep] = useState<"bank" | "address" | null>(
@@ -228,12 +239,22 @@ export const SupplierOnboardingWidget: React.FC<SupplierOnboardingWidgetProps> =
             </div>
           </div>
 
-          {/* Progress Bar Display */}
-          <div className="w-full sm:w-48 bg-slate-100 dark:bg-slate-800 rounded-full h-3 p-0.5 overflow-hidden border border-slate-200 dark:border-slate-700">
-            <div 
-              className="bg-gradient-to-r from-amber-500 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-700 shadow-sm"
-              style={{ width: `${completionPercentage}%` }}
-            ></div>
+          {/* Progress Bar Display and Close Button */}
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="w-full sm:w-40 bg-slate-100 dark:bg-slate-800 rounded-full h-3 p-0.5 overflow-hidden border border-slate-200 dark:border-slate-700">
+              <div 
+                className="bg-gradient-to-r from-amber-500 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-700 shadow-sm"
+                style={{ width: `${completionPercentage}%` }}
+              ></div>
+            </div>
+            <button
+              type="button"
+              onClick={handleDismiss}
+              title="بستن این کادر"
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 

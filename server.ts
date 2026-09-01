@@ -1368,6 +1368,9 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "brandName" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "nationalCode" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "address" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "apiKey" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profitMarginType" TEXT DEFAULT 'percent';`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profitMarginValue" DOUBLE PRECISION DEFAULT 0;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'ACTIVE';`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "mobile" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "email" TEXT;`,
@@ -1474,7 +1477,10 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "maxUses" INTEGER;`,
       `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "usedCount" INTEGER DEFAULT 0;`,
       `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "expiryDate" TIMESTAMP;`,
-      `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true;`
+      `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true;`,
+
+      // Lead table columns
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "additionalPhones" TEXT;`
     ];
 
     for (const sql of postgresStatements) {
@@ -3858,41 +3864,8 @@ app.post('/api/supplier/orders/ship-batch', authenticateToken, requireSupplier, 
         data: { status: 'SHIPPED' }
       });
       
+      // Order item status updated to SHIPPED. Inventory is already deducted at payment time.
       updatedItems = items;
-
-      // Automatically deduct product and variant inventory for each shipped item
-      for (const item of items) {
-        if (item.status !== 'SHIPPED' && item.status !== 'DELIVERED') {
-          if (item.productId) {
-            try {
-              await tx.product.update({
-                where: { id: item.productId },
-                data: {
-                  inventory: {
-                    decrement: item.quantity || 1
-                  }
-                }
-              });
-            } catch (invErr) {
-              console.warn('Could not decrement product inventory:', item.productId, invErr);
-            }
-          }
-          if (item.variantId) {
-            try {
-              await tx.productVariant.update({
-                where: { id: item.variantId },
-                data: {
-                  stock: {
-                    decrement: item.quantity || 1
-                  }
-                }
-              });
-            } catch (varErr) {
-              console.warn('Could not decrement variant stock:', item.variantId, varErr);
-            }
-          }
-        }
-      }
       
       // Update parent order statuses
       const orderIds = Array.from(new Set(items.map(i => i.orderId)));
@@ -4090,36 +4063,7 @@ app.patch('/api/supplier/orders/:itemId', authenticateToken, requireSupplier, as
     const wasStage5 = ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(item.status);
 
     if (isStage5 && !wasStage5) {
-      if (item.productId) {
-        try {
-          await prisma.product.update({
-            where: { id: item.productId },
-            data: {
-              inventory: {
-                decrement: item.quantity || 1
-              }
-            }
-          });
-        } catch (invErr) {
-          console.warn('Inventory decrement error:', invErr);
-        }
-      }
-
-      if (item.variantId) {
-        try {
-          await prisma.productVariant.update({
-            where: { id: item.variantId },
-            data: {
-              stock: {
-                decrement: item.quantity || 1
-              }
-            }
-          });
-        } catch (varErr) {
-          console.warn('Variant stock decrement error:', varErr);
-        }
-      }
-
+      // Inventory was already deducted when store manager paid the order.
       // Automatically credit supplier wallet on shipping if not already credited
       try {
         const existingTx = await prisma.supplierWalletTransaction.findFirst({
@@ -4201,7 +4145,10 @@ app.patch('/api/supplier/orders/:itemId', authenticateToken, requireSupplier, as
           const suppUser = await prisma.user.findUnique({ where: { id: req.user.userId } });
           notifySupplierCommitment(parentOrder.id, storeMobile, suppUser?.mobile).catch(console.error);
         }
-      } else if (status === 'REJECTED' || status === 'OUT_OF_STOCK') {
+      } else if (status === 'REJECTED' || status === 'OUT_OF_STOCK' || status === 'CANCELLED') {
+        // Automatically restore inventory back to product and variant stock
+        await restoreOrderItemInventory(prisma, item);
+
         // Calculate item base supplier cost
         const itemAmt = (item.supplierPrice || 0) * (item.quantity || 1);
         
@@ -5093,7 +5040,7 @@ app.get('/api/store-manager/daily-limit', authenticateToken, requireStoreManager
 app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
     const storeId = req.user.userId;
-    const { items: requestItems, productId, variantId, quantity, notes, shippingAddressType, shippingAddress, shippingMethod, postalLabel } = req.body;
+    const { items: requestItems, productId, variantId, quantity, notes, shippingAddressType, shippingAddress, shippingMethod, postalLabel, postalCode } = req.body;
 
     // Normalize input into an array of item requests
     let rawItems: Array<{ productId: number; variantId?: number | null; quantity?: number; notes?: string }> = [];
@@ -5217,19 +5164,7 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
       }
     });
 
-    // Deduct inventory dynamically immediately upon order creation
-    for (const i of groupItems) {
-      if (i.variantId) {
-        await prisma.productVariant.update({
-          where: { id: i.variantId },
-          data: { stock: { decrement: i.quantity } }
-        }).catch(console.error);
-      }
-      await prisma.product.update({
-        where: { id: i.product.id },
-        data: { inventory: { decrement: i.quantity } }
-      }).catch(console.error);
-    }
+    // Note: Inventory will be deducted when the order is paid by the store manager.
 
     // Notify supplier via SMS
     if (sId) {
@@ -5376,6 +5311,334 @@ app.post('/api/store-manager/notifications/settings', authenticateToken, require
     res.json({ success: true, settings: req.body });
   } catch (err: any) {
     res.json({ success: true, settings: req.body });
+  }
+});
+
+// ==========================================
+// STORE MANAGER WOOCOMMERCE & API KEY SETTINGS
+// ==========================================
+import crypto from 'crypto';
+
+// 1. Get Store Manager API Settings (API Key & Profit Margin)
+app.get('/api/store-manager/settings', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        apiKey: true,
+        profitMarginType: true,
+        profitMarginValue: true,
+        storeName: true,
+        storeUrl: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'کاربر یافت نشد' });
+    }
+
+    res.json({
+      success: true,
+      apiKey: user.apiKey || null,
+      profitMarginType: user.profitMarginType || 'percent',
+      profitMarginValue: user.profitMarginValue ?? 0,
+      storeName: user.storeName || '',
+      storeUrl: user.storeUrl || ''
+    });
+  } catch (err: any) {
+    console.error('Error fetching store settings:', err);
+    res.status(500).json({ success: false, error: 'خطا در دریافت تنظیمات' });
+  }
+});
+
+// 2. Generate / Regenerate API Key for Store Manager
+app.post('/api/store-manager/api-key/generate', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const newApiKey = 'zop_live_' + crypto.randomBytes(16).toString('hex');
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { apiKey: newApiKey }
+    });
+
+    res.json({
+      success: true,
+      message: 'کلید API جدید با موفقیت تولید شد',
+      apiKey: updatedUser.apiKey
+    });
+  } catch (err: any) {
+    console.error('Error generating API Key:', err);
+    res.status(500).json({ success: false, error: 'خطا در تولید کلید API' });
+  }
+});
+
+// 3. Update Profit Margin Settings (Percent / Fixed)
+app.put('/api/store-manager/profit-margin', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { profitMarginType, profitMarginValue } = req.body;
+
+    if (!['percent', 'fixed'].includes(profitMarginType)) {
+      return res.status(400).json({ success: false, error: 'نوع سود غیرمجاز است. باید percent یا fixed باشد.' });
+    }
+
+    const val = parseFloat(profitMarginValue);
+    if (isNaN(val) || val < 0) {
+      return res.status(400).json({ success: false, error: 'مقدار سود باید یک عدد مثبت باشد.' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        profitMarginType,
+        profitMarginValue: val
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'تنظیمات سوددهی با موفقیت بروزرسانی شد',
+      profitMarginType: updatedUser.profitMarginType,
+      profitMarginValue: updatedUser.profitMarginValue
+    });
+  } catch (err: any) {
+    console.error('Error updating profit margin:', err);
+    res.status(500).json({ success: false, error: 'خطا در بروزرسانی تنظیمات سوددهی' });
+  }
+});
+
+// ==========================================
+// WOOCOMMERCE EXTERNAL API (v1) & MIDDLEWARE
+// ==========================================
+
+async function authenticateStoreApiKey(req: any, res: any, next: any) {
+  try {
+    const apiKey = (
+      req.headers['x-api-key'] ||
+      req.headers['api_key'] ||
+      req.headers['api-key'] ||
+      (req.headers['authorization']?.startsWith('Bearer ') ? req.headers['authorization'].split(' ')[1] : null) ||
+      req.query.api_key ||
+      req.body.api_key
+    );
+
+    if (!apiKey) {
+      return res.status(401).json({
+        success: false,
+        error: 'کلید API ارسال نشده است (Unauthorized). لطفا کلید را در هدر X-API-KEY یا پارامتر api_key قرار دهید.'
+      });
+    }
+
+    const storeManager = await prisma.user.findFirst({
+      where: { apiKey: String(apiKey).trim() }
+    });
+
+    if (!storeManager) {
+      return res.status(401).json({
+        success: false,
+        error: 'کلید API نامعتبر است یا حساب مدیر فروشگاه مربوطه فعال نیست.'
+      });
+    }
+
+    req.storeManager = storeManager;
+    req.user = storeManager;
+    next();
+  } catch (err: any) {
+    console.error('Error in authenticateStoreApiKey:', err);
+    res.status(500).json({ success: false, error: 'خطا در احراز هویت کلید API' });
+  }
+}
+
+// API Endpoint 1: GET /api/v1/store/products
+// Returns published products with selling price calculated according to store manager's margin formula
+app.get('/api/v1/store/products', authenticateStoreApiKey, async (req: any, res: any) => {
+  try {
+    const storeManager = req.storeManager;
+    const marginType = storeManager.profitMarginType || 'percent';
+    const marginVal = Number(storeManager.profitMarginValue || 0);
+
+    function calculateSellingPrice(supplierBasePrice: number) {
+      if (marginType === 'fixed') {
+        return Math.round(supplierBasePrice + marginVal);
+      }
+      return Math.round(supplierBasePrice + (supplierBasePrice * (marginVal / 100)));
+    }
+
+    const selections = await prisma.storeProductSelection.findMany({
+      where: { storeId: storeManager.id },
+      select: { productId: true }
+    });
+
+    let productFilter: any = { status: 'PUBLISHED' };
+    if (selections.length > 0) {
+      const selectedIds = selections.map(s => s.productId);
+      productFilter = {
+        id: { in: selectedIds },
+        status: 'PUBLISHED'
+      };
+    }
+
+    const products = await prisma.product.findMany({
+      where: productFilter,
+      include: {
+        category: true,
+        images: true,
+        variants: true,
+        supplier: {
+          select: { brandName: true, firstName: true, lastName: true }
+        }
+      },
+      orderBy: { id: 'desc' }
+    });
+
+    const formattedProducts = products.map(p => {
+      const basePrice = p.supplierBasePrice || 0;
+      const sellingPrice = calculateSellingPrice(basePrice);
+
+      return {
+        id: p.id,
+        name: p.name,
+        sku: p.sku || `ZOP-${p.id}`,
+        shortDescription: p.shortDescription || '',
+        longDescription: p.longDescription || '',
+        category: p.category?.name || 'عمومی',
+        supplierBrand: p.supplier?.brandName || `${p.supplier?.firstName || ''} ${p.supplier?.lastName || ''}`.trim() || 'تامین‌کننده زوپیت',
+        supplierBasePrice: basePrice,
+        price: sellingPrice,
+        inventory: p.inventory,
+        images: p.images.map(img => img.url),
+        variants: p.variants.map(v => {
+          const vBasePrice = v.supplierBasePrice || basePrice;
+          const vSellingPrice = calculateSellingPrice(vBasePrice);
+          return {
+            id: v.id,
+            sku: v.sku || `ZOP-${p.id}-${v.id}`,
+            attributes: v.attributes,
+            supplierBasePrice: vBasePrice,
+            price: vSellingPrice,
+            stock: v.stock
+          };
+        })
+      };
+    });
+
+    res.json({
+      success: true,
+      storeName: storeManager.storeName || storeManager.username,
+      profitMargin: {
+        type: marginType,
+        value: marginVal
+      },
+      count: formattedProducts.length,
+      products: formattedProducts
+    });
+  } catch (err: any) {
+    console.error('Error fetching v1 store products:', err);
+    res.status(500).json({ success: false, error: 'خطا در دریافت لیست کالاها' });
+  }
+});
+
+// API Endpoint 2: POST /api/v1/store/orders (Webhook from WooCommerce)
+// Secures price calculation by strictly looking up product & supplier base price in Zopit database
+app.post('/api/v1/store/orders', authenticateStoreApiKey, async (req: any, res: any) => {
+  try {
+    const storeManager = req.storeManager;
+    const { woo_order_id, items: requestItems, product_id, variant_id, quantity, customer, shipping_method } = req.body;
+
+    let rawItems: Array<{ product_id: number; variant_id?: number; quantity?: number }> = [];
+    if (Array.isArray(requestItems) && requestItems.length > 0) {
+      rawItems = requestItems;
+    } else if (product_id) {
+      rawItems = [{ product_id: Number(product_id), variant_id: variant_id ? Number(variant_id) : undefined, quantity: Number(quantity || 1) }];
+    }
+
+    if (rawItems.length === 0) {
+      return res.status(400).json({ success: false, error: 'هیچ آیتمی در درخواست یافت نشد. product_id یا items الزامی است.' });
+    }
+
+    if (!customer || !customer.name || !customer.mobile || !customer.address) {
+      return res.status(400).json({ success: false, error: 'اطلاعات گیرنده (نام، شماره تماس و آدرس) الزامی است.' });
+    }
+
+    let totalBaseAmount = 0;
+    const itemsToCreate: any[] = [];
+
+    for (const rawItem of rawItems) {
+      const pId = Number(rawItem.product_id);
+      const vId = rawItem.variant_id ? Number(rawItem.variant_id) : null;
+      const qty = Math.max(1, Number(rawItem.quantity || 1));
+
+      const product = await prisma.product.findUnique({
+        where: { id: pId },
+        include: { variants: true }
+      });
+
+      if (!product) {
+        return res.status(404).json({ success: false, error: `محصولی با شناسه ${pId} در بانک اطلاعاتی زوپیت یافت نشد.` });
+      }
+
+      let variantObj: any = null;
+      if (vId) {
+        variantObj = product.variants.find(v => v.id === vId);
+      }
+
+      // STRICT HOLE CLOSING: Always read supplier base price from Zopit DB
+      const baseSupplierPrice = variantObj ? variantObj.supplierBasePrice : product.supplierBasePrice;
+      const itemCost = baseSupplierPrice * qty;
+      totalBaseAmount += itemCost;
+
+      itemsToCreate.push({
+        supplierId: product.supplierId,
+        productId: product.id,
+        variantId: variantObj ? variantObj.id : null,
+        quantity: qty,
+        price: baseSupplierPrice,
+        supplierPrice: baseSupplierPrice,
+        status: 'PENDING',
+        notes: `سفارش ووکامرس شماره #${woo_order_id || 'API'}`
+      });
+    }
+
+    const shippingFee = 45000;
+    const grandTotal = totalBaseAmount + shippingFee;
+
+    const newOrder = await prisma.order.create({
+      data: {
+        storeId: storeManager.id,
+        totalAmount: grandTotal,
+        shippingFee: shippingFee,
+        status: 'REQUESTED',
+        shippingAddressType: 'OTHER_ADDRESS',
+        shippingAddress: `${customer.province || ''} - ${customer.city || ''} - ${customer.address}`,
+        postalCode: customer.postal_code || customer.postalCode || '',
+        orderSource: `ووکامرس (${woo_order_id ? '#' + woo_order_id : 'API'})`,
+        customerName: customer.name,
+        customerPhone: customer.mobile,
+        customerAddress: customer.address,
+        shippingMethod: shipping_method || 'POST',
+        items: {
+          create: itemsToCreate
+        }
+      },
+      include: { items: true }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'سفارش با موفقیت در زوپیت ثبت شد و در انتظار پرداخت مدیر فروشگاه قرار گرفت.',
+      zopitOrderId: newOrder.id,
+      wooOrderId: woo_order_id || null,
+      supplierBaseTotal: totalBaseAmount,
+      shippingFee: shippingFee,
+      totalAmountToPayInZopit: grandTotal,
+      status: 'REQUESTED'
+    });
+  } catch (err: any) {
+    console.error('Error creating order from WooCommerce API:', err);
+    res.status(500).json({ success: false, error: 'خطا در ثبت سفارش از طریق ووکامرس', details: err.message });
   }
 });
 
@@ -5556,6 +5819,77 @@ app.put('/api/store-manager/orders/:id/shipping', authenticateToken, requireStor
     res.status(500).json({ error: 'خطا در ثبت مشخصات پستی سفارش: ' + err.message });
   }
 });
+
+// Helper to deduct product & variant inventory immediately when order is paid by store manager
+async function deductOrderInventory(tx: any, orders: any[]) {
+  try {
+    for (const o of orders) {
+      const orderItems = await tx.orderItem.findMany({
+        where: { orderId: o.id },
+        include: { product: true }
+      });
+
+      for (const item of orderItems) {
+        const qty = item.quantity || 1;
+        if (item.variantId) {
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { decrement: qty } }
+          }).catch((err: any) => console.warn(`Error decrementing variant stock ${item.variantId}:`, err.message));
+        }
+        if (item.productId) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { inventory: { decrement: qty } }
+          }).catch((err: any) => console.warn(`Error decrementing product inventory ${item.productId}:`, err.message));
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('Error in deductOrderInventory:', err.message);
+  }
+}
+
+// Helper to restore inventory when an order item is cancelled or rejected
+async function restoreOrderItemInventory(tx: any, item: any) {
+  try {
+    if (!item) return;
+    const qty = item.quantity || 1;
+    if (item.variantId) {
+      await tx.productVariant.update({
+        where: { id: item.variantId },
+        data: { stock: { increment: qty } }
+      }).catch((err: any) => console.warn(`Error incrementing variant stock ${item.variantId}:`, err.message));
+    }
+    if (item.productId) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { inventory: { increment: qty } }
+      }).catch((err: any) => console.warn(`Error incrementing product inventory ${item.productId}:`, err.message));
+    }
+  } catch (err: any) {
+    console.error('Error restoring order item inventory:', err.message);
+  }
+}
+
+// Helper to restore inventory when an entire order is cancelled or rejected
+async function restoreOrderInventory(tx: any, orderOrOrders: any) {
+  try {
+    const ordersList = Array.isArray(orderOrOrders) ? orderOrOrders : [orderOrOrders];
+    for (const o of ordersList) {
+      const orderId = typeof o === 'number' ? o : o?.id;
+      if (!orderId) continue;
+      const items = await tx.orderItem.findMany({
+        where: { orderId }
+      });
+      for (const item of items) {
+        await restoreOrderItemInventory(tx, item);
+      }
+    }
+  } catch (err: any) {
+    console.error('Error restoring order inventory:', err.message);
+  }
+}
 
 // Helper to credit supplier wallets for paid orders (base cost without mark-up/profit)
 async function creditSuppliersForOrders(tx: any, orders: any[]) {
@@ -6226,8 +6560,8 @@ app.post('/api/admin/manual-invoices/:id/approve', authenticateToken, requireAdm
         });
       }
 
-      // Automatically charge supplier wallets for these paid orders
-      await creditSuppliersForOrders(tx, orders);
+      // Automatically deduct product/variant inventory for these paid orders
+      await deductOrderInventory(tx, orders);
     });
 
     res.json({ message: 'فیش واریزی با موفقیت تایید و سفارشات تسویه شدند.' });
@@ -6557,8 +6891,8 @@ app.get('/api/public/store-invoice/callback', async (req: any, res: any) => {
           }
         }
 
-        // Automatically credit supplier wallets for paid orders
-        await creditSuppliersForOrders(tx, invoice.orders);
+        // Automatically deduct product/variant inventory upon payment completion
+        await deductOrderInventory(tx, invoice.orders);
       });
       return res.redirect(`${baseUrl}/?payment_status=success&invoiceId=${invoiceId}&trackId=${resolvedTrackId}&refId=${refId}`);
     } else {
@@ -6623,8 +6957,8 @@ app.get('/api/public/store-invoice/pay-simulate', async (req: any, res: any) => 
         });
       }
 
-      // Automatically charge supplier wallets for these paid orders
-      await creditSuppliersForOrders(tx, orders);
+      // Automatically deduct product/variant inventory for these paid orders
+      await deductOrderInventory(tx, orders);
     });
 
     // Redirect to frontend with success parameters
@@ -8697,14 +9031,15 @@ app.patch('/api/admin/orders/:id/status', authenticateToken, requireAdmin, async
       data: dataToUpdate
     });
 
-    // Handle automated financial wallet logic based on status transition
+    // Handle automated financial wallet logic & inventory logic based on status transition
     if (status) {
-      const paidStatuses = ['PAID', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED', 'COMPLETED', 'DELIVERED', 'PREPARING', 'PENDING_POSTAL_LABEL'];
+      const paidStatuses = ['PAID', 'PROCESSING', 'READY_TO_SHIP', 'PREPARING', 'PENDING_POSTAL_LABEL'];
       const rejectedStatuses = ['REJECTED', 'CANCELLED', 'OUT_OF_STOCK'];
 
       if (paidStatuses.includes(status)) {
-        await creditSuppliersForOrders(prisma, [updatedOrder]);
+        await deductOrderInventory(prisma, [updatedOrder]);
       } else if (rejectedStatuses.includes(status)) {
+        await restoreOrderInventory(prisma, [updatedOrder]);
         await debitSupplierForRejectedOrder(prisma, orderId);
       }
     }
@@ -8728,6 +9063,88 @@ app.get('/api/admin/badges', authenticateToken, requireAdmin, async (req: any, r
     res.json({ orders, tickets, invoices, settlements });
   } catch (err) {
     res.json({ orders: 0, tickets: 0, invoices: 0, settlements: 0 });
+  }
+});
+
+// Admin Inspect Order Details for Ticket / Dispute Resolution
+app.get('/api/admin/orders/:id/inspect', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const orderId = parseInt(req.params.id, 10);
+    if (isNaN(orderId)) {
+      return res.status(400).json({ error: 'شناسه سفارش نامعتبر است' });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                supplierId: true,
+                supplier: {
+                  select: {
+                    id: true,
+                    username: true,
+                    firstName: true,
+                    lastName: true,
+                    brandName: true,
+                    mobile: true,
+                    city: true,
+                    province: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        store: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            mobile: true,
+            storeName: true,
+            city: true
+          }
+        },
+        statusHistory: {
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'سفارش مورد نظر یافت نشد' });
+    }
+
+    // Extract unique suppliers in this order
+    const suppliers: any[] = [];
+    const seenSupplierIds = new Set<number>();
+    for (const item of (order.items || [])) {
+      const supp = item.product?.supplier;
+      if (supp && !seenSupplierIds.has(supp.id)) {
+        seenSupplierIds.add(supp.id);
+        suppliers.push(supp);
+      }
+    }
+
+    return res.json({
+      order,
+      suppliers,
+      itemCount: order.items?.length || 0,
+      totalAmount: order.totalAmount,
+      shippingFee: order.shippingFee || 0,
+      hasPostalLabel: !!order.postalLabel,
+      trackingCode: order.trackingCode || null
+    });
+  } catch (err: any) {
+    console.error('Error inspecting order:', err);
+    return res.status(500).json({ error: 'خطا در دریافت پرونده سفارش' });
   }
 });
 
@@ -10297,8 +10714,8 @@ app.get('/api/public/checkout/callback', async (req, res) => {
         }
       });
 
-      // Automatically credit supplier wallet for this paid order
-      await creditSuppliersForOrders(prisma, [updatedOrder]);
+      // Deduct inventory for paid order
+      await deductOrderInventory(prisma, [updatedOrder]);
 
       return res.redirect(`${baseUrl}/?payment_status=success&trackId=${resolvedTrackId}&orderId=${orderId}&refNumber=${refId}`);
     } else {
@@ -10580,8 +10997,8 @@ const handlePaymentCallback = async (req: any, res: any) => {
           }
         }).catch(() => null);
 
-        // Credit supplier wallets
-        await creditSuppliersForOrders(prisma, [orderToUpdate]);
+        // Deduct inventory for paid order
+        await deductOrderInventory(prisma, [orderToUpdate]);
       }
 
       return res.redirect(
@@ -10675,21 +11092,24 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
 
 app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
-    const { name, phone, address, category, commission, ambassadorId, status } = req.body;
+    const { name, phone, additionalPhones, address, category, commission, ambassadorId, status } = req.body;
     if (!name || !phone) {
-      return res.status(400).json({ error: 'نام و شماره تماس تامین‌کننده هدف اجباری است.' });
+      return res.status(400).json({ error: 'نام و شماره تماس اصلی تامین‌کننده هدف اجباری است.' });
     }
 
     const cleanPhone = String(phone).replace(/\s+/g, '');
+    const cleanAddPhones = additionalPhones ? String(additionalPhones).trim() : null;
+
     const existing = await prisma.lead.findUnique({ where: { phone: cleanPhone } });
     if (existing) {
-      return res.status(400).json({ error: 'تامین‌کننده‌ای با این شماره تماس قبلاً ثبت شده است.' });
+      return res.status(400).json({ error: 'تامین‌کننده‌ای با این شماره تماس اصلی قبلاً ثبت شده است.' });
     }
 
     const lead = await prisma.lead.create({
       data: {
         name: String(name).trim(),
         phone: cleanPhone,
+        additionalPhones: cleanAddPhones,
         address: address ? String(address).trim() : null,
         category: category ? String(category).trim() : 'لوازم جانبی و دیجیتال',
         commission: Number(commission) || 100000,
@@ -10703,20 +11123,24 @@ app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, r
     res.json({ success: true, lead, message: 'تامین‌کننده هدف با موفقیت اضافه شد.' });
   } catch (err: any) {
     console.error('Error adding lead:', err);
-    res.status(500).json({ error: 'خطا در افزودن تامین‌کننده هدف' });
+    if (err?.code === 'P2002') {
+      return res.status(400).json({ error: 'تامین‌کننده‌ای با این شماره تماس قبلاً ثبت شده است.' });
+    }
+    res.status(500).json({ error: err?.message || 'خطا در افزودن تامین‌کننده هدف' });
   }
 });
 
 app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const leadId = parseInt(req.params.id);
-    const { name, phone, address, category, commission, status, ambassadorId } = req.body;
+    const { name, phone, additionalPhones, address, category, commission, status, ambassadorId } = req.body;
 
     const updated = await prisma.lead.update({
       where: { id: leadId },
       data: {
         name: name ? String(name).trim() : undefined,
         phone: phone ? String(phone).replace(/\s+/g, '') : undefined,
+        additionalPhones: additionalPhones !== undefined ? (additionalPhones ? String(additionalPhones).trim() : null) : undefined,
         address: address !== undefined ? String(address).trim() : undefined,
         category: category !== undefined ? String(category).trim() : undefined,
         commission: commission !== undefined ? Number(commission) : undefined,
@@ -10727,9 +11151,9 @@ app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any
     });
 
     res.json({ success: true, lead: updated, message: 'اطلاعات با موفقیت بروزرسانی شد.' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error updating lead:', err);
-    res.status(500).json({ error: 'خطا در بروزرسانی سرنخ' });
+    res.status(500).json({ error: err?.message || 'خطا در بروزرسانی سرنخ' });
   }
 });
 
@@ -10810,6 +11234,34 @@ app.post('/api/ambassador/leads/:id/status', authenticateToken, async (req: any,
       return res.status(403).json({ error: 'این سرنخ متعلق به پنل شما نیست' });
     }
     
+    // Strict Verification: If trying to mark as COMPLETED, verify supplier phone exists in User database
+    if (status === 'COMPLETED') {
+      const cleanLeadPhone = String(lead.phone || '').replace(/\s+/g, '').replace(/^\+98/, '0');
+      const otherPhones = String(lead.additionalPhones || '')
+        .split(/[\n,;\s]+/)
+        .map(p => p.replace(/\s+/g, '').replace(/^\+98/, '0'))
+        .filter(Boolean);
+      const allLeadPhones = Array.from(new Set([cleanLeadPhone, ...otherPhones])).filter(p => p.length >= 8);
+
+      const matchingSupplier = await prisma.user.findFirst({
+        where: {
+          role: { in: ['SUPPLIER', 'STORE_MANAGER'] },
+          OR: [
+            { username: { in: allLeadPhones } },
+            { mobile: { in: allLeadPhones } },
+            { telephone: { in: allLeadPhones } }
+          ]
+        }
+      });
+
+      if (!matchingSupplier) {
+        return res.status(400).json({
+          error: `تامین‌کننده با شماره‌های ثبت‌شده (${allLeadPhones.join('، ')}) هنوز عضو فعال زوپیت نشده است. تا زمان ثبت‌نام رسمی، تایید پرونده مجاز نیست. در صورت ثبت‌نام با شماره‌ای دیگر، از گزینه «ثبت شماره جدید و استعلام پشتیبانی» استفاده فرمایید.`,
+          requiresPhoneVerification: true
+        });
+      }
+    }
+
     const updated = await prisma.lead.update({
       where: { id: leadId },
       data: { status }
@@ -10817,6 +11269,54 @@ app.post('/api/ambassador/leads/:id/status', authenticateToken, async (req: any,
     res.json({ success: true, lead: updated, message: 'وضعیت ماموریت به‌روزرسانی شد.' });
   } catch (err) {
     res.status(500).json({ error: 'خطا در تغییر وضعیت ماموریت' });
+  }
+});
+
+// Endpoint to submit ticket for phone mismatch inquiry
+app.post('/api/ambassador/leads/:id/ticket-phone-mismatch', authenticateToken, async (req: any, res) => {
+  if (req.user.role !== 'AMBASSADOR' && req.user.role !== 'REFERRER') return res.status(403).json({ error: 'عدم دسترسی' });
+  try {
+    const leadId = parseInt(req.params.id);
+    const { newPhone, notes } = req.body;
+    if (!newPhone) {
+      return res.status(400).json({ error: 'لطفاً شماره تماس جدید تامین‌کننده را وارد کنید.' });
+    }
+
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead || lead.ambassadorId !== req.user.userId) {
+      return res.status(403).json({ error: 'این پرونده متعلق به پنل شما نیست.' });
+    }
+
+    const ticketSubject = `استعلام تغییر شماره تماس تامین‌کننده (کد پرونده #${lead.id} - ${lead.name})`;
+    const ticketContent = `با سلام و احترام،\nتامین‌یاب محترم ${req.user.username} درخواست بررسی عضویت تامین‌کننده زیر با شماره تماس جدید را ثبت کرده است:\n\nنام تامین‌کننده: ${lead.name}\nشماره قبلی پرونده: ${lead.phone}\nشماره ثبت‌نامی جدید اعلام‌شده: ${newPhone}\nتوضیحات تکمیلی تامین‌یاب: ${notes || 'بدون توضیح'}\n\nلطفاً پس از استعلام تلفنی و اطمینان از صحت ثبت‌نام، پرونده را تایید فرمایید.`;
+
+    const ticket = await prisma.ticket.create({
+      data: {
+        userId: req.user.userId,
+        subject: ticketSubject,
+        department: 'SUPPLIER_VERIFICATION',
+        priority: 'HIGH',
+        status: 'OPEN',
+        messages: {
+          create: [
+            {
+              senderId: req.user.userId,
+              senderRole: req.user.role,
+              content: ticketContent
+            }
+          ]
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      ticketId: ticket.id,
+      message: 'تیکت استعلام شماره جدید با موفقیت ارسال شد. پس از بررسی پشتیبانی، پورسانت آزاد خواهد شد.'
+    });
+  } catch (err: any) {
+    console.error('Error in phone mismatch ticket:', err);
+    res.status(500).json({ error: 'خطا در ارسال تیکت استعلام' });
   }
 });
 

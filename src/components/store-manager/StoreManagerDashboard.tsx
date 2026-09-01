@@ -1278,7 +1278,7 @@ export default function StoreManagerDashboard({
                   onNavigateTab={(tab: string) => setActiveTab(tab)}
                 />
               )}
-              {activeTab === "settings" && <StoreConnection />}
+              {activeTab === "settings" && <StoreConnection showNotification={showNotification} />}
               {activeTab === "customers" && <StoreCustomers />}
               {activeTab === "page_settings" && (
                 <InstagramPageSettings

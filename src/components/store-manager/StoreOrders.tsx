@@ -1192,12 +1192,15 @@ export default function StoreOrders({
                     <select
                       required
                       value={shippingProvince}
-                      onChange={(e) => setShippingProvince(e.target.value)}
+                      onChange={(e) => {
+                        setShippingProvince(e.target.value);
+                        setShippingCity("");
+                      }}
                       className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
                     >
                       <option value="">-- انتخاب استان --</option>
                       {PROVINCES.map((p) => (
-                        <option key={p} value={p}>{p}</option>
+                        <option key={p.name} value={p.name}>{p.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1205,14 +1208,28 @@ export default function StoreOrders({
                     <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                       شهر مقصد <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="مثال: تهران / اصفهان"
-                      value={shippingCity}
-                      onChange={(e) => setShippingCity(e.target.value)}
-                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
-                    />
+                    {shippingProvince && PROVINCES.find(p => p.name === shippingProvince)?.cities.length ? (
+                      <select
+                        required
+                        value={shippingCity}
+                        onChange={(e) => setShippingCity(e.target.value)}
+                        className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                      >
+                        <option value="">-- انتخاب شهر --</option>
+                        {PROVINCES.find(p => p.name === shippingProvince)?.cities.map((city) => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        required
+                        placeholder="مثال: تهران / اصفهان"
+                        value={shippingCity}
+                        onChange={(e) => setShippingCity(e.target.value)}
+                        className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                      />
+                    )}
                   </div>
                 </div>
 

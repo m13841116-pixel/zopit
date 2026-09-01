@@ -291,6 +291,12 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
     setTimeout(() => {
       try {
+        if (resource.downloadUrl && (resource.downloadUrl.startsWith("http://") || resource.downloadUrl.startsWith("https://") || resource.downloadUrl.startsWith("/"))) {
+          window.open(resource.downloadUrl, "_blank");
+          setDownloadingId(null);
+          return;
+        }
+
         const dummyContent = `--- پلتفرم هوشمند زوپیت - پکیج اختصاصی اکانت پرو ---
 عنوان پکیج: ${resource.title}
 توضیحات: ${resource.description}
@@ -319,7 +325,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       } finally {
         setDownloadingId(null);
       }
-    }, 600);
+    }, 500);
   };
 
   // Canvas Coordinates Helper

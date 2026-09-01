@@ -27,6 +27,7 @@ interface Lead {
   id: number;
   name: string;
   phone: string;
+  additionalPhones?: string | null;
   address?: string | null;
   category?: string | null;
   commission: number;
@@ -86,6 +87,7 @@ export default function LeadsManager() {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
+    additionalPhones: "",
     address: "",
     category: "لوازم جانبی و دیجیتال",
     commission: 150000,
@@ -134,6 +136,7 @@ export default function LeadsManager() {
       const payload = {
         name: formData.name.trim(),
         phone: formData.phone.trim(),
+        additionalPhones: formData.additionalPhones.trim(),
         address: formData.address.trim(),
         category: formData.category.trim(),
         commission: Number(formData.commission),
@@ -169,6 +172,7 @@ export default function LeadsManager() {
         setFormData({
           name: "",
           phone: "",
+          additionalPhones: "",
           address: "",
           category: "لوازم جانبی و دیجیتال",
           commission: 150000,
@@ -255,6 +259,7 @@ export default function LeadsManager() {
     setFormData({
       name: lead.name,
       phone: lead.phone,
+      additionalPhones: lead.additionalPhones || "",
       address: lead.address || "",
       category: lead.category || "لوازم جانبی و دیجیتال",
       commission: lead.commission || 150000,
@@ -268,6 +273,7 @@ export default function LeadsManager() {
     const matchesSearch =
       lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       lead.phone.includes(searchQuery) ||
+      (lead.additionalPhones && lead.additionalPhones.includes(searchQuery)) ||
       (lead.category && lead.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (lead.address && lead.address.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (lead.ambassador && (
@@ -334,6 +340,7 @@ export default function LeadsManager() {
             setFormData({
               name: "",
               phone: "",
+              additionalPhones: "",
               address: "",
               category: "لوازم جانبی و دیجیتال",
               commission: 150000,
@@ -533,6 +540,12 @@ export default function LeadsManager() {
                                 {lead.phone}
                               </a>
                             </div>
+                            {lead.additionalPhones && (
+                              <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-mono mt-1" dir="ltr">
+                                <span className="text-[10px] text-muted font-sans font-normal">شماره‌های دیگر:</span>
+                                <span className="font-bold truncate max-w-[180px]" title={lead.additionalPhones}>{lead.additionalPhones}</span>
+                              </div>
+                            )}
                             {lead.address && (
                               <div className="flex items-center gap-1 text-[11px] text-muted mt-1 max-w-xs truncate">
                                 <Building className="w-3 h-3 shrink-0" />
@@ -793,6 +806,24 @@ export default function LeadsManager() {
               </div>
 
               <div>
+                <label className="block text-xs font-bold text-secondary mb-1 flex items-center justify-between">
+                  <span>شماره‌های تماس بیشتر (همراه / ثابت دیگر) - اختیاری</span>
+                  <span className="text-[10px] text-muted font-normal">با کاما (،) یا فاصله جدا کنید</span>
+                </label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={formData.additionalPhones}
+                  onChange={(e) => setFormData({ ...formData, additionalPhones: e.target.value })}
+                  placeholder="09181112233, 08734221100"
+                  className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500 text-left"
+                />
+                <p className="text-[10px] text-muted mt-1">
+                  💡 سیستم تمامی این شماره‌ها را موقع احراز هویت خودکار و اعتبارسنجی ثبت‌نام تامین‌کننده بررسی خواهد کرد.
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-secondary mb-1">
                   آدرس یا موقعیت بازار
                 </label>
@@ -820,8 +851,8 @@ export default function LeadsManager() {
                     dir="ltr"
                   />
                   {/* Quick Commission Presets */}
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    {[100000, 150000, 200000, 250000].map((preset) => (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    {[10000, 30000, 60000, 100000, 200000].map((preset) => (
                       <button
                         key={preset}
                         type="button"
@@ -832,7 +863,7 @@ export default function LeadsManager() {
                             : "bg-surface text-muted border-subtle hover:text-primary"
                         }`}
                       >
-                        {(preset / 1000).toLocaleString("fa-IR")}هزار
+                        {(preset / 1000).toLocaleString("fa-IR")} هزار
                       </button>
                     ))}
                   </div>

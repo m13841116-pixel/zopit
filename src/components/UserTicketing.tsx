@@ -22,7 +22,8 @@ export function UserTicketing({ user }: { user: any }) {
   // New ticket modal state
   const [showNewModal, setShowNewModal] = useState(false);
   const [subject, setSubject] = useState("");
-  const [department, setDepartment] = useState("GENERAL_MANAGER"); // GENERAL_MANAGER, SUPPORT, FINANCIAL, SHIPPING, DISPUTE
+  const [department, setDepartment] = useState("ORDER_DELAY_LOGISTICS"); // ORDER_DELAY_LOGISTICS, ORDER_DELAY_SUPPLIER, GENERAL_MANAGER, SUPPORT, FINANCIAL, SHIPPING, DISPUTE
+  const [orderNumber, setOrderNumber] = useState("");
   const [message, setMessage] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +59,14 @@ export function UserTicketing({ user }: { user: any }) {
     if (!subject.trim() || !message.trim()) return;
     setSubmitting(true);
     try {
+      let finalSubject = subject.trim();
+      let finalMessage = message.trim();
+      if (orderNumber.trim()) {
+        const cleanOrder = orderNumber.trim().replace("#", "");
+        finalSubject = `[پیگیری سفارش #${cleanOrder}] ${finalSubject}`;
+        finalMessage = `📌 شماره سفارش مرتبط: #${cleanOrder}\n\n` + finalMessage;
+      }
+
       const res = await fetch("/api/tickets", {
         method: "POST",
         headers: {
@@ -65,9 +74,9 @@ export function UserTicketing({ user }: { user: any }) {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify({
-          subject,
+          subject: finalSubject,
           department,
-          message,
+          message: finalMessage,
           attachmentUrl,
         }),
       });
@@ -76,6 +85,7 @@ export function UserTicketing({ user }: { user: any }) {
         toast("تیکت شما با موفقیت ثبت شد و به مدیریت ارشد ارسال گردید.", "success");
         setShowNewModal(false);
         setSubject("");
+        setOrderNumber("");
         setMessage("");
         setAttachmentUrl("");
         fetchTickets();
@@ -130,14 +140,18 @@ export function UserTicketing({ user }: { user: any }) {
 
   const getDepartmentLabel = (dep: string) => {
     switch (dep) {
+      case "ORDER_DELAY_LOGISTICS":
+        return "🚚 پیگیری تأخیر در ارسال و پست (لجستیک)";
+      case "ORDER_DELAY_SUPPLIER":
+        return "📦 تأخیر و عدم ارسال توسط تأمین‌کننده";
       case "GENERAL_MANAGER":
-        return "مدیرکل (مدیریت ارشد)";
+        return "👑 مدیرکل (مدیریت ارشد)";
       case "FINANCIAL":
-        return "امور مالی و فاکتورها";
+        return "💰 امور مالی و فاکتورها";
       case "SHIPPING":
-        return "لجستیک و پست";
+        return "🚚 لجستیک و پست";
       case "DISPUTE":
-        return "شکایات و اختلاف حساب";
+        return "⚖️ شکایات و اختلاف حساب";
       default:
         return "پشتیبانی عمومی";
     }
@@ -267,12 +281,26 @@ export function UserTicketing({ user }: { user: any }) {
                   onChange={(e) => setDepartment(e.target.value)}
                   className="w-full px-4 py-3 bg-surface border border-border-subtle rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary-default/20 text-text-primary cursor-pointer"
                 >
-                  <option value="GENERAL_MANAGER">ارسال به مدیرکل (مدیریت ارشد) 👑</option>
-                  <option value="SUPPORT">پشتیبانی عمومی</option>
-                  <option value="FINANCIAL">امور مالی و فاکتورها</option>
-                  <option value="SHIPPING">لجستیک و ارسال پستی</option>
-                  <option value="DISPUTE">شکایت / اختلاف حساب</option>
+                  <option value="ORDER_DELAY_LOGISTICS">🚚 پیگیری تأخیر در ارسال و مسائل پستی (لجستیک)</option>
+                  <option value="ORDER_DELAY_SUPPLIER">📦 پیگیری تأخیر و عدم ارسال توسط تأمین‌کننده</option>
+                  <option value="GENERAL_MANAGER">👑 ارسال مستقیم به مدیرکل (مدیریت ارشد)</option>
+                  <option value="SUPPORT">💬 پشتیبانی عمومی سیستم</option>
+                  <option value="FINANCIAL">💰 امور مالی، تسویه و فاکتورها</option>
+                  <option value="DISPUTE">⚖️ شکایت رسمی / مغایرت کالا و مرجوعی</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">
+                  شماره سفارش مرتبط (اختیاری):
+                </label>
+                <input
+                  type="text"
+                  value={orderNumber}
+                  onChange={(e) => setOrderNumber(e.target.value)}
+                  placeholder="مثلاً: 1042 (جهت دسترسی سریع مدیر کل به پرونده سفارش)"
+                  className="w-full px-4 py-3 bg-surface border border-border-subtle rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary-default/20 text-text-primary font-mono text-left"
+                />
               </div>
 
               <div>

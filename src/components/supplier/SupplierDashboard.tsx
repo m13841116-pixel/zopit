@@ -1016,13 +1016,43 @@ export function SupplierDashboard({
                     </div>
                   </div>
 
-                  {/* Supplier Onboarding Progression & Banking Completion Widget */}
-                  <SupplierOnboardingWidget
-                    user={user}
-                    onUpdateUser={onUpdateUser}
-                    showNotification={showNotification}
-                    onGoToSettings={() => setActiveTab("profile")}
-                  />
+                  {/* Smart Settlement Reminder (After 3+ fulfilled orders) */}
+                  {(() => {
+                    const fulfilledOrdersCount = orders.filter(
+                      (o) => o.status === "SHIPPED" || o.status === "COMPLETED" || o.status === "DELIVERED"
+                    ).length;
+                    const walletBalance = walletInfo.wallet?.balance || 0;
+                    if (fulfilledOrdersCount >= 3 && walletBalance > 0) {
+                      return (
+                        <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-500/30 p-4 md:p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm animate-fade-in">
+                          <div className="flex items-center gap-3 text-right">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
+                              <Wallet className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="text-xs md:text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                <span>🔔 یادآوری تسویه حساب سفارشات ارسالی</span>
+                                <span className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                  {fulfilledOrdersCount.toLocaleString('fa-IR')} سفارش ارسال شده
+                                </span>
+                              </h4>
+                              <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 font-medium leading-relaxed">
+                                همکار گرامی، موجودی کیف پول شما مبلغ <strong>{walletBalance.toLocaleString('fa-IR')} تومان</strong> است. در صورت تمایل می‌توانید جهت واریز به شماره شبای خود، درخواست تسویه ثبت نمایید.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setActiveTab("wallet")}
+                            className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                            <span>ثبت درخواست تسویه حساب</span>
+                          </button>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   {/* Highly Visible Label Printing Box for Supplier */}
                   {(() => {
@@ -1452,6 +1482,14 @@ export function SupplierDashboard({
                       </div>
                     </div>
                   </div>
+
+                  {/* Supplier Onboarding Progression & Banking Completion Widget (Placed comfortably below main stats) */}
+                  <SupplierOnboardingWidget
+                    user={user}
+                    onUpdateUser={onUpdateUser}
+                    showNotification={showNotification}
+                    onGoToSettings={() => setActiveTab("profile")}
+                  />
                 </div>
               )}
               {/* PRODUCTS TAB */}
@@ -1836,25 +1874,25 @@ export function SupplierDashboard({
                       {selectedItems.length > 0 && (
                         <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in shadow-xl shadow-indigo-950/20 border border-indigo-700/40">
                           <div className="flex items-center gap-3">
-                            <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-inner">
-                              <ShoppingCart className="w-5 h-5" />
+                            <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-inner">
+                              <Truck className="w-5 h-5" />
                             </div>
                             <div>
                               <p className="font-black text-white text-sm">
-                                تعداد {selectedItems.length} سفارش برای عملیات گروهی انتخاب شده است.
+                                تعداد {selectedItems.length} سفارش برای عملیات ارسال انتخاب شده است.
                               </p>
                               <p className="text-xs text-slate-200 mt-0.5 font-medium">
-                                می‌توانید تمام سفارشات انتخاب شده را به صورت یکجا تایید و آماده ارسال کنید.
+                                می‌توانید وضعیت تمام سفارشات انتخاب شده را به صورت یکجا به «ارسال شد» تغییر داده و تحویل پست دهید.
                               </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 w-full md:w-auto">
                             <button
                               onClick={approveBatchOrders}
-                              className="flex-1 md:flex-initial bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-95"
+                              className="flex-1 md:flex-initial bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-95"
                             >
-                              <CheckCircle className="w-4 h-4" />
-                              تایید گروهی سفارشات ({selectedItems.length})
+                              <Truck className="w-4 h-4" />
+                              ارسال شد ({selectedItems.length})
                             </button>
                           </div>
                         </div>
@@ -2063,6 +2101,20 @@ export function SupplierDashboard({
                                           </>
                                         ) : (
                                           <>
+                                            {/* Label Printing Shortcut in Actions Column */}
+                                            {order.order?.postalLabel && (
+                                              <a
+                                                href={order.order.postalLabel}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-rose-600/20 cursor-pointer"
+                                                title="چاپ برچسب و بارکد پستی مرسوله"
+                                              >
+                                                <Printer className="w-4 h-4 shrink-0" />
+                                                <span>چاپ لیبل پستی</span>
+                                              </a>
+                                            )}
+
                                             {(order.status === "REQUESTED" ||
                                               order.status === "PENDING") && (
                                               <>
@@ -2073,11 +2125,11 @@ export function SupplierDashboard({
                                                       "SHIPPED",
                                                     )
                                                   }
-                                                  className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-success hover:bg-emerald-700 active:scale-95 text-inverse text-xs font-bold rounded-xl transition-all duration-300 shadow-sm shadow-emerald-600/10 hover:shadow-emerald-600/25 hover:shadow-md cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-success"
-                                                  aria-label={`تایید سفارش شماره ${order.id}`}
+                                                  className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all duration-300 shadow-sm shadow-emerald-600/20 hover:shadow-md cursor-pointer outline-none"
+                                                  aria-label={`ارسال سفارش شماره ${order.id}`}
                                                 >
-                                                  <CheckCircle className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                                                  تایید سفارش
+                                                  <Truck className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                                                  ارسال شد
                                                 </button>
                                                 <button
                                                   onClick={() =>
@@ -2094,15 +2146,15 @@ export function SupplierDashboard({
                                                 </button>
                                               </>
                                             )}
-                                            {/* Change Order details button with RefreshCw */}
+                                            {/* Direct Action for Paid / Preparing */}
                                             {["PAID", "PREPARING"].includes(order.status) && (
                                               <button
                                                 onClick={() => updateOrderStatus(order.id, "SHIPPED")}
-                                                className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 text-xs font-black rounded-xl transition-all duration-300 shadow-sm shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:shadow-md cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500"
-                                                aria-label="تایید و ارسال"
+                                                className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 text-xs font-black rounded-xl transition-all duration-300 shadow-sm shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:shadow-md cursor-pointer outline-none"
+                                                aria-label="تغییر به ارسال شد"
                                               >
                                                 <Truck className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
-                                                ثبت ارسال کالا
+                                                ارسال شد
                                               </button>
                                             )}
                                             {["SHIPPED"].includes(order.status) ? (

@@ -39,6 +39,9 @@ model User {
   storeUrl               String?
   storeLink              String?
   avatarUrl              String?
+  apiKey                 String?                 @unique
+  profitMarginType       String?                 @default("percent")
+  profitMarginValue      Float?                  @default(0)
   autoApproveOrders      Boolean?  @default(true)
   platformType           String?
   fieldOfActivity        String?
@@ -804,16 +807,17 @@ model PaymentLog {
 
 
 model Lead {
-  id             Int      @id @default(autoincrement())
-  name           String
-  phone          String   @unique
-  address        String?
-  category       String?
-  commission     Float    @default(100000)
-  status         String   @default("PENDING") // PENDING, ASSIGNED, COMPLETED
-  ambassadorId   Int?
-  supplierId     Int?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  ambassador     User?    @relation("AmbassadorLeads", fields: [ambassadorId], references: [id])
+  id               Int      @id @default(autoincrement())
+  name             String
+  phone            String   @unique
+  additionalPhones String?
+  address          String?
+  category         String?
+  commission       Float    @default(100000)
+  status           String   @default("PENDING") // PENDING, ASSIGNED, COMPLETED
+  ambassadorId     Int?
+  supplierId       Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  ambassador       User?    @relation("AmbassadorLeads", fields: [ambassadorId], references: [id])
 }
