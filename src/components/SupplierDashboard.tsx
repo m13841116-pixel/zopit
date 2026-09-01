@@ -170,7 +170,7 @@ export const SupplierDashboard: React.FC = () => {
           <span className="text-xs text-slate-500">Fulfill purchase orders and update shipping statuses</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                 <th className="p-4">Order ID</th>
@@ -268,7 +268,7 @@ export const SupplierDashboard: React.FC = () => {
           <span className="text-xs text-slate-500">Automated ACH net-30 payouts</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                 <th className="p-4">Settlement ID</th>

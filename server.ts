@@ -3851,10 +3851,10 @@ app.get('/api/supplier/wallet', authenticateToken, requireSupplier, async (req: 
 // Update supplier profile
 app.put('/api/supplier/profile', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address, autoApproveOrders } = req.body;
+    const { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders } = req.body;
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address, autoApproveOrders }
+      data: { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders }
     });
     res.json({ message: 'پروفایل با موفقیت بروزرسانی شد', user });
   } catch (err) {
@@ -3864,10 +3864,10 @@ app.put('/api/supplier/profile', authenticateToken, requireSupplier, async (req:
 
 app.patch('/api/supplier/profile', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address, autoApproveOrders } = req.body;
+    const { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders } = req.body;
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: { firstName, lastName, brandName, shaba, mobile, bankName, accountHolderName, address, autoApproveOrders }
+      data: { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders }
     });
     res.json({ message: 'پروفایل با موفقیت بروزرسانی شد', user });
   } catch (err) {
@@ -6203,12 +6203,41 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
       ? parseInt(settingsMap['promax_account_price'] || '299000', 10)
       : parseInt(settingsMap['pro_account_price'] || '189000', 10);
     
-    let basePrice = typeof amount === 'number' && amount >= 0 ? amount : defaultPrice;
+    let basePrice = defaultPrice;
     let enamadCost = hasEnamad ? 50000 : 0;
     
-    // Promo Code logic (e.g., 100% discount on base price if matched)
-    if (promoCodeInput && settingsMap['pro_promo_code'] && promoCodeInput.trim().toUpperCase() === settingsMap['pro_promo_code'].trim().toUpperCase()) {
-      basePrice = 0; // Discounted base price
+    // Promo Code / Discount Code logic
+    if (promoCodeInput && promoCodeInput.trim()) {
+      const cleanCoupon = promoCodeInput.trim().toUpperCase();
+      if (settingsMap['pro_promo_code'] && cleanCoupon === settingsMap['pro_promo_code'].trim().toUpperCase()) {
+        basePrice = 0; // 100% legacy master promo
+      } else {
+        try {
+          const discount = await prisma.discountCode.findUnique({ where: { code: cleanCoupon } });
+          if (discount && discount.isActive) {
+            const notExpired = !discount.expiryDate || new Date(discount.expiryDate) >= new Date();
+            const notExhausted = !discount.maxUses || discount.usedCount < discount.maxUses;
+            const planMatches = !discount.applicablePlan || discount.applicablePlan === 'ALL' || discount.applicablePlan === selectedPlan;
+            if (notExpired && notExhausted && planMatches) {
+              if (discount.discountType === 'PERCENTAGE') {
+                const percent = Math.min(100, Math.max(0, discount.discountValue));
+                basePrice = Math.max(0, Math.round(defaultPrice * (1 - percent / 100)));
+              } else {
+                basePrice = Math.max(0, defaultPrice - discount.discountValue);
+              }
+              // Increment usedCount
+              await prisma.discountCode.update({
+                where: { id: discount.id },
+                data: { usedCount: { increment: 1 } }
+              }).catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.error('Error applying coupon in pro register:', e);
+        }
+      }
+    } else if (typeof amount === 'number' && amount >= 0 && amount < defaultPrice) {
+      basePrice = amount;
     }
 
     let totalPayable = basePrice + enamadCost;
@@ -6650,6 +6679,136 @@ app.post('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async 
   } catch (err: any) {
     console.error('Error saving pro settings:', err);
     res.status(500).json({ error: 'خطا در ذخیره تنظیمات عمومی پرو' });
+  }
+});
+
+// 10. Super Admin Create Direct Ticket for a User / Store Manager
+app.post('/api/superadmin/tickets/create-for-user', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { targetUserId, subject, department, priority, message, sendNotification } = req.body;
+    if (!targetUserId || !subject || !message) {
+      return res.status(400).json({ error: 'کاربر مقصد، موضوع و متن پیام الزامی هستند' });
+    }
+
+    const parsedUserId = parseInt(String(targetUserId), 10);
+    const targetUser = await prisma.user.findUnique({ where: { id: parsedUserId } });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'کاربر مورد نظر یافت نشد' });
+    }
+
+    const ticket = await prisma.ticket.create({
+      data: {
+        userId: parsedUserId,
+        subject: subject.trim(),
+        department: department || 'اکانت پرو و راه‌اندازی هاست',
+        priority: priority || 'HIGH',
+        message: message.trim(),
+        status: 'ANSWERED'
+      }
+    });
+
+    // Create the message entry
+    const ticketMsg = await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        userId: req.user.userId,
+        message: message.trim()
+      }
+    });
+
+    res.status(201).json({
+      message: 'تیکت مستقیم با موفقیت برای کاربر ارسال و ثبت شد',
+      ticket,
+      ticketMsg
+    });
+  } catch (err: any) {
+    console.error('Error creating direct ticket:', err);
+    res.status(500).json({ error: 'خطا در ارسال تیکت مستقیم' });
+  }
+});
+
+// 11. Pro Downloadable Resources (Plugins & Files)
+app.get('/api/store-manager/pro/resources', authenticateToken, async (req: any, res: any) => {
+  try {
+    const setting = await prisma.systemSettings.findUnique({ where: { key: 'pro_download_resources' } });
+    let resources = [];
+    if (setting && setting.value) {
+      try {
+        resources = JSON.parse(setting.value);
+      } catch (e) {
+        resources = [];
+      }
+    }
+
+    if (!resources || resources.length === 0) {
+      // Default standard resources if not configured
+      resources = [
+        {
+          id: 'plugins-bundle',
+          title: 'پکیج جامع افزونه‌های پریمیوم و ضروری زوپیت',
+          description: 'شامل افزونه‌های امنیت، سئو پیشرفته Yoast/RankMath، شتاب‌دهنده سرعت LiteSpeed/WP Rocket، پنل پیامک، درگاه پرداخت زیبال و بهینه‌ساز دیتابیس',
+          version: '2.4.0',
+          fileType: 'ZIP',
+          fileSize: '48.5 MB',
+          downloadUrl: '/downloads/zopit-pro-plugins-bundle.zip',
+          isPremium: true,
+          updatedAt: '1403/06/01'
+        },
+        {
+          id: 'store-theme',
+          title: 'قالب اختصاصی فروشگاهی زوپیت (Zopit Commerce Theme)',
+          description: 'قالب سبک، واکنش‌گرا و بهینه‌سازی‌شده برای بارگذاری فوق‌سریع در هاست ابری زوپیت با قابلیت سفارشی‌سازی کامل',
+          version: '3.1.2',
+          fileType: 'ZIP',
+          fileSize: '14.2 MB',
+          downloadUrl: '/downloads/zopit-store-theme.zip',
+          isPremium: true,
+          updatedAt: '1403/05/28'
+        },
+        {
+          id: 'setup-guide',
+          title: 'کتابچه راهنمای جامع اتصال و راه‌اندازی فروشگاه آنلاین',
+          description: 'دفترچه مصور راهنمای راه‌اندازی، اتصال دامنه اختصاصی، اینماد، درگاه پرداخت و دریافت سفارشات گام به گام',
+          version: '1.0',
+          fileType: 'PDF',
+          fileSize: '4.8 MB',
+          downloadUrl: '/downloads/zopit-pro-setup-guide.pdf',
+          isPremium: false,
+          updatedAt: '1403/06/05'
+        },
+        {
+          id: 'demo-data',
+          title: 'محتوای نمونه و کاتالوگ آماده فروشگاه (Demo Data)',
+          description: 'فایل درون‌ریزی محصولات نمونه، دسته‌بندی‌های پیش‌فرض و چیدمان استاندارد برای شروع فوری فروش',
+          version: '2.0',
+          fileType: 'XML / WXR',
+          fileSize: '6.1 MB',
+          downloadUrl: '/downloads/zopit-demo-content.xml',
+          isPremium: true,
+          updatedAt: '1403/05/20'
+        }
+      ];
+    }
+
+    res.json(resources);
+  } catch (err: any) {
+    console.error('Error fetching pro resources:', err);
+    res.status(500).json({ error: 'خطا در دریافت لیست فایل‌ها' });
+  }
+});
+
+app.post('/api/superadmin/pro/resources', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { resources } = req.body;
+    await prisma.systemSettings.upsert({
+      where: { key: 'pro_download_resources' },
+      update: { value: JSON.stringify(resources || []) },
+      create: { key: 'pro_download_resources', value: JSON.stringify(resources || []) }
+    });
+    res.json({ message: 'فهرست فایل‌ها و پکیج‌های دانلودی با موفقیت ذخیره شد' });
+  } catch (err: any) {
+    console.error('Error saving pro resources:', err);
+    res.status(500).json({ error: 'خطا در ذخیره فایل‌های پرو' });
   }
 });
 
@@ -10183,7 +10342,7 @@ async function startServer() {
   FinancialJobs.start();
 
   // Start Express Server
-  const PORT = process.env.DEFAULT_APP_PORT ? parseInt(process.env.DEFAULT_APP_PORT, 10) : (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
+  const PORT = 3000;
 
 // --- Financial Engine Routes ---
 const paymentService = new PaymentLifecycleService();

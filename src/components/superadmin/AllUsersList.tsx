@@ -374,7 +374,7 @@ export default function AllUsersList({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
+            <table className="w-full text-right text-sm min-w-[800px]">
               <thead className="bg-surface text-secondary font-bold border-b border-subtle">
                 <tr>
                   <th className="p-4 w-12 text-center">
@@ -736,7 +736,7 @@ export default function AllUsersList({
 
                   {activeModalUser.products && activeModalUser.products.length > 0 ? (
                     <div className="border border-subtle rounded-2xl overflow-hidden">
-                      <table className="w-full text-right text-xs">
+                      <table className="w-full text-right text-xs min-w-[800px]">
                         <thead className="bg-surface font-bold text-muted border-b border-subtle">
                           <tr>
                             <th className="p-3">عنوان محصول</th>

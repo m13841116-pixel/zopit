@@ -665,7 +665,7 @@ export default function StoreOrders({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-right">
+              <table className="w-full text-sm text-right min-w-[800px]">
                 <thead className="bg-background text-muted">
                   <tr>
                     <th className="py-4 px-6 w-12 text-center">
@@ -1329,7 +1329,7 @@ export default function StoreOrders({
                 اقلام و فرآورده‌های سفارش داده شده:
               </h4>
               <div className="overflow-x-auto rounded-2xl border border-subtle overflow-hidden">
-                <table className="w-full text-sm text-right">
+                <table className="w-full text-sm text-right min-w-[800px]">
                   <thead className="bg-background text-muted">
                     <tr>
                       <th className="py-3 px-4 font-bold">نام محصول</th>

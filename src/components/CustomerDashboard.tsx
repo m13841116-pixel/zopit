@@ -254,7 +254,7 @@ export function CustomerDashboard({
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-right border-collapse text-sm">
+                  <table className="w-full text-right border-collapse text-sm min-w-[800px]">
                     <thead>
                       <tr className="bg-surface border-b border-subtle text-muted font-bold text-xs">
                         <th className="p-4">شناسه سفارش</th>

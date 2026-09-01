@@ -126,7 +126,7 @@ export default function SystemLogs() {
             <div className="text-center p-12 text-muted">در حال بارگذاری...</div>
           ) : (
             <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden">
-              <table className="w-full text-right text-sm">
+              <table className="w-full text-right text-sm min-w-[800px]">
                 <thead className="bg-background border-b border-subtle text-muted font-medium">
                   <tr>
                     <th className="px-6 py-4">زمان</th>
@@ -203,7 +203,7 @@ export default function SystemLogs() {
           ) : (
             <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-right text-sm">
+                <table className="w-full text-right text-sm min-w-[800px]">
                   <thead className="bg-background border-b border-subtle text-muted font-medium whitespace-nowrap">
                     <tr>
                       <th className="px-6 py-4">زمان</th>

@@ -964,7 +964,7 @@ export function Table<T>({
       {/* Main Table Container */}
       <div className="border border-border-subtle bg-card rounded-2xl shadow-sm overflow-hidden flex-1 flex flex-col">
         <div className="overflow-x-auto flex-1">
-          <table className="w-full text-right border-collapse text-xs">
+          <table className="w-full text-right border-collapse text-xs min-w-[800px]">
             <thead className="bg-surface border-b border-border-subtle text-text-secondary font-extrabold sticky top-0 z-10">
               <tr>
                 {selectable && getRowId && (

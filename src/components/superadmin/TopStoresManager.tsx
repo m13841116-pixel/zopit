@@ -351,7 +351,7 @@ export default function TopStoresManager({ showNotification }: TopStoresManagerP
 
         {/* Top Stores Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-right">
+          <table className="w-full text-xs text-right min-w-[800px]">
             <thead className="bg-surface text-muted">
               <tr>
                 <th className="px-4 py-3.5 font-bold">فروشگاه و مدیر</th>

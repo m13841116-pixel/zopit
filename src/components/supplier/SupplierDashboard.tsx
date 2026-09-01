@@ -66,6 +66,8 @@ import {
   Menu
 } from "lucide-react";
 import { EducationModal } from "../EducationModal";
+import { SupplierOnboardingWidget } from "./SupplierOnboardingWidget";
+import { AutomationVideoModal } from "../AutomationVideoModal";
 import { ZopitLogo } from "../ZopitLogo";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -189,6 +191,7 @@ export function SupplierDashboard({
   useSyncTabWithUrl("/supplier", activeTab, setActiveTab, "overview", validSupplierTabs);
 
   const [showEducationModal, setShowEducationModal] = useState(false);
+  const [showAutomationVideoModal, setShowAutomationVideoModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [sysConfig, setSysConfig] = useState<Record<string, boolean>>({});
   const [products, setProducts] = useState<any[]>([]);
@@ -893,6 +896,18 @@ export function SupplierDashboard({
               <span className="hidden xs:inline">حساب فعال</span>
             </div>
             <button
+              onClick={() => setShowAutomationVideoModal(true)}
+              className="p-2 sm:px-3 sm:py-1.5 bg-gradient-to-r from-rose-500/10 via-purple-500/10 to-indigo-500/10 hover:from-rose-500/20 hover:to-indigo-500/20 text-rose-600 dark:text-rose-400 rounded-xl transition-all duration-200 border border-rose-500/30 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs group"
+              title="مشاهده ویدیوی ۱ دقیقه‌ای اتوماسیون تامین‌کننده"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+              </span>
+              <Play className="w-3.5 h-3.5 fill-current text-rose-500 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-black hidden sm:inline-block">اتوماسیون ۶۰ ثانیه‌ای</span>
+            </button>
+            <button
               onClick={() => setShowEducationModal(true)}
               className="p-2 bg-surface hover:bg-emerald-500/10 text-muted hover:text-emerald-600 rounded-xl transition-all duration-200 border border-subtle hover:border-emerald-200 cursor-pointer flex items-center justify-center gap-1.5"
               title="مرکز آموزش و ویدیوهای راهنما"
@@ -910,6 +925,12 @@ export function SupplierDashboard({
         <EducationModal
           isOpen={showEducationModal}
           onClose={() => setShowEducationModal(false)}
+        />
+
+        <AutomationVideoModal
+          isOpen={showAutomationVideoModal}
+          onClose={() => setShowAutomationVideoModal(false)}
+          role="SUPPLIER"
         />
         {/* Scrollable Area */}
         <div className="flex-1 overflow-auto p-8 relative">
@@ -993,6 +1014,14 @@ export function SupplierDashboard({
                       </button>
                     </div>
                   </div>
+
+                  {/* Supplier Onboarding Progression & Banking Completion Widget */}
+                  <SupplierOnboardingWidget
+                    user={user}
+                    onUpdateUser={onUpdateUser}
+                    showNotification={showNotification}
+                    onGoToSettings={() => setActiveTab("profile")}
+                  />
 
                   {/* Highly Visible Label Printing Box for Supplier */}
                   {(() => {
@@ -1459,7 +1488,7 @@ export function SupplierDashboard({
                         (p.brand && p.brand.toLowerCase().includes(productSearch.toLowerCase())) ||
                         String(p.id).includes(productSearch)
                       ).length > 0 ? (
-                        <table className="w-full text-right text-sm">
+                        <table className="w-full text-right text-sm min-w-[800px]">
                           
                           <thead className="bg-background border-b border-subtle text-muted font-medium">
                             
@@ -1834,7 +1863,7 @@ export function SupplierDashboard({
                       <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden">
                         {filteredOrders.length > 0 ? (
                           <div className="overflow-x-auto">
-                            <table className="w-full text-right text-sm">
+                            <table className="w-full text-right text-sm min-w-[800px]">
                               <thead className="bg-background border-b border-subtle text-muted font-medium">
                                 <tr>
                                   <th className="px-6 py-4 w-12 text-center">
@@ -2407,7 +2436,7 @@ export function SupplierDashboard({
                         walletInfo.payouts.length > 0 ? (
                         <div className="overflow-x-auto">
                           
-                          <table className="w-full text-right border-collapse">
+                          <table className="w-full text-right border-collapse min-w-[800px]">
                             
                             <thead>
                               
@@ -2923,7 +2952,7 @@ export function SupplierDashboard({
                   
                   <div className="overflow-x-auto">
                     
-                    <table className="w-full text-right text-xs">
+                    <table className="w-full text-right text-xs min-w-[800px]">
                       
                       <thead className="bg-background border-b border-subtle">
                         

@@ -628,7 +628,7 @@ export default function OrdersList() {
       ) : (
         <div className="bg-card rounded-3xl shadow-sm border border-border-subtle overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
+            <table className="w-full text-right text-sm min-w-[800px]">
               <thead className="bg-surface border-b border-border-subtle text-text-secondary font-bold text-xs">
                 <tr>
                   <th className="p-4">کد سفارش</th>

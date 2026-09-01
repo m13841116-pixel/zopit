@@ -4,12 +4,13 @@ import { CartProvider } from "./components/CartContext";
 import { ToastProvider, useToast } from "./components/ToastContext";
 import Explore from "./components/Explore";
 import { ZopitLogo } from "./components/ZopitLogo";
-import { Compass, LayoutDashboard, ShoppingBag, Megaphone, Volume2 } from "lucide-react";
+import { Compass, LayoutDashboard, ShoppingBag, Megaphone, Volume2, GraduationCap } from "lucide-react";
 import Announcements from "./components/Announcements";
 import StoreManagerDashboard from "./components/store-manager/StoreManagerDashboard";
 import SuperAdminDashboard from "./components/superadmin/SuperAdminDashboard";
 import { ZopitEcosystemBanner } from "./components/ZopitEcosystemBanner";
 import { PublicAnnouncementsModal } from "./components/PublicAnnouncementsModal";
+import { EducationModal } from "./components/EducationModal";
 import { UrgentNotificationPopup } from "./components/UrgentNotificationPopup";
 import { UserTicketing } from "./components/UserTicketing";
 import React, { useState, useEffect } from "react";
@@ -307,6 +308,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   const [loading, setLoading] = useState(false);
   const [loginPublicAnnouncementsOpen, setLoginPublicAnnouncementsOpen] = useState(false);
   const [loginIntroVideoOpen, setLoginIntroVideoOpen] = useState(false);
+  const [loginEducationOpen, setLoginEducationOpen] = useState(false);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [termsTab, setTermsTab] = useState<"store" | "supplier" | "privacy">("store");
 
@@ -1750,6 +1752,15 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
+                            onClick={() => setLoginEducationOpen(true)}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-black transition-all cursor-pointer"
+                            title="مرکز آموزش و ویدیوهای راهنما"
+                          >
+                            <GraduationCap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <span>آموزش پلتفرم</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => setLoginIntroVideoOpen(true)}
                             className="lg:hidden flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-black transition-all cursor-pointer"
                             title="مشاهده ویدیو معرفی"
@@ -2837,6 +2848,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                     onBackToLogin={() => setView("login")}
                     onBackToRoleSelect={() => setView("role_select")}
                     showNotification={showNotification}
+                    onShowTerms={() => { setTermsTab("supplier"); setTermsModalOpen(true); }}
                   />
                 </div>
               )}
@@ -3360,6 +3372,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           </div>
         </div>
       )}
+
+      <EducationModal
+        isOpen={loginEducationOpen}
+        onClose={() => setLoginEducationOpen(false)}
+      />
 
       <GlobalModals />
       <GlobalToast />

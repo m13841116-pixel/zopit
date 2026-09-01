@@ -5,7 +5,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Settings, Ticket,
+  Settings,
+  Ticket,
   Search,
   Eye,
   Edit,
@@ -24,7 +25,15 @@ import {
   X,
   Upload,
   Trash2,
-  Volume2
+  Volume2,
+  MessageSquare,
+  Send,
+  Download,
+  FolderDown,
+  Plus,
+  FileArchive,
+  ExternalLink,
+  ShieldCheck
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 import SuperAdminDiscountCodes from "./SuperAdminDiscountCodes";
@@ -34,7 +43,7 @@ interface SuperAdminProAccountsProps {
 }
 
 export default function SuperAdminProAccounts({ showNotification }: SuperAdminProAccountsProps) {
-  const [activeTab, setActiveTab] = useUrlQueryState<"accounts" | "settings" | "discounts">("subtab", "accounts");
+  const [activeTab, setActiveTab] = useUrlQueryState<"accounts" | "resources" | "settings" | "discounts">("subtab", "accounts");
   const [loading, setLoading] = useState(true);
   const [proAccounts, setProAccounts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -50,7 +59,26 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
   const [editWpUser, setEditWpUser] = useState("");
   const [editWpPass, setEditWpPass] = useState("");
   const [editStatus, setEditStatus] = useState("APPROVED");
+  const [sendTicketOnSave, setSendTicketOnSave] = useState(true);
   const [savingAccount, setSavingAccount] = useState(false);
+
+  // Direct Ticket Modal states
+  const [ticketTargetAccount, setTicketTargetAccount] = useState<any>(null);
+  const [directTicketSubject, setDirectTicketSubject] = useState("");
+  const [directTicketMsg, setDirectTicketMsg] = useState("");
+  const [directTicketPriority, setDirectTicketPriority] = useState("HIGH");
+  const [sendingDirectTicket, setSendingDirectTicket] = useState(false);
+
+  // Downloadable Resources states
+  const [resourcesList, setResourcesList] = useState<any[]>([]);
+  const [loadingResources, setLoadingResources] = useState(false);
+  const [savingResources, setSavingResources] = useState(false);
+  const [showAddResourceModal, setShowAddResourceModal] = useState(false);
+  const [newResTitle, setNewResTitle] = useState("");
+  const [newResDesc, setNewResDesc] = useState("");
+  const [newResVersion, setNewResVersion] = useState("1.0");
+  const [newResFileType, setNewResFileType] = useState("ZIP");
+  const [newResFileSize, setNewResFileSize] = useState("10 MB");
 
   // Global Pro Settings states
   const [autoApprove, setAutoApprove] = useState(true);
@@ -68,6 +96,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
   useEffect(() => {
     fetchAccounts();
     fetchSettings();
+    fetchResources();
   }, []);
 
   const fetchAccounts = async () => {
@@ -112,6 +141,73 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
     }
   };
 
+  const fetchResources = async () => {
+    setLoadingResources(true);
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/store-manager/pro/resources", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setResourcesList(data);
+      }
+    } catch (err) {
+      console.error("Error fetching resources:", err);
+    } finally {
+      setLoadingResources(false);
+    }
+  };
+
+  const handleSaveResources = async (updatedList: any[]) => {
+    setSavingResources(true);
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/superadmin/pro/resources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ resources: updatedList })
+      });
+      if (res.ok) {
+        setResourcesList(updatedList);
+        const msg = "فهرست فایل‌های دانلودی با موفقیت بروزرسانی شد.";
+        if (showNotification) showNotification(msg, "success");
+        else toast(msg, "success");
+      }
+    } catch (err) {
+      toast("خطا در ذخیره فایل‌ها", "error");
+    } finally {
+      setSavingResources(false);
+    }
+  };
+
+  const handleAddResource = () => {
+    if (!newResTitle.trim()) {
+      toast("لطفاً عنوان فایل را وارد نمایید", "error");
+      return;
+    }
+    const newRes = {
+      id: `resource-${Date.now()}`,
+      title: newResTitle.trim(),
+      description: newResDesc.trim() || "پکیج اختصاصی ارائه‌شده توسط زوپیت",
+      version: newResVersion.trim() || "1.0",
+      fileType: newResFileType,
+      fileSize: newResFileSize.trim() || "10 MB",
+      downloadUrl: `/downloads/${newResTitle.trim().toLowerCase().replace(/\s+/g, '-')}.${newResFileType.toLowerCase()}`,
+      updatedAt: new Date().toLocaleDateString("fa-IR")
+    };
+    const updated = [...resourcesList, newRes];
+    handleSaveResources(updated);
+    setShowAddResourceModal(false);
+    setNewResTitle("");
+    setNewResDesc("");
+  };
+
+  const handleDeleteResource = (id: string) => {
+    const updated = resourcesList.filter((r) => r.id !== id);
+    handleSaveResources(updated);
+  };
+
   const handleOpenAccountModal = (acc: any) => {
     setSelectedAccount(acc);
     setEditDomain(acc.domainName || "");
@@ -122,6 +218,68 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
     setEditWpUser(acc.wpUsername || "");
     setEditWpPass(acc.wpPassword || "");
     setEditStatus(acc.status || "APPROVED");
+    setSendTicketOnSave(true);
+  };
+
+  const handleOpenDirectTicket = (acc: any) => {
+    setTicketTargetAccount(acc);
+    setDirectTicketSubject(`اطلاعات راه‌اندازی و دسترسی‌های اختصاصی هاست (${acc.fullName || acc.user?.storeName})`);
+    setDirectTicketMsg(
+      `سلام و درود،
+مشخصات و دسترسی‌های اختصاصی فروشگاه و هاست شما در پلتفرم زوپیت به شرح زیر آماده و پیکربندی شد:
+
+دامنه: ${acc.domainName || 'در حال اتصال'}
+ورود به cPanel: ${acc.cpanelUrl || '—'}
+نام کاربری cPanel: ${acc.cpanelUsername || '—'}
+کلمه عبور cPanel: ${acc.cpanelPassword || '—'}
+
+ورود به مدیریت وردپرس: ${acc.wpAdminUrl || '—'}
+نام کاربری وردپرس: ${acc.wpUsername || '—'}
+کلمه عبور وردپرس: ${acc.wpPassword || '—'}
+
+همچنین پکیج افزونه‌ها و قالب اختصاصی از بخش «مرکز دانلود پکیج‌ها» در منوی اکانت پرو برای شما در دسترس است.
+در صورت هرگونه سوال، در همین تیکت پاسخ دهید.
+با احترام، تیم مدیریت زوپیت`
+    );
+    setDirectTicketPriority("HIGH");
+  };
+
+  const handleSendDirectTicketSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketTargetAccount || !directTicketSubject.trim() || !directTicketMsg.trim()) {
+      toast("لطفاً موضوع و متن تیکت را وارد کنید", "error");
+      return;
+    }
+
+    setSendingDirectTicket(true);
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/superadmin/tickets/create-for-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          targetUserId: ticketTargetAccount.userId || ticketTargetAccount.user?.id,
+          subject: directTicketSubject.trim(),
+          department: "اکانت پرو و راه‌اندازی هاست",
+          priority: directTicketPriority,
+          message: directTicketMsg.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const msg = "تیکت مستقیم با موفقیت برای فروشگاه ارسال شد.";
+        if (showNotification) showNotification(msg, "success");
+        else toast(msg, "success");
+        setTicketTargetAccount(null);
+      } else {
+        toast(data.error || "خطا در ارسال تیکت", "error");
+      }
+    } catch (err: any) {
+      toast(err.message || "خطا در ارسال تیکت", "error");
+    } finally {
+      setSendingDirectTicket(false);
+    }
   };
 
   const handleSaveAccount = async () => {
@@ -149,7 +307,35 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
 
       const data = await res.json();
       if (res.ok) {
-        const msg = "اطلاعات دسترسی اکانت پرو با موفقیت ویرایش شد.";
+        if (sendTicketOnSave && (editDomain || editCpanelUrl || editWpUrl)) {
+          const ticketBody = `سلام و احترام،
+اطلاعات هاست اختصاصی و مدیریت سایت شما در تاریخ ${new Date().toLocaleDateString("fa-IR")} با موفقیت ثبت/بروزرسانی شد:
+
+🌐 دامنه اختصاصی: ${editDomain || 'در حال اتصال'}
+🎛️ ورود به cPanel: ${editCpanelUrl || '—'}
+کاربر cPanel: ${editCpanelUser || '—'}
+رمز cPanel: ${editCpanelPass || '—'}
+
+🧩 پیشخوان وردپرس (WP-Admin): ${editWpUrl || '—'}
+کاربر وردپرس: ${editWpUser || '—'}
+رمز وردپرس: ${editWpPass || '—'}
+
+همچنین پکیج افزونه‌ها و قالب اختصاصی در تب «اکانت پرو» آماده دانلود مستقیم است.`;
+
+          await fetch("/api/superadmin/tickets/create-for-user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              targetUserId: selectedAccount.userId,
+              subject: "اطلاعات دسترسی به هاست و پیشخوان وردپرس شما (اکانت پرو)",
+              department: "اکانت پرو و راه‌اندازی هاست",
+              priority: "HIGH",
+              message: ticketBody
+            })
+          }).catch(() => {});
+        }
+
+        const msg = "اطلاعات دسترسی اکانت پرو با موفقیت ویرایش و ثبت شد.";
         if (showNotification) showNotification(msg, "success");
         else toast(msg, "success");
         setSelectedAccount(null);
@@ -232,47 +418,58 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
             <Crown className="w-6 h-6 text-emerald-500" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-primary">مدیریت اکانت‌های پرو (ویژه)</h1>
+            <h1 className="text-xl font-black text-primary">مدیریت اکانت‌های پرو و پرومکس</h1>
             <p className="text-xs text-muted mt-1">
-              مدیریت درخواست‌های فعال‌سازی، تخصیص cPanel/ورود وردپرس و تنظیمات عمومی پکیج پرو
+              مدیریت درخواست‌های فعال‌سازی، تخصیص cPanel/ورود وردپرس، فایل‌های دانلودی و تیکت مستقیم
             </p>
           </div>
         </div>
 
         {/* Tabs switcher */}
-        <div className="flex items-center gap-2 bg-surface p-1.5 rounded-2xl border border-subtle">
+        <div className="flex items-center gap-2 bg-surface p-1.5 rounded-2xl border border-subtle flex-wrap">
           <button
             onClick={() => setActiveTab("accounts")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === "accounts"
                 ? "bg-emerald-500 text-slate-950 shadow-md"
                 : "text-muted hover:text-primary"
             }`}
           >
             <Crown className="w-4 h-4" />
-            <span>لیست درخواست‌ها ({proAccounts.length})</span>
+            <span>درخواست‌ها ({proAccounts.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("resources")}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "resources"
+                ? "bg-emerald-500 text-slate-950 shadow-md"
+                : "text-muted hover:text-primary"
+            }`}
+          >
+            <FolderDown className="w-4 h-4" />
+            <span>فایل‌ها و افزونه‌ها ({resourcesList.length})</span>
           </button>
           <button
             onClick={() => setActiveTab("settings")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === "settings"
                 ? "bg-emerald-500 text-slate-950 shadow-md"
                 : "text-muted hover:text-primary"
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>تنظیمات و قوانین اشتراک پرو و پرو مکس</span>
+            <span>تنظیمات و تعرفه‌ها</span>
           </button>
           <button
             onClick={() => setActiveTab("discounts")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === "discounts"
                 ? "bg-emerald-500 text-slate-950 shadow-md"
                 : "text-muted hover:text-primary"
             }`}
           >
             <Ticket className="w-4 h-4" />
-            <span>کدهای تخفیف و کوپن‌ها</span>
+            <span>کدهای تخفیف</span>
           </button>
         </div>
       </div>
@@ -288,7 +485,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="جستجو بر اساس نام، نام فروشگاه، کد ملی..."
+                placeholder="جستجو بر اساس نام، نام فروشگاه، کد ملی، شماره..."
                 className="w-full pr-10 pl-4 py-2 bg-background border border-subtle rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
@@ -323,16 +520,17 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
+                <table className="w-full text-right text-xs min-w-[800px]">
                   <thead className="bg-surface border-b border-subtle text-muted font-bold">
                     <tr>
                       <th className="p-4">کاربر / مدیر فروشگاه</th>
+                      <th className="p-4">نوع اشتراک</th>
                       <th className="p-4">نام فروشگاه</th>
                       <th className="p-4">کد ملی & شماره همراه</th>
                       <th className="p-4">دامنه اختصاصی</th>
                       <th className="p-4">وضعیت</th>
                       <th className="p-4">تاریخ ثبت</th>
-                      <th className="p-4 text-center">عملیات & دسترسی‌ها</th>
+                      <th className="p-4 text-center">عملیات & ارتباط مستقیم</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-subtle">
@@ -341,7 +539,18 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                         <td className="p-4 font-bold text-primary">
                           {acc.fullName || `${acc.user?.firstName || ""} ${acc.user?.lastName || ""}`}
                           <span className="block text-[10px] text-muted font-normal font-mono">
-                            Username: {acc.user?.username} (ID: #{acc.userId})
+                            شناسه کاربر: #{acc.userId}
+                          </span>
+                        </td>
+
+                        <td className="p-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-black border ${
+                            acc.planType === 'PRO'
+                              ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                              : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                          }`}>
+                            <Crown className="w-3 h-3" />
+                            {acc.planType === 'PRO' ? 'پرو (PRO)' : 'پرو مکس (PRO MAX)'}
                           </span>
                         </td>
 
@@ -351,7 +560,18 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
 
                         <td className="p-4 font-mono text-muted space-y-0.5">
                           <div>کد ملی: {acc.nationalCode || "—"}</div>
-                          <div>همراه: {acc.mobile || "—"}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span>همراه: {acc.mobile || acc.user?.mobile || "—"}</span>
+                            {(acc.mobile || acc.user?.mobile) && (
+                              <a
+                                href={`tel:${acc.mobile || acc.user?.mobile}`}
+                                className="p-1 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-slate-950 transition-all"
+                                title="تماس تلفنی با مدیر فروشگاه"
+                              >
+                                <Phone className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
                         </td>
 
                         <td className="p-4 font-mono text-emerald-600 dark:text-emerald-400 font-bold">
@@ -369,7 +589,7 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                             </span>
                           ) : acc.status === "PENDING" ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[11px]">
-                              <Clock className="w-3.5 h-3.5" /> در انتظار (PENDING)
+                              <Clock className="w-3.5 h-3.5" /> در انتظار بررسی
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20 text-[11px]">
@@ -383,14 +603,27 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                         </td>
 
                         <td className="p-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenAccountModal(acc)}
-                            className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-slate-950 dark:hover:text-slate-950 font-bold rounded-xl border border-emerald-500/20 transition-all text-xs inline-flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                            <span>مدیریت دسترسی‌ها</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDirectTicket(acc)}
+                              className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white font-bold rounded-xl border border-blue-500/20 transition-all text-xs inline-flex items-center gap-1 cursor-pointer"
+                              title="ارسال مستقیم تیکت به کاربر"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>تیکت</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAccountModal(acc)}
+                              className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-slate-950 dark:hover:text-slate-950 font-bold rounded-xl border border-emerald-500/20 transition-all text-xs inline-flex items-center gap-1 cursor-pointer"
+                              title="مدیریت دسترسی‌های هاست و وردپرس"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                              <span>مدیریت هاست</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -402,7 +635,81 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
         </div>
       )}
 
-      {/* TAB 2: GLOBAL PRO SETTINGS */}
+      {/* TAB 2: DOWNLOADABLE RESOURCES MANAGEMENT */}
+      {activeTab === "resources" && (
+        <div className="space-y-6">
+          <div className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-4">
+              <div>
+                <h2 className="text-lg font-black text-primary flex items-center gap-2">
+                  <FolderDown className="w-5 h-5 text-emerald-500" />
+                  <span>مدیریت پکیج‌های دانلودی و افزونه‌های اختصاصی پرو</span>
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  فایل‌های این بخش در مرکز دانلود کاربران پرو و پرومکس فعال نمایش داده می‌شوند.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddResourceModal(true)}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-emerald-500/20 flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>افزودن پکیج / فایل جدید</span>
+              </button>
+            </div>
+
+            {loadingResources ? (
+              <div className="py-12 text-center text-muted flex flex-col items-center gap-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-emerald-500" />
+                <span className="text-xs">در حال دریافت فایل‌ها...</span>
+              </div>
+            ) : resourcesList.length === 0 ? (
+              <div className="py-12 text-center text-muted space-y-2">
+                <FileArchive className="w-8 h-8 mx-auto opacity-50 text-emerald-500" />
+                <p className="text-xs font-bold text-primary">هیچ فایلی ثبت نشده است</p>
+                <p className="text-[11px]">با زدن دکمه «افزودن پکیج»، اولین فایل یا پکیج افزونه‌ها را تعریف کنید.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {resourcesList.map((item) => (
+                  <div key={item.id} className="bg-surface p-5 rounded-2xl border border-subtle space-y-3 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            {item.fileType || "ZIP"}
+                          </span>
+                          <span className="text-xs font-mono text-muted">حجم: {item.fileSize}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteResource(item.id)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                          title="حذف این فایل"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <h3 className="font-black text-sm text-primary">{item.title}</h3>
+                      <p className="text-xs text-secondary leading-relaxed">{item.description}</p>
+                    </div>
+
+                    <div className="pt-2.5 border-t border-subtle/60 flex items-center justify-between text-[11px] text-muted">
+                      <span>نسخه: {item.version || "۱.۰"}</span>
+                      <span>بروزرسانی: {item.updatedAt || "اخیر"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: GLOBAL PRO SETTINGS */}
       {activeTab === "settings" && (
         <form onSubmit={handleSaveSettings} className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
           <div className="border-b border-border-subtle pb-4 flex items-center justify-between">
@@ -795,11 +1102,25 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
               </div>
             </div>
 
+            {/* Auto Ticket Notification Checkbox */}
+            <div className="bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-2xl flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="sendTicketCheckbox"
+                checked={sendTicketOnSave}
+                onChange={(e) => setSendTicketOnSave(e.target.checked)}
+                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              />
+              <label htmlFor="sendTicketCheckbox" className="text-xs text-primary font-bold cursor-pointer">
+                ارسال خودکار مشخصات دامنه، cPanel و وردپرس در قالب تیکت پشتیبانی برای کاربر
+              </label>
+            </div>
+
             <div className="pt-4 border-t border-border-subtle flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedAccount(null)}
-                className="px-5 py-2.5 bg-surface text-muted font-bold text-xs rounded-xl hover:bg-subtle"
+                className="px-5 py-2.5 bg-surface text-muted font-bold text-xs rounded-xl hover:bg-subtle cursor-pointer"
               >
                 انصراف
               </button>
@@ -807,10 +1128,197 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                 type="button"
                 onClick={handleSaveAccount}
                 disabled={savingAccount}
-                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 {savingAccount ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                <span>ذخیره تغییرات و ارسال اطلاعات</span>
+                <span>ذخیره تغییرات و صدور دسترسی</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIRECT TICKET MODAL (SUPERADMIN TO PRO USER) */}
+      {ticketTargetAccount && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border-subtle rounded-3xl max-w-xl w-full p-6 md:p-8 space-y-5 shadow-2xl animate-scale-up" dir="rtl">
+            <div className="border-b border-border-subtle pb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-primary">ارسال تیکت مستقیم به مدیر فروشگاه</h3>
+                  <span className="text-xs text-muted">
+                    کاربر: {ticketTargetAccount.fullName || ticketTargetAccount.user?.storeName} ({ticketTargetAccount.mobile || ticketTargetAccount.user?.mobile})
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setTicketTargetAccount(null)}
+                className="text-muted hover:text-primary p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendDirectTicketSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-secondary mb-1.5">موضوع تیکت:</label>
+                <input
+                  type="text"
+                  value={directTicketSubject}
+                  onChange={(e) => setDirectTicketSubject(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-secondary mb-1.5">دپارتمان:</label>
+                  <input
+                    type="text"
+                    value="اکانت پرو و راه‌اندازی هاست"
+                    disabled
+                    className="w-full px-4 py-2.5 bg-surface border border-subtle rounded-xl text-xs text-muted font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-secondary mb-1.5">اولویت:</label>
+                  <select
+                    value={directTicketPriority}
+                    onChange={(e) => setDirectTicketPriority(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="HIGH">فوری / بالا (HIGH)</option>
+                    <option value="MEDIUM">معمولی (MEDIUM)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-secondary mb-1.5">متن پیام یا مشخصات ارسالی:</label>
+                <textarea
+                  value={directTicketMsg}
+                  onChange={(e) => setDirectTicketMsg(e.target.value)}
+                  rows={8}
+                  className="w-full p-4 bg-background border border-subtle rounded-2xl text-xs text-primary font-mono leading-relaxed focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div className="pt-3 border-t border-border-subtle flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTicketTargetAccount(null)}
+                  className="px-5 py-2.5 bg-surface text-muted font-bold text-xs rounded-xl hover:bg-subtle cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingDirectTicket}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {sendingDirectTicket ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  <span>ارسال تیکت مستقیم</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADD RESOURCE MODAL */}
+      {showAddResourceModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border-subtle rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-scale-up" dir="rtl">
+            <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+              <h3 className="text-base font-black text-primary flex items-center gap-2">
+                <FolderDown className="w-5 h-5 text-emerald-500" />
+                <span>افزودن فایل دانلودی جدید به اکانت‌های پرو</span>
+              </h3>
+              <button onClick={() => setShowAddResourceModal(false)} className="text-muted hover:text-primary">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-secondary mb-1">عنوان پکیج / فایل:</label>
+                <input
+                  type="text"
+                  value={newResTitle}
+                  onChange={(e) => setNewResTitle(e.target.value)}
+                  placeholder="مثال: پکیج افزونه‌های سئو و امنیت نسخه ۳"
+                  className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-secondary mb-1">توضیحات و مشخصات اقلام:</label>
+                <textarea
+                  value={newResDesc}
+                  onChange={(e) => setNewResDesc(e.target.value)}
+                  placeholder="توضیح کوتاه در مورد افزونه‌ها یا راهنما..."
+                  rows={3}
+                  className="w-full p-3 bg-background border border-subtle rounded-xl text-xs text-primary outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-secondary mb-1">نوع فایل:</label>
+                  <select
+                    value={newResFileType}
+                    onChange={(e) => setNewResFileType(e.target.value)}
+                    className="w-full px-2 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono outline-none"
+                  >
+                    <option value="ZIP">ZIP</option>
+                    <option value="PDF">PDF</option>
+                    <option value="XML">XML / WXR</option>
+                    <option value="RAR">RAR</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-secondary mb-1">نسخه:</label>
+                  <input
+                    type="text"
+                    value={newResVersion}
+                    onChange={(e) => setNewResVersion(e.target.value)}
+                    placeholder="2.4"
+                    className="w-full px-2 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-secondary mb-1">حجم:</label>
+                  <input
+                    type="text"
+                    value={newResFileSize}
+                    onChange={(e) => setNewResFileSize(e.target.value)}
+                    placeholder="45 MB"
+                    className="w-full px-2 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => setShowAddResourceModal(false)}
+                className="px-4 py-2 bg-surface text-muted text-xs font-bold rounded-xl"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                onClick={handleAddResource}
+                className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl shadow-md cursor-pointer"
+              >
+                ثبت و اضافه به لیست
               </button>
             </div>
           </div>

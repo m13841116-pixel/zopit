@@ -640,7 +640,7 @@ export default function SupplierPenaltyManagement() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse">
+            <table className="w-full text-right border-collapse min-w-[800px]">
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs bg-surface/50">
                   <th className="py-3 px-3 font-semibold rounded-r-xl">عنوان قانون</th>
@@ -738,7 +738,7 @@ export default function SupplierPenaltyManagement() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse">
+            <table className="w-full text-right border-collapse min-w-[800px]">
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs bg-surface/50">
                   <th className="py-3 px-3 font-semibold rounded-r-xl">تامین‌کننده</th>

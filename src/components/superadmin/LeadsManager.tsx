@@ -307,22 +307,22 @@ export default function LeadsManager() {
   }).sort((a, b) => b.completedCount - a.completedCount || b.earnedCommission - a.earnedCommission);
 
   return (
-    <div className="space-y-8 animate-fade-in text-slate-900 dark:text-slate-100" dir="rtl" id="leads-ambassadors-section">
+    <div className="space-y-6 animate-fade-in text-primary" dir="rtl" id="leads-ambassadors-section">
       {/* Top Header */}
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="bg-card p-6 md:p-7 rounded-3xl border border-border-subtle shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-sm shrink-0">
             <Target className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-950 dark:text-white flex items-center gap-2">
+            <h1 className="text-xl font-black text-primary flex items-center gap-2">
               تأمین‌یاب‌ها و مدیریت جذب تامین‌کنندگان هدف
-              <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-950 dark:bg-indigo-950 dark:text-indigo-200 font-bold">
-                توسعه بازار
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                توسعه بازار B2B
               </span>
             </h1>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium leading-relaxed">
-              تعریف تامین‌کنندگان مدنظر، تعیین پاداش جذب، انتساب به تأمین‌یاب‌ها و پایش لحظه‌ای مذاکرات
+            <p className="text-xs text-muted mt-1 font-medium leading-relaxed">
+              تعریف تامین‌کنندگان هدف بازار، تعیین پاداش جذب، انتساب به تأمین‌یاب‌ها و پایش لحظه‌ای مذاکرات
             </p>
           </div>
         </div>
@@ -341,73 +341,73 @@ export default function LeadsManager() {
             });
             setShowAddModal(true);
           }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer shrink-0"
+          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           <span>افزودن تامین‌کننده هدف جدید</span>
         </button>
       </div>
 
-      {/* Metric Cards - Ultra Clean High-Contrast */}
+      {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex items-center justify-between">
+        <div className="bg-card border border-border-subtle rounded-2xl p-5 shadow-xs flex items-center justify-between hover:border-emerald-500/30 transition-all">
           <div>
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-400">کل تامین‌کنندگان هدف</p>
-            <p className="text-2xl font-black text-slate-950 dark:text-white mt-1">
-              {stats.totalLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-slate-500">فروشگاه/برند</span>
+            <p className="text-xs font-bold text-muted">کل تامین‌کنندگان هدف</p>
+            <p className="text-2xl font-black text-primary mt-1">
+              {stats.totalLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-muted">فروشگاه / برند</span>
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+          <div className="w-12 h-12 rounded-xl bg-surface text-secondary flex items-center justify-center border border-subtle">
             <Building className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex items-center justify-between">
+        <div className="bg-card border border-border-subtle rounded-2xl p-5 shadow-xs flex items-center justify-between hover:border-blue-500/30 transition-all">
           <div>
-            <p className="text-xs font-bold text-blue-600 dark:text-blue-400">در حال پیگیری و مذاکره</p>
-            <p className="text-2xl font-black text-blue-950 dark:text-blue-100 mt-1">
-              {stats.assignedLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-slate-500">مورد فعال</span>
+            <p className="text-xs font-bold text-blue-500 dark:text-blue-400">در حال پیگیری و مذاکره</p>
+            <p className="text-2xl font-black text-blue-600 dark:text-blue-300 mt-1">
+              {stats.assignedLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-muted">مورد فعال</span>
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200 dark:border-blue-800">
+          <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center border border-blue-500/20">
             <Clock className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex items-center justify-between">
+        <div className="bg-card border border-border-subtle rounded-2xl p-5 shadow-xs flex items-center justify-between hover:border-emerald-500/30 transition-all">
           <div>
             <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">جذب‌شده و ثبت‌نام موفق</p>
-            <p className="text-2xl font-black text-emerald-950 dark:text-emerald-100 mt-1">
-              {stats.completedLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-slate-500">تامین‌کننده</span>
+            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+              {stats.completedLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-muted">تامین‌کننده</span>
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
             <CheckCircle2 className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex items-center justify-between">
+        <div className="bg-card border border-border-subtle rounded-2xl p-5 shadow-xs flex items-center justify-between hover:border-amber-500/30 transition-all">
           <div>
-            <p className="text-xs font-bold text-amber-600 dark:text-amber-400">پورسانت‌های پرداخت‌شده</p>
-            <p className="text-2xl font-black text-amber-950 dark:text-amber-100 mt-1">
-              {stats.paidCommissions.toLocaleString("fa-IR")} <span className="text-xs font-medium text-slate-500">تومان</span>
+            <p className="text-xs font-bold text-amber-500 dark:text-amber-400">پورسانت‌های پرداخت‌شده</p>
+            <p className="text-2xl font-black text-amber-600 dark:text-amber-300 mt-1">
+              {stats.paidCommissions.toLocaleString("fa-IR")} <span className="text-xs font-medium text-muted">تومان</span>
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200 dark:border-amber-800">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
             <DollarSign className="w-6 h-6" />
           </div>
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+      <div className="flex items-center gap-2 bg-surface p-1.5 rounded-2xl border border-subtle self-start w-fit">
         <button
           type="button"
           onClick={() => setActiveViewTab("leads")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
             activeViewTab === "leads"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+              : "text-muted hover:text-primary"
           }`}
         >
           <Target className="w-4 h-4" />
@@ -417,10 +417,10 @@ export default function LeadsManager() {
         <button
           type="button"
           onClick={() => setActiveViewTab("ambassadors")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
             activeViewTab === "ambassadors"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+              : "text-muted hover:text-primary"
           }`}
         >
           <Award className="w-4 h-4" />
@@ -432,15 +432,15 @@ export default function LeadsManager() {
       {activeViewTab === "leads" && (
         <div className="space-y-4">
           {/* Filter Bar */}
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-center gap-3">
+          <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs flex flex-col md:flex-row items-center gap-3">
             <div className="relative flex-1 w-full">
-              <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-muted" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="جستجو بر اساس نام تامین‌کننده، شماره تماس، دسته‌بندی یا تأمین‌یاب..."
-                className="w-full pl-4 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                className="w-full pl-4 pr-10 py-2.5 bg-background border border-subtle rounded-xl text-xs font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
@@ -448,7 +448,7 @@ export default function LeadsManager() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-900 dark:text-white outline-none"
+                className="bg-background border border-subtle rounded-xl px-3 py-2.5 text-xs font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="ALL">همه وضعیت‌ها</option>
                 <option value="PENDING">آزاد (در انتظار تأمین‌یاب)</option>
@@ -460,7 +460,7 @@ export default function LeadsManager() {
               <select
                 value={ambassadorFilter}
                 onChange={(e) => setAmbassadorFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-900 dark:text-white outline-none"
+                className="bg-background border border-subtle rounded-xl px-3 py-2.5 text-xs font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="ALL">همه تأمین‌یاب‌ها</option>
                 <option value="NONE">بدون تأمین‌یاب (آزاد)</option>
@@ -474,10 +474,10 @@ export default function LeadsManager() {
           </div>
 
           {/* Leads Table */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+          <div className="bg-card rounded-2xl border border-border-subtle overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-extrabold border-b border-slate-200 dark:border-slate-700">
+              <table className="w-full text-right text-xs min-w-[800px]">
+                <thead className="bg-surface border-b border-subtle text-muted font-bold">
                   <tr>
                     <th className="p-4">نام تامین‌کننده / برند</th>
                     <th className="p-4">دسته‌بندی و حوزه کالا</th>
@@ -488,16 +488,16 @@ export default function LeadsManager() {
                     <th className="p-4 text-center">عملیات</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody className="divide-y divide-subtle">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="p-10 text-center text-slate-500 font-bold">
+                      <td colSpan={7} className="p-10 text-center text-muted font-bold">
                         در حال بارگذاری اطلاعات...
                       </td>
                     </tr>
                   ) : filteredLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-12 text-center text-slate-500 font-bold">
+                      <td colSpan={7} className="p-12 text-center text-muted font-bold">
                         تامین‌کننده‌ای با مشخصات مدنظر یافت نشد.
                       </td>
                     </tr>
@@ -505,37 +505,36 @@ export default function LeadsManager() {
                     filteredLeads.map((lead) => {
                       const isCompleted = lead.status === "COMPLETED";
                       const isAssigned = lead.status === "ASSIGNED" || lead.status === "IN_NEGOTIATION";
-                      const isPending = lead.status === "PENDING";
 
                       return (
                         <tr
                           key={lead.id}
-                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                          className="hover:bg-surface/50 transition-colors"
                         >
                           <td className="p-4">
-                            <div className="font-extrabold text-slate-950 dark:text-white text-sm">
+                            <div className="font-extrabold text-primary text-sm">
                               {lead.name}
                             </div>
-                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                            <span className="text-[10px] text-muted block mt-0.5 font-mono">
                               کد پرونده: #{lead.id}
                             </span>
                           </td>
 
                           <td className="p-4">
-                            <span className="inline-block px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-bold">
+                            <span className="inline-block px-2.5 py-1 bg-surface text-secondary border border-subtle rounded-lg text-[11px] font-bold">
                               {lead.category || "عمومی"}
                             </span>
                           </td>
 
-                          <td className="p-4 text-slate-700 dark:text-slate-300">
-                            <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400" dir="ltr">
+                          <td className="p-4 text-secondary">
+                            <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">
                               <Phone className="w-3.5 h-3.5" />
                               <a href={`tel:${lead.phone}`} className="hover:underline">
                                 {lead.phone}
                               </a>
                             </div>
                             {lead.address && (
-                              <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-xs truncate">
+                              <div className="flex items-center gap-1 text-[11px] text-muted mt-1 max-w-xs truncate">
                                 <Building className="w-3 h-3 shrink-0" />
                                 <span>{lead.address}</span>
                               </div>
@@ -543,7 +542,7 @@ export default function LeadsManager() {
                           </td>
 
                           <td className="p-4">
-                            <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                            <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm font-mono">
                               {Number(lead.commission).toLocaleString("fa-IR")}{" "}
                               <span className="text-[10px] font-bold">تومان</span>
                             </span>
@@ -554,7 +553,7 @@ export default function LeadsManager() {
                               <select
                                 value={lead.ambassadorId ? String(lead.ambassadorId) : ""}
                                 onChange={(e) => handleAssignAmbassador(lead.id, e.target.value)}
-                                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-2 py-1.5 text-xs font-bold outline-none"
+                                className="bg-background border border-subtle text-primary rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                               >
                                 <option value="">-- بدون تأمین‌یاب (آزاد) --</option>
                                 {ambassadors.map((amb) => (
@@ -568,14 +567,14 @@ export default function LeadsManager() {
 
                           <td className="p-4">
                             <span
-                              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black border ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${
                                 isCompleted
-                                  ? "bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-50 dark:border-emerald-700"
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                   : isAssigned
-                                  ? "bg-blue-100 text-blue-950 border-blue-300 dark:bg-blue-900 dark:text-blue-50 dark:border-blue-700"
+                                  ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
                                   : lead.status === "CANCELLED"
-                                  ? "bg-rose-100 text-rose-950 border-rose-300 dark:bg-rose-900 dark:text-rose-50 dark:border-rose-700"
-                                  : "bg-amber-400 text-slate-950 border-amber-500 dark:bg-amber-400 dark:text-slate-950 dark:border-amber-300"
+                                  ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                               }`}
                             >
                               {isCompleted && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -596,7 +595,7 @@ export default function LeadsManager() {
                                 <button
                                   type="button"
                                   onClick={() => handleStatusChange(lead.id, "COMPLETED")}
-                                  className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 rounded-lg transition-all"
+                                  className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-slate-950 rounded-lg transition-all cursor-pointer"
                                   title="ثبت به عنوان جذب موفق و واریز پاداش تأمین‌یاب"
                                 >
                                   <CheckCircle2 className="w-4 h-4" />
@@ -606,7 +605,7 @@ export default function LeadsManager() {
                               <button
                                 type="button"
                                 onClick={() => openEditModal(lead)}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 rounded-lg transition-all"
+                                className="p-1.5 bg-surface hover:bg-subtle text-secondary hover:text-primary rounded-lg transition-all cursor-pointer"
                                 title="ویرایش اطلاعات و مبلغ پاداش"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -615,7 +614,7 @@ export default function LeadsManager() {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteLead(lead.id)}
-                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 dark:text-rose-300 rounded-lg transition-all"
+                                className="p-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-lg transition-all cursor-pointer"
                                 title="حذف تامین‌کننده هدف"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -636,20 +635,20 @@ export default function LeadsManager() {
       {/* VIEW TAB 2: AMBASSADOR LEADERBOARD */}
       {activeViewTab === "ambassadors" && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800">
-              <h3 className="text-base font-black text-slate-950 dark:text-white flex items-center gap-2">
+          <div className="bg-card rounded-2xl border border-border-subtle overflow-hidden shadow-xs">
+            <div className="p-5 border-b border-subtle">
+              <h3 className="text-base font-black text-primary flex items-center gap-2">
                 <Award className="w-5 h-5 text-amber-500" />
-                رتبه‌بندی و گزارش عملکرد تأمین‌یاب‌ها
+                <span>رتبه‌بندی و گزارش عملکرد تأمین‌یاب‌ها</span>
               </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
+              <p className="text-xs text-muted mt-1 font-medium">
                 تعداد تامین‌کنندگان راضی‌شده، پرونده‌های در جریان و مجموع پاداش‌های کسب‌شده توسط هر تأمین‌یاب
               </p>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-extrabold border-b border-slate-200 dark:border-slate-700">
+              <table className="w-full text-right text-xs min-w-[800px]">
+                <thead className="bg-surface border-b border-subtle text-muted font-bold">
                   <tr>
                     <th className="p-4">رتبه</th>
                     <th className="p-4">نام تأمین‌یاب</th>
@@ -660,16 +659,16 @@ export default function LeadsManager() {
                     <th className="p-4">مجموع پاداش دریافتی</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody className="divide-y divide-subtle">
                   {ambassadorStats.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-10 text-center text-slate-500 font-bold">
+                      <td colSpan={7} className="p-10 text-center text-muted font-bold">
                         هنوز تأمین‌یاب فعالی در سیستم ثبت نشده است.
                       </td>
                     </tr>
                   ) : (
                     ambassadorStats.map((item, idx) => (
-                      <tr key={item.ambassador.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <tr key={item.ambassador.id} className="hover:bg-surface/50 transition-colors">
                         <td className="p-4">
                           <span className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs ${
                             idx === 0
@@ -678,24 +677,24 @@ export default function LeadsManager() {
                               ? "bg-slate-300 text-slate-900 font-black"
                               : idx === 2
                               ? "bg-amber-700 text-amber-50 font-black"
-                              : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                              : "bg-surface text-secondary border border-subtle"
                           }`}>
                             {idx + 1}
                           </span>
                         </td>
 
                         <td className="p-4">
-                          <div className="font-extrabold text-slate-950 dark:text-white text-sm">
+                          <div className="font-extrabold text-primary text-sm">
                             {item.ambassador.firstName || item.ambassador.username} {item.ambassador.lastName || ""}
                           </div>
-                          <span className="text-[10px] text-slate-400">شناسه: #{item.ambassador.id}</span>
+                          <span className="text-[10px] text-muted font-mono">شناسه: #{item.ambassador.id}</span>
                         </td>
 
-                        <td className="p-4 font-mono text-xs font-bold text-slate-600 dark:text-slate-300" dir="ltr">
+                        <td className="p-4 font-mono text-xs font-bold text-secondary" dir="ltr">
                           {item.ambassador.phone || "-"}
                         </td>
 
-                        <td className="p-4 font-bold text-blue-600 dark:text-blue-400">
+                        <td className="p-4 font-bold text-blue-500">
                           {item.inProgressCount} مورد در حال مذاکره
                         </td>
 
@@ -705,19 +704,19 @@ export default function LeadsManager() {
                           </span>
                         </td>
 
-                        <td className="p-4 font-bold text-slate-700 dark:text-slate-300">
+                        <td className="p-4 font-bold text-secondary">
                           <div className="flex items-center gap-2">
-                            <div className="w-20 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                            <div className="w-20 bg-surface border border-subtle h-2 rounded-full overflow-hidden">
                               <div
                                 className="bg-emerald-500 h-full rounded-full"
                                 style={{ width: `${item.conversionRate}%` }}
                               />
                             </div>
-                            <span>{item.conversionRate}%</span>
+                            <span className="font-mono">{item.conversionRate}%</span>
                           </div>
                         </td>
 
-                        <td className="p-4 font-black text-slate-950 dark:text-white text-sm">
+                        <td className="p-4 font-black text-primary text-sm font-mono">
                           {item.earnedCommission.toLocaleString("fa-IR")} تومان
                         </td>
                       </tr>
@@ -732,17 +731,17 @@ export default function LeadsManager() {
 
       {/* MODAL: Add / Edit Target Supplier Lead */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up" dir="rtl">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-base font-black text-slate-950 dark:text-white flex items-center gap-2">
-                <Target className="w-5 h-5 text-indigo-600" />
-                {editingLead ? "ویرایش تامین‌کننده هدف و پورسانت" : "تعریف تامین‌کننده هدف جدید"}
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up" dir="rtl">
+            <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+              <h3 className="text-base font-black text-primary flex items-center gap-2">
+                <Target className="w-5 h-5 text-emerald-500" />
+                <span>{editingLead ? "ویرایش تامین‌کننده هدف و پاداش" : "تعریف تامین‌کننده هدف جدید"}</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
+                className="p-1 rounded-lg hover:bg-surface text-muted hover:text-primary cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -750,7 +749,7 @@ export default function LeadsManager() {
 
             <form onSubmit={handleSaveLead} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-secondary mb-1">
                   نام تامین‌کننده / فروشگاه / برند *
                 </label>
                 <input
@@ -759,13 +758,13 @@ export default function LeadsManager() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="مثال: بازرگانی پارس دیجیتال یا عمده‌فروشی برادران احمدی"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-bold text-secondary mb-1">
                     شماره تماس / موبایل مدیر *
                   </label>
                   <input
@@ -775,26 +774,26 @@ export default function LeadsManager() {
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="09123456789"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white outline-none focus:border-indigo-500 text-left"
+                    className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500 text-left"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-bold text-secondary mb-1">
                     صنف و دسته‌بندی کالا
                   </label>
                   <input
                     type="text"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="مثال: قاب و گلس یا لوازم جانبی"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                    placeholder="مثال: لوازم جانبی موبایل"
+                    className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-secondary mb-1">
                   آدرس یا موقعیت بازار
                 </label>
                 <input
@@ -802,13 +801,13 @@ export default function LeadsManager() {
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="مثال: تهران، پاساژ علاءالدین، طبقه ۳، پلاک ۳۱۵"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-bold text-secondary mb-1">
                     پاداش تأمین‌یاب به ازای ثبت‌نام (تومان) *
                   </label>
                   <input
@@ -817,19 +816,36 @@ export default function LeadsManager() {
                     step={10000}
                     value={formData.commission}
                     onChange={(e) => setFormData({ ...formData, commission: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:border-indigo-500 text-left"
+                    className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500 text-left"
                     dir="ltr"
                   />
+                  {/* Quick Commission Presets */}
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {[100000, 150000, 200000, 250000].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, commission: preset })}
+                        className={`text-[10px] px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
+                          formData.commission === preset
+                            ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/40 font-bold"
+                            : "bg-surface text-muted border-subtle hover:text-primary"
+                        }`}
+                      >
+                        {(preset / 1000).toLocaleString("fa-IR")}هزار
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-bold text-secondary mb-1">
                     تخصیص به تأمین‌یاب (اختیاری)
                   </label>
                   <select
                     value={formData.ambassadorId}
                     onChange={(e) => setFormData({ ...formData, ambassadorId: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none"
+                    className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
                     <option value="">-- آزاد (انتخاب توسط خود تأمین‌یاب‌ها) --</option>
                     {ambassadors.map((amb) => (
@@ -841,18 +857,18 @@ export default function LeadsManager() {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
+              <div className="pt-4 border-t border-border-subtle flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-muted hover:text-primary bg-surface hover:bg-subtle cursor-pointer"
                 >
                   انصراف
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+                  className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black shadow-md shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting ? "در حال ثبت..." : editingLead ? "ذخیره تغییرات" : "ثبت تامین‌کننده هدف"}
                 </button>

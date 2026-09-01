@@ -313,7 +313,7 @@ export default function Categories() {
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
+            <table className="w-full text-right text-sm min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50/90 border-b border-slate-200/80 text-slate-600 font-bold text-xs uppercase tracking-wider">
                   <th className="px-6 py-4">کد</th>

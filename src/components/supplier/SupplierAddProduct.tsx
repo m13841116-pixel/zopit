@@ -653,7 +653,7 @@ export function SupplierAddProduct({
             </div>
 
             <div className="max-h-72 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
-              <table className="w-full text-right text-xs">
+              <table className="w-full text-right text-xs min-w-[800px]">
                 <thead className="bg-slate-100 dark:bg-slate-800 font-extrabold text-slate-700 dark:text-slate-300 sticky top-0">
                   <tr>
                     <th className="p-3">ردیف</th>
@@ -1208,7 +1208,7 @@ export function SupplierAddProduct({
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-subtle">
-                <table className="w-full text-right text-sm">
+                <table className="w-full text-right text-sm min-w-[800px]">
                   <thead className="bg-surface text-muted">
                     <tr>
                       <th className="p-3 rounded-tr-xl">ترکیب / نام ویژگی</th>

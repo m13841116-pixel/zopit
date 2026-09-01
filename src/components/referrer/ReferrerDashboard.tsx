@@ -403,7 +403,7 @@ export default function ReferrerDashboard({ currentUser, onLogout, showNotificat
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-right border-collapse">
+                  <table className="w-full text-right border-collapse min-w-[800px]">
                     <thead>
                       <tr className="border-b border-border-default text-xs text-text-muted">
                         <th className="pb-3 font-extrabold">ردیف</th>

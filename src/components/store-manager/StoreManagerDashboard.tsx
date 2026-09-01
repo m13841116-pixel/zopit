@@ -67,9 +67,11 @@ import {
   Grid,
   Info,
   GraduationCap,
-  Ticket
+  Ticket,
+  Play
 } from "lucide-react";
 import { EducationModal } from "../EducationModal";
+import { AutomationVideoModal } from "../AutomationVideoModal";
 import { ZopitLogo } from "../ZopitLogo";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -171,6 +173,7 @@ export default function StoreManagerDashboard({
   useSyncTabWithUrl("/store", activeTab, setActiveTab, "overview", validStoreTabs);
 
   const [showEducationModal, setShowEducationModal] = useState(false);
+  const [showAutomationVideoModal, setShowAutomationVideoModal] = useState(false);
   const [unansweredQuestionsCount, setUnansweredQuestionsCount] = useState(0);
   const [sysConfig, setSysConfig] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<any>(null);
@@ -729,6 +732,19 @@ export default function StoreManagerDashboard({
             )}
 
             <button
+              onClick={() => setShowAutomationVideoModal(true)}
+              className="p-2 sm:px-3 sm:py-1.5 bg-gradient-to-r from-rose-500/10 via-purple-500/10 to-indigo-500/10 hover:from-rose-500/20 hover:to-indigo-500/20 text-rose-600 dark:text-rose-400 rounded-xl transition-all duration-200 border border-rose-500/30 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs group"
+              title="مشاهده ویدیوی ۱ دقیقه‌ای اتوماسیون فروشگاه"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+              </span>
+              <Play className="w-3.5 h-3.5 fill-current text-rose-500 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-black hidden sm:inline-block">اتوماسیون ۶۰ ثانیه‌ای</span>
+            </button>
+
+            <button
               onClick={() => setShowEducationModal(true)}
               className="p-2 bg-surface hover:bg-emerald-500/10 text-muted hover:text-emerald-600 rounded-xl transition-all duration-200 border border-subtle hover:border-emerald-200 cursor-pointer flex items-center justify-center gap-1.5"
               title="مرکز آموزش و ویدیوهای راهنما"
@@ -747,6 +763,12 @@ export default function StoreManagerDashboard({
         <EducationModal
           isOpen={showEducationModal}
           onClose={() => setShowEducationModal(false)}
+        />
+
+        <AutomationVideoModal
+          isOpen={showAutomationVideoModal}
+          onClose={() => setShowAutomationVideoModal(false)}
+          role="STORE_MANAGER"
         />
         <div className="flex-1 overflow-auto p-4 lg:p-8 relative">
           {loading ? (
@@ -1141,8 +1163,8 @@ export default function StoreManagerDashboard({
                 (sysConfig["STORE_FINANCIAL_ENABLED"] === false ? (
                   renderMaintenance("صورت‌حساب‌ها")
                 ) : (
-                  <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in">
-                    <table className="w-full text-right text-sm">
+                  <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-x-auto animate-fade-in">
+                    <table className="w-full text-right text-sm min-w-[800px]">
                       <thead className="bg-background border-b border-subtle text-muted font-medium">
                         <tr>
                           <th className="px-6 py-4">شماره فاکتور</th>
@@ -1412,8 +1434,8 @@ export default function StoreManagerDashboard({
                 </div>
               </div>
               {/* Items Breakdown Table */}
-              <div className="border border-subtle rounded-xl overflow-hidden">
-                <table className="w-full text-right text-xs">
+              <div className="border border-subtle rounded-xl overflow-x-auto">
+                <table className="w-full text-right text-xs min-w-[800px]">
                   <thead className="bg-background text-muted border-b border-subtle font-bold">
                     <tr>
                       <th className="px-4 py-3 w-12 text-center">ردیف</th>

@@ -27,7 +27,15 @@ import {
   Ticket,
   Building2,
   ShieldCheck,
-  Info
+  Info,
+  Download,
+  FileArchive,
+  HardDrive,
+  FolderDown,
+  FileCode,
+  Terminal,
+  FileCheck,
+  Layers
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 import { ProAccountMediaShowcase } from "./ProAccountMediaShowcase";
@@ -43,6 +51,13 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [loading, setLoading] = useState(true);
   const [proAccount, setProAccount] = useState<any>(null);
   const [selectedPlan, setSelectedPlan] = useState<"PRO" | "PRO_MAX">("PRO_MAX");
+  const [submitting, setSubmitting] = useState(false);
+  const [renewingHost, setRenewingHost] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showCpanelPass, setShowCpanelPass] = useState(false);
+  const [showWpPass, setShowWpPass] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [proResources, setProResources] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({
     autoApprove: true,
     proAccountPrice: 189000,
@@ -101,7 +116,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       const res = await fetch("/api/store-manager/pro/apply-discount", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: JSON.stringify({ code })
+        body: JSON.stringify({ code, planType: selectedPlan })
       });
       
       const data = await res.json();
@@ -127,7 +142,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
       setAppliedDiscount(discountAmount);
       setIsDiscountApplied(true);
-      const msg = "کد تخفیف ویژه با موفقیت اعمال گردید!";
+      const msg = `کد تخفیف ${code} با موفقیت اعمال گردید!`;
       if (showNotification) showNotification(msg, "success");
       else toast(msg, "success");
     } catch (err: any) {
@@ -143,14 +158,6 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
-
-  // Visibility toggles for passwords
-  const [showCpanelPass, setShowCpanelPass] = useState(false);
-  const [showWpPass, setShowWpPass] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  const [submitting, setSubmitting] = useState(false);
-  const [renewingHost, setRenewingHost] = useState(false);
   const [payingTorob, setPayingTorob] = useState(false);
 
   useEffect(() => {
@@ -241,11 +248,78 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           setActivePromotions(data.activePromotions);
         }
       }
+
+      // Fetch all active public promotions from public API
+      try {
+        const promoRes = await fetch("/api/public/discounts/promotions");
+        if (promoRes.ok) {
+          const promoData = await promoRes.json();
+          if (Array.isArray(promoData)) {
+            setActivePromotions(promoData);
+          }
+        }
+      } catch (pe) {}
+
+      await fetchProResources();
     } catch (err) {
       console.error("Error fetching pro status:", err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchProResources = async () => {
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/store-manager/pro/resources", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setProResources(data);
+      }
+    } catch (e) {
+      console.error("Error fetching pro resources:", e);
+    }
+  };
+
+  const handleDownloadResource = (resource: any) => {
+    setDownloadingId(resource.id);
+    const msg = `دانلود پکیج «${resource.title}» آغاز شد.`;
+    if (showNotification) showNotification(msg, "success");
+    else toast(msg, "success");
+
+    setTimeout(() => {
+      try {
+        const dummyContent = `--- پلتفرم هوشمند زوپیت - پکیج اختصاصی اکانت پرو ---
+عنوان پکیج: ${resource.title}
+توضیحات: ${resource.description}
+نسخه: ${resource.version || '1.0'}
+حجم فایل: ${resource.fileSize || 'اختصاصی'}
+پلتفرم: فروشگاه‌ساز ابری زوپیت (Zopit Cloud E-Commerce)
+
+راهنمای سریع استفاده:
+۱. وارد پیشخوان مدیریت وردپرس فروشگاه اختصاصی خود شوید.
+۲. از منوی افزونه‌ها > افزودن افزونه > بارگذاری، فایل را انتخاب و فعال نمایید.
+۳. درگاه‌های بانکی و وب‌سرویس پیامک به صورت خودکار متصل می‌گردند.
+۴. برای پشتیبانی می‌توانید از بخش تیکت‌های پرو استفاده کنید.
+`;
+        const blob = new Blob([dummyContent], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const ext = resource.fileType?.toLowerCase().includes("pdf") ? "pdf" : (resource.fileType?.toLowerCase().includes("xml") ? "xml" : "zip");
+        a.download = `${resource.id || 'zopit-package'}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("Download error:", err);
+      } finally {
+        setDownloadingId(null);
+      }
+    }, 600);
   };
 
   // Canvas Coordinates Helper
@@ -722,113 +796,221 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
             <div className="flex items-center justify-between border-b border-border-subtle pb-4">
               <div className="flex items-center gap-3">
                 <Server className="w-6 h-6 text-emerald-500" />
-                <h2 className="text-lg font-black text-primary">اطلاعات هاست و دسترسی‌های اختصاصی شما</h2>
+                <div>
+                  <h2 className="text-lg font-black text-primary">اطلاعات هاست و دسترسی‌های اختصاصی شما</h2>
+                  <p className="text-xs text-muted">مشخصات ورود به کنترل‌پنل هاست و پیشخوان وردپرس فروشگاه</p>
+                </div>
               </div>
               <span className="text-xs text-emerald-500 font-bold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                تخصیص یافته
+                تخصیص یافته و فعال
               </span>
             </div>
 
             {proAccount.domainName || proAccount.cpanelUrl || proAccount.wpAdminUrl ? (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Domain Card */}
-                <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-muted flex items-center gap-1.5">
-                      <Globe className="w-4 h-4 text-blue-500" /> دامنه اختصاصی:
-                    </span>
-                    {proAccount.domainName && (
-                      <a
-                        href={`https://${proAccount.domainName}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-blue-500 hover:underline flex items-center gap-1 font-mono"
-                      >
-                        باز کردن <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                  <p className="font-mono font-black text-sm text-primary dir-ltr text-right truncate">
-                    {proAccount.domainName || "در حال ثبت توسط پشتیبانی..."}
-                  </p>
-                </div>
-
-                {/* cPanel Access Card */}
-                <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-muted flex items-center gap-1.5">
-                      <Server className="w-4 h-4 text-amber-500" /> ورود به cPanel:
-                    </span>
-                    {proAccount.cpanelUrl && (
-                      <a
-                        href={proAccount.cpanelUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-amber-500 hover:underline flex items-center gap-1 font-mono"
-                      >
-                        ورود به کنترل‌پنل <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                  <div className="space-y-1.5 text-xs font-mono dir-ltr text-right">
-                    <div className="flex justify-between items-center bg-card p-2 rounded-lg border border-subtle">
-                      <span className="text-muted">User:</span>
-                      <span className="font-bold text-primary">{proAccount.cpanelUsername || "—"}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-card p-2 rounded-lg border border-subtle">
-                      <span className="text-muted">Pass:</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-primary">
-                          {showCpanelPass ? proAccount.cpanelPassword || "—" : "••••••••"}
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Domain Card */}
+                  <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-4 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-muted flex items-center gap-1.5">
+                          <Globe className="w-4 h-4 text-blue-500" /> دامنه اختصاصی:
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowCpanelPass(!showCpanelPass)}
-                          className="text-muted hover:text-primary"
+                        {proAccount.domainName && (
+                          <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                            متصل به هاست
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-mono font-black text-sm text-primary dir-ltr text-right truncate bg-card p-3 rounded-xl border border-subtle">
+                        {proAccount.domainName || "در حال اتصال توسط پشتیبانی..."}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-subtle/60 flex items-center justify-between">
+                      <span className="text-[11px] text-muted">DNSهای زوپیت: ns1.zopit.ir</span>
+                      {proAccount.domainName && (
+                        <a
+                          href={`https://${proAccount.domainName}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded-xl text-xs font-bold transition-colors flex items-center gap-1"
                         >
-                          {showCpanelPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
+                          مشاهده سایت <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* cPanel Access Card */}
+                  <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-4 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-muted flex items-center gap-1.5">
+                          <Server className="w-4 h-4 text-amber-500" /> کنترل‌پنل هاست (cPanel):
+                        </span>
+                        <span className="text-[10px] font-mono text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                          Direct Access
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-xs font-mono dir-ltr text-right">
+                        <div className="flex justify-between items-center bg-card p-2.5 rounded-xl border border-subtle">
+                          <span className="text-muted text-[11px]">User:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-primary">{proAccount.cpanelUsername || "—"}</span>
+                            {proAccount.cpanelUsername && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(proAccount.cpanelUsername);
+                                  setCopiedField("cp_user");
+                                  toast("نام کاربری cPanel کپی شد", "success");
+                                  setTimeout(() => setCopiedField(null), 2000);
+                                }}
+                                className="text-muted hover:text-primary cursor-pointer p-1"
+                                title="کپی نام کاربری"
+                              >
+                                {copiedField === "cp_user" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center bg-card p-2.5 rounded-xl border border-subtle">
+                          <span className="text-muted text-[11px]">Pass:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-primary">
+                              {showCpanelPass ? proAccount.cpanelPassword || "—" : "••••••••"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowCpanelPass(!showCpanelPass)}
+                              className="text-muted hover:text-primary cursor-pointer p-1"
+                              title={showCpanelPass ? "مخفی کردن" : "نمایش پسورد"}
+                            >
+                              {showCpanelPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                            {proAccount.cpanelPassword && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(proAccount.cpanelPassword);
+                                  setCopiedField("cp_pass");
+                                  toast("کلمه عبور cPanel کپی شد", "success");
+                                  setTimeout(() => setCopiedField(null), 2000);
+                                }}
+                                className="text-muted hover:text-primary cursor-pointer p-1"
+                                title="کپی پسورد"
+                              >
+                                {copiedField === "cp_pass" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* WP Admin Access Card */}
-                <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-muted flex items-center gap-1.5">
-                      <Lock className="w-4 h-4 text-purple-500" /> وردپرس (WP Admin):
-                    </span>
-                    {proAccount.wpAdminUrl && (
-                      <a
-                        href={proAccount.wpAdminUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-purple-500 hover:underline flex items-center gap-1 font-mono"
-                      >
-                        ورود به مدیریت <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                  <div className="space-y-1.5 text-xs font-mono dir-ltr text-right">
-                    <div className="flex justify-between items-center bg-card p-2 rounded-lg border border-subtle">
-                      <span className="text-muted">User:</span>
-                      <span className="font-bold text-primary">{proAccount.wpUsername || "—"}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-card p-2 rounded-lg border border-subtle">
-                      <span className="text-muted">Pass:</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-primary">
-                          {showWpPass ? proAccount.wpPassword || "—" : "••••••••"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowWpPass(!showWpPass)}
-                          className="text-muted hover:text-primary"
+                    <div className="pt-2 border-t border-subtle/60">
+                      {proAccount.cpanelUrl ? (
+                        <a
+                          href={proAccount.cpanelUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20"
                         >
-                          {showWpPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
+                          <span>ورود به کنترل‌پنل cPanel</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-muted block text-center">آدرس لاگین در حال صدور</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* WP Admin Access Card */}
+                  <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-4 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-muted flex items-center gap-1.5">
+                          <Lock className="w-4 h-4 text-purple-500" /> پیشخوان وردپرس (WP-Admin):
+                        </span>
+                        <span className="text-[10px] font-mono text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-md">
+                          Store Admin
+                        </span>
                       </div>
+
+                      <div className="space-y-2 text-xs font-mono dir-ltr text-right">
+                        <div className="flex justify-between items-center bg-card p-2.5 rounded-xl border border-subtle">
+                          <span className="text-muted text-[11px]">User:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-primary">{proAccount.wpUsername || "—"}</span>
+                            {proAccount.wpUsername && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(proAccount.wpUsername);
+                                  setCopiedField("wp_user");
+                                  toast("نام کاربری وردپرس کپی شد", "success");
+                                  setTimeout(() => setCopiedField(null), 2000);
+                                }}
+                                className="text-muted hover:text-primary cursor-pointer p-1"
+                                title="کپی نام کاربری"
+                              >
+                                {copiedField === "wp_user" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center bg-card p-2.5 rounded-xl border border-subtle">
+                          <span className="text-muted text-[11px]">Pass:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-primary">
+                              {showWpPass ? proAccount.wpPassword || "—" : "••••••••"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowWpPass(!showWpPass)}
+                              className="text-muted hover:text-primary cursor-pointer p-1"
+                              title={showWpPass ? "مخفی کردن" : "نمایش پسورد"}
+                            >
+                              {showWpPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                            {proAccount.wpPassword && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(proAccount.wpPassword);
+                                  setCopiedField("wp_pass");
+                                  toast("کلمه عبور وردپرس کپی شد", "success");
+                                  setTimeout(() => setCopiedField(null), 2000);
+                                }}
+                                className="text-muted hover:text-primary cursor-pointer p-1"
+                                title="کپی پسورد"
+                              >
+                                {copiedField === "wp_pass" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-subtle/60">
+                      {proAccount.wpAdminUrl ? (
+                        <a
+                          href={proAccount.wpAdminUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/20"
+                        >
+                          <span>ورود به پیشخوان وردپرس</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-muted block text-center">آدرس پیشخوان در حال صدور</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -843,6 +1025,87 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 </p>
               </div>
             )}
+          </div>
+
+          {/* DOWNLOADS & PLUGINS CENTER (NEW SECTION) */}
+          <div className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                  <FolderDown className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-primary">مرکز دانلود پکیج افزونه‌ها و فایل‌های اختصاصی فروشگاه</h2>
+                  <p className="text-xs text-muted">فایل‌های ضروری، افزونه‌های فعال‌شده و راهنماهای گام‌به‌گام برای اکانت شما</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 self-start sm:self-auto">
+                شامل لایسنس مادام‌العمر
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {proResources && proResources.length > 0 ? (
+                proResources.map((res: any) => (
+                  <div
+                    key={res.id}
+                    className="bg-surface hover:bg-surface-hover/80 p-5 rounded-2xl border border-subtle hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-4 group"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                            {res.fileType || "ZIP"}
+                          </span>
+                          <span className="text-xs font-mono text-muted">حجم: {res.fileSize || "—"}</span>
+                        </div>
+                        {res.version && (
+                          <span className="text-[11px] font-mono font-bold text-muted bg-card px-2 py-0.5 rounded-md border border-subtle">
+                            v{res.version}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="font-black text-sm text-primary group-hover:text-emerald-400 transition-colors">
+                        {res.title}
+                      </h3>
+                      <p className="text-xs text-secondary leading-relaxed font-normal">
+                        {res.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-subtle/60 flex items-center justify-between">
+                      <span className="text-[11px] text-muted">
+                        بروزرسانی: {res.updatedAt || "اخیر"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadResource(res)}
+                        disabled={downloadingId === res.id}
+                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {downloadingId === res.id ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>در حال آماده‌سازی...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3.5 h-3.5" />
+                            <span>دانلود فایل</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-2 py-8 text-center bg-surface rounded-2xl border border-subtle">
+                  <FileArchive className="w-8 h-8 text-muted mx-auto mb-2 opacity-50" />
+                  <p className="text-xs text-muted">در حال بارگذاری فایل‌های پکیج...</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* RENEWALS AND SERVICES SECTION */}
@@ -971,33 +1234,57 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           {/* Zopit Expectation Box */}
           {/* Active Promotion Banner for Initial Registration */}
           {activePromotions && activePromotions.length > 0 && !isProApproved && (
-            <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-teal-950/80 border-2 border-emerald-500/40 p-5 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5 text-right">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full">
-                      🔥 تخفیف ویژه هزینه اولیه ثبت‌نام
-                    </span>
-                    <h3 className="font-black text-sm md:text-base text-white">
-                      کد تخفیف <span className="font-mono text-emerald-400">{activePromotions[0].code}</span> فعال است!
-                    </h3>
-                  </div>
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    با استفاده از این کد از <strong className="text-emerald-300 font-bold">{activePromotions[0].discountType === 'PERCENTAGE' ? (activePromotions[0].discountValue + '٪ تخفیف') : (activePromotions[0].discountValue?.toLocaleString('fa-IR') + ' تومان تخفیف')}</strong> روی هزینه اولیه بهره‌مند شوید. {activePromotions[0].remainingUses ? ('(تنها ' + activePromotions[0].remainingUses + ' ظرفیت باقی‌مانده)') : ''}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleApplyDiscountCodeWithCode(activePromotions[0].code)}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-5 py-3 rounded-2xl transition-all shadow-lg shadow-emerald-500/20 shrink-0 cursor-pointer active:scale-95 flex items-center gap-2"
-              >
-                <Ticket className="w-4 h-4" />
-                <span>اعمال خودکار این کد تخفیف</span>
-              </button>
+            <div className="space-y-3">
+              {activePromotions
+                .filter((p: any) => !p.applicablePlan || p.applicablePlan === 'ALL' || p.applicablePlan === selectedPlan)
+                .map((promo: any, pIdx: number) => {
+                  const isCurrentApplied = isDiscountApplied && discountCodeText.trim().toUpperCase() === promo.code.toUpperCase();
+                  return (
+                    <div 
+                      key={promo.id || pIdx}
+                      className="bg-indigo-950/90 dark:bg-slate-900 border-2 border-indigo-500/50 p-5 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-sm"
+                    >
+                      <div className="flex items-center gap-3.5 text-right w-full md:w-auto">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                          <Sparkles className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full">
+                              🔥 تخفیف ویژه همگانی
+                            </span>
+                            {promo.applicablePlan && promo.applicablePlan !== 'ALL' && (
+                              <span className="bg-purple-500/30 text-purple-200 border border-purple-400/40 font-black text-[10px] px-2 py-0.5 rounded-md">
+                                {promo.applicablePlan === 'PRO_MAX' ? 'ویژه پرومکس' : 'ویژه پرو'}
+                              </span>
+                            )}
+                            <h3 className="font-black text-sm md:text-base text-white">
+                              کد تخفیف <span className="font-mono text-amber-300 font-black px-1.5 py-0.5 bg-amber-950/60 rounded-md border border-amber-500/30" dir="ltr">{promo.code}</span> فعال است!
+                            </h3>
+                          </div>
+                          <p className="text-xs text-slate-200 mt-1 leading-relaxed">
+                            {promo.title ? <strong>{promo.title}: </strong> : null}
+                            بهره‌مندی از <strong className="text-amber-300 font-bold">{promo.discountType === 'PERCENTAGE' ? (promo.discountValue + '٪ تخفیف') : (Number(promo.discountValue)?.toLocaleString('fa-IR') + ' تومان تخفیف')}</strong> روی هزینه فعال‌سازی اشتراک.
+                            {promo.maxUses ? <span className="text-slate-400 text-[11px] mr-1">(ظرفیت محدود: {promo.maxUses - (promo.usedCount || 0)} اکانت باقی‌مانده)</span> : null}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isCurrentApplied}
+                        onClick={() => handleApplyDiscountCodeWithCode(promo.code)}
+                        className={`font-black text-xs px-5 py-3 rounded-2xl transition-all shrink-0 cursor-pointer active:scale-95 flex items-center gap-2 ${
+                          isCurrentApplied
+                            ? "bg-emerald-600 text-white cursor-default opacity-90 shadow-md"
+                            : "bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20"
+                        }`}
+                      >
+                        <Ticket className="w-4 h-4" />
+                        <span>{isCurrentApplied ? "✓ این تخفیف اعمال شده است" : "اعمال خودکار این کد تخفیف"}</span>
+                      </button>
+                    </div>
+                  );
+                })}
             </div>
           )}
 

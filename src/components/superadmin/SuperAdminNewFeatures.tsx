@@ -263,7 +263,7 @@ function InfoCenterManager({
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-subtle">
           
-          <table className="w-full text-sm text-right">
+          <table className="w-full text-sm text-right min-w-[800px]">
             
             <thead className="bg-background text-muted text-xs">
               
@@ -1056,7 +1056,7 @@ function DashboardMessagesManager({
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-subtle">
           
-          <table className="w-full text-sm text-right">
+          <table className="w-full text-sm text-right min-w-[800px]">
             
             <thead className="bg-background text-muted text-xs">
               

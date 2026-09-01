@@ -199,7 +199,7 @@ export default function Financial() {
           </div>
           <div className="overflow-x-auto">
             
-            <table className="w-full text-sm text-right">
+            <table className="w-full text-sm text-right min-w-[800px]">
               
               <thead className="bg-background text-muted border-b border-subtle text-xs uppercase">
                 

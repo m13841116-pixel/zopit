@@ -683,88 +683,102 @@ export default function ProductsList() {
     sortDate !== "NEWEST";
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in text-right">
-      
-      <div className="flex justify-between items-center bg-card p-6 rounded-2xl border border-subtle shadow-sm">
-        
+    <div className="p-4 sm:p-6 space-y-4 animate-fade-in text-right">
+      {/* Header Area */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 sm:p-5 rounded-2xl border border-subtle shadow-xs">
         <div>
-          
-          <h2 className="text-2xl font-bold text-primary">
+          <h2 className="text-xl sm:text-2xl font-black text-primary flex items-center gap-2">
+            <Package className="w-5 h-5 text-primary-default" />
             مدیریت محصولات و قیمت‌گذاری
           </h2>
-          <p className="text-muted mt-1 text-sm">
-            بررسی کالاها، قیمت‌گذاری سود، مدیریت کدهای SKU و افزودن مستقیم کالا
-            توسط مدیر کل
+          <p className="text-muted mt-0.5 text-xs sm:text-sm font-medium">
+            بررسی کالاها، قیمت‌گذاری سود، مدیریت کدهای SKU و نظارت جامع بر کاتالوگ
           </p>
         </div>
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-5 py-3 bg-primary-default text-inverse rounded-xl text-sm font-bold hover:bg-primary-hover transition-colors cursor-pointer shadow-lg shadow-primary-default/10"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-default text-inverse rounded-xl text-xs sm:text-sm font-bold hover:bg-primary-hover transition-all cursor-pointer shadow-md shadow-primary-default/15 shrink-0"
         >
-          
-          <Plus className="w-5 h-5" /> افزودن محصول جدید
+          <Plus className="w-4 h-4" /> افزودن محصول جدید
         </button>
       </div>
 
-      <div className="flex border-b border-subtle gap-4">
+      {/* Tabs */}
+      <div className="flex items-center border-b border-subtle gap-2 text-xs sm:text-sm">
         <button
           onClick={() => setSubTab("all")}
-          className={`pb-3 text-sm font-bold transition-all px-2 border-b-2 cursor-pointer ${subTab === "all" ? "border-primary-default text-primary-default" : "border-transparent text-muted hover:text-primary"}`}
+          className={`pb-2.5 font-bold transition-all px-3 border-b-2 cursor-pointer flex items-center gap-1.5 ${
+            subTab === "all"
+              ? "border-primary-default text-primary-default"
+              : "border-transparent text-muted hover:text-primary"
+          }`}
         >
-          لیست کل محصولات
+          <ListIcon className="w-4 h-4" />
+          <span>لیست کل محصولات</span>
+          <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full font-mono font-bold">
+            {products.length}
+          </span>
         </button>
         <button
           onClick={() => setSubTab("explore")}
-          className={`pb-3 text-sm font-bold transition-all px-2 border-b-2 cursor-pointer ${subTab === "explore" ? "border-primary-default text-primary-default" : "border-transparent text-muted hover:text-primary"}`}
+          className={`pb-2.5 font-bold transition-all px-3 border-b-2 cursor-pointer flex items-center gap-1.5 ${
+            subTab === "explore"
+              ? "border-primary-default text-primary-default"
+              : "border-transparent text-muted hover:text-primary"
+          }`}
         >
-          مدیریت محتوای سفارشی اکسپلور ({exploreProducts.length})
+          <Sparkles className="w-4 h-4" />
+          <span>مدیریت محتوای سفارشی اکسپلور</span>
+          <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full font-mono font-bold">
+            {exploreProducts.length}
+          </span>
         </button>
       </div>
 
       {subTab === "all" ? (
         loading ? (
           <div className="space-y-4 animate-pulse">
-            <div className="h-16 bg-slate-200 dark:bg-slate-700/60 rounded-2xl w-full" />
+            <div className="h-14 bg-slate-200 dark:bg-slate-700/60 rounded-2xl w-full" />
             <TableSkeleton cols={7} rows={7} />
           </div>
         ) : (
-        <div className="space-y-4">
-          {/* Search and Filters Bar */}
-          <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm space-y-4">
-            {/* Top Bar: Search input & main controls */}
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-              {/* Search Input */}
-              <div className="relative w-full lg:w-96">
-                <input
-                  type="text"
-                  placeholder="جستجو نام محصول، کد SKU، تامین‌کننده..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pr-10 pl-8 py-2.5 bg-surface border border-subtle rounded-xl text-sm font-medium text-primary focus:outline-none focus:border-primary-default transition-all"
-                />
-                <Search className="w-5 h-5 text-muted absolute right-3 top-3" />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute left-3 top-3 text-muted hover:text-primary text-xs cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+        <div className="space-y-3">
+          {/* Compact Streamlined Filter Toolbar */}
+          <div className="bg-card p-3 sm:p-4 rounded-2xl border border-subtle shadow-xs space-y-2.5">
+            {/* Row 1: Search, Dropdowns, Action Buttons & View Toggle */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              {/* Right Side: Search & Quick Filters */}
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                {/* Search Input */}
+                <div className="relative w-full sm:w-64 lg:w-72">
+                  <input
+                    type="text"
+                    placeholder="جستجو نام، SKU، تامین‌کننده..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pr-8 pl-7 py-1.5 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default transition-all"
+                  />
+                  <Search className="w-4 h-4 text-muted absolute right-2.5 top-2" />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute left-2.5 top-2 text-muted hover:text-primary text-xs cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
 
-              {/* Main Selects Row */}
-              <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                {/* Category Select */}
-                <div className="flex items-center gap-1.5 bg-surface px-3 py-2 rounded-xl border border-subtle text-xs">
-                  <Layers className="w-4 h-4 text-muted" />
+                {/* Category Dropdown */}
+                <div className="flex items-center gap-1 bg-surface px-2.5 py-1.5 rounded-xl border border-subtle text-xs">
+                  <Layers className="w-3.5 h-3.5 text-muted shrink-0" />
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="bg-transparent text-primary font-bold focus:outline-none cursor-pointer"
+                    className="bg-transparent text-primary font-bold focus:outline-none cursor-pointer text-xs"
                   >
                     <option value="ALL" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-                      همه دسته‌بندی‌ها
+                      دسته‌بندی (همه)
                     </option>
                     {categories.map((c, idx) => {
                       const name = c.name && c.name.trim() ? c.name : (DEFAULT_CATEGORIES[idx]?.name || `دسته‌بندی ${c.id}`);
@@ -777,15 +791,15 @@ export default function ProductsList() {
                   </select>
                 </div>
 
-                {/* Supplier Select */}
-                <div className="flex items-center gap-1.5 bg-surface px-3 py-2 rounded-xl border border-subtle text-xs">
-                  <Users className="w-4 h-4 text-muted" />
+                {/* Supplier Dropdown */}
+                <div className="flex items-center gap-1 bg-surface px-2.5 py-1.5 rounded-xl border border-subtle text-xs">
+                  <Users className="w-3.5 h-3.5 text-muted shrink-0" />
                   <select
                     value={selectedSupplier}
                     onChange={(e) => setSelectedSupplier(e.target.value)}
-                    className="bg-transparent text-primary font-bold focus:outline-none cursor-pointer"
+                    className="bg-transparent text-primary font-bold focus:outline-none cursor-pointer text-xs"
                   >
-                    <option value="ALL">همه تامین‌کنندگان</option>
+                    <option value="ALL">تامین‌کننده (همه)</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={String(s.id)}>
                         {s.brandName || `${s.firstName || ""} ${s.lastName || ""}` || s.username}
@@ -794,63 +808,97 @@ export default function ProductsList() {
                   </select>
                 </div>
 
-                {/* Pricing Status Select */}
-                <div className="flex items-center gap-1.5 bg-surface px-3 py-2 rounded-xl border border-subtle text-xs">
-                  <DollarSign className="w-4 h-4 text-muted" />
+                {/* Pricing Status */}
+                <div className="flex items-center gap-1 bg-surface px-2.5 py-1.5 rounded-xl border border-subtle text-xs">
+                  <DollarSign className="w-3.5 h-3.5 text-muted shrink-0" />
                   <select
                     value={pricingStatus}
                     onChange={(e) => setPricingStatus(e.target.value as any)}
-                    className="bg-transparent text-primary font-bold focus:outline-none cursor-pointer"
+                    className="bg-transparent text-primary font-bold focus:outline-none cursor-pointer text-xs"
                   >
-                    <option value="ALL">وضعیت قیمت‌گذاری (همه)</option>
+                    <option value="ALL">قیمت‌گذاری (همه)</option>
                     <option value="PRICED">تعیین قیمت شده</option>
                     <option value="UNPRICED">تعیین قیمت نشده</option>
                   </select>
                 </div>
-                <div className="flex items-center gap-1.5 bg-surface px-3 py-2 rounded-xl border border-subtle text-xs">
+
+                {/* Approval Status */}
+                <div className="flex items-center gap-1 bg-surface px-2.5 py-1.5 rounded-xl border border-subtle text-xs">
                   <select
                     value={approvalStatus}
                     onChange={(e) => setApprovalStatus(e.target.value as any)}
-                    className="bg-transparent text-primary font-bold focus:outline-none cursor-pointer"
+                    className="bg-transparent text-primary font-bold focus:outline-none cursor-pointer text-xs"
                   >
                     <option value="ALL">وضعیت تایید (همه)</option>
-                    <option value="PENDING">در انتظار تایید جدید</option>
+                    <option value="PENDING">در انتظار تایید</option>
                   </select>
                 </div>
 
-                {/* Toggle Advanced Filters Button */}
+                {/* Advanced Filters Toggle Button */}
                 <button
                   onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer shrink-0 ${
                     showAdvancedFilters || minPrice || maxPrice || dateFilter !== "ALL"
                       ? "bg-primary-default/10 text-primary-default border-primary-default/30"
                       : "bg-surface text-muted border-subtle hover:text-primary"
                   }`}
+                  title="فیلترهای قیمتی و تاریخی"
                 >
-                  <Sliders className="w-4 h-4" />
-                  <span>فیلترهای پیشرفته</span>
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>فیلتر پیشرفته</span>
+                  {(minPrice || maxPrice || dateFilter !== "ALL") && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary-default animate-pulse"></span>
+                  )}
                 </button>
 
                 {/* Reset Filters */}
                 {isAnyFilterActive && (
                   <button
                     onClick={handleResetFilters}
-                    className="flex items-center gap-1 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-xl text-xs font-bold border border-rose-500/20 transition-all cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-xl text-xs font-bold border border-rose-500/20 transition-all cursor-pointer shrink-0"
                     title="پاک کردن همه فیلترها"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-3 h-3" />
                     <span>پاکسازی</span>
                   </button>
                 )}
+              </div>
+
+              {/* Left Side: View Mode Toggle */}
+              <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-subtle shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("table")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                    viewMode === "table"
+                      ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs"
+                      : "text-muted hover:text-primary"
+                  }`}
+                >
+                  <ListIcon className="w-3.5 h-3.5" />
+                  <span>جدول</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                    viewMode === "grid"
+                      ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs"
+                      : "text-muted hover:text-primary"
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>کارت</span>
+                </button>
               </div>
             </div>
 
             {/* Collapsible Advanced Filters Panel */}
             {showAdvancedFilters && (
-              <div className="pt-4 border-t border-subtle grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
+              <div className="pt-3 border-t border-subtle grid grid-cols-2 lg:grid-cols-4 gap-2.5 animate-fade-in">
                 {/* Min Price */}
                 <div>
-                  <label className="block text-xs font-bold text-muted mb-1">
+                  <label className="block text-[11px] font-bold text-muted mb-1">
                     حداقل قیمت (تومان)
                   </label>
                   <input
@@ -858,13 +906,13 @@ export default function ProductsList() {
                     placeholder="مثلا ۱,۰۰۰,۰۰۰"
                     value={minPrice}
                     onChange={(e) => setMinPrice(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default"
+                    className="w-full px-3 py-1.5 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default"
                   />
                 </div>
 
                 {/* Max Price */}
                 <div>
-                  <label className="block text-xs font-bold text-muted mb-1">
+                  <label className="block text-[11px] font-bold text-muted mb-1">
                     حداکثر قیمت (تومان)
                   </label>
                   <input
@@ -872,36 +920,36 @@ export default function ProductsList() {
                     placeholder="مثلا ۵۰,۰۰۰,۰۰۰"
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default"
+                    className="w-full px-3 py-1.5 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default"
                   />
                 </div>
 
                 {/* Registration Date Filter */}
                 <div>
-                  <label className="block text-xs font-bold text-muted mb-1">
+                  <label className="block text-[11px] font-bold text-muted mb-1">
                     تاریخ ثبت محصول
                   </label>
                   <select
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default cursor-pointer"
+                    className="w-full px-3 py-1.5 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default cursor-pointer"
                   >
                     <option value="ALL">تمام زمان‌ها</option>
                     <option value="TODAY">ثبت شده در امروز</option>
-                    <option value="WEEK">ثبت شده در ۷ روز اخیر</option>
-                    <option value="MONTH">ثبت شده در ۳۰ روز اخیر</option>
+                    <option value="WEEK">۷ روز اخیر</option>
+                    <option value="MONTH">۳۰ روز اخیر</option>
                   </select>
                 </div>
 
                 {/* Date Sorting */}
                 <div>
-                  <label className="block text-xs font-bold text-muted mb-1">
-                    مرتب‌سازی بر اساس تاریخ
+                  <label className="block text-[11px] font-bold text-muted mb-1">
+                    مرتب‌سازی تاریخ
                   </label>
                   <select
                     value={sortDate}
                     onChange={(e) => setSortDate(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default cursor-pointer"
+                    className="w-full px-3 py-1.5 bg-surface border border-subtle rounded-xl text-xs font-medium text-primary focus:outline-none focus:border-primary-default cursor-pointer"
                   >
                     <option value="NEWEST">جدیدترین محصولات</option>
                     <option value="OLDEST">قدیمی‌ترین محصولات</option>
@@ -910,24 +958,21 @@ export default function ProductsList() {
               </div>
             )}
 
-            {/* Results Count, Category Chips, and View Mode Switcher */}
-            <div className="pt-3 border-t border-subtle/50 space-y-3">
+            {/* Row 2: Category Quick Chips & Counter */}
+            <div className="pt-2 border-t border-subtle/50 flex flex-wrap items-center justify-between gap-2">
               {/* Category Quick Chips Bar */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                <span className="text-xs font-bold text-muted shrink-0 flex items-center gap-1">
-                  <Tag className="w-3.5 h-3.5 text-primary-default" /> دسته‌بندی‌ها:
-                </span>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 max-w-full scrollbar-none flex-1 min-w-0">
                 <button
                   type="button"
                   onClick={() => setSelectedCategory("ALL")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
                     selectedCategory === "ALL"
-                      ? "bg-primary-default text-inverse shadow-sm"
+                      ? "bg-primary-default text-inverse shadow-xs"
                       : "bg-surface hover:bg-surface/80 text-secondary border border-subtle"
                   }`}
                 >
                   <span>همه</span>
-                  <span className="bg-black/10 dark:bg-white/15 px-1.5 py-0.5 rounded-full text-[10px]">
+                  <span className="bg-black/10 dark:bg-white/15 px-1 py-0.2 rounded-full text-[9px]">
                     {products.length}
                   </span>
                 </button>
@@ -942,14 +987,14 @@ export default function ProductsList() {
                       key={c.id}
                       type="button"
                       onClick={() => setSelectedCategory(String(c.id))}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
                         isSelected
-                          ? "bg-purple-600 text-white shadow-sm"
+                          ? "bg-purple-600 text-white shadow-xs"
                           : "bg-surface hover:bg-surface/80 text-secondary border border-subtle"
                       }`}
                     >
                       <span>{name}</span>
-                      <span className="bg-black/10 dark:bg-white/15 px-1.5 py-0.5 rounded-full text-[10px]">
+                      <span className="bg-black/10 dark:bg-white/15 px-1 py-0.2 rounded-full text-[9px]">
                         {catCount}
                       </span>
                     </button>
@@ -957,47 +1002,17 @@ export default function ProductsList() {
                 })}
               </div>
 
-              {/* View Switcher and Count */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted">
-                  <span>
-                    نمایش <strong className="text-primary font-black">{filteredProducts.length}</strong> محصول از مجموع{" "}
-                    <strong className="text-primary font-black">{products.length}</strong> کالا
+              {/* Product Count Display */}
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted shrink-0">
+                <span>
+                  نمایش <strong className="text-primary font-black">{filteredProducts.length}</strong> از{" "}
+                  <strong className="text-primary font-black">{products.length}</strong> کالا
+                </span>
+                {isAnyFilterActive && (
+                  <span className="text-white font-bold bg-emerald-600 px-2 py-0.5 rounded-full text-[10px]">
+                    فیلتر فعال
                   </span>
-                  {isAnyFilterActive && (
-                    <span className="text-white font-bold bg-emerald-600 px-2.5 py-0.5 rounded-full shadow-xs text-[11px]">
-                      فیلتر فعال است
-                    </span>
-                  )}
-                </div>
-
-                {/* View Mode Toggle */}
-                <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-subtle">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("table")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                      viewMode === "table"
-                        ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm"
-                        : "text-muted hover:text-primary"
-                    }`}
-                  >
-                    <ListIcon className="w-3.5 h-3.5" />
-                    <span>جدول مدیریتی</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("grid")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                      viewMode === "grid"
-                        ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm"
-                        : "text-muted hover:text-primary"
-                    }`}
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                    <span>نمایش کارتی</span>
-                  </button>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -1006,7 +1021,7 @@ export default function ProductsList() {
           {viewMode === "table" ? (
             <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-right text-sm min-w-[1050px]">
+                <table className="w-full text-right text-sm min-w-[800px]">
                   <thead className="bg-background/90 border-b border-subtle text-muted font-bold text-xs uppercase">
                     <tr>
                       <th className="px-4 py-4 w-16 text-center">شناسه</th>

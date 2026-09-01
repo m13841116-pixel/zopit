@@ -178,7 +178,7 @@ export const StoreCustomers: React.FC = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-right border-collapse">
+                <table className="w-full text-right border-collapse min-w-[800px]">
                   <thead>
                     <tr className="border-b border-border-subtle text-text-muted text-xs">
                       <th className="px-6 py-4 font-bold">شناسه سفارش</th>
@@ -249,7 +249,7 @@ export const StoreCustomers: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse">
+            <table className="w-full text-right border-collapse min-w-[800px]">
               <thead>
                 <tr className="border-b border-border-subtle text-text-muted text-xs">
                   <th className="px-6 py-4 font-bold">نام مشتری</th>

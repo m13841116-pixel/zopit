@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Building2, 
   User, 
@@ -16,19 +16,22 @@ import {
   FileCheck
 } from "lucide-react";
 import { ZopitLogo } from "../ZopitLogo";
+import { PROVINCES } from "../../data/provinces";
 
 interface SupplierRegisterFormProps {
   onSuccess: (user: any, token: string) => void;
   onBackToLogin: () => void;
   onBackToRoleSelect?: () => void;
   showNotification?: (msg: string, type?: "success" | "error" | "info" | "warning") => void;
+  onShowTerms?: () => void;
 }
 
 export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
   onSuccess,
   onBackToLogin,
   onBackToRoleSelect,
-  showNotification
+  showNotification,
+  onShowTerms
 }) => {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -46,13 +49,10 @@ export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const iranianProvinces = [
-    "تهران", "اصفهان", "فارس", "خراسان رضوی", "آذربایجان شرقی", "خوزستان",
-    "مازندران", "گیلان", "البرز", "قم", "کرمان", "یزد", "همدان", "مرکزی",
-    "هرمزگان", "بوشهر", "آذربایجان غربی", "کرمانشاه", "قزوین", "زنجان",
-    "سمنان", "گلستان", "لرستان", "اردبیل", "کردستان", "سیستان و بلوچستان",
-    "چهارمحال و بختیاری", "خراسان جنوبی", "خراسان شمالی", "ایلام", "کهگیلویه و بویراحمد"
-  ];
+  const availableCities = useMemo(() => {
+    const prov = PROVINCES.find(p => p.name === formData.province);
+    return prov ? prov.cities : [];
+  }, [formData.province]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,30 +297,43 @@ export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
               <div className="relative">
                 <select
                   value={formData.province}
-                  onChange={(e) => setFormData({ ...formData, province: e.target.value, city: e.target.value })}
-                  className="w-full pl-4 pr-10 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                  onChange={(e) => {
+                    const newProvince = e.target.value;
+                    const prov = PROVINCES.find(p => p.name === newProvince);
+                    setFormData({ 
+                      ...formData, 
+                      province: newProvince, 
+                      city: prov && prov.cities.length > 0 ? prov.cities[0] : "" 
+                    });
+                  }}
+                  className="w-full pl-4 pr-10 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium cursor-pointer"
                 >
-                  {iranianProvinces.map((prov) => (
-                    <option key={prov} value={prov}>
-                      {prov}
+                  {PROVINCES.map((prov) => (
+                    <option key={prov.name} value={prov.name}>
+                      {prov.name}
                     </option>
                   ))}
                 </select>
                 <MapPin className="w-4 h-4 text-text-muted absolute right-3.5 top-3.5" />
               </div>
             </div>
-
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-text-secondary">
                 شهر / منطقه
               </label>
-              <input
-                type="text"
-                placeholder="مثال: بازار بزرگ، شهرک صنعتی"
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-4 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
-              />
+              <div className="relative">
+                <select
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  className="w-full pl-4 pr-10 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium cursor-pointer"
+                  disabled={availableCities.length === 0}
+                >
+                  {availableCities.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <MapPin className="w-4 h-4 text-text-muted absolute right-3.5 top-3.5" />
+              </div>
             </div>
           </div>
 
@@ -381,17 +394,28 @@ export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
           </div>
 
           {/* Terms checkbox */}
-          <label className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 font-semibold cursor-pointer select-none">
+          <div className="flex items-center gap-2.5 pt-2">
             <input
+              id="terms-checkbox"
               type="checkbox"
               checked={formData.agreementAccepted}
               onChange={(e) => setFormData({ ...formData, agreementAccepted: e.target.checked })}
-              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
             />
-            <span>
-              قوانین، مقررات و تعهدات تامین‌کنندگان زوپیت را مطالعه نموده و می‌پذیرم.
-            </span>
-          </label>
+            <label htmlFor="terms-checkbox" className="text-xs text-slate-700 dark:text-slate-300 font-semibold cursor-pointer select-none">
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onShowTerms) onShowTerms();
+                }} 
+                className="text-indigo-600 dark:text-indigo-400 hover:underline font-black cursor-pointer inline-block ml-1"
+              >
+                قوانین، مقررات و تعهدات تامین‌کنندگان زوپیت
+              </button>
+              را مطالعه نموده و می‌پذیرم.
+            </label>
+          </div>
 
           {/* Submit Button */}
           <div className="pt-2">

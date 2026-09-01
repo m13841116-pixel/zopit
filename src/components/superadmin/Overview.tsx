@@ -575,7 +575,7 @@ export default function Overview({ onNavigateTab }: OverviewProps): React.ReactE
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-right">
+            <table className="w-full text-xs text-right min-w-[800px]">
               <thead className="bg-surface text-text-secondary">
                 <tr>
                   <th className="p-3 font-bold rounded-r-xl">شماره سفارش</th>

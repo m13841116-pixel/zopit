@@ -225,7 +225,7 @@ export const StoreManagerView: React.FC<StoreManagerViewProps> = ({ onAddToCart,
             <span className="text-xs text-slate-500">Showing all submitted wholesale orders</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                   <th className="p-4">Order ID</th>

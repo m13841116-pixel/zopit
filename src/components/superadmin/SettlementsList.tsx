@@ -530,7 +530,7 @@ export default function SettlementsList() {
         </div>
         <div className="overflow-x-auto">
           
-          <table className="w-full text-right text-sm">
+          <table className="w-full text-right text-sm min-w-[800px]">
             
             <thead className="bg-background text-muted border-b border-subtle text-xs font-extrabold">
               
@@ -955,7 +955,7 @@ export default function SettlementsList() {
                   تراکنشی برای این کیف پول ثبت نشده است.
                 </p>
               ) : (
-                <table className="w-full text-right text-xs">
+                <table className="w-full text-right text-xs min-w-[800px]">
                   
                   <thead className="bg-background text-muted border-b border-subtle font-extrabold">
                     
@@ -1315,7 +1315,7 @@ export default function SettlementsList() {
                   {/* Items breakdown list */}
                   <div className="border border-subtle/60 rounded-2xl overflow-hidden">
                     
-                    <table className="w-full text-right text-xs">
+                    <table className="w-full text-right text-xs min-w-[800px]">
                       
                       <thead className="bg-background text-muted border-b border-subtle font-bold">
                         
@@ -1689,7 +1689,7 @@ export default function SettlementsList() {
                         
                         <div className="overflow-x-auto">
                           
-                          <table className="w-full text-right text-xs">
+                          <table className="w-full text-right text-xs min-w-[800px]">
                             
                             <thead className="bg-background text-muted border-b border-subtle font-extrabold">
                               

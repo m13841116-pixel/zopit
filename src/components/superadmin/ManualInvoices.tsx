@@ -129,7 +129,7 @@ export default function ManualInvoices() {
         ) : (
           <div className="overflow-x-auto">
             
-            <table className="w-full text-right text-sm">
+            <table className="w-full text-right text-sm min-w-[800px]">
               
               <thead className="bg-background border-b border-subtle text-muted font-medium">
                 
