@@ -38,7 +38,7 @@ interface Lead {
     username: string;
     firstName?: string;
     lastName?: string;
-    phone?: string;
+    mobile?: string;
   } | null;
   createdAt: string;
 }
@@ -48,7 +48,7 @@ interface Ambassador {
   username: string;
   firstName?: string;
   lastName?: string;
-  phone?: string;
+  mobile?: string;
   role: string;
 }
 
@@ -473,7 +473,7 @@ export default function LeadsManager() {
                 <option value="NONE">بدون تأمین‌یاب (آزاد)</option>
                 {ambassadors.map((amb) => (
                   <option key={amb.id} value={amb.id}>
-                    {amb.firstName || amb.username} ({amb.phone || "بدون شماره"})
+                    {amb.firstName || amb.username} ({amb.mobile || "بدون شماره"})
                   </option>
                 ))}
               </select>
@@ -704,7 +704,7 @@ export default function LeadsManager() {
                         </td>
 
                         <td className="p-4 font-mono text-xs font-bold text-secondary" dir="ltr">
-                          {item.ambassador.phone || "-"}
+                          {item.ambassador.mobile || item.ambassador.username || "-"}
                         </td>
 
                         <td className="p-4 font-bold text-blue-500">
@@ -881,7 +881,7 @@ export default function LeadsManager() {
                     <option value="">-- آزاد (انتخاب توسط خود تأمین‌یاب‌ها) --</option>
                     {ambassadors.map((amb) => (
                       <option key={amb.id} value={amb.id}>
-                        {amb.firstName || amb.username} ({amb.phone || "تأمین‌یاب"})
+                        {amb.firstName || amb.username} ({amb.mobile || "تأمین‌یاب"})
                       </option>
                     ))}
                   </select>

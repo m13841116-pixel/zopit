@@ -1339,6 +1339,21 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
         "webhookUrl" TEXT
       );`,
 
+      `CREATE TABLE IF NOT EXISTS "Lead" (
+        "id" SERIAL PRIMARY KEY,
+        "name" TEXT NOT NULL,
+        "phone" TEXT UNIQUE NOT NULL,
+        "additionalPhones" TEXT,
+        "address" TEXT,
+        "category" TEXT,
+        "commission" DOUBLE PRECISION DEFAULT 100000,
+        "status" TEXT DEFAULT 'PENDING',
+        "ambassadorId" INTEGER,
+        "supplierId" INTEGER,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
       // User table columns (ALTER TABLE ADD COLUMN IF NOT EXISTS)
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "autoApproveOrders" BOOLEAN DEFAULT true;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "cardNumber" TEXT;`,
@@ -11041,7 +11056,7 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
             username: true,
             firstName: true,
             lastName: true,
-            phone: true,
+            mobile: true,
             role: true,
           }
         }
@@ -11058,7 +11073,7 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
         username: true,
         firstName: true,
         lastName: true,
-        phone: true,
+        mobile: true,
         role: true,
       }
     });
