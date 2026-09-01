@@ -507,12 +507,12 @@ add_action('plugins_loaded', array('Zopit_Woo_Connector', 'get_instance'));`}
             </div>
             <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900">
               <a
-                href="/zopit-woo-connector.php"
-                download="zopit-woo-connector.php"
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2"
+                href="/zopit-woo-connector.zip"
+                download="zopit-woo-connector.zip"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg"
               >
                 <Download className="w-4 h-4" />
-                <span>دانلود این سورس به صورت فایل PHP</span>
+                <span>دانلود فایل افزونه وردپرس (ZIP)</span>
               </a>
               <button
                 onClick={() => setShowCodeModal(false)}
