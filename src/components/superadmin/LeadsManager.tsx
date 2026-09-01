@@ -84,6 +84,7 @@ export default function LeadsManager() {
   // Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [showAdditionalPhones, setShowAdditionalPhones] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -265,6 +266,7 @@ export default function LeadsManager() {
       commission: lead.commission || 150000,
       ambassadorId: lead.ambassadorId ? String(lead.ambassadorId) : ""
     });
+    setShowAdditionalPhones(Boolean(lead.additionalPhones));
     setShowAddModal(true);
   };
 
@@ -346,6 +348,7 @@ export default function LeadsManager() {
               commission: 150000,
               ambassadorId: ""
             });
+            setShowAdditionalPhones(false);
             setShowAddModal(true);
           }}
           className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
@@ -761,6 +764,7 @@ export default function LeadsManager() {
             </div>
 
             <form onSubmit={handleSaveLead} className="space-y-4">
+              {/* 1. Name */}
               <div>
                 <label className="block text-xs font-bold text-secondary mb-1">
                   نام تامین‌کننده / فروشگاه / برند *
@@ -775,6 +779,7 @@ export default function LeadsManager() {
                 />
               </div>
 
+              {/* 2. Phone & Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-secondary mb-1">
@@ -805,24 +810,7 @@ export default function LeadsManager() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-secondary mb-1 flex items-center justify-between">
-                  <span>شماره‌های تماس بیشتر (همراه / ثابت دیگر) - اختیاری</span>
-                  <span className="text-[10px] text-muted font-normal">با کاما (،) یا فاصله جدا کنید</span>
-                </label>
-                <input
-                  type="text"
-                  dir="ltr"
-                  value={formData.additionalPhones}
-                  onChange={(e) => setFormData({ ...formData, additionalPhones: e.target.value })}
-                  placeholder="09181112233, 08734221100"
-                  className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500 text-left"
-                />
-                <p className="text-[10px] text-muted mt-1">
-                  💡 سیستم تمامی این شماره‌ها را موقع احراز هویت خودکار و اعتبارسنجی ثبت‌نام تامین‌کننده بررسی خواهد کرد.
-                </p>
-              </div>
-
+              {/* 3. Address */}
               <div>
                 <label className="block text-xs font-bold text-secondary mb-1">
                   آدرس یا موقعیت بازار
@@ -836,6 +824,7 @@ export default function LeadsManager() {
                 />
               </div>
 
+              {/* 4. Reward & Ambassador */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-secondary mb-1">
@@ -886,6 +875,51 @@ export default function LeadsManager() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* 5. Additional Phones (Collapsible section at the bottom) */}
+              <div className="pt-1">
+                {!showAdditionalPhones ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAdditionalPhones(true)}
+                    className="w-full border border-dashed border-emerald-500/40 hover:border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>+ افزودن شماره‌های تماس بیشتر / همراه دیگر (اختیاری)</span>
+                  </button>
+                ) : (
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5 transition-all">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-secondary flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-amber-500" />
+                        <span>شماره‌های تماس بیشتر (همراه / ثابت دیگر)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAdditionalPhones(false);
+                          setFormData({ ...formData, additionalPhones: "" });
+                        }}
+                        className="text-[11px] text-rose-500 hover:text-rose-600 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>حذف و بستن</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      value={formData.additionalPhones}
+                      onChange={(e) => setFormData({ ...formData, additionalPhones: e.target.value })}
+                      placeholder="مثال: 09181112233, 08734221100"
+                      className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono font-bold text-primary outline-none focus:ring-2 focus:ring-emerald-500 text-left"
+                    />
+                    <p className="text-[10px] text-muted leading-relaxed">
+                      💡 با جداکننده کاما (،) یا فاصله وارد کنید. سیستم تمامی این شماره‌ها را موقع احراز هویت خودکار و اعتبارسنجی ثبت‌نام تامین‌کننده بررسی خواهد کرد.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 border-t border-border-subtle flex items-center justify-end gap-2">
