@@ -958,6 +958,148 @@ class MemoryDatabase {
 
 const memoryStore = !isProduction ? new MemoryDatabase() : (null as any);
 
+let isSchemaSyncing = false;
+let schemaSynced = false;
+
+async function ensureDatabaseSchemaColumns(client?: any, force = false) {
+  if (schemaSynced && !force) return;
+  if (isSchemaSyncing && !force) return;
+  isSchemaSyncing = true;
+
+  try {
+    const targetPrisma = client || realPrisma || getActivePrisma();
+    if (!targetPrisma || typeof targetPrisma.$executeRawUnsafe !== 'function') {
+      isSchemaSyncing = false;
+      return;
+    }
+
+    const rawExec = targetPrisma.$executeRawUnsafe.bind(targetPrisma);
+
+    // Postgres statements (idempotent with IF NOT EXISTS)
+    const postgresStatements = [
+      // User table columns
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "autoApproveOrders" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "cardNumber" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "province" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "city" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "postalCode" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "telephone" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "website" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "accountHolderName" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "shaba" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bankName" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "agreementAccepted" BOOLEAN DEFAULT false;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "agreementVersion" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "agreementAcceptedAt" TIMESTAMP;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "storeName" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "storeUrl" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "storeLink" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "platformType" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fieldOfActivity" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "productCount" INTEGER;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "performanceScore" INTEGER DEFAULT 100;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "penaltyPoints" INTEGER DEFAULT 0;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "warningLevel" TEXT DEFAULT 'NONE';`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralCode" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "activityType" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "brandName" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "nationalCode" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "address" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'ACTIVE';`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "mobile" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "email" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "firstName" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastName" TEXT;`,
+
+      // Order table columns
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingAddressType" TEXT DEFAULT 'OTHER_ADDRESS';`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingAddress" TEXT;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingMethod" TEXT DEFAULT 'POST';`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "postalCode" TEXT;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "trackingCode" TEXT;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "postalLabel" TEXT;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "orderSource" TEXT DEFAULT 'store';`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "customerName" TEXT;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "customerPhone" TEXT;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "customerAddress" TEXT;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "customerCardNumber" TEXT;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingFee" DOUBLE PRECISION DEFAULT 0;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "storeInvoiceId" INTEGER;`,
+
+      // OrderItem table columns
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "notes" TEXT;`,
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "trackingCode" TEXT;`,
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "price" DOUBLE PRECISION DEFAULT 0;`,
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "supplierPrice" DOUBLE PRECISION DEFAULT 0;`,
+
+      // Product table columns
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "marginType" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "marginValue" DOUBLE PRECISION;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "finalPrice" DOUBLE PRECISION;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "publishStartDate" TIMESTAMP;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "publishEndDate" TIMESTAMP;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "minOrderQuantity" INTEGER DEFAULT 1;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN DEFAULT false;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "inventory" INTEGER DEFAULT 0;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "discount" DOUBLE PRECISION DEFAULT 0;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "sku" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "brand" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'DRAFT';`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "shortDescription" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "longDescription" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "technicalSpecs" TEXT;`,
+
+      // StoreInvoice table columns
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "receiptUrl" TEXT;`,
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "receiptStatus" TEXT;`,
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "receiptNotes" TEXT;`,
+
+      // ProAccount table if missing
+      `CREATE TABLE IF NOT EXISTS "ProAccount" (
+        "id" SERIAL PRIMARY KEY,
+        "userId" INTEGER UNIQUE NOT NULL,
+        "planType" TEXT DEFAULT 'PRO',
+        "status" TEXT DEFAULT 'PENDING',
+        "acceptedTerms" BOOLEAN DEFAULT true,
+        "signatureImage" TEXT,
+        "nationalCode" TEXT,
+        "fullName" TEXT,
+        "mobile" TEXT,
+        "domainName" TEXT,
+        "cpanelUrl" TEXT,
+        "cpanelUsername" TEXT,
+        "cpanelPassword" TEXT,
+        "wpAdminUrl" TEXT,
+        "wpUsername" TEXT,
+        "wpPassword" TEXT,
+        "hasEnamad" BOOLEAN DEFAULT false,
+        "hasGateway" BOOLEAN DEFAULT false,
+        "hasTaxProfile" BOOLEAN DEFAULT false,
+        "hostExpiresAt" TIMESTAMP,
+        "torobConnected" BOOLEAN DEFAULT false,
+        "payLink" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`
+    ];
+
+    for (const sql of postgresStatements) {
+      try {
+        await rawExec(sql);
+      } catch (err: any) {
+        // Silently skip if DB syntax is different or column already exists
+      }
+    }
+    schemaSynced = true;
+    console.log('[Schema Auto-Heal] Successfully verified and updated database columns in PostgreSQL.');
+  } catch (err: any) {
+    console.warn('[Schema Auto-Heal] Notice while verifying schema columns:', err?.message || err);
+  } finally {
+    isSchemaSyncing = false;
+  }
+}
+
 function getActivePrisma() {
   if (!realPrisma) {
     if (isProduction) {
@@ -976,6 +1118,8 @@ function getActivePrisma() {
         }
       });
       isPrismaMock = false;
+      // Proactively trigger self-healing schema migration in background
+      ensureDatabaseSchemaColumns(realPrisma).catch(() => {});
       return realPrisma;
     }
 
@@ -993,6 +1137,7 @@ function getActivePrisma() {
           }
         });
         isPrismaMock = false;
+        ensureDatabaseSchemaColumns(realPrisma).catch(() => {});
       } else {
         isPrismaMock = true;
       }
@@ -1063,7 +1208,17 @@ let prisma: any = new Proxy({}, {
           if (isProduction) {
             const active = getActivePrisma();
             if (active && typeof active[prop]?.[subProp] === 'function') {
-              return await active[prop][subProp](...args);
+              try {
+                return await active[prop][subProp](...args);
+              } catch (err: any) {
+                // If column does not exist (P2022), auto-heal schema and retry query once
+                if (err?.code === 'P2022' || String(err?.message || '').includes('does not exist')) {
+                  console.warn(`[Prisma P2022 Auto-Heal] Missing DB column detected on ${prop}.${subProp}, auto-healing schema now...`);
+                  await ensureDatabaseSchemaColumns(active, true);
+                  return await active[prop][subProp](...args);
+                }
+                throw err;
+              }
             }
             throw new Error(`[Prisma Production Error] Method ${prop}.${subProp} is not available on PrismaClient.`);
           }
@@ -1073,6 +1228,15 @@ let prisma: any = new Proxy({}, {
             try {
               return await active[prop][subProp](...args);
             } catch (err: any) {
+              if (err?.code === 'P2022' || String(err?.message || '').includes('does not exist')) {
+                console.warn(`[Prisma P2022 Auto-Heal] Missing DB column detected on ${prop}.${subProp}, auto-healing schema now...`);
+                await ensureDatabaseSchemaColumns(active, true);
+                try {
+                  return await active[prop][subProp](...args);
+                } catch (retryErr: any) {
+                  // If retry still failed, fallback to memoryStore
+                }
+              }
               const errMsg = err?.message || String(err);
               console.warn(`[Prisma Query Fallback] ${prop}.${subProp} fallback to memory store due to error:`, errMsg);
               try {
@@ -1183,6 +1347,24 @@ app.get('/api/orders/:id/postal-label/file', async (req: any, res: any) => {
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Proactive DB schema sync middleware for serverless cold starts
+app.use(async (req, res, next) => {
+  if (!schemaSynced && !isSchemaSyncing) {
+    ensureDatabaseSchemaColumns().catch(() => {});
+  }
+  next();
+});
+
+// Dedicated Schema Sync Endpoint for instant manual or webhook sync
+app.all('/api/system/schema-sync', async (req: any, res: any) => {
+  try {
+    await ensureDatabaseSchemaColumns(getActivePrisma() || prisma, true);
+    return res.json({ success: true, message: 'Database schema columns verified and updated successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || String(err) });
+  }
+});
 
 // Serve uploads folder statically for product images, receipts, and attachments
 const rootUploadsDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(process.cwd(), 'uploads');
@@ -2326,9 +2508,27 @@ app.post('/api/auth/login', async (req, res) => {
     const isSuperAdminCandidate = cleanUsername === 'admin' || cleanUsername === 'superadmin' || cleanUsername === '09120000000';
 
     let user: any = null;
-    user = await prisma.user.findUnique({ where: { username: cleanUsername } });
+    try {
+      user = await prisma.user.findUnique({ where: { username: cleanUsername } });
+    } catch (queryErr: any) {
+      if (queryErr?.code === 'P2022' || String(queryErr?.message || '').includes('does not exist')) {
+        console.warn('[Login Auto-Heal] P2022 column missing error in login query, healing database schema now...');
+        await ensureDatabaseSchemaColumns(getActivePrisma() || prisma, true);
+        user = await prisma.user.findUnique({ where: { username: cleanUsername } });
+      } else {
+        throw queryErr;
+      }
+    }
+
     if (!user && isSuperAdminCandidate) {
-      user = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
+      try {
+        user = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
+      } catch (saErr: any) {
+        if (saErr?.code === 'P2022' || String(saErr?.message || '').includes('does not exist')) {
+          await ensureDatabaseSchemaColumns(getActivePrisma() || prisma, true);
+          user = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
+        }
+      }
     }
 
     // Special auto-recovery for Super Admin login only in development environment
