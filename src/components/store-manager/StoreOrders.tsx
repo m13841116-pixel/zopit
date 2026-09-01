@@ -21,6 +21,7 @@ import {
   XCircle,
   Printer, Clock,
   Trash2,
+  AlertTriangle
 } from "lucide-react";
 import { printOrderInvoice } from "../../utils/printLabel";
 import { Bell, BellRing, Volume2, Play } from "lucide-react";
@@ -108,6 +109,10 @@ export default function StoreOrders({
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<
     any | null
   >(null);
+  const [showReportIssue, setShowReportIssue] = useState(false);
+  const [issueCategory, setIssueCategory] = useState<"LOGISTICS" | "SUPPLIER" | "FINANCIAL" | "OTHER">("LOGISTICS");
+  const [issueText, setIssueText] = useState("");
+  const [submittingIssue, setSubmittingIssue] = useState(false);
 
   // Lock body scroll on mobile when modals are open
   useMobileScrollLock(showModal || paymentModalOpen || !!selectedOrderForDetails || showShippingModal);
@@ -309,6 +314,30 @@ export default function StoreOrders({
     setQuantity(1);
   };
 
+  const handleUseStoreAddressForNewOrder = () => {
+    if (user) {
+      if (user.storeName || user.firstName) {
+        setShippingRecipientName(`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.storeName || '');
+      }
+      if (user.mobile) {
+        setShippingRecipientPhone(user.mobile);
+      }
+      if (user.province) {
+        setShippingProvince(user.province);
+      }
+      if (user.city) {
+        setShippingCity(user.city);
+      }
+      if (user.postalCode) {
+        setShippingPostalCode(user.postalCode);
+      }
+      if (user.address) {
+        setShippingAddressDetail(user.address);
+      }
+      toast("اطلاعات فروشگاه در فیلدهای آدرس درج شد.", "info");
+    }
+  };
+
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -352,6 +381,38 @@ export default function StoreOrders({
       return;
     }
 
+    // Validate recipient and shipping address
+    if (!shippingRecipientName || shippingRecipientName.trim().length < 2) {
+      setError("لطفاً نام و نام‌خانوادگی تحویل‌گیرنده را وارد کنید.");
+      return;
+    }
+    const cleanPhone = shippingRecipientPhone.trim();
+    const iranianPhoneRegex = /^09\d{9}$/;
+    const landlinePhoneRegex = /^0\d{10}$/;
+    if (!cleanPhone || (!iranianPhoneRegex.test(cleanPhone) && !landlinePhoneRegex.test(cleanPhone))) {
+      setError("شماره تماس گیرنده نامعتبر است (مثال: 09123456789).");
+      return;
+    }
+    if (!shippingProvince) {
+      setError("لطفاً استان مقصد را انتخاب نمایید.");
+      return;
+    }
+    if (!shippingCity) {
+      setError("لطفاً شهر مقصد را وارد کنید.");
+      return;
+    }
+    const cleanPostal = shippingPostalCode.trim();
+    if (!cleanPostal || cleanPostal.length !== 10 || !/^\d{10}$/.test(cleanPostal)) {
+      setError("کد پستی باید دقیقاً یک عدد ۱۰ رقمی باشد.");
+      return;
+    }
+    if (!shippingAddressDetail || shippingAddressDetail.trim().length < 8) {
+      setError("لطفاً آدرس پستی دقیق شامل خیابان، کوچه و پلاک را بنویسید (حداقل ۸ حرف).");
+      return;
+    }
+
+    const fullShippingAddress = `${shippingProvince}، ${shippingCity}، ${shippingAddressDetail} (کد پستی: ${cleanPostal}) - گیرنده: ${shippingRecipientName} - تماس: ${cleanPhone}`;
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/store-manager/orders", {
@@ -369,9 +430,15 @@ export default function StoreOrders({
             notes,
           })),
           notes,
-          shippingAddressType: "OTHER_ADDRESS",
-          shippingAddress: "",
-          shippingMethod: "PLATFORM_PANEL",
+          shippingAddressType,
+          shippingAddress: fullShippingAddress,
+          shippingMethod,
+          recipientName: shippingRecipientName,
+          recipientPhone: cleanPhone,
+          province: shippingProvince,
+          city: shippingCity,
+          postalCode: cleanPostal,
+          addressDetail: shippingAddressDetail,
           postalLabel: null,
         }),
       });
@@ -384,6 +451,7 @@ export default function StoreOrders({
         setQuantity(1);
         setNotes("");
         fetchOrders();
+        toast("سفارش شما با موفقیت ثبت شد و در صف برآورد هزینه ارسال قرار گرفت.", "success");
       } else {
         setError(data.error || "خطا در ثبت سفارش");
       }
@@ -392,6 +460,49 @@ export default function StoreOrders({
       setError("خطای شبکه");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleReportIssue = async () => {
+    if (!selectedOrderForDetails) return;
+    if (!issueText || issueText.trim().length < 5) {
+      toast("لطفاً شرح مشکل یا پیگیری را با جزئیات وارد کنید.", "error");
+      return;
+    }
+    setSubmittingIssue(true);
+    try {
+      const categoryTitles: Record<string, string> = {
+        LOGISTICS: "پیگیری مشکل لجستیکی و ارسال پستی",
+        SUPPLIER: "گزارش مغایرت یا عدم ارسال تامین‌کننده",
+        FINANCIAL: "درخواست بررسی و هماهنگی مالی / تسویه",
+        OTHER: "پیگیری سفارش",
+      };
+      const title = `[سفارش #${selectedOrderForDetails.id}] ${categoryTitles[issueCategory] || "پیگیری سفارش"}`;
+      const res = await fetch("/api/store-manager/tickets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+        },
+        body: JSON.stringify({
+          title,
+          category: issueCategory === "LOGISTICS" ? "ORDER_STATUS" : issueCategory === "FINANCIAL" ? "FINANCIAL" : "PRODUCT_INQUIRY",
+          message: `شناسه سفارش: #${selectedOrderForDetails.id}\nدسته‌بندی موضوع: ${categoryTitles[issueCategory]}\n\nتوضیحات و شرح مشکل:\n${issueText.trim()}`,
+          orderId: selectedOrderForDetails.id,
+        }),
+      });
+      if (res.ok) {
+        toast("گزارش مشکل شما ثبت شد و جهت بررسی در اولویت کارشناسان پشتیبانی قرار گرفت.", "success");
+        setShowReportIssue(false);
+        setIssueText("");
+        setIssueCategory("LOGISTICS");
+      } else {
+        toast("خطا در ثبت گزارش مشکل", "error");
+      }
+    } catch (e) {
+      toast("خطای شبکه در ارتباط با سرور", "error");
+    } finally {
+      setSubmittingIssue(false);
     }
   };
   const handlePaymentClick = (orderId: number) => {
@@ -1027,6 +1138,131 @@ export default function StoreOrders({
                 </button>
               </div>
 
+              {/* Recipient and Shipping Address Section */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2.5">
+                  <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    مشخصات گیرنده و نشانی پستی مقصد (یک آدرس واحد برای تمام اقلام این سفارش)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleUseStoreAddressForNewOrder}
+                    className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    ⚡ درج آدرس فروشگاه من
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      نام و نام‌خانوادگی گیرنده <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="مثال: علی رضایی"
+                      value={shippingRecipientName}
+                      onChange={(e) => setShippingRecipientName(e.target.value)}
+                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      شماره تماس گیرنده <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="09123456789"
+                      dir="ltr"
+                      value={shippingRecipientPhone}
+                      onChange={(e) => setShippingRecipientPhone(e.target.value)}
+                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      استان مقصد <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={shippingProvince}
+                      onChange={(e) => setShippingProvince(e.target.value)}
+                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                    >
+                      <option value="">-- انتخاب استان --</option>
+                      {PROVINCES.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      شهر مقصد <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="مثال: تهران / اصفهان"
+                      value={shippingCity}
+                      onChange={(e) => setShippingCity(e.target.value)}
+                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      کد پستی (۱۰ رقم) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={10}
+                      placeholder="1234567890"
+                      dir="ltr"
+                      value={shippingPostalCode}
+                      onChange={(e) => setShippingPostalCode(e.target.value)}
+                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      روش ارسال ترجیحی
+                    </label>
+                    <select
+                      value={shippingMethod}
+                      onChange={(e) => setShippingMethod(e.target.value)}
+                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                    >
+                      <option value="POST">پست پیشتاز سراسری</option>
+                      <option value="POST_VIZHE">پست ویژه / اکسپرس</option>
+                      <option value="TIPAX">تیپاکس (ارسال سریع)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    نشانی دقیق پستی (خیابان، کوچه، پلاک، واحد) <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={2}
+                    placeholder="خیابان اصلی، فرعی، پلاک، طبقه و واحد..."
+                    value={shippingAddressDetail}
+                    onChange={(e) => setShippingAddressDetail(e.target.value)}
+                    className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none"
+                  />
+                </div>
+              </div>
+
               {/* Order Notes */}
               <div>
                 <label className="block text-sm font-bold text-secondary mb-2">
@@ -1057,10 +1293,10 @@ export default function StoreOrders({
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting || !selectedProduct}
-                  className="flex-1 px-4 py-3 rounded-xl font-bold text-xs text-inverse bg-primary-default hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer"
+                  disabled={submitting || (orderItems.length === 0 && !selectedProduct)}
+                  className="flex-1 px-4 py-3 rounded-xl font-bold text-xs text-inverse bg-primary-default hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer shadow-md shadow-primary-default/20"
                 >
-                  {submitting ? "در حال ثبت..." : "ثبت نهایی سفارش"}
+                  {submitting ? "در حال ثبت..." : "ثبت نهایی سفارش و ارسال برای برآورد هزینه"}
                 </button>
               </div>
             </form>
@@ -1710,6 +1946,12 @@ export default function StoreOrders({
               >
                 <Printer className="w-5 h-5" /> دریافت فاکتور رسمی (PDF)
               </button>
+              <button
+                onClick={() => setShowReportIssue(true)}
+                className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <AlertTriangle className="w-5 h-5" /> ثبت مشکل / پیگیری
+              </button>
               
             {selectedOrderForDetails.status === "WAITING_SHIPPING_PAYMENT" && (
               <div className="mt-6 flex justify-end">
@@ -1736,6 +1978,95 @@ export default function StoreOrders({
                 >
                   پرداخت آنلاین هزینه ارسال
                 </button>
+              </div>
+            )}
+
+            {showReportIssue && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setShowReportIssue(false)}>
+                <div className="bg-card w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-border-subtle p-6 text-right" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between border-b border-border-subtle pb-4 mb-4">
+                    <h3 className="font-extrabold text-lg text-rose-600 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5" /> ثبت مشکل و پیگیری سفارش #{selectedOrderForDetails.id}
+                    </h3>
+                    <button onClick={() => setShowReportIssue(false)} className="p-2 text-text-muted hover:bg-surface rounded-full"><X className="w-5 h-5" /></button>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                        دسته‌بندی موضوع مشکل <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIssueCategory("LOGISTICS")}
+                          className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                            issueCategory === "LOGISTICS"
+                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
+                              : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                          }`}
+                        >
+                          <span>🚚</span>
+                          <span>مشکل لجستیک و ارسال پستی</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIssueCategory("SUPPLIER")}
+                          className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                            issueCategory === "SUPPLIER"
+                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
+                              : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                          }`}
+                        >
+                          <span>📦</span>
+                          <span>مغایرت یا عدم ارسال کالا</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIssueCategory("FINANCIAL")}
+                          className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                            issueCategory === "FINANCIAL"
+                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
+                              : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                          }`}
+                        >
+                          <span>💳</span>
+                          <span>مسائل مالی و استرداد وجه</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIssueCategory("OTHER")}
+                          className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                            issueCategory === "OTHER"
+                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
+                              : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                          }`}
+                        >
+                          <span>💬</span>
+                          <span>سایر پیگیری‌ها و هماهنگی</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        شرح کامل مشکل و توضیحات <span className="text-rose-500">*</span>
+                      </label>
+                      <textarea
+                        value={issueText}
+                        onChange={(e) => setIssueText(e.target.value)}
+                        rows={4}
+                        className="w-full px-4 py-3 bg-surface border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-text-primary resize-none leading-relaxed"
+                        placeholder="لطفاً جزئیات مشکل پیش‌آمده (مانند عدم تطابق کالا، تاخیر، یا عدم ارسال) را به طور کامل شرح دهید..."
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <button onClick={() => setShowReportIssue(false)} className="flex-1 py-3 bg-surface hover:bg-surface-hover text-text-primary rounded-xl text-xs font-bold transition-all">انصراف</button>
+                      <button onClick={handleReportIssue} disabled={submittingIssue || !issueText.trim()} className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50 flex justify-center items-center gap-2">
+                        {submittingIssue ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                        <span>ارسال و ثبت گزارش</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

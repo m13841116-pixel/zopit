@@ -41,16 +41,16 @@ export function startCronJobs() {
         }
       }
 
-      // 2. Label uploaded but not shipped (12 hours)
+      // 2. Label uploaded but not shipped (18 hours)
       // Status is PROCESSING, meaning admin uploaded label, supplier needs to ship.
-      const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+      const eighteenHoursAgo = new Date(now.getTime() - 18 * 60 * 60 * 1000);
       const processingOrders = await prisma.order.findMany({
         where: {
           status: 'PROCESSING',
           statusHistory: {
             some: {
               toStatus: 'PROCESSING',
-              createdAt: { lte: twelveHoursAgo }
+              createdAt: { lte: eighteenHoursAgo }
             }
           }
         },
@@ -59,7 +59,7 @@ export function startCronJobs() {
 
       for (const order of processingOrders) {
         const alreadySent = await prisma.auditTrail.findFirst({
-          where: { action: 'SMS_LABEL_12H_DELAY', resource: order.id.toString() }
+          where: { action: 'SMS_LABEL_18H_DELAY', resource: order.id.toString() }
         });
 
         if (!alreadySent) {
@@ -68,12 +68,12 @@ export function startCronJobs() {
             await sendPattern(supplierMobile, 'MELLIPAYAMAK_PATTERN_LABEL_ISSUED', [order.id.toString()]);
             await prisma.auditTrail.create({
               data: {
-                action: 'SMS_LABEL_12H_DELAY',
+                action: 'SMS_LABEL_18H_DELAY',
                 resource: order.id.toString(),
-                metadata: 'Sent 12h label print reminder to supplier'
+                metadata: 'Sent 18h label print reminder to supplier'
               }
             });
-            console.log(`Sent 12h label reminder SMS to supplier ${supplierMobile} for order ${order.id}`);
+            console.log(`Sent 18h label reminder SMS to supplier ${supplierMobile} for order ${order.id}`);
           }
         }
       }

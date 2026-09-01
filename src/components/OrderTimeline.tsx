@@ -95,23 +95,25 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
   // Convert English status values to Persian readable labels
   const getStatusLabel = (status: string) => {
     const mapping: Record<string, string> = {
-      REQUESTED: 'ثبت سفارش جدید',
-      NEW: 'ثبت سفارش جدید',
-      PENDING_APPROVAL: 'در انتظار تایید',
-      WAITING_SUPPLIER_CONFIRMATION: '۱. در انتظار تایید تامین‌کننده',
-      WAITING_STORE_ADDRESS: '۲. در انتظار دریافت آدرس پستی',
+      REQUESTED: '۱. ثبت سفارش جدید',
+      NEW: '۱. ثبت سفارش جدید',
+      PENDING_APPROVAL: '۱. در انتظار تکمیل آدرس',
+      WAITING_SUPPLIER_CONFIRMATION: '۱. ثبت سفارش',
+      WAITING_STORE_ADDRESS: '۱. در انتظار ثبت آدرس پستی',
       APPROVED: 'تایید شده',
-      SUPPLIER_APPROVED: 'تایید تامین‌کننده',
-      WAITING_SHIPPING_COST: '۳. در انتظار برآورد هزینه ارسال',
-      PENDING_PAYMENT: '۴. نیازمند پرداخت توسط مدیر فروشگاه',
-      WAITING_FOR_PAYMENT: '۴. نیازمند پرداخت توسط مدیر فروشگاه',
-      PAID: 'پرداخت شده',
-      PREPARING: 'در حال آماده‌سازی',
-      PENDING_POSTAL_LABEL: '۵. نیازمند دریافت لیبل',
-      SHIPPED: '۶. در حال ارسال',
-      PROCESSING: 'در حال پردازش',
-      DELIVERED: 'تحویل شده',
-      COMPLETED: 'تکمیل شده',
+      SUPPLIER_APPROVED: '۲. در انتظار برآورد هزینه ارسال',
+      WAITING_SHIPPING_COST: '۲. در انتظار برآورد هزینه ارسال',
+      PENDING_PAYMENT: '۳. نیازمند پرداخت توسط مدیر فروشگاه',
+      WAITING_FOR_PAYMENT: '۳. نیازمند پرداخت توسط مدیر فروشگاه',
+      WAITING_SHIPPING_PAYMENT: '۳. نیازمند پرداخت هزینه ارسال',
+      PAID: '۴. پرداخت شده (در انتظار صدور و چاپ لیبل)',
+      PREPARING: '۴. در حال آماده‌سازی و چاپ لیبل',
+      PENDING_POSTAL_LABEL: '۴. صدور و چاپ لیبل پستی',
+      READY_TO_SHIP: '۴. آماده تحویل به پست',
+      SHIPPED: '۵. تحویل به پست و در حال ارسال',
+      PROCESSING: '۴. در حال پردازش و چاپ لیبل',
+      DELIVERED: '۵. تحویل داده شده به گیرنده',
+      COMPLETED: '۵. تکمیل و تحویل شده',
       CANCELLED: 'لغو شده',
       REJECTED: 'رد شده',
     };
@@ -129,41 +131,35 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
     return mapping[role] || role;
   };
 
-  // Define 6 key milestone steps for the horizontal timeline in chronological order
+  // Define 5 key milestone steps for the horizontal timeline in chronological order
   const steps = [
     { 
-      label: '۱. تایید تامین‌کننده', 
-      activeStatuses: ['WAITING_SUPPLIER_CONFIRMATION', 'REQUESTED', 'NEW'], 
-      completedStatuses: ['WAITING_STORE_ADDRESS', 'SUPPLIER_APPROVED', 'WAITING_SHIPPING_COST', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      label: '۱. ثبت و آدرس مقصد', 
+      activeStatuses: ['WAITING_STORE_ADDRESS', 'REQUESTED', 'NEW', 'WAITING_SUPPLIER_CONFIRMATION'], 
+      completedStatuses: ['WAITING_SHIPPING_COST', 'SUPPLIER_APPROVED', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: CheckSquare 
     },
     { 
-      label: '۲. دریافت آدرس پستی', 
-      activeStatuses: ['WAITING_STORE_ADDRESS', 'SUPPLIER_APPROVED'], 
-      completedStatuses: ['WAITING_SHIPPING_COST', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
-      icon: FileText 
-    },
-    { 
-      label: '۳. برآورد هزینه ارسال', 
-      activeStatuses: ['WAITING_SHIPPING_COST'], 
-      completedStatuses: ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      label: '۲. برآورد هزینه ارسال', 
+      activeStatuses: ['WAITING_SHIPPING_COST', 'SUPPLIER_APPROVED'], 
+      completedStatuses: ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: Package 
     },
     { 
-      label: '۴. نیازمند پرداخت', 
-      activeStatuses: ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT'], 
+      label: '۳. نیازمند پرداخت', 
+      activeStatuses: ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT'], 
       completedStatuses: ['PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: CreditCard 
     },
     { 
-      label: '۵. دریافت لیبل', 
-      activeStatuses: ['PENDING_POSTAL_LABEL', 'READY_TO_SHIP'], 
-      completedStatuses: ['SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      label: '۴. دریافت و چاپ لیبل', 
+      activeStatuses: ['PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'PROCESSING'], 
+      completedStatuses: ['SHIPPED', 'DELIVERED', 'COMPLETED'], 
       icon: FileText 
     },
     { 
-      label: '۶. در حال ارسال', 
-      activeStatuses: ['SHIPPED', 'PROCESSING'], 
+      label: '۵. ارسال پستی', 
+      activeStatuses: ['SHIPPED'], 
       completedStatuses: ['DELIVERED', 'COMPLETED'], 
       icon: Truck 
     }
@@ -259,7 +255,7 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
           <div 
             className="absolute right-[8%] top-5 h-[2px] bg-gradient-to-l from-purple-500 to-emerald-400 transition-all duration-500 rounded-full z-0"
             style={{
-              left: `${100 - 8 - (getFurthestStepIndex() * 21)}%`,
+              left: `${100 - 8 - (getFurthestStepIndex() * (84 / Math.max(1, steps.length - 1)))}%`,
               display: steps.some((_, i) => getStepState(i) === 'completed') ? 'block' : 'none'
             }}
           ></div>

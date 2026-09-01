@@ -151,7 +151,7 @@ export class ZibalService implements PaymentGateway {
           const prisma = getPrisma();
           const order = await prisma.order.findUnique({ where: { id: Number(orderId) } });
           if (order) {
-            userId = order.customerId;
+            userId = (order as any).storeId || (order as any).customerId;
             
             // Amount check in DB (Rials)
             const expectedAmount = Math.round(order.totalAmount * 10);

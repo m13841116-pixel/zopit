@@ -977,7 +977,369 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
 
     // Postgres statements (idempotent with IF NOT EXISTS)
     const postgresStatements = [
-      // User table columns
+      // Tables creation if missing
+      `CREATE TABLE IF NOT EXISTS "User" (
+        "id" SERIAL PRIMARY KEY,
+        "username" TEXT UNIQUE NOT NULL,
+        "password" TEXT NOT NULL,
+        "role" TEXT NOT NULL,
+        "status" TEXT DEFAULT 'ACTIVE',
+        "firstName" TEXT,
+        "lastName" TEXT,
+        "mobile" TEXT,
+        "email" TEXT,
+        "nationalCode" TEXT,
+        "brandName" TEXT,
+        "activityType" TEXT,
+        "address" TEXT,
+        "province" TEXT,
+        "city" TEXT,
+        "postalCode" TEXT,
+        "telephone" TEXT,
+        "website" TEXT,
+        "accountHolderName" TEXT,
+        "shaba" TEXT,
+        "bankName" TEXT,
+        "cardNumber" TEXT,
+        "agreementAccepted" BOOLEAN DEFAULT false,
+        "agreementVersion" TEXT,
+        "agreementAcceptedAt" TIMESTAMP,
+        "storeName" TEXT,
+        "storeUrl" TEXT,
+        "storeLink" TEXT,
+        "avatarUrl" TEXT,
+        "autoApproveOrders" BOOLEAN DEFAULT true,
+        "platformType" TEXT,
+        "fieldOfActivity" TEXT,
+        "productCount" INTEGER,
+        "performanceScore" INTEGER DEFAULT 100,
+        "penaltyPoints" INTEGER DEFAULT 0,
+        "warningLevel" TEXT DEFAULT 'NONE',
+        "referralCode" TEXT UNIQUE
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ProAccount" (
+        "id" SERIAL PRIMARY KEY,
+        "userId" INTEGER UNIQUE NOT NULL,
+        "planType" TEXT DEFAULT 'PRO',
+        "status" TEXT DEFAULT 'PENDING',
+        "acceptedTerms" BOOLEAN DEFAULT true,
+        "signatureImage" TEXT,
+        "nationalCode" TEXT,
+        "fullName" TEXT,
+        "mobile" TEXT,
+        "domainName" TEXT,
+        "cpanelUrl" TEXT,
+        "cpanelUsername" TEXT,
+        "cpanelPassword" TEXT,
+        "wpAdminUrl" TEXT,
+        "wpUsername" TEXT,
+        "wpPassword" TEXT,
+        "hasEnamad" BOOLEAN DEFAULT false,
+        "hasGateway" BOOLEAN DEFAULT false,
+        "hasTaxProfile" BOOLEAN DEFAULT false,
+        "hostExpiresAt" TIMESTAMP,
+        "torobConnected" BOOLEAN DEFAULT false,
+        "payLink" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "Category" (
+        "id" SERIAL PRIMARY KEY,
+        "name" TEXT NOT NULL,
+        "isActive" BOOLEAN DEFAULT true,
+        "sortOrder" INTEGER DEFAULT 0
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "Product" (
+        "id" SERIAL PRIMARY KEY,
+        "supplierId" INTEGER NOT NULL,
+        "categoryId" INTEGER NOT NULL,
+        "name" TEXT NOT NULL,
+        "shortDescription" TEXT,
+        "longDescription" TEXT,
+        "technicalSpecs" TEXT,
+        "supplierBasePrice" DOUBLE PRECISION DEFAULT 0,
+        "discount" DOUBLE PRECISION DEFAULT 0,
+        "sku" TEXT,
+        "brand" TEXT,
+        "status" TEXT DEFAULT 'DRAFT',
+        "marginType" TEXT,
+        "marginValue" DOUBLE PRECISION,
+        "finalPrice" DOUBLE PRECISION,
+        "publishStartDate" TIMESTAMP,
+        "publishEndDate" TIMESTAMP,
+        "minOrderQuantity" INTEGER DEFAULT 1,
+        "isPinned" BOOLEAN DEFAULT false,
+        "inventory" INTEGER DEFAULT 0
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ProductImage" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER NOT NULL,
+        "url" TEXT NOT NULL
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ProductVariant" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER NOT NULL,
+        "attributes" TEXT NOT NULL,
+        "supplierBasePrice" DOUBLE PRECISION DEFAULT 0,
+        "stock" INTEGER DEFAULT 0,
+        "sku" TEXT,
+        "imageUrl" TEXT
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "StoreInvoice" (
+        "id" SERIAL PRIMARY KEY,
+        "storeManagerId" INTEGER NOT NULL,
+        "totalAmount" DOUBLE PRECISION DEFAULT 0,
+        "status" TEXT DEFAULT 'PENDING',
+        "paidAt" TIMESTAMP,
+        "trackId" TEXT,
+        "gatewayReference" TEXT,
+        "paymentMethod" TEXT DEFAULT 'ONLINE',
+        "receiptUrl" TEXT,
+        "receiptStatus" TEXT,
+        "receiptNotes" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "Order" (
+        "id" SERIAL PRIMARY KEY,
+        "storeId" INTEGER,
+        "storeInvoiceId" INTEGER,
+        "totalAmount" DOUBLE PRECISION DEFAULT 0,
+        "shippingFee" DOUBLE PRECISION DEFAULT 0,
+        "status" TEXT DEFAULT 'REQUESTED',
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "shippingAddressType" TEXT DEFAULT 'OTHER_ADDRESS',
+        "shippingAddress" TEXT,
+        "shippingMethod" TEXT DEFAULT 'POST',
+        "postalCode" TEXT,
+        "trackingCode" TEXT,
+        "postalLabel" TEXT,
+        "orderSource" TEXT DEFAULT 'store',
+        "customerName" TEXT,
+        "customerPhone" TEXT,
+        "customerAddress" TEXT,
+        "customerCardNumber" TEXT
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "OrderItem" (
+        "id" SERIAL PRIMARY KEY,
+        "orderId" INTEGER NOT NULL,
+        "supplierId" INTEGER NOT NULL,
+        "productId" INTEGER NOT NULL,
+        "variantId" INTEGER,
+        "status" TEXT DEFAULT 'PENDING',
+        "quantity" INTEGER DEFAULT 1,
+        "notes" TEXT,
+        "trackingCode" TEXT,
+        "price" DOUBLE PRECISION DEFAULT 0,
+        "supplierPrice" DOUBLE PRECISION DEFAULT 0
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ShippingInvoice" (
+        "id" SERIAL PRIMARY KEY,
+        "orderId" INTEGER UNIQUE NOT NULL,
+        "shippingCost" DOUBLE PRECISION DEFAULT 0,
+        "shippingMethod" TEXT DEFAULT 'POST',
+        "description" TEXT,
+        "status" TEXT DEFAULT 'PENDING',
+        "payLink" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "DiscountCode" (
+        "id" SERIAL PRIMARY KEY,
+        "code" TEXT UNIQUE NOT NULL,
+        "discountType" TEXT DEFAULT 'PERCENTAGE',
+        "discountValue" DOUBLE PRECISION DEFAULT 0,
+        "maxUses" INTEGER,
+        "usedCount" INTEGER DEFAULT 0,
+        "expiryDate" TIMESTAMP,
+        "isActive" BOOLEAN DEFAULT true,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "PaymentLog" (
+        "id" TEXT PRIMARY KEY,
+        "requestId" TEXT NOT NULL,
+        "gateway" TEXT DEFAULT 'ZIBAL',
+        "action" TEXT NOT NULL,
+        "status" TEXT NOT NULL,
+        "targetUrl" TEXT,
+        "httpStatus" INTEGER,
+        "durationMs" INTEGER,
+        "dnsMs" INTEGER,
+        "connectMs" INTEGER,
+        "tlsMs" INTEGER,
+        "errorMessage" TEXT,
+        "errorCode" TEXT,
+        "requestBody" TEXT,
+        "responseBody" TEXT,
+        "orderId" TEXT,
+        "userId" INTEGER,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "SystemSettings" (
+        "id" SERIAL PRIMARY KEY,
+        "key" TEXT UNIQUE NOT NULL,
+        "value" TEXT NOT NULL,
+        "description" TEXT
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "SystemConfig" (
+        "key" TEXT PRIMARY KEY,
+        "value" TEXT NOT NULL,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "Banner" (
+        "id" SERIAL PRIMARY KEY,
+        "title" TEXT NOT NULL,
+        "description" TEXT NOT NULL,
+        "imageUrl" TEXT,
+        "isActive" BOOLEAN DEFAULT true,
+        "displayLocation" TEXT DEFAULT 'SHOP',
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "PublicMessage" (
+        "id" SERIAL PRIMARY KEY,
+        "content" TEXT NOT NULL,
+        "icon" TEXT DEFAULT 'info',
+        "color" TEXT DEFAULT 'indigo',
+        "expiryDate" TIMESTAMP,
+        "isActive" BOOLEAN DEFAULT true,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "DashboardMessage" (
+        "id" SERIAL PRIMARY KEY,
+        "title" TEXT NOT NULL,
+        "content" TEXT NOT NULL,
+        "targetRole" TEXT DEFAULT 'ALL',
+        "priority" TEXT DEFAULT 'MEDIUM',
+        "expiryDate" TIMESTAMP,
+        "publishDate" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "attachments" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "InfoPage" (
+        "id" SERIAL PRIMARY KEY,
+        "title" TEXT NOT NULL,
+        "slug" TEXT UNIQUE NOT NULL,
+        "category" TEXT NOT NULL,
+        "summary" TEXT NOT NULL,
+        "content" TEXT NOT NULL,
+        "images" TEXT,
+        "attachments" TEXT,
+        "videos" TEXT,
+        "tags" TEXT,
+        "publishDate" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "isPublished" BOOLEAN DEFAULT true,
+        "isPinned" BOOLEAN DEFAULT false,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "author" TEXT DEFAULT 'مدیریت'
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "Announcement" (
+        "id" TEXT PRIMARY KEY,
+        "title" TEXT NOT NULL,
+        "content" TEXT NOT NULL,
+        "target" TEXT DEFAULT 'ALL',
+        "priority" TEXT DEFAULT 'MEDIUM',
+        "isSticky" BOOLEAN DEFAULT false,
+        "isLoginPopup" BOOLEAN DEFAULT false,
+        "expiryDate" TIMESTAMP,
+        "scheduledFor" TIMESTAMP,
+        "attachmentUrl" TEXT,
+        "imageUrl" TEXT,
+        "isActive" BOOLEAN DEFAULT true,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ProductComment" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER NOT NULL,
+        "authorName" TEXT NOT NULL,
+        "text" TEXT NOT NULL,
+        "isApproved" BOOLEAN DEFAULT true,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ProductQuestion" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER NOT NULL,
+        "storeManagerId" INTEGER,
+        "askerName" TEXT,
+        "questionText" TEXT NOT NULL,
+        "answerText" TEXT,
+        "isAnswered" BOOLEAN DEFAULT false,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "answeredAt" TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ProductCustomization" (
+        "id" SERIAL PRIMARY KEY,
+        "storeManagerId" INTEGER NOT NULL,
+        "productId" INTEGER NOT NULL,
+        "customTitle" TEXT,
+        "customDescription" TEXT,
+        "customVideoUrl" TEXT,
+        "customImageUrl" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE ("storeManagerId", "productId")
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ProductExploreContent" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER UNIQUE NOT NULL,
+        "customTitle" TEXT,
+        "customDescription" TEXT,
+        "customImageUrl" TEXT,
+        "customVideoUrl" TEXT,
+        "isPublished" BOOLEAN DEFAULT false,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "OrderStatusHistory" (
+        "id" SERIAL PRIMARY KEY,
+        "orderId" INTEGER NOT NULL,
+        "fromStatus" TEXT,
+        "toStatus" TEXT NOT NULL,
+        "actorRole" TEXT NOT NULL,
+        "actorName" TEXT,
+        "note" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "ProductLike" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER NOT NULL,
+        "deviceId" TEXT NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE ("productId", "deviceId")
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS "StoreSettings" (
+        "id" SERIAL PRIMARY KEY,
+        "storeManagerId" INTEGER UNIQUE NOT NULL,
+        "platformType" TEXT,
+        "apiKey" TEXT,
+        "webhookUrl" TEXT
+      );`,
+
+      // User table columns (ALTER TABLE ADD COLUMN IF NOT EXISTS)
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "autoApproveOrders" BOOLEAN DEFAULT true;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "cardNumber" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "province" TEXT;`,
@@ -1012,7 +1374,36 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "firstName" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastName" TEXT;`,
 
+      // ProAccount table columns (ALTER TABLE ADD COLUMN IF NOT EXISTS)
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "planType" TEXT DEFAULT 'PRO';`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'PENDING';`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "acceptedTerms" BOOLEAN DEFAULT true;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "signatureImage" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "nationalCode" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "fullName" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "mobile" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "domainName" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "cpanelUrl" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "cpanelUsername" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "cpanelPassword" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "wpAdminUrl" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "wpUsername" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "wpPassword" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "hasEnamad" BOOLEAN DEFAULT false;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "hasGateway" BOOLEAN DEFAULT false;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "hasTaxProfile" BOOLEAN DEFAULT false;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "hostExpiresAt" TIMESTAMP;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "torobConnected" BOOLEAN DEFAULT false;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "payLink" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+
       // Order table columns
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "storeId" INTEGER;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "storeInvoiceId" INTEGER;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "totalAmount" DOUBLE PRECISION DEFAULT 0;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingFee" DOUBLE PRECISION DEFAULT 0;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'REQUESTED';`,
       `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingAddressType" TEXT DEFAULT 'OTHER_ADDRESS';`,
       `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingAddress" TEXT;`,
       `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingMethod" TEXT DEFAULT 'POST';`,
@@ -1024,16 +1415,24 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "customerPhone" TEXT;`,
       `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "customerAddress" TEXT;`,
       `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "customerCardNumber" TEXT;`,
-      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingFee" DOUBLE PRECISION DEFAULT 0;`,
-      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "storeInvoiceId" INTEGER;`,
+      `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
 
       // OrderItem table columns
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "orderId" INTEGER;`,
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "supplierId" INTEGER;`,
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "productId" INTEGER;`,
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "variantId" INTEGER;`,
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'PENDING';`,
+      `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "quantity" INTEGER DEFAULT 1;`,
       `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "notes" TEXT;`,
       `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "trackingCode" TEXT;`,
       `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "price" DOUBLE PRECISION DEFAULT 0;`,
       `ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "supplierPrice" DOUBLE PRECISION DEFAULT 0;`,
 
       // Product table columns
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "supplierId" INTEGER;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "categoryId" INTEGER;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "name" TEXT;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "marginType" TEXT;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "marginValue" DOUBLE PRECISION;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "finalPrice" DOUBLE PRECISION;`,
@@ -1051,37 +1450,31 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "technicalSpecs" TEXT;`,
 
       // StoreInvoice table columns
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "storeManagerId" INTEGER;`,
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "totalAmount" DOUBLE PRECISION DEFAULT 0;`,
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'PENDING';`,
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "paidAt" TIMESTAMP;`,
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "trackId" TEXT;`,
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "gatewayReference" TEXT;`,
+      `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT DEFAULT 'ONLINE';`,
       `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "receiptUrl" TEXT;`,
       `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "receiptStatus" TEXT;`,
       `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "receiptNotes" TEXT;`,
 
-      // ProAccount table if missing
-      `CREATE TABLE IF NOT EXISTS "ProAccount" (
-        "id" SERIAL PRIMARY KEY,
-        "userId" INTEGER UNIQUE NOT NULL,
-        "planType" TEXT DEFAULT 'PRO',
-        "status" TEXT DEFAULT 'PENDING',
-        "acceptedTerms" BOOLEAN DEFAULT true,
-        "signatureImage" TEXT,
-        "nationalCode" TEXT,
-        "fullName" TEXT,
-        "mobile" TEXT,
-        "domainName" TEXT,
-        "cpanelUrl" TEXT,
-        "cpanelUsername" TEXT,
-        "cpanelPassword" TEXT,
-        "wpAdminUrl" TEXT,
-        "wpUsername" TEXT,
-        "wpPassword" TEXT,
-        "hasEnamad" BOOLEAN DEFAULT false,
-        "hasGateway" BOOLEAN DEFAULT false,
-        "hasTaxProfile" BOOLEAN DEFAULT false,
-        "hostExpiresAt" TIMESTAMP,
-        "torobConnected" BOOLEAN DEFAULT false,
-        "payLink" TEXT,
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`
+      // ShippingInvoice table columns
+      `ALTER TABLE "ShippingInvoice" ADD COLUMN IF NOT EXISTS "shippingCost" DOUBLE PRECISION DEFAULT 0;`,
+      `ALTER TABLE "ShippingInvoice" ADD COLUMN IF NOT EXISTS "shippingMethod" TEXT DEFAULT 'POST';`,
+      `ALTER TABLE "ShippingInvoice" ADD COLUMN IF NOT EXISTS "description" TEXT;`,
+      `ALTER TABLE "ShippingInvoice" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'PENDING';`,
+      `ALTER TABLE "ShippingInvoice" ADD COLUMN IF NOT EXISTS "payLink" TEXT;`,
+
+      // DiscountCode table columns
+      `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "discountType" TEXT DEFAULT 'PERCENTAGE';`,
+      `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "discountValue" DOUBLE PRECISION DEFAULT 0;`,
+      `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "maxUses" INTEGER;`,
+      `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "usedCount" INTEGER DEFAULT 0;`,
+      `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "expiryDate" TIMESTAMP;`,
+      `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true;`
     ];
 
     for (const sql of postgresStatements) {
@@ -4772,110 +5165,85 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
       return res.status(400).json({ error: 'هیچ آیتم معتبری یافت نشد.' });
     }
 
-    // Group items by supplierId to ensure strictly 1 supplier per order (prevent shipping calculation conflict)
-    const groupedBySupplier = new Map<number, typeof resolvedItems>();
-    for (const item of resolvedItems) {
-      const sId = item.supplierId;
-      if (!groupedBySupplier.has(sId)) {
-        groupedBySupplier.set(sId, []);
-      }
-      groupedBySupplier.get(sId)!.push(item);
+    // Ensure all items belong to a single supplier
+    const uniqueSuppliers = new Set(resolvedItems.map(item => item.supplierId));
+    if (uniqueSuppliers.size > 1) {
+      return res.status(400).json({ error: 'ثبت سفارش از چند تامین‌کننده مختلف در یک سبد امکان‌پذیر نیست. لطفاً اقلام هر تامین‌کننده را مجزا سفارش دهید.' });
     }
 
-    const createdOrders: any[] = [];
+    const sId = Array.from(uniqueSuppliers)[0];
+    const groupItems = resolvedItems;
+    const totalAmount = groupItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    
+    const hasAddress = Boolean(shippingAddress && shippingAddress.trim().length > 5);
+    const initialOrderStatus = hasAddress ? 'WAITING_SHIPPING_COST' : 'WAITING_STORE_ADDRESS';
+    const initialStatusNote = hasAddress
+      ? 'سفارش و مشخصات مقصد ثبت شد و در صف برآورد هزینه ارسال توسط مدیریت مجموعه قرار گرفت.'
+      : 'سفارش ثبت شد و در انتظار تکمیل مشخصات پستی و آدرس مقصد است.';
 
-    for (const [sId, groupItems] of groupedBySupplier.entries()) {
-      const totalAmount = groupItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-      
-      const supplier = await prisma.user.findUnique({ where: { id: sId } });
-      const isAutoApprove = supplier?.autoApproveOrders !== false;
-      const initialItemStatus = isAutoApprove ? 'SUPPLIER_APPROVED' : 'PENDING';
-      const initialOrderStatus = isAutoApprove ? 'WAITING_FOR_PAYMENT' : 'WAITING_SUPPLIER_CONFIRMATION';
+    const order = await prisma.order.create({
+      data: {
+        storeId,
+        totalAmount,
+        status: initialOrderStatus,
+        shippingAddressType: shippingAddressType || 'OTHER_ADDRESS',
+        shippingAddress: shippingAddress || '',
+        shippingMethod: shippingMethod || 'POST',
+        postalCode: postalCode || null,
+        postalLabel: null,
 
-      const order = await prisma.order.create({
-        data: {
-          storeId,
-          totalAmount,
-          status: initialOrderStatus,
-          shippingAddressType: shippingAddressType || 'OTHER_ADDRESS',
-          shippingAddress: shippingAddress || '',
-          shippingMethod: shippingMethod || 'POST',
-          postalLabel: null,
-
-          orderSource: 'store',
-          items: {
-            create: groupItems.map(i => ({
-              productId: i.product.id,
-              variantId: i.variantId,
-              supplierId: i.supplierId,
-              quantity: i.quantity,
-              notes: i.notes,
-              price: i.price,
-              supplierPrice: i.supplierPrice,
-              status: initialItemStatus
-            }))
-          },
-          statusHistory: {
-            create: {
-              fromStatus: null,
-              toStatus: initialOrderStatus,
-              actorRole: 'STORE_MANAGER',
-              actorName: req.user.username || 'فروشگاه',
-              note: isAutoApprove ? 'سفارش ثبت شد و به صورت خودکار تایید موجودی گردید.' : 'سفارش ثبت شد و در انتظار تایید تامین‌کننده است.'
-            }
+        orderSource: 'store',
+        items: {
+          create: groupItems.map(i => ({
+            productId: i.product.id,
+            variantId: i.variantId,
+            supplierId: i.supplierId,
+            quantity: i.quantity,
+            notes: i.notes,
+            price: i.price,
+            supplierPrice: i.supplierPrice,
+            status: 'SUPPLIER_APPROVED'
+          }))
+        },
+        statusHistory: {
+          create: {
+            fromStatus: null,
+            toStatus: initialOrderStatus,
+            actorRole: 'STORE_MANAGER',
+            actorName: req.user.username || 'فروشگاه',
+            note: initialStatusNote
           }
         }
-      });
+      }
+    });
 
-      // Deduct inventory dynamically immediately upon order creation
-      for (const i of groupItems) {
-        if (i.variantId) {
-          await prisma.productVariant.update({
-            where: { id: i.variantId },
-            data: { stock: { decrement: i.quantity } }
-          }).catch(console.error);
-        }
-        await prisma.product.update({
-          where: { id: i.product.id },
-          data: { inventory: { decrement: i.quantity } }
+    // Deduct inventory dynamically immediately upon order creation
+    for (const i of groupItems) {
+      if (i.variantId) {
+        await prisma.productVariant.update({
+          where: { id: i.variantId },
+          data: { stock: { decrement: i.quantity } }
         }).catch(console.error);
       }
-
-      // Notify supplier via SMS
-      if (sId) {
-        prisma.user.findUnique({ where: { id: sId } }).then((supplier) => {
-          if (supplier?.mobile) {
-            notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
-          }
-        }).catch((smsErr) => console.warn('SMS supplier notification error:', smsErr));
-      }
-
-      createdOrders.push(order);
+      await prisma.product.update({
+        where: { id: i.product.id },
+        data: { inventory: { decrement: i.quantity } }
+      }).catch(console.error);
     }
 
-    if (createdOrders.length === 1) {
-      const singleOrder = createdOrders[0];
-      let payLink = '';
-      try {
-        const paymentGateway = await PaymentServiceFactory.getService();
-        const baseUrl = getCanonicalAppUrl(req);
-        const callbackUrl = `${baseUrl}/api/public/checkout/callback?orderId=${singleOrder.id}`;
-        const zibalResult = await paymentGateway.createPayment(
-          singleOrder.totalAmount * 10,
-          `پرداخت سفارش فروشگاه #${singleOrder.id}`,
-          callbackUrl
-        );
-        payLink = zibalResult.payLink;
-      } catch (paymentErr) {
-        console.error('Error creating Zibal payment:', paymentErr);
-      }
-      return res.status(201).json({ ...singleOrder, payLink });
-    } else {
-      return res.status(201).json({
-        message: `به دلیل متفاوت بودن تامین‌کنندگان، ${createdOrders.length} سفارش مجزا ثبت شد تا هزینه ارسال برای هر تامین‌کننده به صورت تفکیک‌شده محاسبه شود.`,
-        orders: createdOrders
-      });
+    // Notify supplier via SMS
+    if (sId) {
+      prisma.user.findUnique({ where: { id: sId } }).then((supplier) => {
+        if (supplier?.mobile) {
+          notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
+        }
+      }).catch((smsErr) => console.warn('SMS supplier notification error:', smsErr));
     }
+
+    return res.status(201).json({
+      message: 'سفارش با موفقیت ثبت شد و در صف برآورد هزینه ارسال قرار گرفت.',
+      order
+    });
   } catch (err: any) {
     res.status(500).json({ error: 'خطا در ثبت سفارش', details: err.message });
   }
