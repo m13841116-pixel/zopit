@@ -312,6 +312,8 @@ model StoreProductSelection {
   id            Int      @id @default(autoincrement())
   storeId       Int
   productId     Int
+  customPrice   Float?
+  customProfit  Float?
   status        String   @default("PENDING_SYNC")
   selected_at   DateTime @default(now())
   wc_product_id Int?     @unique

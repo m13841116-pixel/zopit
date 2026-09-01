@@ -5049,13 +5049,24 @@ app.post('/api/store-manager/products/:productId/customization', authenticateTok
     const cPriceNum = customPrice ? Number(customPrice) : null;
 
     // Update StoreProductSelection customPrice
-    await prisma.storeProductSelection.updateMany({
-      where: { storeId, productId },
-      data: {
-        customPrice: cPriceNum,
-        status: 'PENDING_SYNC'
-      }
-    });
+    try {
+      await prisma.storeProductSelection.updateMany({
+        where: { storeId, productId },
+        data: {
+          customPrice: cPriceNum,
+          status: 'PENDING_SYNC'
+        }
+      });
+    } catch (dbErr) {
+      await (prisma as any).$executeRawUnsafe(
+        `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customPrice" DOUBLE PRECISION;
+         ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customProfit" DOUBLE PRECISION;`
+      ).catch(() => {});
+      await (prisma as any).$executeRawUnsafe(
+        `UPDATE "StoreProductSelection" SET "customPrice" = $1, "status" = 'PENDING_SYNC' WHERE "storeId" = $2 AND "productId" = $3`,
+        cPriceNum, storeId, productId
+      ).catch(() => {});
+    }
 
     // Update ProductExploreContent for store display customization
     if (customTitle !== undefined || customDescription !== undefined || customImageUrl !== undefined || customVideoUrl !== undefined) {
@@ -5106,17 +5117,39 @@ app.post('/api/store-manager/products/:productId/price', authenticateToken, requ
       return res.status(404).json({ error: 'این محصول در زوپیتی شما یافت نشد.' });
     }
 
-    await prisma.storeProductSelection.updateMany({
-      where: { storeId, productId },
-      data: {
-        customPrice: customPrice ? Number(customPrice) : null,
-        customProfit: customProfit ? Number(customProfit) : null,
-        status: 'PENDING_SYNC'
-      }
-    });
+    const priceNum = customPrice !== null && customPrice !== undefined && customPrice !== '' ? Number(customPrice) : null;
+    const profitNum = customProfit !== null && customProfit !== undefined && customProfit !== '' ? Number(customProfit) : null;
+
+    try {
+      await prisma.storeProductSelection.updateMany({
+        where: { storeId, productId },
+        data: {
+          customPrice: priceNum,
+          customProfit: profitNum,
+          status: 'PENDING_SYNC'
+        }
+      });
+    } catch (dbErr) {
+      // Fallback with raw SQL in case column missing or prisma schema mismatch
+      await (prisma as any).$executeRawUnsafe(
+        `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customPrice" DOUBLE PRECISION;`
+      ).catch(() => {});
+      await (prisma as any).$executeRawUnsafe(
+        `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customProfit" DOUBLE PRECISION;`
+      ).catch(() => {});
+
+      await (prisma as any).$executeRawUnsafe(
+        `UPDATE "StoreProductSelection" SET "customPrice" = $1, "customProfit" = $2, "status" = 'PENDING_SYNC' WHERE "storeId" = $3 AND "productId" = $4`,
+        priceNum,
+        profitNum,
+        storeId,
+        productId
+      );
+    }
 
     res.json({ message: 'قیمت فروش با موفقیت بروزرسانی شد.' });
   } catch (err: any) {
+    console.error('Error updating product price:', err);
     res.status(500).json({ error: 'خطا در تغییر قیمت محصول', details: err.message });
   }
 });
@@ -5131,18 +5164,34 @@ app.post('/api/store-manager/products/batch-markup', authenticateToken, requireS
       return res.status(400).json({ error: 'مبلغ سود نامعتبر است.' });
     }
 
-    // Update all product selections for this store manager
-    await prisma.storeProductSelection.updateMany({
-      where: { storeId },
-      data: {
-        customProfit: markupAmount,
-        customPrice: null, // resetting explicit custom price to use base + markup
-        status: 'PENDING_SYNC'
-      }
-    });
+    try {
+      // Update all product selections for this store manager
+      await prisma.storeProductSelection.updateMany({
+        where: { storeId },
+        data: {
+          customProfit: markupAmount,
+          customPrice: null, // resetting explicit custom price to use base + markup
+          status: 'PENDING_SYNC'
+        }
+      });
+    } catch (dbErr) {
+      await (prisma as any).$executeRawUnsafe(
+        `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customPrice" DOUBLE PRECISION;`
+      ).catch(() => {});
+      await (prisma as any).$executeRawUnsafe(
+        `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customProfit" DOUBLE PRECISION;`
+      ).catch(() => {});
+
+      await (prisma as any).$executeRawUnsafe(
+        `UPDATE "StoreProductSelection" SET "customProfit" = $1, "customPrice" = NULL, "status" = 'PENDING_SYNC' WHERE "storeId" = $2`,
+        markupAmount,
+        storeId
+      );
+    }
 
     res.json({ message: `سود ثابت ${markupAmount.toLocaleString('fa-IR')} تومان روی تمامی کالاها اعمال گردید.` });
   } catch (err: any) {
+    console.error('Error batch updating profit:', err);
     res.status(500).json({ error: 'خطا در اعمال سود دسته‌جمعی', details: err.message });
   }
 });

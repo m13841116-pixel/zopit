@@ -300,7 +300,7 @@ export default function MyCatalog() {
           <span className="text-xs text-muted">اعمال مستقیم روی اتصال ووکامرس</span>
         </div>
         <p className="text-xs text-muted leading-relaxed">
-          با انتخاب یکی از مبالغ زیر، سود ثابت دلخواه شما به تمام محصولات زوپیتی‌تان اضافه می‌شود (قیمت عمده خرید شما ثابت باقی می‌ماند):
+          با انتخاب یکی از مبالغ زیر، سود ثابت دلخواه شما به تمام محصولات زوپیتی‌تان اضافه می‌شود (قیمت خرید زوپیتی شما ثابت باقی می‌ماند):
         </p>
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {[10000, 20000, 30000, 50000, 100000].map((amt) => (
@@ -397,7 +397,7 @@ export default function MyCatalog() {
                     {/* Price Breakdown */}
                     <div className="space-y-1 bg-surface p-2.5 rounded-xl border border-subtle text-xs">
                       <div className="flex justify-between items-center text-muted">
-                        <span>قیمت عمده زوپیتی:</span>
+                        <span>قیمت زوپیتی:</span>
                         <span className="font-bold text-primary">{wholesale.toLocaleString("fa-IR")} تومان</span>
                       </div>
                       <div className="flex justify-between items-center pt-1 border-t border-subtle/50">
@@ -841,7 +841,7 @@ export default function MyCatalog() {
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold text-xs text-primary truncate">{quickPricingProduct.name}</h4>
                   <p className="text-[11px] text-muted mt-0.5">
-                    قیمت عمده زوپیتی: <span className="font-bold text-primary">{(quickPricingProduct.wholesalePrice || quickPricingProduct.supplierBasePrice || 0).toLocaleString("fa-IR")} تومان</span>
+                    قیمت زوپیتی: <span className="font-bold text-primary">{(quickPricingProduct.wholesalePrice || quickPricingProduct.supplierBasePrice || 0).toLocaleString("fa-IR")} تومان</span>
                   </p>
                 </div>
               </div>
