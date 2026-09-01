@@ -1495,7 +1495,11 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true;`,
 
       // Lead table columns
-      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "additionalPhones" TEXT;`
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "additionalPhones" TEXT;`,
+
+      // StoreProductSelection custom pricing columns
+      `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customPrice" DOUBLE PRECISION;`,
+      `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customProfit" DOUBLE PRECISION;`
     ];
 
     for (const sql of postgresStatements) {
@@ -4950,15 +4954,29 @@ app.get('/api/store-manager/my-catalog', authenticateToken, requireStoreManager,
     const sanitizedSelections = selections.map(s => {
       const product = s.product;
       if (!product) return s;
-      let fPrice = product.finalPrice;
-      if (!fPrice) {
-        fPrice = product.supplierBasePrice;
+      const wholesalePrice = product.supplierBasePrice || 0;
+      
+      let defaultFinalPrice = product.finalPrice;
+      if (!defaultFinalPrice) {
+        defaultFinalPrice = wholesalePrice;
         if (product.marginType === 'PERCENTAGE' && product.marginValue) {
-          fPrice = product.supplierBasePrice * (1 + product.marginValue / 100);
+          defaultFinalPrice = wholesalePrice * (1 + product.marginValue / 100);
         } else if (product.marginType === 'FIXED' && product.marginValue) {
-          fPrice = product.supplierBasePrice + product.marginValue;
+          defaultFinalPrice = wholesalePrice + product.marginValue;
         }
       }
+
+      const storeCustomPrice = (s as any).customPrice !== null && (s as any).customPrice !== undefined ? Number((s as any).customPrice) : null;
+      const storeCustomProfit = (s as any).customProfit !== null && (s as any).customProfit !== undefined ? Number((s as any).customProfit) : null;
+
+      let effectiveSellingPrice = defaultFinalPrice;
+      if (storeCustomPrice && storeCustomPrice > 0) {
+        effectiveSellingPrice = storeCustomPrice;
+      } else if (storeCustomProfit && storeCustomProfit > 0) {
+        effectiveSellingPrice = wholesalePrice + storeCustomProfit;
+      }
+
+      const calculatedProfit = Math.max(0, effectiveSellingPrice - wholesalePrice);
 
       const mappedVariants = product.variants?.map((v: any) => {
         let vfPrice = v.finalPrice;
@@ -4970,11 +4988,10 @@ app.get('/api/store-manager/my-catalog', authenticateToken, requireStoreManager,
             vfPrice = v.supplierBasePrice + product.marginValue;
           }
         }
-        const { supplierBasePrice, ...safeV } = v;
-        return { ...safeV, finalPrice: vfPrice };
+        return { ...v, wholesalePrice: v.supplierBasePrice, finalPrice: storeCustomProfit ? (v.supplierBasePrice + storeCustomProfit) : (storeCustomPrice || vfPrice) };
       });
 
-      const { supplierId, supplierBasePrice, marginType, marginValue, ...safeProduct } = product;
+      const { supplierId, marginType, marginValue, ...safeProduct } = product;
       
       const imgUrl = (product.images && product.images[0]?.url) || product.exploreContent?.customImageUrl || product.imageUrl || getValidProductImageUrlServer(product);
       const customName = product.exploreContent?.customTitle || product.name;
@@ -4986,12 +5003,18 @@ app.get('/api/store-manager/my-catalog', authenticateToken, requireStoreManager,
 
       return { 
         ...s, 
+        customPrice: storeCustomPrice,
+        customProfit: storeCustomProfit,
         product: { 
           ...safeProduct, 
           name: customName,
           shortDescription: customDesc,
           longDescription: customDesc,
-          finalPrice: fPrice, 
+          wholesalePrice,
+          supplierBasePrice: wholesalePrice,
+          finalPrice: effectiveSellingPrice,
+          calculatedProfit,
+          customPrice: storeCustomPrice,
           imageUrl: imgUrl,
           image: imgUrl,
           mainImage: imgUrl,
@@ -5004,6 +5027,123 @@ app.get('/api/store-manager/my-catalog', authenticateToken, requireStoreManager,
     res.json(sanitizedSelections);
   } catch (err) {
     res.status(500).json({ error: 'خطا در دریافت لیست محصولات' });
+  }
+});
+
+// Save or Update Product Customization (Title, Description, Images, Videos, Custom Selling Price)
+app.post('/api/store-manager/products/:productId/customization', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const productId = parseInt(req.params.productId);
+    const { customTitle, customDescription, customVideoUrl, customImageUrl, customPrice } = req.body;
+
+    // Check if selection exists
+    const selection = await prisma.storeProductSelection.findFirst({
+      where: { storeId, productId }
+    });
+
+    if (!selection) {
+      return res.status(404).json({ error: 'این محصول در زوپیتی شما قرار ندارد.' });
+    }
+
+    const cPriceNum = customPrice ? Number(customPrice) : null;
+
+    // Update StoreProductSelection customPrice
+    await prisma.storeProductSelection.updateMany({
+      where: { storeId, productId },
+      data: {
+        customPrice: cPriceNum,
+        status: 'PENDING_SYNC'
+      }
+    });
+
+    // Update ProductExploreContent for store display customization
+    if (customTitle !== undefined || customDescription !== undefined || customImageUrl !== undefined || customVideoUrl !== undefined) {
+      const existingExplore = await prisma.productExploreContent.findUnique({ where: { productId } });
+      if (existingExplore) {
+        await prisma.productExploreContent.update({
+          where: { productId },
+          data: {
+            customTitle: customTitle || null,
+            customDescription: customDescription || null,
+            customImageUrl: customImageUrl || null,
+            customVideoUrl: customVideoUrl || null,
+            isPublished: true
+          }
+        });
+      } else {
+        await prisma.productExploreContent.create({
+          data: {
+            productId,
+            customTitle: customTitle || null,
+            customDescription: customDescription || null,
+            customImageUrl: customImageUrl || null,
+            customVideoUrl: customVideoUrl || null,
+            isPublished: true
+          }
+        });
+      }
+    }
+
+    res.json({ message: 'تنظیمات و قیمت اختصاصی محصول با موفقیت ذخیره شد.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در ذخیره شخصی‌سازی محصول', details: err.message });
+  }
+});
+
+// Fast Single Price / Profit Update
+app.post('/api/store-manager/products/:productId/price', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const productId = parseInt(req.params.productId);
+    const { customPrice, customProfit } = req.body;
+
+    const selection = await prisma.storeProductSelection.findFirst({
+      where: { storeId, productId }
+    });
+
+    if (!selection) {
+      return res.status(404).json({ error: 'این محصول در زوپیتی شما یافت نشد.' });
+    }
+
+    await prisma.storeProductSelection.updateMany({
+      where: { storeId, productId },
+      data: {
+        customPrice: customPrice ? Number(customPrice) : null,
+        customProfit: customProfit ? Number(customProfit) : null,
+        status: 'PENDING_SYNC'
+      }
+    });
+
+    res.json({ message: 'قیمت فروش با موفقیت بروزرسانی شد.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در تغییر قیمت محصول', details: err.message });
+  }
+});
+
+// Batch Profit Markup Across All Store Catalog Products (e.g., +10k, +20k, +30k, +50k, +100k Toman profit)
+app.post('/api/store-manager/products/batch-markup', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const { markupAmount } = req.body;
+
+    if (typeof markupAmount !== 'number' || markupAmount < 0) {
+      return res.status(400).json({ error: 'مبلغ سود نامعتبر است.' });
+    }
+
+    // Update all product selections for this store manager
+    await prisma.storeProductSelection.updateMany({
+      where: { storeId },
+      data: {
+        customProfit: markupAmount,
+        customPrice: null, // resetting explicit custom price to use base + markup
+        status: 'PENDING_SYNC'
+      }
+    });
+
+    res.json({ message: `سود ثابت ${markupAmount.toLocaleString('fa-IR')} تومان روی تمامی کالاها اعمال گردید.` });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در اعمال سود دسته‌جمعی', details: err.message });
   }
 });
 
@@ -5052,6 +5192,7 @@ app.get('/api/store-manager/daily-limit', authenticateToken, requireStoreManager
   }
 });
 
+// Create Order with Automatic Multi-Supplier Splitting
 app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
     const storeId = req.user.userId;
@@ -5089,7 +5230,7 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
       }
 
       let price = product.finalPrice || product.supplierBasePrice || 0;
-      let supplierPrice = product.supplierBasePrice;
+      let supplierPrice = product.supplierBasePrice || 0;
       let finalVariantId: number | null = null;
 
       if (itemReq.variantId) {
@@ -5098,7 +5239,7 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
         });
         if (variant && variant.productId === product.id) {
           finalVariantId = variant.id;
-          supplierPrice = variant.supplierBasePrice || product.supplierBasePrice;
+          supplierPrice = variant.supplierBasePrice || product.supplierBasePrice || 0;
           let vfPrice = variant.finalPrice;
           if (!vfPrice) {
             vfPrice = supplierPrice;
@@ -5127,72 +5268,89 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
       return res.status(400).json({ error: 'هیچ آیتم معتبری یافت نشد.' });
     }
 
-    // Ensure all items belong to a single supplier
-    const uniqueSuppliers = new Set(resolvedItems.map(item => item.supplierId));
-    if (uniqueSuppliers.size > 1) {
-      return res.status(400).json({ error: 'ثبت سفارش از چند تامین‌کننده مختلف در یک سبد امکان‌پذیر نیست. لطفاً اقلام هر تامین‌کننده را مجزا سفارش دهید.' });
+    // Group items by supplierId for order splitting
+    const itemsBySupplier = new Map<number, typeof resolvedItems>();
+    for (const item of resolvedItems) {
+      const suppId = item.supplierId || 0;
+      if (!itemsBySupplier.has(suppId)) {
+        itemsBySupplier.set(suppId, []);
+      }
+      itemsBySupplier.get(suppId)!.push(item);
     }
 
-    const sId = Array.from(uniqueSuppliers)[0];
-    const groupItems = resolvedItems;
-    const totalAmount = groupItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-    
+    const createdOrders: any[] = [];
     const hasAddress = Boolean(shippingAddress && shippingAddress.trim().length > 5);
     const initialOrderStatus = hasAddress ? 'WAITING_SHIPPING_COST' : 'WAITING_STORE_ADDRESS';
-    const initialStatusNote = hasAddress
-      ? 'سفارش و مشخصات مقصد ثبت شد و در صف برآورد هزینه ارسال توسط مدیریت مجموعه قرار گرفت.'
-      : 'سفارش ثبت شد و در انتظار تکمیل مشخصات پستی و آدرس مقصد است.';
 
-    const order = await prisma.order.create({
-      data: {
-        storeId,
-        totalAmount,
-        status: initialOrderStatus,
-        shippingAddressType: shippingAddressType || 'OTHER_ADDRESS',
-        shippingAddress: shippingAddress || '',
-        shippingMethod: shippingMethod || 'POST',
-        postalCode: postalCode || null,
-        postalLabel: null,
+    for (const [suppId, groupItems] of itemsBySupplier.entries()) {
+      // Store manager pays wholesale base price (supplierPrice * quantity)
+      const wholesaleTotal = groupItems.reduce((sum, i) => sum + (i.supplierPrice * i.quantity), 0);
+      
+      const initialStatusNote = itemsBySupplier.size > 1
+        ? `سفارش به صورت تفکیک‌شده برای تامین‌کننده (شناسه #${suppId}) ثبت گردید تا پنل پستی و هزینه ارسال آن به طور مجزا صادر شود.`
+        : (hasAddress
+          ? 'سفارش و مشخصات مقصد ثبت شد و در صف برآورد هزینه ارسال توسط مدیریت مجموعه قرار گرفت.'
+          : 'سفارش ثبت شد و در انتظار تکمیل مشخصات پستی و آدرس مقصد است.');
 
-        orderSource: 'store',
-        items: {
-          create: groupItems.map(i => ({
-            productId: i.product.id,
-            variantId: i.variantId,
-            supplierId: i.supplierId,
-            quantity: i.quantity,
-            notes: i.notes,
-            price: i.price,
-            supplierPrice: i.supplierPrice,
-            status: 'SUPPLIER_APPROVED'
-          }))
-        },
-        statusHistory: {
-          create: {
-            fromStatus: null,
-            toStatus: initialOrderStatus,
-            actorRole: 'STORE_MANAGER',
-            actorName: req.user.username || 'فروشگاه',
-            note: initialStatusNote
+      const order = await prisma.order.create({
+        data: {
+          storeId,
+          totalAmount: wholesaleTotal,
+          status: initialOrderStatus,
+          shippingAddressType: shippingAddressType || 'OTHER_ADDRESS',
+          shippingAddress: shippingAddress || '',
+          shippingMethod: shippingMethod || 'POST',
+          postalCode: postalCode || null,
+          postalLabel: null,
+          orderSource: itemsBySupplier.size > 1 ? `store (تفکیک - تامین‌کننده #${suppId})` : 'store',
+          items: {
+            create: groupItems.map(i => ({
+              productId: i.product.id,
+              variantId: i.variantId,
+              supplierId: i.supplierId,
+              quantity: i.quantity,
+              notes: i.notes,
+              price: i.price,
+              supplierPrice: i.supplierPrice,
+              status: 'SUPPLIER_APPROVED'
+            }))
+          },
+          statusHistory: {
+            create: {
+              fromStatus: null,
+              toStatus: initialOrderStatus,
+              actorRole: 'STORE_MANAGER',
+              actorName: req.user.username || 'فروشگاه',
+              note: initialStatusNote
+            }
           }
-        }
+        },
+        include: { items: true }
+      });
+
+      // Notify supplier via SMS
+      if (suppId) {
+        prisma.user.findUnique({ where: { id: suppId } }).then((supplier) => {
+          if (supplier?.mobile) {
+            notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
+          }
+        }).catch((smsErr) => console.warn('SMS supplier notification error:', smsErr));
       }
-    });
 
-    // Note: Inventory will be deducted when the order is paid by the store manager.
-
-    // Notify supplier via SMS
-    if (sId) {
-      prisma.user.findUnique({ where: { id: sId } }).then((supplier) => {
-        if (supplier?.mobile) {
-          notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
-        }
-      }).catch((smsErr) => console.warn('SMS supplier notification error:', smsErr));
+      createdOrders.push(order);
     }
 
+    const isSplit = createdOrders.length > 1;
+    const msg = isSplit
+      ? `سفارش شما به دلیل تعدد تامین‌کنندگان، به صورت هوشمند به ${createdOrders.length} سفارش مجزا تفکیک گردید تا پنل پستی هر تامین‌کننده مشخص و هزینه ارسال دقیق محاسبه شود.`
+      : 'سفارش با موفقیت ثبت شد و در صف برآورد هزینه ارسال قرار گرفت.';
+
     return res.status(201).json({
-      message: 'سفارش با موفقیت ثبت شد و در صف برآورد هزینه ارسال قرار گرفت.',
-      order
+      message: msg,
+      isSplit,
+      orderCount: createdOrders.length,
+      orders: createdOrders,
+      order: createdOrders[0]
     });
   } catch (err: any) {
     res.status(500).json({ error: 'خطا در ثبت سفارش', details: err.message });
@@ -5617,38 +5775,71 @@ app.post('/api/v1/store/orders', authenticateStoreApiKey, async (req: any, res: 
       });
     }
 
-    const shippingFee = 45000;
-    const grandTotal = totalBaseAmount + shippingFee;
+    // Group items by supplierId for order splitting
+    const itemsBySupplier = new Map<number, any[]>();
+    for (const item of itemsToCreate) {
+      const suppId = item.supplierId || 0;
+      if (!itemsBySupplier.has(suppId)) {
+        itemsBySupplier.set(suppId, []);
+      }
+      itemsBySupplier.get(suppId)!.push(item);
+    }
 
-    const newOrder = await prisma.order.create({
-      data: {
-        storeId: storeManager.id,
-        totalAmount: grandTotal,
-        shippingFee: shippingFee,
-        status: 'REQUESTED',
-        shippingAddressType: 'OTHER_ADDRESS',
-        shippingAddress: `${customer.province || ''} - ${customer.city || ''} - ${customer.address}`,
-        postalCode: customer.postal_code || customer.postalCode || '',
-        orderSource: `ووکامرس (${woo_order_id ? '#' + woo_order_id : 'API'})`,
-        customerName: customer.name,
-        customerPhone: customer.mobile,
-        customerAddress: customer.address,
-        shippingMethod: shipping_method || 'POST',
-        items: {
-          create: itemsToCreate
-        }
-      },
-      include: { items: true }
-    });
+    const createdOrders: any[] = [];
+    const shippingFeePerOrder = 45000;
+
+    for (const [suppId, supplierItems] of itemsBySupplier.entries()) {
+      const supplierBaseTotal = supplierItems.reduce((sum, i) => sum + (i.supplierPrice * i.quantity), 0);
+      const grandTotal = supplierBaseTotal + shippingFeePerOrder;
+
+      const newOrder = await prisma.order.create({
+        data: {
+          storeId: storeManager.id,
+          totalAmount: grandTotal,
+          shippingFee: shippingFeePerOrder,
+          status: 'REQUESTED',
+          shippingAddressType: 'OTHER_ADDRESS',
+          shippingAddress: `${customer.province || ''} - ${customer.city || ''} - ${customer.address}`,
+          postalCode: customer.postal_code || customer.postalCode || '',
+          orderSource: `ووکامرس (${woo_order_id ? '#' + woo_order_id : 'API'}${itemsBySupplier.size > 1 ? ` - تامین‌کننده #${suppId}` : ''})`,
+          customerName: customer.name,
+          customerPhone: customer.mobile,
+          customerAddress: customer.address,
+          shippingMethod: shipping_method || 'POST',
+          items: {
+            create: supplierItems
+          }
+        },
+        include: { items: true }
+      });
+
+      // Notify supplier via SMS
+      if (suppId) {
+        prisma.user.findUnique({ where: { id: suppId } }).then((supplier) => {
+          if (supplier?.mobile) {
+            notifySupplierNewOrder(supplier.mobile, newOrder.id, supplier.brandName || supplier.username);
+          }
+        }).catch((smsErr) => console.warn('SMS supplier notification error:', smsErr));
+      }
+
+      createdOrders.push(newOrder);
+    }
+
+    const isSplit = createdOrders.length > 1;
 
     res.status(201).json({
       success: true,
-      message: 'سفارش با موفقیت در زوپیت ثبت شد و در انتظار پرداخت مدیر فروشگاه قرار گرفت.',
-      zopitOrderId: newOrder.id,
+      message: isSplit 
+        ? `سفارش ووکامرس به دلیل تعدد تامین‌کنندگان به ${createdOrders.length} سفارش مجزا تفکیک گردید تا پنل پستی و ارسال هر تامین‌کننده جداگانه مدیریت شود.`
+        : 'سفارش با موفقیت در زوپیت ثبت شد و در انتظار پرداخت مدیر فروشگاه قرار گرفت.',
+      isSplit,
+      orderCount: createdOrders.length,
+      zopitOrderId: createdOrders[0].id,
+      zopitOrderIds: createdOrders.map(o => o.id),
       wooOrderId: woo_order_id || null,
       supplierBaseTotal: totalBaseAmount,
-      shippingFee: shippingFee,
-      totalAmountToPayInZopit: grandTotal,
+      shippingFee: shippingFeePerOrder * createdOrders.length,
+      totalAmountToPayInZopit: createdOrders.reduce((s, o) => s + o.totalAmount, 0),
       status: 'REQUESTED'
     });
   } catch (err: any) {
