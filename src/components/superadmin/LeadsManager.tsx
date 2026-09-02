@@ -964,12 +964,13 @@ export default function LeadsManager() {
           {/* Leads Table */}
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs min-w-[700px]">
+              <table className="w-full text-right text-xs min-w-[750px]">
                 <thead className="bg-purple-50/60 border-b border-purple-100 text-slate-900 font-black">
                   <tr>
                     <th className="p-4">نام تامین‌کننده / برند</th>
                     <th className="p-4">شماره تماس</th>
                     <th className="p-4">آدرس</th>
+                    <th className="p-4">پاداش جذب</th>
                     <th className="p-4">وضعیت و تأمین‌یاب</th>
                     <th className="p-4 text-center">عملیات</th>
                   </tr>
@@ -977,7 +978,7 @@ export default function LeadsManager() {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
+                      <td colSpan={6} className="p-12 text-center text-slate-500 font-bold">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
                           <span className="text-xs text-slate-700 font-bold">در حال بارگذاری اطلاعات تامین‌کنندگان...</span>
@@ -986,7 +987,7 @@ export default function LeadsManager() {
                     </tr>
                   ) : fetchError ? (
                     <tr>
-                      <td colSpan={5} className="p-10 text-center">
+                      <td colSpan={6} className="p-10 text-center">
                         <div className="max-w-md mx-auto p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col items-center gap-3">
                           <span className="text-xs font-bold text-amber-900">{fetchError}</span>
                           <button
@@ -1001,7 +1002,7 @@ export default function LeadsManager() {
                     </tr>
                   ) : filteredLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
+                      <td colSpan={6} className="p-12 text-center text-slate-500 font-bold">
                         تامین‌کننده‌ای با مشخصات مدنظر یافت نشد.
                       </td>
                     </tr>
@@ -1071,7 +1072,15 @@ export default function LeadsManager() {
                             )}
                           </td>
 
-                          {/* 4. Status & Ambassador */}
+                          {/* 4. Commission (Reward) */}
+                          <td className="p-4">
+                            <span className="font-mono font-black text-purple-900 text-xs bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg inline-block">
+                              {Number(lead.commission).toLocaleString("fa-IR")}{" "}
+                              <span className="text-[10px] font-bold text-slate-600 font-sans">تومان</span>
+                            </span>
+                          </td>
+
+                          {/* 5. Status & Ambassador */}
                           <td className="p-4">
                             <div className="flex flex-col gap-1.5">
                               <div className="flex items-center gap-1.5">
@@ -1458,6 +1467,39 @@ export default function LeadsManager() {
                 />
               </div>
 
+              {/* 4. Reward / Commission (Main Visible Field) */}
+              <div>
+                <label className="block text-xs font-black text-slate-900 mb-1">
+                  پاداش تأمین‌یاب به ازای ثبت‌نام (تومان) <span className="text-purple-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  step={10000}
+                  value={formData.commission}
+                  onChange={(e) => setFormData({ ...formData, commission: Number(e.target.value) })}
+                  className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-black text-purple-800 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 text-left transition-all"
+                  dir="ltr"
+                />
+                {/* Reward Preset Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  {[30000, 60000, 90000, 100000, 150000, 200000].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, commission: preset })}
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                        formData.commission === preset
+                          ? "bg-purple-600 text-white font-black border-purple-600 shadow-xs"
+                          : "bg-slate-100 hover:bg-purple-50 text-slate-800 border-slate-200 hover:border-purple-200 font-bold"
+                      }`}
+                    >
+                      {(preset / 1000).toLocaleString("fa-IR")} هزار
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* EXPANDABLE SECTION BUTTON */}
               <div className="pt-1">
                 <button
@@ -1467,7 +1509,7 @@ export default function LeadsManager() {
                 >
                   <div className="flex items-center gap-2">
                     <Filter className="w-3.5 h-3.5 text-purple-600" />
-                    <span>اطلاعات و تنظیمات بیشتر (دسته‌بندی، پاداش، وب‌سایت، انتشار)</span>
+                    <span>اطلاعات و تنظیمات بیشتر (دسته‌بندی، وب‌سایت، تخصیص، انتشار)</span>
                   </div>
                   {showMoreFormFields ? (
                     <ChevronUp className="w-4 h-4 text-purple-600" />
@@ -1511,55 +1553,23 @@ export default function LeadsManager() {
                     </div>
                   </div>
 
-                  {/* Reward & Ambassador */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-800 mb-1">
-                        پاداش ثبت‌نام (تومان)
-                      </label>
-                      <input
-                        type="number"
-                        step={10000}
-                        value={formData.commission}
-                        onChange={(e) => setFormData({ ...formData, commission: Number(e.target.value) })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-black text-purple-800 outline-none focus:border-purple-600 text-left"
-                        dir="ltr"
-                      />
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {[50000, 100000, 150000, 200000].map((preset) => (
-                          <button
-                            key={preset}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, commission: preset })}
-                            className={`text-[10px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
-                              formData.commission === preset
-                                ? "bg-purple-600 text-white font-black border-purple-600"
-                                : "bg-white hover:bg-purple-50 text-slate-700 border-slate-200"
-                            }`}
-                          >
-                            {(preset / 1000).toLocaleString("fa-IR")}هزار
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-800 mb-1">
-                        تخصیص به تأمین‌یاب
-                      </label>
-                      <select
-                        value={formData.ambassadorId}
-                        onChange={(e) => setFormData({ ...formData, ambassadorId: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-purple-600 cursor-pointer"
-                      >
-                        <option value="">-- آزاد --</option>
-                        {ambassadors.map((amb) => (
-                          <option key={amb.id} value={amb.id}>
-                            {amb.firstName || amb.username}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  {/* Ambassador */}
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-800 mb-1">
+                      تخصیص به تأمین‌یاب (اختیاری)
+                    </label>
+                    <select
+                      value={formData.ambassadorId}
+                      onChange={(e) => setFormData({ ...formData, ambassadorId: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="">-- آزاد (انتخاب توسط خود تأمین‌یاب‌ها) --</option>
+                      {ambassadors.map((amb) => (
+                        <option key={amb.id} value={amb.id}>
+                          {amb.firstName || amb.username} ({amb.mobile || "تأمین‌یاب"})
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Publish Toggle */}
