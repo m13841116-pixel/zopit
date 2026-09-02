@@ -1472,10 +1472,12 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   };
   const handleReferrerRegister = async () => {
     if (
+      !refForm.firstName ||
+      !refForm.firstName.trim() ||
       !refForm.mobile ||
       !refForm.password
     ) {
-      showNotification("لطفاً شماره موبایل و رمز عبور را وارد نمایید.", "error");
+      showNotification("لطفاً نام و نام خانوادگی، شماره موبایل و رمز عبور را کامل وارد نمایید.", "error");
       return;
     }
     setLoading(true);
@@ -2875,55 +2877,63 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
               {/* 3. TAMINYAB REGISTRATION FORM */}
               {view === "ambassador_form" && (
                 <div className="max-w-md mx-auto py-12 px-4 animate-fade-in text-right">
-                  <div className="bg-card border border-border-default/80 dark:border-border-subtle/50 p-8 rounded-3xl shadow-xl shadow-slate-950/5 relative overflow-hidden">
-                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-border-subtle">
+                  <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-800">
                       <div>
-                        <h2 className="text-2xl font-black text-text-primary flex items-center gap-3">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
                           <ZopitLogo size="sm" />
                           ثبت‌نام تأمین‌یاب
                         </h2>
-                        <p className="text-xs text-text-muted mt-2 font-medium">عضویت سریع و آسان به عنوان تأمین‌یاب زوپیت</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 font-bold">عضویت سریع و آسان به عنوان تأمین‌یاب زوپیت</p>
                       </div>
                       <button
                         onClick={() => setView("role_select")}
-                        className="p-2.5 bg-surface hover:bg-border-default text-text-muted hover:text-text-primary rounded-2xl transition-colors cursor-pointer"
+                        className="p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl transition-colors cursor-pointer"
                       >
                         <ArrowRight className="w-5 h-5" />
                       </button>
                     </div>
                     <form onSubmit={handleReferrerRegister} className="space-y-5">
                       <div>
-                        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">نام و نام خانوادگی (اختیاری)</label>
+                        <label className="block text-xs font-black text-slate-900 dark:text-slate-100 mb-1.5">
+                          نام و نام خانوادگی <span className="text-indigo-600 dark:text-indigo-400">*</span>
+                        </label>
                         <input
                           type="text"
+                          required
                           value={refForm.firstName}
                           onChange={(e) => setRefForm({ ...refForm, firstName: e.target.value })}
-                          className="w-full px-4 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-extrabold focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
                           placeholder="مثال: علی احمدی"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">شماره موبایل (نام کاربری) *</label>
+                        <label className="block text-xs font-black text-slate-900 dark:text-slate-100 mb-1.5">
+                          شماره موبایل (نام کاربری) <span className="text-indigo-600 dark:text-indigo-400">*</span>
+                        </label>
                         <input
                           type="tel"
                           required
                           value={refForm.mobile}
                           onChange={(e) => setRefForm({ ...refForm, mobile: e.target.value, username: e.target.value })}
-                          className="w-full px-4 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-left font-bold"
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono font-black text-left focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
                           placeholder="0912..."
                           dir="ltr"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">رمز عبور *</label>
+                        <label className="block text-xs font-black text-slate-900 dark:text-slate-100 mb-1.5">
+                          رمز عبور <span className="text-indigo-600 dark:text-indigo-400">*</span>
+                        </label>
                         <input
                           type="password"
                           required
                           value={refForm.password}
                           onChange={(e) => setRefForm({ ...refForm, password: e.target.value })}
-                          className="w-full px-4 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-left font-bold"
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono font-black text-left focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
+                          placeholder="••••••••"
                           dir="ltr"
                         />
                       </div>

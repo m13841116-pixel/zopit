@@ -1563,36 +1563,55 @@ export default function LeadsManager() {
                 />
               </div>
 
-              {/* 4. Reward / Commission (Main Visible Field) */}
-              <div>
-                <label className="block text-xs font-black text-slate-900 mb-1">
-                  پاداش تأمین‌یاب به ازای ثبت‌نام (تومان) <span className="text-purple-600">*</span>
-                </label>
-                <input
-                  type="number"
-                  required
-                  step={10000}
-                  value={formData.commission}
-                  onChange={(e) => setFormData({ ...formData, commission: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-black text-purple-800 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 text-left transition-all"
-                  dir="ltr"
-                />
-                {/* Reward Preset Buttons */}
-                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  {[30000, 60000, 90000, 100000, 150000, 200000].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, commission: preset })}
-                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                        formData.commission === preset
-                          ? "bg-purple-600 text-white font-black border-purple-600 shadow-xs"
-                          : "bg-slate-100 hover:bg-purple-50 text-slate-800 border-slate-200 hover:border-purple-200 font-bold"
-                      }`}
-                    >
-                      {(preset / 1000).toLocaleString("fa-IR")} هزار
-                    </button>
-                  ))}
+              {/* 4. Reward / Commission & Website URL (Side by Side Grid) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Right: Reward */}
+                <div>
+                  <label className="block text-xs font-black text-slate-900 mb-1">
+                    پاداش ثبت‌نام (تومان) <span className="text-purple-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    step={10000}
+                    value={formData.commission}
+                    onChange={(e) => setFormData({ ...formData, commission: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-black text-purple-800 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 text-left transition-all"
+                    dir="ltr"
+                  />
+                  {/* Reward Preset Buttons */}
+                  <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                    {[30000, 60000, 90000, 100000, 150000, 200000].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, commission: preset })}
+                        className={`text-[10px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                          formData.commission === preset
+                            ? "bg-purple-600 text-white font-black border-purple-600 shadow-xs"
+                            : "bg-slate-100 hover:bg-purple-50 text-slate-800 border-slate-200 hover:border-purple-200 font-bold"
+                        }`}
+                      >
+                        {(preset / 1000).toLocaleString("fa-IR")}هزار
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Left (سمت چپش): Website / Page Domain */}
+                <div>
+                  <label className="block text-xs font-black text-slate-900 mb-1 flex items-center gap-1">
+                    <Globe className="w-3.5 h-3.5 text-purple-600" />
+                    <span>آدرس وب‌سایت / دامنه یا پیج</span>
+                  </label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={formData.websiteUrl}
+                    onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                    placeholder="example.com یا @page"
+                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 text-left placeholder:text-slate-400 transition-all"
+                  />
                 </div>
               </div>
 
@@ -1618,7 +1637,7 @@ export default function LeadsManager() {
               {/* EXPANDABLE FIELDS */}
               {showMoreFormFields && (
                 <div className="space-y-3 p-3.5 bg-purple-50/30 rounded-2xl border border-purple-100/80 animate-fade-in">
-                  {/* Category & Website */}
+                  {/* Category & Additional Phones */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                       <label className="block text-[11px] font-black text-slate-800 mb-1">
@@ -1628,22 +1647,21 @@ export default function LeadsManager() {
                         type="text"
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        placeholder="مثال: لوازم جانبی"
+                        placeholder="مثال: پوشاک، دیجیتال، کیف و کفش"
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-purple-600"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-black text-slate-800 mb-1 flex items-center gap-1">
-                        <Globe className="w-3 h-3 text-purple-600" />
-                        <span>وب‌سایت / پیج</span>
+                      <label className="block text-[11px] font-black text-slate-800 mb-1">
+                        شماره‌های تماس فرعی
                       </label>
                       <input
                         type="text"
                         dir="ltr"
-                        value={formData.websiteUrl}
-                        onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
-                        placeholder="example.com"
+                        value={formData.additionalPhones}
+                        onChange={(e) => setFormData({ ...formData, additionalPhones: e.target.value })}
+                        placeholder="مثال: 02188888888"
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-purple-600 text-left"
                       />
                     </div>

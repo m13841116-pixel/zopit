@@ -211,8 +211,8 @@ export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
           {/* Full Name & Brand Name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-text-secondary">
-                نام و نام خانوادگی مدیر / رابط *
+              <label className="block text-xs font-black text-slate-900 dark:text-slate-100">
+                نام و نام خانوادگی مدیر / رابط <span className="text-indigo-600 dark:text-indigo-400">*</span>
               </label>
               <div className="relative">
                 <input
@@ -221,15 +221,15 @@ export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
                   placeholder="مثال: علی احمدی"
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full pl-4 pr-10 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                  className="w-full pl-4 pr-10 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-extrabold focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
                 />
-                <User className="w-4 h-4 text-text-muted absolute right-3.5 top-3.5" />
+                <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-text-secondary">
-                نام برند تجاری / تولیدی / بازرگانی *
+              <label className="block text-xs font-black text-slate-900 dark:text-slate-100">
+                نام برند تجاری / تولیدی / بازرگانی <span className="text-indigo-600 dark:text-indigo-400">*</span>
               </label>
               <div className="relative">
                 <input
@@ -238,9 +238,9 @@ export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
                   placeholder="مثال: پخش نگین، کارگاه آریا"
                   value={formData.brandName}
                   onChange={(e) => setFormData({ ...formData, brandName: e.target.value })}
-                  className="w-full pl-4 pr-10 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                  className="w-full pl-4 pr-10 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-extrabold focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
                 />
-                <Store className="w-4 h-4 text-text-muted absolute right-3.5 top-3.5" />
+                <Store className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
               </div>
             </div>
           </div>
@@ -248,8 +248,8 @@ export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
           {/* Mobile & Activity Type */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-text-secondary">
-                شماره موبایل (جهت ورود و پیامک) *
+              <label className="block text-xs font-black text-slate-900 dark:text-slate-100">
+                شماره موبایل (جهت ورود و پیامک) <span className="text-indigo-600 dark:text-indigo-400">*</span>
               </label>
               <div className="relative">
                 <input
@@ -265,9 +265,9 @@ export const SupplierRegisterForm: React.FC<SupplierRegisterFormProps> = ({
                       .replace(/\D/g, "");
                     setFormData({ ...formData, mobile: clean });
                   }}
-                  className="w-full pl-4 pr-10 py-3 bg-background border border-border-default/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-left font-bold"
+                  className="w-full pl-4 pr-10 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono font-black text-left focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
                 />
-                <Smartphone className="w-4 h-4 text-text-muted absolute right-3.5 top-3.5" />
+                <Smartphone className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
               </div>
             </div>
 
