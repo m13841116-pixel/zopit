@@ -21,6 +21,8 @@ import {
   X,
   ExternalLink,
   ChevronDown,
+  ChevronUp,
+  Info,
   Download,
   FileSpreadsheet,
   Copy,
@@ -108,6 +110,8 @@ export default function LeadsManager() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [showAdditionalPhones, setShowAdditionalPhones] = useState(false);
+  const [showMoreFormFields, setShowMoreFormFields] = useState(false);
+  const [viewingLeadDetails, setViewingLeadDetails] = useState<Lead | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -394,6 +398,7 @@ export default function LeadsManager() {
       isPublished: Boolean(lead.isPublished)
     });
     setShowAdditionalPhones(Boolean(lead.additionalPhones));
+    setShowMoreFormFields(Boolean(lead.additionalPhones || lead.websiteUrl || lead.category !== "لوازم جانبی و دیجیتال" || lead.commission !== 150000 || lead.ambassadorId));
     setShowAddModal(true);
   };
 
@@ -758,6 +763,7 @@ export default function LeadsManager() {
                 isPublished: false
               });
               setShowAdditionalPhones(false);
+              setShowMoreFormFields(false);
               setShowAddModal(true);
             }}
             className="bg-gradient-to-r from-violet-600 via-purple-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white px-5 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-purple-600/30 transition-all cursor-pointer shrink-0"
@@ -958,32 +964,29 @@ export default function LeadsManager() {
           {/* Leads Table */}
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs min-w-[850px]">
+              <table className="w-full text-right text-xs min-w-[700px]">
                 <thead className="bg-purple-50/60 border-b border-purple-100 text-slate-900 font-black">
                   <tr>
-                    <th className="p-4.5">نام تامین‌کننده / برند</th>
-                    <th className="p-4.5">دسته‌بندی و حوزه کالا</th>
-                    <th className="p-4.5">شماره تماس و آدرس</th>
-                    <th className="p-4.5">وضعیت انتشار</th>
-                    <th className="p-4.5">پاداش جذب</th>
-                    <th className="p-4.5">تأمین‌یاب مسئول</th>
-                    <th className="p-4.5">وضعیت پیشرفت</th>
-                    <th className="p-4.5 text-center">عملیات</th>
+                    <th className="p-4">نام تامین‌کننده / برند</th>
+                    <th className="p-4">شماره تماس</th>
+                    <th className="p-4">آدرس</th>
+                    <th className="p-4">وضعیت و تأمین‌یاب</th>
+                    <th className="p-4 text-center">عملیات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="p-12 text-center text-slate-500 font-bold">
+                      <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-xs text-slate-700 font-bold">در حال بارگذاری اطلاعات پرونده‌ها و تامین‌کنندگان...</span>
+                          <span className="text-xs text-slate-700 font-bold">در حال بارگذاری اطلاعات تامین‌کنندگان...</span>
                         </div>
                       </td>
                     </tr>
                   ) : fetchError ? (
                     <tr>
-                      <td colSpan={8} className="p-10 text-center">
+                      <td colSpan={5} className="p-10 text-center">
                         <div className="max-w-md mx-auto p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col items-center gap-3">
                           <span className="text-xs font-bold text-amber-900">{fetchError}</span>
                           <button
@@ -998,7 +1001,7 @@ export default function LeadsManager() {
                     </tr>
                   ) : filteredLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-12 text-center text-slate-500 font-bold">
+                      <td colSpan={5} className="p-12 text-center text-slate-500 font-bold">
                         تامین‌کننده‌ای با مشخصات مدنظر یافت نشد.
                       </td>
                     </tr>
@@ -1012,35 +1015,37 @@ export default function LeadsManager() {
                           key={lead.id}
                           className="hover:bg-purple-50/40 transition-colors"
                         >
-                          <td className="p-4.5">
+                          {/* 1. Name */}
+                          <td className="p-4">
                             <div className="font-extrabold text-slate-900 text-sm">
                               {lead.name}
                             </div>
-                            {lead.websiteUrl && (
-                              <a
-                                href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:underline mt-1 bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200 max-w-[220px] truncate"
-                                title={lead.websiteUrl}
-                              >
-                                <Globe className="w-3 h-3 shrink-0" />
-                                <span className="truncate" dir="ltr">{lead.websiteUrl.replace(/^https?:\/\//, "")}</span>
-                                <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-70" />
-                              </a>
-                            )}
-                            <span className="text-[10px] text-slate-500 block mt-1 font-mono">
-                              کد پرونده: #{lead.id}
-                            </span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                #{lead.id}
+                              </span>
+                              {lead.category && (
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold">
+                                  {lead.category}
+                                </span>
+                              )}
+                              {lead.websiteUrl && (
+                                <a
+                                  href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 hover:underline bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 max-w-[140px] truncate"
+                                  title={lead.websiteUrl}
+                                >
+                                  <Globe className="w-2.5 h-2.5 shrink-0" />
+                                  <span className="truncate" dir="ltr">{lead.websiteUrl.replace(/^https?:\/\//, "")}</span>
+                                </a>
+                              )}
+                            </div>
                           </td>
 
-                          <td className="p-4.5">
-                            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px] font-bold">
-                              {lead.category || "عمومی"}
-                            </span>
-                          </td>
-
-                          <td className="p-4.5">
+                          {/* 2. Phone */}
+                          <td className="p-4">
                             <div className="flex items-center gap-1.5 font-mono text-xs font-black text-purple-700" dir="ltr">
                               <Phone className="w-3.5 h-3.5 text-purple-600" />
                               <a href={`tel:${lead.phone}`} className="hover:underline">
@@ -1048,104 +1053,99 @@ export default function LeadsManager() {
                               </a>
                             </div>
                             {lead.additionalPhones && (
-                              <div className="flex items-center gap-1 text-[11px] text-amber-700 font-mono mt-1" dir="ltr">
-                                <span className="text-[10px] text-slate-500 font-sans font-normal">شماره‌های دیگر:</span>
-                                <span className="font-bold truncate max-w-[180px]" title={lead.additionalPhones}>{lead.additionalPhones}</span>
-                              </div>
-                            )}
-                            {lead.address && (
-                              <div className="flex items-center gap-1 text-[11px] text-slate-600 mt-1 max-w-xs truncate">
-                                <Building className="w-3 h-3 shrink-0 text-slate-400" />
-                                <span>{lead.address}</span>
-                              </div>
+                              <span className="text-[10px] text-amber-700 font-mono block mt-1" dir="ltr" title={lead.additionalPhones}>
+                                +شماره‌های دیگر موجود
+                              </span>
                             )}
                           </td>
 
-                          <td className="p-4.5">
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePublish(lead.id)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
-                                lead.isPublished
-                                  ? "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200"
-                                  : "bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-200"
-                              }`}
-                              title={
-                                lead.isPublished
-                                  ? "منتشرشده در پنل تأمین‌یاب‌ها (کلیک کنید تا به پیش‌نویس برگردد)"
-                                  : "پیش‌نویس / مخفی از تأمین‌یاب‌ها (کلیک کنید تا منتشر شود)"
-                              }
-                            >
-                              {lead.isPublished ? (
-                                <>
-                                  <Eye className="w-3.5 h-3.5 text-purple-700" />
-                                  <span>منتشرشده</span>
-                                </>
-                              ) : (
-                                <>
-                                  <EyeOff className="w-3.5 h-3.5 text-slate-600" />
-                                  <span>پیش‌نویس (پیامک)</span>
-                                </>
-                              )}
-                            </button>
+                          {/* 3. Address */}
+                          <td className="p-4">
+                            {lead.address ? (
+                              <div className="flex items-center gap-1 text-xs text-slate-700 max-w-xs truncate">
+                                <Building className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                <span className="truncate">{lead.address}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">-</span>
+                            )}
                           </td>
 
-                          <td className="p-4.5">
-                            <span className="font-black text-slate-900 text-sm font-mono">
-                              {Number(lead.commission).toLocaleString("fa-IR")}{" "}
-                              <span className="text-[10px] font-bold text-slate-500 font-sans">تومان</span>
-                            </span>
-                          </td>
+                          {/* 4. Status & Ambassador */}
+                          <td className="p-4">
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black border ${
+                                    isCompleted
+                                      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                      : isAssigned
+                                      ? "bg-purple-100 text-purple-800 border-purple-300"
+                                      : lead.status === "CANCELLED"
+                                      ? "bg-rose-100 text-rose-800 border-rose-300"
+                                      : "bg-amber-100 text-amber-900 border-amber-300"
+                                  }`}
+                                >
+                                  {isCompleted && <CheckCircle2 className="w-3 h-3" />}
+                                  {isAssigned && <Clock className="w-3 h-3" />}
+                                  {isCompleted
+                                    ? "جذب موفق"
+                                    : isAssigned
+                                    ? "در حال مذاکره"
+                                    : lead.status === "CANCELLED"
+                                    ? "عدم توافق"
+                                    : "آزاد"}
+                                </span>
 
-                          <td className="p-4.5">
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={lead.ambassadorId ? String(lead.ambassadorId) : ""}
-                                onChange={(e) => handleAssignAmbassador(lead.id, e.target.value)}
-                                className="bg-white border-2 border-slate-200 hover:border-purple-300 text-slate-900 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none focus:border-purple-600 cursor-pointer shadow-xs"
-                              >
-                                <option value="">-- بدون تأمین‌یاب (آزاد) --</option>
-                                {ambassadors.map((amb) => (
-                                  <option key={amb.id} value={amb.id}>
-                                    {amb.firstName || amb.username}
-                                  </option>
-                                ))}
-                              </select>
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePublish(lead.id)}
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-black border transition-all cursor-pointer ${
+                                    lead.isPublished
+                                      ? "bg-purple-100 text-purple-800 border-purple-200"
+                                      : "bg-slate-100 text-slate-700 border-slate-200"
+                                  }`}
+                                  title={lead.isPublished ? "منتشرشده در پنل" : "پیش‌نویس"}
+                                >
+                                  {lead.isPublished ? "منتشرشده" : "پیش‌نویس"}
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-1 text-[11px] text-slate-600">
+                                <select
+                                  value={lead.ambassadorId ? String(lead.ambassadorId) : ""}
+                                  onChange={(e) => handleAssignAmbassador(lead.id, e.target.value)}
+                                  className="bg-white border border-slate-200 hover:border-purple-300 text-slate-800 rounded-lg px-2 py-1 text-[11px] font-bold outline-none cursor-pointer"
+                                >
+                                  <option value="">-- بدون تأمین‌یاب --</option>
+                                  {ambassadors.map((amb) => (
+                                    <option key={amb.id} value={amb.id}>
+                                      {amb.firstName || amb.username}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                           </td>
 
-                          <td className="p-4.5">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border ${
-                                isCompleted
-                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                  : isAssigned
-                                  ? "bg-purple-100 text-purple-800 border-purple-300"
-                                  : lead.status === "CANCELLED"
-                                  ? "bg-rose-100 text-rose-800 border-rose-300"
-                                  : "bg-amber-100 text-amber-900 border-amber-300"
-                              }`}
-                            >
-                              {isCompleted && <CheckCircle2 className="w-3.5 h-3.5" />}
-                              {isAssigned && <Clock className="w-3.5 h-3.5" />}
-                              {isCompleted
-                                ? "جذب موفق و ثبت‌نام شد"
-                                : isAssigned
-                                ? "در حال مذاکره تأمین‌یاب"
-                                : lead.status === "CANCELLED"
-                                ? "عدم توافق"
-                                : "آزاد (در انتظار تأمین‌یاب)"}
-                            </span>
-                          </td>
+                          {/* 5. Actions */}
+                          <td className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewingLeadDetails(lead)}
+                                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all cursor-pointer shadow-xs"
+                                title="مشاهده اطلاعات کامل تامین‌کننده"
+                              >
+                                <Info className="w-4 h-4 text-slate-700" />
+                              </button>
 
-                          <td className="p-4.5 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
                               {!isCompleted && (
                                 <button
                                   type="button"
                                   onClick={() => handleStatusChange(lead.id, "COMPLETED")}
                                   className="p-2 bg-emerald-100 hover:bg-emerald-600 text-emerald-800 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
-                                  title="ثبت به عنوان جذب موفق و واریز پاداش تأمین‌یاب"
+                                  title="ثبت به عنوان جذب موفق"
                                 >
                                   <CheckCircle2 className="w-4 h-4" />
                                 </button>
@@ -1155,7 +1155,7 @@ export default function LeadsManager() {
                                 type="button"
                                 onClick={() => openEditModal(lead)}
                                 className="p-2 bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
-                                title="ویرایش اطلاعات و مبلغ پاداش"
+                                title="ویرایش"
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
@@ -1164,7 +1164,7 @@ export default function LeadsManager() {
                                 type="button"
                                 onClick={() => handleDeleteLead(lead.id)}
                                 className="p-2 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
-                                title="حذف تامین‌کننده هدف"
+                                title="حذف"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -1176,6 +1176,120 @@ export default function LeadsManager() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: View Full Lead Details */}
+      {viewingLeadDetails && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 md:p-6 max-w-md w-full shadow-2xl space-y-4 animate-scale-up my-auto" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-black">
+                  <Building className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">{viewingLeadDetails.name}</h3>
+                  <span className="text-[11px] text-slate-500 font-mono">کد پرونده: #{viewingLeadDetails.id}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingLeadDetails(null)}
+                className="p-1.5 rounded-xl bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-purple-50/50 rounded-2xl border border-purple-100 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-bold">شماره تماس اصلی:</span>
+                  <a href={`tel:${viewingLeadDetails.phone}`} className="font-mono font-black text-purple-700 hover:underline" dir="ltr">
+                    {viewingLeadDetails.phone}
+                  </a>
+                </div>
+                {viewingLeadDetails.additionalPhones && (
+                  <div className="flex justify-between items-center border-t border-purple-100 pt-2">
+                    <span className="text-slate-500 font-bold">شماره‌های دیگر:</span>
+                    <span className="font-mono font-bold text-slate-800" dir="ltr">{viewingLeadDetails.additionalPhones}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-bold">آدرس / موقعیت:</span>
+                  <span className="font-bold text-slate-900">{viewingLeadDetails.address || "ثبت نشده"}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-200 pt-2">
+                  <span className="text-slate-500 font-bold">دسته‌بندی و صنف:</span>
+                  <span className="font-bold text-slate-800">{viewingLeadDetails.category || "عمومی"}</span>
+                </div>
+                {viewingLeadDetails.websiteUrl && (
+                  <div className="flex justify-between items-center border-t border-slate-200 pt-2">
+                    <span className="text-slate-500 font-bold">وب‌سایت / پیج:</span>
+                    <a
+                      href={viewingLeadDetails.websiteUrl.startsWith("http") ? viewingLeadDetails.websiteUrl : `https://${viewingLeadDetails.websiteUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-bold text-purple-700 hover:underline flex items-center gap-1"
+                      dir="ltr"
+                    >
+                      <span>{viewingLeadDetails.websiteUrl}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-bold">مبلغ پاداش جذب:</span>
+                  <span className="font-mono font-black text-purple-800 text-sm">
+                    {Number(viewingLeadDetails.commission).toLocaleString("fa-IR")} تومان
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-200 pt-2">
+                  <span className="text-slate-500 font-bold">تأمین‌یاب مسئول:</span>
+                  <span className="font-bold text-slate-800">
+                    {viewingLeadDetails.ambassador
+                      ? `${viewingLeadDetails.ambassador.firstName || viewingLeadDetails.ambassador.username} (${viewingLeadDetails.ambassador.mobile || "بدون شماره"})`
+                      : "آزاد (در انتظار انتخاب تأمین‌یاب)"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-200 pt-2">
+                  <span className="text-slate-500 font-bold">وضعیت انتشار:</span>
+                  <span className={`font-black ${viewingLeadDetails.isPublished ? "text-purple-700" : "text-slate-600"}`}>
+                    {viewingLeadDetails.isPublished ? "🌐 منتشرشده برای تأمین‌یاب" : "📝 پیش‌نویس (ویژه پیامک)"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const leadToEdit = viewingLeadDetails;
+                  setViewingLeadDetails(null);
+                  openEditModal(leadToEdit);
+                }}
+                className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>ویرایش این تامین‌کننده</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingLeadDetails(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-xs transition-colors cursor-pointer"
+              >
+                بستن
+              </button>
             </div>
           </div>
         </div>
@@ -1280,28 +1394,28 @@ export default function LeadsManager() {
 
       {/* MODAL: Add / Edit Target Supplier Lead */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up" dir="rtl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
-                <div className="w-9 h-9 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
-                  <Target className="w-4.5 h-4.5" />
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 md:p-6 max-w-md w-full shadow-2xl space-y-4 animate-scale-up my-auto" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                  <Target className="w-4 h-4" />
                 </div>
-                <span>{editingLead ? "ویرایش تامین‌کننده هدف و پاداش" : "تعریف تامین‌کننده هدف جدید"}</span>
+                <span>{editingLead ? "ویرایش تامین‌کننده هدف" : "تعریف تامین‌کننده هدف جدید"}</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 rounded-xl bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveLead} className="space-y-4">
+            <form onSubmit={handleSaveLead} className="space-y-3.5">
               {/* 1. Name */}
               <div>
-                <label className="block text-xs font-black text-slate-900 mb-1.5">
+                <label className="block text-xs font-black text-slate-900 mb-1">
                   نام تامین‌کننده / فروشگاه / برند <span className="text-purple-600">*</span>
                 </label>
                 <input
@@ -1309,211 +1423,220 @@ export default function LeadsManager() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="مثال: بازرگانی پارس دیجیتال یا عمده‌فروشی برادران احمدی"
-                  className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
+                  placeholder="مثال: بازرگانی پارس یا عمده‌فروشی برادران احمدی"
+                  className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
                 />
               </div>
 
-              {/* 2. Phone & Category */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-slate-900 mb-1.5">
-                    شماره تماس / موبایل مدیر <span className="text-purple-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    dir="ltr"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="09123456789"
-                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-mono font-black text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 text-left placeholder:text-slate-400 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-slate-900 mb-1.5">
-                    صنف و دسته‌بندی کالا
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="مثال: لوازم جانبی موبایل"
-                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
-                  />
-                </div>
+              {/* 2. Phone */}
+              <div>
+                <label className="block text-xs font-black text-slate-900 mb-1">
+                  شماره تماس / موبایل مدیر <span className="text-purple-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  dir="ltr"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="09123456789"
+                  className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-black text-slate-900 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 text-left placeholder:text-slate-400 transition-all"
+                />
               </div>
 
-              {/* 3. Website & Address */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-slate-900 mb-1.5 flex items-center gap-1">
-                    <Globe className="w-3.5 h-3.5 text-purple-600" />
-                    <span>لینک وب‌سایت یا پیج تامین‌کننده</span>
-                  </label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={formData.websiteUrl}
-                    onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
-                    placeholder="example.com یا https://..."
-                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 text-left placeholder:text-slate-400 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-slate-900 mb-1.5">
-                    آدرس یا موقعیت بازار
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="مثال: تهران، پاساژ علاءالدین، طبقه ۳، پلاک ۳۱۵"
-                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
-                  />
-                </div>
+              {/* 3. Address */}
+              <div>
+                <label className="block text-xs font-black text-slate-900 mb-1">
+                  آدرس یا موقعیت بازار
+                </label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="مثال: تهران، پاساژ علاءالدین، طبقه ۳، پلاک ۳۱۵"
+                  className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
+                />
               </div>
 
-              {/* 4. Reward & Ambassador */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-slate-900 mb-1.5">
-                    پاداش تأمین‌یاب به ازای ثبت‌نام (تومان) <span className="text-purple-600">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    step={10000}
-                    value={formData.commission}
-                    onChange={(e) => setFormData({ ...formData, commission: Number(e.target.value) })}
-                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-mono font-black text-purple-800 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 text-left"
-                    dir="ltr"
-                  />
-                  {/* Quick Commission Presets */}
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                    {[30000, 60000, 90000, 100000, 150000, 200000].map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, commission: preset })}
-                        className={`text-[11px] px-2.5 py-1 rounded-xl border transition-all cursor-pointer ${
-                          formData.commission === preset
-                            ? "bg-purple-600 text-white font-black border-purple-600 shadow-xs"
-                            : "bg-slate-100 hover:bg-purple-50 text-slate-800 border-slate-200 hover:border-purple-200 font-bold"
-                        }`}
-                      >
-                        {(preset / 1000).toLocaleString("fa-IR")} هزار
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-slate-900 mb-1.5">
-                    تخصیص به تأمین‌یاب (اختیاری)
-                  </label>
-                  <select
-                    value={formData.ambassadorId}
-                    onChange={(e) => setFormData({ ...formData, ambassadorId: e.target.value })}
-                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="">-- آزاد (انتخاب توسط خود تأمین‌یاب‌ها) --</option>
-                    {ambassadors.map((amb) => (
-                      <option key={amb.id} value={amb.id}>
-                        {amb.firstName || amb.username} ({amb.mobile || "تأمین‌یاب"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* 5. Publish Toggle (Publish Delay Setting) */}
-              <div className="p-4 bg-purple-50/50 border-2 border-purple-200 rounded-2xl flex items-center justify-between gap-3">
-                <div>
-                  <label className="text-xs font-black text-slate-900 flex items-center gap-1.5 cursor-pointer">
-                    <Radio className="w-4 h-4 text-purple-600" />
-                    <span>وضعیت انتشار برای تأمین‌یاب‌ها</span>
-                  </label>
-                  <p className="text-[11px] text-slate-600 mt-1 font-medium">
-                    {formData.isPublished
-                      ? "این پرونده فوراً در پنل تمام تأمین‌یاب‌ها برای پیگیری تماس نمایش داده می‌شود."
-                      : "این پرونده در حالت پیش‌نویس می‌ماند تا ابتدا از طریق ملی‌پیامک به آن پیامک دهید."}
-                  </p>
-                </div>
+              {/* EXPANDABLE SECTION BUTTON */}
+              <div className="pt-1">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, isPublished: !formData.isPublished })}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shadow-xs ${
-                    formData.isPublished
-                      ? "bg-purple-600 hover:bg-purple-700 text-white"
-                      : "bg-slate-700 hover:bg-slate-800 text-white"
-                  }`}
+                  onClick={() => setShowMoreFormFields(!showMoreFormFields)}
+                  className="w-full border-2 border-dashed border-purple-200 hover:border-purple-400 bg-purple-50/50 hover:bg-purple-100/50 text-purple-900 text-xs font-black py-2.5 px-3.5 rounded-xl flex items-center justify-between transition-all cursor-pointer"
                 >
-                  {formData.isPublished ? "🌐 منتشر شود" : "📝 پیش‌نویس (پیامک)"}
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-3.5 h-3.5 text-purple-600" />
+                    <span>اطلاعات و تنظیمات بیشتر (دسته‌بندی، پاداش، وب‌سایت، انتشار)</span>
+                  </div>
+                  {showMoreFormFields ? (
+                    <ChevronUp className="w-4 h-4 text-purple-600" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  )}
                 </button>
               </div>
 
-              {/* 6. Additional Phones (Collapsible section at the bottom) */}
-              <div className="pt-1">
-                {!showAdditionalPhones ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowAdditionalPhones(true)}
-                    className="w-full border-2 border-dashed border-purple-200 hover:border-purple-400 bg-purple-50/50 hover:bg-purple-100/50 text-purple-800 text-xs font-black py-3 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4 text-purple-600" />
-                    <span>+ افزودن شماره‌های تماس بیشتر / همراه دیگر (اختیاری)</span>
-                  </button>
-                ) : (
-                  <div className="p-4 bg-purple-50/40 rounded-2xl border-2 border-purple-200 space-y-2.5 transition-all">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                        <Phone className="w-4 h-4 text-purple-600" />
-                        <span>شماره‌های تماس بیشتر (همراه / ثابت دیگر)</span>
+              {/* EXPANDABLE FIELDS */}
+              {showMoreFormFields && (
+                <div className="space-y-3 p-3.5 bg-purple-50/30 rounded-2xl border border-purple-100/80 animate-fade-in">
+                  {/* Category & Website */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-800 mb-1">
+                        صنف و دسته‌بندی کالا
                       </label>
+                      <input
+                        type="text"
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        placeholder="مثال: لوازم جانبی"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-purple-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-800 mb-1 flex items-center gap-1">
+                        <Globe className="w-3 h-3 text-purple-600" />
+                        <span>وب‌سایت / پیج</span>
+                      </label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={formData.websiteUrl}
+                        onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                        placeholder="example.com"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-purple-600 text-left"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reward & Ambassador */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-800 mb-1">
+                        پاداش ثبت‌نام (تومان)
+                      </label>
+                      <input
+                        type="number"
+                        step={10000}
+                        value={formData.commission}
+                        onChange={(e) => setFormData({ ...formData, commission: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-black text-purple-800 outline-none focus:border-purple-600 text-left"
+                        dir="ltr"
+                      />
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {[50000, 100000, 150000, 200000].map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, commission: preset })}
+                            className={`text-[10px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                              formData.commission === preset
+                                ? "bg-purple-600 text-white font-black border-purple-600"
+                                : "bg-white hover:bg-purple-50 text-slate-700 border-slate-200"
+                            }`}
+                          >
+                            {(preset / 1000).toLocaleString("fa-IR")}هزار
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-800 mb-1">
+                        تخصیص به تأمین‌یاب
+                      </label>
+                      <select
+                        value={formData.ambassadorId}
+                        onChange={(e) => setFormData({ ...formData, ambassadorId: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-purple-600 cursor-pointer"
+                      >
+                        <option value="">-- آزاد --</option>
+                        {ambassadors.map((amb) => (
+                          <option key={amb.id} value={amb.id}>
+                            {amb.firstName || amb.username}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Publish Toggle */}
+                  <div className="p-3 bg-white border border-purple-200 rounded-xl flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-xs font-black text-slate-900 block">انتشار برای تأمین‌یاب‌ها</span>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        {formData.isPublished ? "نمایش فوری در پنل" : "پیش‌نویس ویژه پیامک"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, isPublished: !formData.isPublished })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                        formData.isPublished
+                          ? "bg-purple-600 text-white"
+                          : "bg-slate-700 text-white"
+                      }`}
+                    >
+                      {formData.isPublished ? "🌐 منتشرشده" : "📝 پیش‌نویس"}
+                    </button>
+                  </div>
+
+                  {/* Additional Phones */}
+                  <div>
+                    {!showAdditionalPhones ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          setShowAdditionalPhones(false);
-                          setFormData({ ...formData, additionalPhones: "" });
-                        }}
-                        className="text-xs text-rose-600 hover:text-rose-700 font-black hover:bg-rose-50 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                        onClick={() => setShowAdditionalPhones(true)}
+                        className="text-[11px] text-purple-700 hover:text-purple-900 font-bold hover:underline flex items-center gap-1 cursor-pointer"
                       >
-                        <X className="w-3.5 h-3.5" />
-                        <span>حذف و بستن</span>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>افزودن شماره‌های تماس همراه/ثابت دیگر</span>
                       </button>
-                    </div>
-                    <input
-                      type="text"
-                      dir="ltr"
-                      value={formData.additionalPhones}
-                      onChange={(e) => setFormData({ ...formData, additionalPhones: e.target.value })}
-                      placeholder="مثال: 09181112233, 08734221100"
-                      className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-black text-slate-900 outline-none focus:border-purple-600 text-left placeholder:text-slate-400"
-                    />
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                      💡 با جداکننده کاما (،) یا فاصله وارد کنید. سیستم تمامی این شماره‌ها را موقع احراز هویت خودکار و اعتبارسنجی ثبت‌نام تامین‌کننده بررسی خواهد کرد.
-                    </p>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-black text-slate-800">شماره‌های دیگر</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAdditionalPhones(false);
+                              setFormData({ ...formData, additionalPhones: "" });
+                            }}
+                            className="text-[10px] text-rose-600 hover:underline cursor-pointer"
+                          >
+                            بستن
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          value={formData.additionalPhones}
+                          onChange={(e) => setFormData({ ...formData, additionalPhones: e.target.value })}
+                          placeholder="09181112233, 08734221100"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 text-left outline-none"
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-5 py-3 rounded-2xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   انصراف
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-7 py-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-2xl text-xs font-black shadow-md shadow-purple-600/25 transition-all cursor-pointer disabled:opacity-50"
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-xl text-xs font-black shadow-md shadow-purple-600/20 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmitting ? "در حال ثبت..." : editingLead ? "ذخیره تغییرات" : "ثبت تامین‌کننده هدف"}
+                  {isSubmitting ? "در حال ثبت..." : editingLead ? "ذخیره تغییرات" : "ثبت تامین‌کننده"}
                 </button>
               </div>
             </form>
