@@ -734,14 +734,14 @@ export default function StoreManagerDashboard({
             <button
               onClick={() => setShowAutomationVideoModal(true)}
               className="p-2 sm:px-3 sm:py-1.5 bg-gradient-to-r from-rose-500/10 via-purple-500/10 to-indigo-500/10 hover:from-rose-500/20 hover:to-indigo-500/20 text-rose-600 dark:text-rose-400 rounded-xl transition-all duration-200 border border-rose-500/30 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs group"
-              title="مشاهده ویدیوی ۱ دقیقه‌ای اتوماسیون فروشگاه"
+              title="مشاهده ویدیوی ۱ دقیقه‌ای آموزش سریع فروشگاه"
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
               </span>
               <Play className="w-3.5 h-3.5 fill-current text-rose-500 group-hover:scale-110 transition-transform" />
-              <span className="text-[11px] font-black hidden sm:inline-block">اتوماسیون ۶۰ ثانیه‌ای</span>
+              <span className="text-[11px] font-black hidden sm:inline-block">آموزش سریع ۶۰ ثانیه‌ای</span>
             </button>
 
             <button
@@ -813,21 +813,21 @@ export default function StoreManagerDashboard({
                   </div>
 
                   {/* Store Link Alert Banner */}
-                  <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-500/30 rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="bg-amber-50/90 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700/70 rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-start sm:items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-400/40">
                         <Globe className="w-6 h-6" />
                       </div>
-                      <div className="space-y-1 text-right">
-                        <h3 className="text-sm font-black text-primary flex items-center gap-2">
+                      <div className="space-y-1.5 text-right">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-amber-100 flex items-center gap-2">
                           <span>🌐 لینک خرید اختصاصی وب‌سایت شما برای خریداران</span>
-                          <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                          <span className="text-[10px] bg-amber-200 dark:bg-amber-900/70 text-amber-900 dark:text-amber-200 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-400/50">
                             مهم
                           </span>
                         </h3>
-                        <p className="text-xs text-muted leading-relaxed max-w-2xl">
+                        <p className="text-xs text-slate-700 dark:text-amber-200/90 leading-relaxed max-w-2xl font-medium">
                           {user?.storeLink ? (
-                            <>خریداران زوپیت در صفحه اکسپلور مستقیماً به آدرس <strong className="font-mono text-amber-600 dark:text-amber-400 dir-ltr inline-block px-1 bg-amber-500/10 rounded">{user.storeLink}</strong> منتقل می‌شوند.</>
+                            <>خریداران زوپیت در صفحه اکسپلور مستقیماً به آدرس <strong className="font-mono text-amber-800 dark:text-amber-300 dir-ltr inline-block px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/60 rounded border border-amber-300 dark:border-amber-700">{user.storeLink}</strong> منتقل می‌شوند.</>
                           ) : (
                             <>خریداران در صفحه اکسپلور زوپیت مستقیماً به سایت اختصاصی شما هدایت می‌شوند. لطفاً آدرس اینترنتی یا لینک خرید فروشگاه خود را تنظیم فرمایید.</>
                           )}

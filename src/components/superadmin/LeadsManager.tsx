@@ -124,6 +124,25 @@ export default function LeadsManager() {
     }
   };
 
+  const handleAutoMatch = async () => {
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/admin/leads/auto-match", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "تطبیق هوشمند شماره‌ها و برندها انجام شد.");
+        fetchLeadsData();
+      } else {
+        toast.error(data.error || "خطا در ارزیابی خودکار");
+      }
+    } catch {
+      toast.error("خطا در ارتباط با سرور");
+    }
+  };
+
   const handleSaveLead = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) {
@@ -335,27 +354,39 @@ export default function LeadsManager() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setEditingLead(null);
-            setFormData({
-              name: "",
-              phone: "",
-              additionalPhones: "",
-              address: "",
-              category: "لوازم جانبی و دیجیتال",
-              commission: 150000,
-              ambassadorId: ""
-            });
-            setShowAdditionalPhones(false);
-            setShowAddModal(true);
-          }}
-          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>افزودن تامین‌کننده هدف جدید</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAutoMatch}
+            className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-4 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-xs"
+            title="ارزیابی اتوماتیک شماره‌های همراه/ثابت و اسامی برندها با تامین‌کنندگان ثبت‌نامی"
+          >
+            <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
+            <span>تطبیق هوشمند شماره‌ها و برندها</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditingLead(null);
+              setFormData({
+                name: "",
+                phone: "",
+                additionalPhones: "",
+                address: "",
+                category: "لوازم جانبی و دیجیتال",
+                commission: 150000,
+                ambassadorId: ""
+              });
+              setShowAdditionalPhones(false);
+              setShowAddModal(true);
+            }}
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>افزودن تامین‌کننده هدف جدید</span>
+          </button>
+        </div>
       </div>
 
       {/* Metric Cards */}
@@ -841,7 +872,7 @@ export default function LeadsManager() {
                   />
                   {/* Quick Commission Presets */}
                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                    {[10000, 30000, 60000, 100000, 200000].map((preset) => (
+                    {[30000, 60000, 90000, 100000, 150000, 200000].map((preset) => (
                       <button
                         key={preset}
                         type="button"

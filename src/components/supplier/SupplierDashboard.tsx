@@ -899,14 +899,14 @@ export function SupplierDashboard({
             <button
               onClick={() => setShowAutomationVideoModal(true)}
               className="p-2 sm:px-3 sm:py-1.5 bg-gradient-to-r from-rose-500/10 via-purple-500/10 to-indigo-500/10 hover:from-rose-500/20 hover:to-indigo-500/20 text-rose-600 dark:text-rose-400 rounded-xl transition-all duration-200 border border-rose-500/30 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs group"
-              title="مشاهده ویدیوی ۱ دقیقه‌ای اتوماسیون تامین‌کننده"
+              title="مشاهده ویدیوی ۱ دقیقه‌ای آموزش سریع تامین‌کننده"
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
               </span>
               <Play className="w-3.5 h-3.5 fill-current text-rose-500 group-hover:scale-110 transition-transform" />
-              <span className="text-[11px] font-black hidden sm:inline-block">اتوماسیون ۶۰ ثانیه‌ای</span>
+              <span className="text-[11px] font-black hidden sm:inline-block">آموزش سریع ۶۰ ثانیه‌ای</span>
             </button>
             <button
               onClick={() => setShowEducationModal(true)}

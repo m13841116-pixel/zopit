@@ -1,5 +1,6 @@
 import { getPrisma } from '../../../prisma.js';
 import { ConnectionService } from './ConnectionService.js';
+import { processOrderPayload } from './WebhookService.js';
 
 const prisma = getPrisma();
 
@@ -10,12 +11,11 @@ export class OrderService {
 
     const auth = Buffer.from(`${conn.consumerKey}:${conn.consumerSecret}`).toString('base64');
     
-    // In a real app we would track last synced order ID or use dates.
-    // For now we just fetch recent orders.
-    const url = new URL('/wp-json/wc/v3/orders?status=processing', conn.storeUrl);
+    // Fetch orders with processing or completed or on-hold status
+    const url = new URL('/wp-json/wc/v3/orders?per_page=20', conn.storeUrl);
     
     try {
-      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(10000), 
+      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(15000), 
         headers: {
           'Authorization': `Basic ${auth}`,
           'Accept': 'application/json'
@@ -25,11 +25,18 @@ export class OrderService {
       if (!response.ok) return { successCount: 0, failedCount: 1 };
       
       const orders = await response.json() as any[];
-      // Syncing logic here
-      // This is a placeholder for importing orders into Bank Kala
-      // Normally, we'd map WooCommerce order line items to Bank Kala products and create Order/OrderItems
+      let importedCount = 0;
+
+      for (const order of orders) {
+        try {
+          const res = await processOrderPayload(order, storeId);
+          if (res) importedCount++;
+        } catch (itemErr) {
+          console.warn(`Error processing synced order #${order.id}:`, itemErr);
+        }
+      }
       
-      return { successCount: orders.length, failedCount: 0 };
+      return { successCount: importedCount, totalFetched: orders.length, failedCount: 0 };
     } catch (err) {
       return { successCount: 0, failedCount: 1 };
     }

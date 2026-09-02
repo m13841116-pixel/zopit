@@ -11345,9 +11345,115 @@ registerPenaltyRoutes(app, prisma);
 registerDiscountRoutes(app, authenticateToken, requireSuperAdmin);
 
 
+// Helper function: Auto-match Leads (تامینیاب‌ها) with registered suppliers by mobile/landline or brand name
+async function autoSyncLeadsWithRegisteredSuppliers() {
+  try {
+    const leads = await prisma.lead.findMany();
+    const suppliers = await prisma.user.findMany({
+      where: { role: 'SUPPLIER' }
+    });
+
+    const cleanPhone = (str: string | null | undefined) => {
+      if (!str) return '';
+      let p = String(str).replace(/[\s\-\+\(\)]/g, '');
+      if (p.startsWith('98')) p = p.slice(2);
+      if (p.startsWith('0')) p = p.slice(1);
+      return p;
+    };
+
+    const cleanName = (str: string | null | undefined) => {
+      if (!str) return '';
+      return String(str)
+        .toLowerCase()
+        .replace(/(بازرگانی|فروشگاه|شرکت|گروه|تولیدی|برند|پخش|عمده)/gi, '')
+        .replace(/[\s\-\_\.]/g, '')
+        .trim();
+    };
+
+    let matchedCount = 0;
+
+    for (const lead of leads) {
+      if (lead.status === 'COMPLETED' && lead.supplierId) continue;
+
+      const leadPhones = [
+        cleanPhone(lead.phone),
+        ...(lead.additionalPhones ? lead.additionalPhones.split(/[,;\n]/).map(cleanPhone) : [])
+      ].filter(p => p.length >= 6);
+
+      const leadNameClean = cleanName(lead.name);
+
+      for (const sup of suppliers) {
+        const supPhones = [
+          cleanPhone(sup.mobile),
+          cleanPhone(sup.telephone)
+        ].filter(p => p.length >= 6);
+
+        // Phone match
+        const hasPhoneMatch = leadPhones.some(lp => supPhones.some(sp => sp.endsWith(lp) || lp.endsWith(sp)));
+
+        // Brand / Store Name / Username match
+        const supBrandName = cleanName(sup.brandName || sup.storeName || sup.username || `${sup.firstName || ''}${sup.lastName || ''}`);
+        const hasNameMatch = leadNameClean.length >= 3 && supBrandName.length >= 3 && (
+          leadNameClean.includes(supBrandName) || supBrandName.includes(leadNameClean)
+        );
+
+        if (hasPhoneMatch || hasNameMatch) {
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: {
+              status: 'COMPLETED',
+              supplierId: sup.id
+            }
+          });
+          matchedCount++;
+
+          // Credit ambassador reward if applicable
+          if (lead.ambassadorId) {
+            const ambassadorUser = await prisma.user.findUnique({ where: { id: lead.ambassadorId } });
+            if (ambassadorUser && lead.commission > 0) {
+              const existingTx = await prisma.walletTransaction.findFirst({
+                where: {
+                  userId: lead.ambassadorId,
+                  description: { contains: `پاداش جذب تامین‌کننده: ${lead.name}` }
+                }
+              });
+              if (!existingTx) {
+                await prisma.walletTransaction.create({
+                  data: {
+                    userId: lead.ambassadorId,
+                    amount: lead.commission,
+                    type: 'CREDIT',
+                    status: 'SUCCESS',
+                    description: `پاداش جذب تامین‌کننده (تطبیق سیستم): ${lead.name}`
+                  }
+                });
+              }
+            }
+          }
+          break;
+        }
+      }
+    }
+    return matchedCount;
+  } catch (err) {
+    console.error('Error in autoSyncLeadsWithRegisteredSuppliers:', err);
+    return 0;
+  }
+}
+
 // --- AMBASSADOR & LEADS ENDPOINTS ---
+app.post('/api/admin/leads/auto-match', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const matchedCount = await autoSyncLeadsWithRegisteredSuppliers();
+    res.json({ success: true, matchedCount, message: `عملیات تطبیق هوشمند انجام گردید.` });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در تطبیق هوشمند سرنخ‌ها' });
+  }
+});
+
 app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
+    await autoSyncLeadsWithRegisteredSuppliers();
     const leads = await prisma.lead.findMany({
       include: {
         ambassador: {

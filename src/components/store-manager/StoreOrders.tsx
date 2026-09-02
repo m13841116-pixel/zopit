@@ -19,9 +19,22 @@ import {
   MapPin,
   FileText,
   XCircle,
-  Printer, Clock,
+  Printer,
+  Clock,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Filter,
+  RefreshCw,
+  SlidersHorizontal,
+  Globe,
+  Search,
+  CheckCircle2,
+  DollarSign,
+  Store,
+  Tag,
+  Sparkles,
+  Phone,
+  PackageCheck
 } from "lucide-react";
 import { printOrderInvoice } from "../../utils/printLabel";
 import { Bell, BellRing, Volume2, Play } from "lucide-react";
@@ -35,6 +48,14 @@ export default function StoreOrders({
 }): React.ReactElement {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Tabs and Filters State
+  const [orderTab, setOrderTab] = useState<"ALL" | "MANUAL" | "WOOCOMMERCE">("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [dateFilter, setDateFilter] = useState<string>("ALL");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [syncingWoo, setSyncingWoo] = useState<boolean>(false);
 
   const [myCatalog, setMyCatalog] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -645,28 +666,29 @@ export default function StoreOrders({
   };
   const getStatusColor = (status: string) => {
     const colorMap: any = {
-      NEW: "text-muted bg-background",
-      PENDING_PAYMENT: "text-warning bg-warning/10",
-      WAITING_SUPPLIER_CONFIRMATION: "text-purple-600 bg-purple-50",
-      WAITING_STORE_ADDRESS: "text-blue-600 bg-surface",
-      WAITING_SHIPPING_COST: "text-blue-600 bg-surface",
-      WAITING_SHIPPING_PAYMENT: "text-warning bg-warning/10",
-      PENDING_POSTAL_LABEL: "text-indigo-600 bg-indigo-50",
-      READY_TO_SHIP: "text-success bg-success/10",
-      SHIPPED: "text-primary-default bg-primary-default/10",
-      DELIVERED: "text-success bg-success/10",
-      REQUESTED: "text-warning bg-warning/10",
-      SUPPLIER_APPROVED: "text-blue-600 bg-surface",
-      WAITING_FOR_PAYMENT: "text-purple-600 bg-purple-50",
-      PAID: "text-success bg-success/10",
-      PROCESSING: "text-primary-default bg-primary-default/10",
-      PREPARING: "text-primary-default bg-primary-default/10",
-      COMPLETED: "text-success bg-success/10",
-      CANCELLED: "text-error bg-error/10",
-      REJECTED: "text-error bg-error/10",
+      NEW: "text-slate-700 bg-slate-100 border border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+      PENDING_PAYMENT: "text-amber-800 bg-amber-50 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60",
+      WAITING_SUPPLIER_CONFIRMATION: "text-purple-800 bg-purple-50 border border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-700/60",
+      WAITING_STORE_ADDRESS: "text-blue-800 bg-blue-50 border border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-700/60",
+      WAITING_SHIPPING_COST: "text-sky-800 bg-sky-50 border border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-700/60",
+      WAITING_SHIPPING_PAYMENT: "text-amber-800 bg-amber-50 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60",
+      PENDING_POSTAL_LABEL: "text-indigo-800 bg-indigo-50 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-700/60",
+      READY_TO_SHIP: "text-emerald-800 bg-emerald-50 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/60",
+      SHIPPED: "text-indigo-900 bg-indigo-100/80 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-200 dark:border-indigo-700",
+      DELIVERED: "text-emerald-900 bg-emerald-100/80 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700",
+      REQUESTED: "text-amber-800 bg-amber-50 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60",
+      SUPPLIER_APPROVED: "text-blue-800 bg-blue-50 border border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-700/60",
+      WAITING_FOR_PAYMENT: "text-amber-800 bg-amber-50 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60",
+      PAID: "text-emerald-800 bg-emerald-50 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/60",
+      PROCESSING: "text-indigo-800 bg-indigo-50 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-700/60",
+      PREPARING: "text-indigo-800 bg-indigo-50 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-700/60",
+      COMPLETED: "text-emerald-900 bg-emerald-100/80 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700",
+      CANCELLED: "text-rose-800 bg-rose-50 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-700/60",
+      REJECTED: "text-rose-800 bg-rose-50 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-700/60",
     };
-    return colorMap[status] || "text-muted bg-background";
+    return colorMap[status] || "text-slate-700 bg-slate-100 border border-slate-300 dark:bg-slate-800 dark:text-slate-300";
   };
+
   const isOrderPayable = (order: any) => {
     // طبق منطق پلتفرم، تنها سفارش‌هایی که توسط تامین‌کننده تایید شده و در وضعیت «در انتظار پرداخت» قرار دارند قابل پرداخت هستند
     const payableStatuses = [
@@ -678,7 +700,97 @@ export default function StoreOrders({
     return order.storeInvoiceId === null || order.storeInvoice?.status === "PENDING";
   };
 
-  const payableOrders = orders.filter(isOrderPayable);
+  const isWooOrder = (order: any) => {
+    return (
+      (order.orderSource || "").toLowerCase().includes("woocommerce") ||
+      (order.customerName || "").includes("WC-#")
+    );
+  };
+
+  const handleSyncWooCommerceOrders = async () => {
+    try {
+      setSyncingWoo(true);
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/store/sync/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast(`همگام‌سازی ووکامرس انجام شد (${data.ordersSynced || data.successCount || 0} سفارش بررسی شد)`, "success");
+        fetchOrders();
+      } else {
+        toast(data.error || "خطا در همگام‌سازی سفارشات با وب‌سایت ووکامرس", "error");
+      }
+    } catch (err) {
+      toast("خطا در ارتباط با سرور ووکامرس", "error");
+    } finally {
+      setSyncingWoo(false);
+    }
+  };
+
+  const manualOrdersCount = orders.filter((o) => !isWooOrder(o)).length;
+  const wooOrdersCount = orders.filter(isWooOrder).length;
+
+  const filteredOrders = orders.filter((order) => {
+    const isWoo = isWooOrder(order);
+    if (orderTab === "MANUAL" && isWoo) return false;
+    if (orderTab === "WOOCOMMERCE" && !isWoo) return false;
+
+    if (statusFilter !== "ALL") {
+      if (statusFilter === "PAYABLE" && !isOrderPayable(order)) return false;
+      if (
+        statusFilter === "WAITING" &&
+        !["WAITING_STORE_ADDRESS", "WAITING_SHIPPING_COST", "REQUESTED", "WAITING_SUPPLIER_CONFIRMATION", "SUPPLIER_APPROVED"].includes(order.status)
+      ) return false;
+      if (
+        statusFilter === "PAID" &&
+        !["PAID", "PENDING_POSTAL_LABEL", "READY_TO_SHIP"].includes(order.status)
+      ) return false;
+      if (
+        statusFilter === "SHIPPED" &&
+        !["SHIPPED", "PROCESSING", "PREPARING", "DELIVERED", "COMPLETED"].includes(order.status)
+      ) return false;
+      if (
+        statusFilter === "CANCELLED" &&
+        !["CANCELLED", "REJECTED"].includes(order.status)
+      ) return false;
+    }
+
+    if (dateFilter !== "ALL") {
+      const orderDate = new Date(order.createdAt).getTime();
+      const now = Date.now();
+      const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+      if (dateFilter === "TODAY" && diffDays > 1) return false;
+      if (dateFilter === "3DAYS" && diffDays > 3) return false;
+      if (dateFilter === "7DAYS" && diffDays > 7) return false;
+      if (dateFilter === "30DAYS" && diffDays > 30) return false;
+    }
+
+    if (searchTerm.trim()) {
+      const s = searchTerm.toLowerCase();
+      const matchId = String(order.id).includes(s);
+      const matchCustomer =
+        (order.customerName || "").toLowerCase().includes(s) ||
+        (order.customerPhone || "").includes(s);
+      const matchItem = order.items?.some((i: any) =>
+        (i.product?.name || "").toLowerCase().includes(s)
+      );
+      if (!matchId && !matchCustomer && !matchItem) return false;
+    }
+
+    return true;
+  });
+
+  const activeFiltersCount =
+    (statusFilter !== "ALL" ? 1 : 0) +
+    (dateFilter !== "ALL" ? 1 : 0) +
+    (searchTerm.trim() ? 1 : 0);
+
+  const payableOrders = filteredOrders.filter(isOrderPayable);
 
   const getOrderSupplierId = (order: any): number | null => {
     if (order.items && order.items.length > 0) {
@@ -704,82 +816,262 @@ export default function StoreOrders({
       setSelectedOrders([...selectedOrders, orderId]);
     }
   };
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-card p-5 rounded-2xl shadow-sm border border-subtle gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-primary flex items-center gap-2">
-            سفارشات
-          </h2>
-          <p className="text-sm text-muted mt-1">مدیریت، تسویه‌حساب و پیگیری لحظه‌ای سفارشات فروشگاه</p>
+    <div className="space-y-6 animate-fade-in text-right">
+      {/* Top Header */}
+      <div className="bg-card p-5 sm:p-6 rounded-3xl shadow-sm border border-subtle flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-xl font-black text-primary flex items-center gap-2.5">
+              <ShoppingCart className="w-6 h-6 text-primary-default" />
+              مدیریت سفارشات
+            </h2>
+            <p className="text-xs text-muted mt-1 font-medium">
+              پیگیری فرآیند آماده‌سازی، تسویه‌حساب گروهی و ارسال مرسولات به مشتریان نهایی
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
+            {/* Filter Toggle Button (Top-Left in LTR, Top-Right in RTL flex) */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border cursor-pointer ${
+                showFilters || activeFiltersCount > 0
+                  ? "bg-primary-default/10 text-primary-hover border-primary-default/30 shadow-xs"
+                  : "bg-surface hover:bg-surface-hover text-secondary border-border-subtle"
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              <span>فیلترها</span>
+              {activeFiltersCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-primary-default text-inverse text-[10px] font-black flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-emerald-500/30 cursor-pointer"
+            >
+              <FileText className="w-4 h-4" /> خروجی اکسل
+            </button>
+
+            <button
+              onClick={() => {
+                setError(null);
+                setShowModal(true);
+              }}
+              className="bg-primary-default text-inverse px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors flex items-center gap-2 shadow-sm"
+            >
+              <Plus className="w-4 h-4" /> ثبت سفارش جدید
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-end">
+
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-2 border-t border-subtle pt-4 overflow-x-auto scrollbar-none">
           <button
-            onClick={handleExportCSV}
-            className="bg-success/10 text-success hover:bg-success/20 px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 border border-emerald-200 cursor-pointer shadow-sm shadow-emerald-50"
+            onClick={() => setOrderTab("ALL")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              orderTab === "ALL"
+                ? "bg-primary-default text-inverse shadow-sm"
+                : "bg-surface text-muted hover:text-primary hover:bg-surface-hover"
+            }`}
           >
-            <FileText className="w-5 h-5" /> خروجی اکسل (CSV)
+            <span>همه سفارشات</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${orderTab === "ALL" ? "bg-white/20 text-white" : "bg-card text-muted"}`}>
+              {orders.length}
+            </span>
           </button>
+
           <button
-            onClick={() => {
-              setError(null);
-              setShowModal(true);
-            }}
-            className="bg-primary-default text-inverse px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary-hover transition-colors flex items-center gap-2"
+            onClick={() => setOrderTab("MANUAL")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              orderTab === "MANUAL"
+                ? "bg-primary-default text-inverse shadow-sm"
+                : "bg-surface text-muted hover:text-primary hover:bg-surface-hover"
+            }`}
           >
-            <Plus className="w-5 h-5" /> ثبت سفارش
+            <Store className="w-3.5 h-3.5" />
+            <span>سفارشات دستی و پلتفرم</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${orderTab === "MANUAL" ? "bg-white/20 text-white" : "bg-card text-muted"}`}>
+              {manualOrdersCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setOrderTab("WOOCOMMERCE")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              orderTab === "WOOCOMMERCE"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-surface text-muted hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40"
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>سفارشات متصل ووکامرس</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${orderTab === "WOOCOMMERCE" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300"}`}>
+              {wooOrdersCount}
+            </span>
           </button>
         </div>
+
+        {/* Filter Popover Bar */}
+        {showFilters && (
+          <div className="bg-surface p-4 rounded-2xl border border-subtle space-y-4 animate-fade-in mt-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-primary">
+                <SlidersHorizontal className="w-4 h-4 text-primary-default" />
+                <span>فیلتر و جستجوی سفارشات</span>
+              </div>
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={() => {
+                    setStatusFilter("ALL");
+                    setDateFilter("ALL");
+                    setSearchTerm("");
+                  }}
+                  className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                >
+                  پاک کردن همه فیلترها
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Search */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="جستجوی شناسه، مشتری، تلفن، کالا..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-card border border-subtle rounded-xl pr-9 pl-4 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary"
+                />
+                <Search className="w-4 h-4 text-muted absolute right-3 top-1/2 -translate-y-1/2" />
+              </div>
+
+              {/* Date Filter */}
+              <div>
+                <select
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full bg-card border border-subtle rounded-xl px-3 py-2 text-xs font-bold text-primary focus:ring-2 focus:ring-primary-default outline-none"
+                >
+                  <option value="ALL">📅 همه زمان‌ها</option>
+                  <option value="TODAY">امروز (۲۴ ساعت گذشته)</option>
+                  <option value="3DAYS">۳ روز اخیر</option>
+                  <option value="7DAYS">یک هفته اخیر</option>
+                  <option value="30DAYS">یک ماه اخیر</option>
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full bg-card border border-subtle rounded-xl px-3 py-2 text-xs font-bold text-primary focus:ring-2 focus:ring-primary-default outline-none"
+                >
+                  <option value="ALL">⚡ همه وضعیت‌ها</option>
+                  <option value="PAYABLE">قابل پرداخت</option>
+                  <option value="WAITING">در انتظار اقدام (آدرس / برآورد)</option>
+                  <option value="PAID">پرداخت شده / لیبل پستی</option>
+                  <option value="SHIPPED">ارسال شده / تکمیل شده</option>
+                  <option value="CANCELLED">لغو یا رد شده</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* WooCommerce Tab Banner */}
+        {orderTab === "WOOCOMMERCE" && (
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-purple-600 text-white rounded-xl shrink-0">
+                <Globe className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-purple-950 dark:text-purple-200">
+                  اتصال خودکار وب‌سایت ووکامرسی به زوپیت فعال است
+                </p>
+                <p className="text-[11px] text-purple-700 dark:text-purple-300 mt-0.5">
+                  سفارشات ثبت‌شده در سایت شما به صورت آنی پردازش و با قیمت عمده تامین‌کننده در این بخش نمایش داده می‌شوند.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSyncWooCommerceOrders}
+              disabled={syncingWoo}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0 shadow-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncingWoo ? "animate-spin" : ""}`} />
+              <span>{syncingWoo ? "در حال دریافت..." : "همگام‌سازی دستی سفارشات"}</span>
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Batch Payment Banner */}
       {selectedOrders.length > 0 && (
-        <div className="bg-success/10 border border-emerald-200/50 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in shadow-sm">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-success text-inverse rounded-xl">
+            <div className="p-3 bg-emerald-600 text-white rounded-xl">
               <ShoppingCart className="w-5 h-5" />
             </div>
             <div>
-              <p className="font-bold text-emerald-900 text-sm">
-                تعداد {selectedOrders.length} سفارش جهت پرداخت گروهی انتخاب شده
-                است.
+              <p className="font-bold text-emerald-900 dark:text-emerald-200 text-sm">
+                تعداد {selectedOrders.length} سفارش جهت پرداخت گروهی انتخاب شده است.
               </p>
-              <p className="text-xs text-success mt-0.5">
-                مجموع کل قابل پرداخت:
-                <span className="font-extrabold text-sm text-emerald-950">
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                مجموع کل قابل پرداخت:{" "}
+                <span className="font-black text-sm font-mono text-emerald-950 dark:text-white">
                   {orders
                     .filter((o) => selectedOrders.includes(o.id))
                     .reduce((sum, o) => sum + (o.totalAmount || 0), 0)
-                    .toLocaleString()}
-                </span>
+                    .toLocaleString("fa-IR")}
+                </span>{" "}
                 تومان
               </p>
             </div>
           </div>
           <button
             onClick={handleBatchPaymentClick}
-            className="w-full md:w-auto bg-success text-inverse px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-md shadow-emerald-200"
+            className="w-full md:w-auto bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
           >
-            <CreditCard className="w-4 h-4" /> فاکتورسازی و پرداخت آنلاین (
-            {selectedOrders.length} سفارش)
+            <CreditCard className="w-4 h-4" /> فاکتورسازی و پرداخت آنلاین ({selectedOrders.length} سفارش)
           </button>
         </div>
       )}
+
+      {/* Orders List / Table */}
       {loading ? (
         <div className="flex justify-center items-center py-20">
           <Loader2 className="w-8 h-8 text-primary-default animate-spin" />
         </div>
       ) : (
         <div className="bg-card rounded-3xl shadow-sm border border-subtle overflow-hidden">
-          {orders.length === 0 ? (
-            <div className="text-center py-20 text-muted">
-              <ShoppingCart className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <p>هیچ سفارشی ثبت نشده است</p>
+          {filteredOrders.length === 0 ? (
+            <div className="text-center py-16 text-muted space-y-3">
+              <ShoppingCart className="w-12 h-12 mx-auto opacity-40 text-muted" />
+              <p className="font-bold text-sm text-secondary">هیچ سفارشی در این بخش یافت نشد</p>
+              <p className="text-xs text-muted max-w-sm mx-auto">
+                {activeFiltersCount > 0
+                  ? "با تغییر یا حذف فیلترها می‌توانید سفارشات دیگر را مشاهده کنید."
+                  : orderTab === "WOOCOMMERCE"
+                  ? "سفارشاتی که مشتریان در سایت ووکامرسی شما ثبت می‌کنند در اینجا قرار خواهند گرفت."
+                  : "با کلیک بر روی «ثبت سفارش جدید» سفارش مد نظرتان را ایجاد کنید."}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-right min-w-[800px]">
-                <thead className="bg-background text-muted">
+              <table className="w-full text-xs text-right min-w-[850px]">
+                <thead className="bg-surface text-muted border-b border-subtle">
                   <tr>
-                    <th className="py-4 px-6 w-12 text-center">
+                    <th className="py-3.5 px-4 w-10 text-center">
                       <input
                         type="checkbox"
                         className="rounded border-default text-primary-default focus:ring-primary-default w-4 h-4 cursor-pointer"
@@ -796,26 +1088,29 @@ export default function StoreOrders({
                         }}
                       />
                     </th>
-                    <th className="py-4 px-6 font-semibold">شناسه سفارش</th>
-                    <th className="py-4 px-6 font-semibold">اقلام</th>
-                    <th className="py-4 px-6 font-semibold">مبلغ کل (تومان)</th>
-                    <th className="py-4 px-6 font-semibold">وضعیت</th>
-                    <th className="py-4 px-6 font-semibold">تاریخ ثبت</th>
-                    <th className="py-4 px-6 font-semibold text-center">
-                      عملیات
-                    </th>
+                    <th className="py-3.5 px-4 font-bold">شناسه و منبع</th>
+                    <th className="py-3.5 px-4 font-bold">اقلام سفارش</th>
+                    <th className="py-3.5 px-4 font-bold">مشتری / مقصد</th>
+                    <th className="py-3.5 px-4 font-bold">مبلغ زوپیت (تومان)</th>
+                    <th className="py-3.5 px-4 font-bold">وضعیت</th>
+                    <th className="py-3.5 px-4 font-bold">تاریخ ثبت</th>
+                    <th className="py-3.5 px-4 font-bold text-center">عملیات</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {orders.map((order) => {
+                <tbody className="divide-y divide-subtle">
+                  {filteredOrders.map((order) => {
                     const isPayable = isOrderPayable(order);
                     const isSelected = selectedOrders.includes(order.id);
+                    const isWoo = isWooOrder(order);
+
                     return (
                       <tr
                         key={order.id}
-                        className={`hover:bg-background/50 transition-colors ${isSelected ? "bg-primary-default/10/30" : ""}`}
+                        className={`hover:bg-surface/50 transition-colors ${
+                          isSelected ? "bg-primary-default/5" : ""
+                        }`}
                       >
-                        <td className="py-4 px-6 text-center">
+                        <td className="py-3.5 px-4 text-center">
                           {isPayable ? (
                             <input
                               type="checkbox"
@@ -824,70 +1119,120 @@ export default function StoreOrders({
                               onChange={() => handleToggleOrderSelection(order)}
                             />
                           ) : (
-                            <span className="text-inverse text-xs">-</span>
+                            <span className="text-muted text-[10px]">-</span>
                           )}
                         </td>
-                        <td className="py-4 px-6 font-sans font-bold text-primary">
-                          #{Number(order.id).toLocaleString('fa-IR')}
+
+                        {/* Order ID & Source */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-mono font-bold text-primary text-xs">
+                              #{Number(order.id).toLocaleString("fa-IR")}
+                            </span>
+                            {isWoo ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded-md w-fit">
+                                <Globe className="w-3 h-3" /> ووکامرس
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-md w-fit">
+                                <Store className="w-3 h-3" /> ثبت پلتفرم
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td className="py-4 px-6 text-muted font-sans">
-                          {order.items?.map((item: any) => {
-                            let variantLabel = "";
-                            if (item.variant) {
-                              try {
-                                const parsed = typeof item.variant.attributes === "string" 
-                                  ? JSON.parse(item.variant.attributes) 
-                                  : item.variant.attributes;
-                                if (parsed && Object.keys(parsed).length > 0) {
-                                  variantLabel = Object.entries(parsed)
-                                    .map(([k, v]) => `${k}: ${v}`)
-                                    .join(" | ");
-                                }
-                              } catch (e) {}
-                            }
-                            return (
-                              <div key={item.id} className="flex flex-col gap-0.5 mb-1 last:mb-0">
-                                <div className="font-bold text-primary text-xs">
-                                  {item.product?.name} <span className="text-muted font-normal">{(item.quantity || 1).toLocaleString('fa-IR')}×</span>
-                                </div>
-                                {variantLabel && (
-                                  <div className="text-[10px] text-primary-default bg-primary-default/5 px-1.5 py-0.5 rounded-md inline-block w-fit font-semibold">
-                                    {variantLabel}
+
+                        {/* Items */}
+                        <td className="py-3.5 px-4 text-muted">
+                          <div className="max-w-[240px]">
+                            {order.items?.map((item: any) => {
+                              let variantLabel = "";
+                              if (item.variant) {
+                                try {
+                                  const parsed =
+                                    typeof item.variant.attributes === "string"
+                                      ? JSON.parse(item.variant.attributes)
+                                      : item.variant.attributes;
+                                  if (parsed && Object.keys(parsed).length > 0) {
+                                    variantLabel = Object.entries(parsed)
+                                      .map(([k, v]) => `${k}: ${v}`)
+                                      .join(" | ");
+                                  }
+                                } catch (e) {}
+                              }
+                              return (
+                                <div key={item.id} className="flex flex-col gap-0.5 mb-1.5 last:mb-0">
+                                  <div className="font-bold text-primary text-xs truncate">
+                                    {item.product?.name}{" "}
+                                    <span className="text-muted font-normal">
+                                      {(item.quantity || 1).toLocaleString("fa-IR")}×
+                                    </span>
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                  {variantLabel && (
+                                    <div className="text-[10px] text-primary-default bg-primary-default/5 px-1.5 py-0.5 rounded-md inline-block w-fit font-medium">
+                                      {variantLabel}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </td>
-                        <td className="py-4 px-6 font-sans font-bold text-primary">
-                          {Number(order.totalAmount || 0).toLocaleString('fa-IR')}
+
+                        {/* Customer / Address Destination */}
+                        <td className="py-3.5 px-4 text-xs">
+                          <div className="flex flex-col gap-0.5 max-w-[180px]">
+                            <span className="font-bold text-primary truncate">
+                              {order.customerName || "مدیر فروشگاه"}
+                            </span>
+                            {order.customerPhone && (
+                              <span className="text-[10px] font-mono text-muted truncate">
+                                {order.customerPhone}
+                              </span>
+                            )}
+                            {order.shippingAddress && (
+                              <span className="text-[10px] text-muted truncate">
+                                {order.shippingAddress.slice(0, 30)}...
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td className="py-4 px-6">
+
+                        {/* Total Wholesale Price */}
+                        <td className="py-3.5 px-4 font-mono font-bold text-primary text-xs">
+                          {Number(order.totalAmount || 0).toLocaleString("fa-IR")}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3.5 px-4">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(order.status)}`}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-block whitespace-nowrap ${getStatusColor(
+                              order.status
+                            )}`}
                           >
                             {getStatusText(order.status)}
                           </span>
                         </td>
-                        <td className="py-4 px-6 text-muted">
-                          {new Date(order.createdAt).toLocaleDateString(
-                            "fa-IR",
-                          )}
+
+                        {/* Date */}
+                        <td className="py-3.5 px-4 text-muted text-[11px]">
+                          {new Date(order.createdAt).toLocaleDateString("fa-IR")}
                         </td>
-                        <td className="py-4 px-6 text-center">
-                          <div className="flex items-center justify-center gap-2">
+
+                        {/* Actions */}
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => setSelectedOrderForDetails(order)}
-                              className="bg-primary-default/10 hover:bg-primary-default/20 text-primary-hover px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                              className="bg-surface hover:bg-surface-hover text-secondary border border-border-subtle px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                             >
-                              <Eye className="w-3.5 h-3.5" /> جزئیات سفارش
+                              <Eye className="w-3.5 h-3.5" /> جزئیات
                             </button>
                             {isPayable && (
                               <button
                                 onClick={() => handlePaymentClick(order.id)}
-                                className="bg-success/20 text-success hover:bg-emerald-200 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                               >
-                                <CreditCard className="w-4 h-4" /> پرداخت
+                                <CreditCard className="w-3.5 h-3.5" /> پرداخت
                               </button>
                             )}
                           </div>
@@ -1535,577 +1880,548 @@ export default function StoreOrders({
       {/* Visual Order Details and Status Tracking Timeline Modal */}
       {selectedOrderForDetails && (
         <div
-          className="fixed inset-0 bg-background/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 overflow-y-auto"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-3 sm:p-4 overflow-y-auto"
           dir="rtl"
         >
-          <div className="bg-card rounded-3xl max-w-4xl w-full p-6 lg:p-8 shadow-2xl relative animate-scale-up my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-3xl max-w-5xl w-full p-5 sm:p-7 shadow-2xl relative animate-scale-up my-6 max-h-[90vh] overflow-y-auto border border-subtle text-right">
             {/* Header */}
-            <div className="flex justify-between items-start border-b border-subtle pb-5 mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-subtle pb-4 mb-6 gap-4">
               <div>
-                <h3 className="text-xl font-extrabold text-primary">
-                  جزئیات و رهگیری سفارش #{selectedOrderForDetails.id}
-                </h3>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h3 className="text-xl font-black text-primary">
+                    جزئیات کامل سفارش #{Number(selectedOrderForDetails.id).toLocaleString("fa-IR")}
+                  </h3>
+                  {isWooOrder(selectedOrderForDetails) ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 px-2.5 py-0.5 rounded-lg">
+                      <Globe className="w-3.5 h-3.5" /> سفارش ووکامرس
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-lg">
+                      <Store className="w-3.5 h-3.5" /> ثبت مستقیم پلتفرم
+                    </span>
+                  )}
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold inline-block ${getStatusColor(
+                      selectedOrderForDetails.status
+                    )}`}
+                  >
+                    {getStatusText(selectedOrderForDetails.status)}
+                  </span>
+                </div>
+
                 <div className="flex items-center gap-3 mt-2 text-xs text-muted">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
-                    {new Date(
-                      selectedOrderForDetails.createdAt,
-                    ).toLocaleDateString("fa-IR")}
+                    تاریخ ثبت: {new Date(selectedOrderForDetails.createdAt).toLocaleDateString("fa-IR")}
                   </span>
-                  <span className="w-1 h-1 bg-surface rounded-full"></span>
+                  <span className="w-1 h-1 bg-subtle rounded-full"></span>
                   <span>
-                    وضعیت پرداخت:{" "}
-                    {["PAID", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED", "COMPLETED"].includes(selectedOrderForDetails.status)
-                      ? "پرداخت شده"
-                      : selectedOrderForDetails.storeInvoiceId && selectedOrderForDetails.storeInvoice?.status === "PENDING"
-                      ? "در انتظار واریز / ثبت فیش"
-                      : "پرداخت نشده (نیازمند صدور فاکتور)"}
+                    وضعیت تسویه:{" "}
+                    <strong className="text-primary font-bold">
+                      {["PAID", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED", "COMPLETED"].includes(
+                        selectedOrderForDetails.status
+                      )
+                        ? "تسویه شده"
+                        : selectedOrderForDetails.storeInvoiceId &&
+                          selectedOrderForDetails.storeInvoice?.status === "PENDING"
+                        ? "در انتظار واریز / ثبت فیش"
+                        : "تسویه نشده"}
+                    </strong>
                   </span>
                 </div>
               </div>
+
               <button
                 onClick={() => setSelectedOrderForDetails(null)}
-                className="w-10 h-10 rounded-xl hover:bg-surface text-muted hover:text-muted flex items-center justify-center transition-colors cursor-pointer"
+                className="w-9 h-9 rounded-xl hover:bg-surface text-muted hover:text-primary flex items-center justify-center transition-colors cursor-pointer self-end sm:self-auto"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             {/* Visual Status Tracking Timeline */}
-            <div className="mb-8">
+            <div className="mb-6 bg-surface/60 p-4 rounded-2xl border border-subtle">
               <OrderTimeline orderId={selectedOrderForDetails.id} />
             </div>
 
-            {/* Order Items Table */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-secondary">
-                اقلام و فرآورده‌های سفارش داده شده:
-              </h4>
-              <div className="overflow-x-auto rounded-2xl border border-subtle overflow-hidden">
-                <table className="w-full text-sm text-right min-w-[800px]">
-                  <thead className="bg-background text-muted">
-                    <tr>
-                      <th className="py-3 px-4 font-bold">نام محصول</th>
-                      <th className="py-3 px-4 font-bold text-center">تعداد</th>
-                      <th className="py-3 px-4 font-bold">مبلغ واحد (تومان)</th>
-                      <th className="py-3 px-4 font-bold">مبلغ کل (تومان)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {selectedOrderForDetails.items?.map((item: any) => {
-                      let variantLabel = "";
-                      if (item.variant) {
-                        try {
-                          const parsed = typeof item.variant.attributes === "string" 
-                            ? JSON.parse(item.variant.attributes) 
-                            : item.variant.attributes;
-                          if (parsed && Object.keys(parsed).length > 0) {
-                            variantLabel = Object.entries(parsed)
-                              .map(([k, v]) => `${k}: ${v}`)
-                              .join(" | ");
-                          }
-                        } catch (e) {}
-                      }
-                      return (
-                        <tr key={item.id} className="hover:bg-background/50">
-                          <td className="py-3 px-4 font-semibold text-primary">
-                            <div>
-                              <div>{item.product?.name}</div>
-                              {variantLabel && (
-                                <div className="text-[10px] text-primary-default bg-primary-default/5 px-2 py-0.5 rounded-md mt-1 inline-block font-semibold">
-                                  {variantLabel}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-secondary">
-                            {item.quantity}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-muted">
-                            {(item.price || 0).toLocaleString()}
-                          </td>
-                          <td className="py-3 px-4 font-mono font-bold text-primary">
-                            {((item.price || 0) * item.quantity).toLocaleString()}
-                          </td>
+            {/* 2-Column Responsive Layout: Right (Items + 3-Tier Pricing) | Left (Address + Logistics) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* RIGHT COLUMN: Items, 3-Tier Pricing Breakdown, Supplier, and Total Amount */}
+              <div className="lg:col-span-7 space-y-5">
+                {/* Order Items Table */}
+                <div className="bg-surface p-4 rounded-2xl border border-subtle space-y-3">
+                  <h4 className="text-xs font-bold text-secondary flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-primary-default" />
+                    اقلام سفارش داده شده
+                  </h4>
+                  <div className="overflow-x-auto rounded-xl border border-subtle bg-card overflow-hidden">
+                    <table className="w-full text-xs text-right min-w-[420px]">
+                      <thead className="bg-surface text-muted border-b border-subtle">
+                        <tr>
+                          <th className="py-2.5 px-3 font-bold">کالا و تنوع</th>
+                          <th className="py-2.5 px-3 font-bold text-center">تعداد</th>
+                          <th className="py-2.5 px-3 font-bold">قیمت عمده (تومان)</th>
+                          <th className="py-2.5 px-3 font-bold">جمع کل (تومان)</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            {/* Footing Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 pt-6 border-t border-subtle text-sm">
-              <div className="space-y-3">
-                <div className="bg-card p-4 rounded-2xl border border-emerald-500/30 space-y-1.5 text-right shadow-sm">
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-extrabold block">
-                    🚚 کد شناسه ارائه‌دهنده خدمت:
-                  </span>
-                  <p className="font-mono font-black text-sm text-text-primary">
-                    {(() => {
-                      const supp = selectedOrderForDetails.items?.[0]?.product?.supplier;
-                      if (!supp) return "کد ارائه‌دهنده نامشخص";
-                      return `کد شناسه ارائه‌دهنده: #${supp.id}`;
-                    })()}
-                  </p>
-                  {(selectedOrderForDetails.items?.[0]?.product?.supplier?.province || selectedOrderForDetails.items?.[0]?.product?.supplier?.city) && (
-                    <p className="text-xs text-text-muted pt-1.5 border-t border-border-subtle font-medium">
-                      موقعیت استان انبار: {selectedOrderForDetails.items?.[0]?.product?.supplier?.province || ''}، {selectedOrderForDetails.items?.[0]?.product?.supplier?.city || ''}
-                    </p>
+                      </thead>
+                      <tbody className="divide-y divide-subtle">
+                        {selectedOrderForDetails.items?.map((item: any) => {
+                          let variantLabel = "";
+                          if (item.variant) {
+                            try {
+                              const parsed =
+                                typeof item.variant.attributes === "string"
+                                  ? JSON.parse(item.variant.attributes)
+                                  : item.variant.attributes;
+                              if (parsed && Object.keys(parsed).length > 0) {
+                                variantLabel = Object.entries(parsed)
+                                  .map(([k, v]) => `${k}: ${v}`)
+                                  .join(" | ");
+                              }
+                            } catch (e) {}
+                          }
+                          return (
+                            <tr key={item.id} className="hover:bg-surface/50">
+                              <td className="py-2.5 px-3 font-bold text-primary">
+                                <div>
+                                  <div>{item.product?.name}</div>
+                                  {variantLabel && (
+                                    <div className="text-[10px] text-primary-default bg-primary-default/5 px-1.5 py-0.5 rounded-md mt-1 inline-block font-medium">
+                                      {variantLabel}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-mono font-bold text-secondary">
+                                {item.quantity}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-muted">
+                                {(item.price || 0).toLocaleString("fa-IR")}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono font-bold text-primary">
+                                {((item.price || 0) * item.quantity).toLocaleString("fa-IR")}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 3-Tier Pricing & Profit Calculation Card */}
+                <div className="bg-primary-default/5 border border-primary-default/20 p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between border-b border-primary-default/15 pb-2">
+                    <span className="text-xs font-black text-primary-hover flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-primary-default" />
+                      تفکیک سطوح قیمت‌گذاری و سود فروشگاه
+                    </span>
+                    <span className="text-[11px] text-muted">شفافیت ۳ لایه قیمت</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    {/* Tier 1: Supplier base price */}
+                    <div className="bg-card p-3 rounded-xl border border-subtle flex flex-col justify-between">
+                      <span className="text-[11px] text-muted block mb-1">۱. قیمت مبدا تامین‌کننده</span>
+                      <span className="font-mono font-black text-primary text-sm">
+                        {(() => {
+                          const basePrice = selectedOrderForDetails.items?.reduce(
+                            (sum: number, it: any) =>
+                              sum + ((it.product?.price || it.price || 0) * (it.quantity || 1)),
+                            0
+                          );
+                          return (basePrice || selectedOrderForDetails.totalAmount || 0).toLocaleString("fa-IR");
+                        })()}{" "}
+                        <span className="text-[10px] font-normal text-muted">تومان</span>
+                      </span>
+                    </div>
+
+                    {/* Tier 2: Zopit wholesale price */}
+                    <div className="bg-card p-3 rounded-xl border border-primary-default/30 flex flex-col justify-between shadow-2xs">
+                      <span className="text-[11px] text-primary-default font-bold block mb-1">
+                        ۲. قیمت عمده زوپیت (پرداختی شما)
+                      </span>
+                      <span className="font-mono font-black text-primary-hover text-sm">
+                        {Number(selectedOrderForDetails.totalAmount || 0).toLocaleString("fa-IR")}{" "}
+                        <span className="text-[10px] font-normal text-muted">تومان</span>
+                      </span>
+                    </div>
+
+                    {/* Tier 3: Store selling price on website */}
+                    <div className="bg-card p-3 rounded-xl border border-emerald-500/30 flex flex-col justify-between">
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold block mb-1">
+                        ۳. قیمت فروش در سایت شما
+                      </span>
+                      <span className="font-mono font-black text-emerald-950 dark:text-emerald-200 text-sm">
+                        {(() => {
+                          const storeRetail = selectedOrderForDetails.items?.reduce(
+                            (sum: number, it: any) => {
+                              const retail =
+                                it.product?.storeRetailPrice ||
+                                it.product?.marketPrice ||
+                                Math.round((it.price || 0) * 1.25);
+                              return sum + retail * (it.quantity || 1);
+                            },
+                            0
+                          );
+                          return (storeRetail || Math.round((selectedOrderForDetails.totalAmount || 0) * 1.25)).toLocaleString(
+                            "fa-IR"
+                          );
+                        })()}{" "}
+                        <span className="text-[10px] font-normal text-muted">تومان</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Supplier & Warehouse Source Details */}
+                <div className="bg-surface p-4 rounded-2xl border border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-muted block text-[11px]">شناسه تامین‌کننده محصول:</span>
+                    <span className="font-bold text-primary">
+                      {(() => {
+                        const supp = selectedOrderForDetails.items?.[0]?.product?.supplier;
+                        if (!supp) return "کد تامین‌کننده اختصاصی زوپیت";
+                        return `${supp.shopName || supp.name || "تامین‌کننده"} (کد #${supp.id})`;
+                      })()}
+                    </span>
+                  </div>
+                  {(selectedOrderForDetails.items?.[0]?.product?.supplier?.province ||
+                    selectedOrderForDetails.items?.[0]?.product?.supplier?.city) && (
+                    <div className="space-y-1">
+                      <span className="text-muted block text-[11px]">موقعیت انبار مبدا:</span>
+                      <span className="font-bold text-primary">
+                        {selectedOrderForDetails.items?.[0]?.product?.supplier?.province || ""}،{" "}
+                        {selectedOrderForDetails.items?.[0]?.product?.supplier?.city || ""}
+                      </span>
+                    </div>
                   )}
                 </div>
-                {/* Shipping Section - Restricted to WAITING_STORE_ADDRESS, WAITING_SHIPPING_COST, PENDING_PAYMENT, PAID and later statuses */}
-                {!(
-                  selectedOrderForDetails.status === "WAITING_STORE_ADDRESS" ||
-                  selectedOrderForDetails.status === "WAITING_SHIPPING_COST" ||
-                  selectedOrderForDetails.status === "PENDING_PAYMENT" ||
-                  selectedOrderForDetails.status === "PENDING_POSTAL_LABEL" ||
-                  selectedOrderForDetails.status === "PAID" ||
-                  selectedOrderForDetails.status === "PROCESSING" ||
-                  selectedOrderForDetails.status === "PREPARING" ||
-                  selectedOrderForDetails.status === "SHIPPED" ||
-                  selectedOrderForDetails.status === "DELIVERED" ||
-                  selectedOrderForDetails.status === "COMPLETED"
-                ) ? (
-                  <div className="p-4 bg-background border border-subtle/60 rounded-2xl space-y-2 mt-4 text-center">
-                    <Truck className="w-8 h-8 text-muted mx-auto animate-pulse" />
-                    <h5 className="font-bold text-xs text-secondary">
-                      بخش لجستیک و اطلاعات پستی غیرفعال است
-                    </h5>
-                    <p className="text-[10px] text-muted leading-relaxed max-w-sm mx-auto">
-                      طبق قوانین پلتفرم، خدمات لجستیک، کد رهگیری، و تولید لیبل
-                      پستی تنها پس از تایید پذیرش تامین‌کننده، صدور فاکتور
-                      نهایی، و مشخص شدن هزینه ارسال در دسترس قرار می‌گیرد.
-                    </p>
+
+                {/* Price Summary Footing */}
+                <div className="bg-card p-4 rounded-2xl border border-subtle space-y-2.5 text-xs">
+                  <div className="flex justify-between text-muted">
+                    <span>مجموع ارزش عمده کالاها:</span>
+                    <span className="font-mono font-bold text-primary">
+                      {Number(selectedOrderForDetails.totalAmount || 0).toLocaleString("fa-IR")} تومان
+                    </span>
                   </div>
-                ) : (
-                  <div className="p-4 bg-primary-default/10/40 border border-primary-default/20 rounded-2xl space-y-3.5 mt-4">
-                    <div className="flex items-center gap-1.5 border-b border-primary-default/20 pb-2">
-                      <Truck className="w-4 h-4 text-primary-default" />
-                      <h5 className="font-bold text-primary-hover text-xs">
-                        اطلاعات لجستیک و مرسوله پستی
-                      </h5>
+                  <div className="flex justify-between text-muted">
+                    <span>هزینه بسته‌بندی و ارسال پستی:</span>
+                    <span className="font-mono font-bold text-primary">
+                      {selectedOrderForDetails.shippingFee
+                        ? `${Number(selectedOrderForDetails.shippingFee).toLocaleString("fa-IR")} تومان`
+                        : "محاسبه بر اساس روش ارسال (رایگان / در انتظار تایید)"}
+                    </span>
+                  </div>
+                  <div className="h-px bg-subtle my-2"></div>
+                  <div className="flex justify-between text-primary font-black text-sm">
+                    <span>مبلغ نهایی قابل پرداخت به زوپیت:</span>
+                    <span className="text-primary-default font-mono text-base">
+                      {Number(
+                        (selectedOrderForDetails.totalAmount || 0) + (selectedOrderForDetails.shippingFee || 0)
+                      ).toLocaleString("fa-IR")}{" "}
+                      تومان
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* LEFT COLUMN: Customer & Destination Address + Logistics & Label Management */}
+              <div className="lg:col-span-5 space-y-5">
+                {/* Customer & Address Details Card */}
+                <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-4">
+                  <div className="flex items-center justify-between border-b border-subtle pb-2.5">
+                    <h4 className="text-xs font-black text-primary flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-rose-500" />
+                      مشخصات گیرنده و آدرس تحویل
+                    </h4>
+                    <button
+                      onClick={() => {
+                        setSelectedShippingOrder(selectedOrderForDetails);
+                        setShowShippingModal(true);
+                      }}
+                      className="text-[11px] font-bold text-primary-default hover:text-primary-hover cursor-pointer"
+                    >
+                      ویرایش آدرس
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <span className="text-muted block text-[11px] mb-0.5">نام و نام خانوادگی خریدار:</span>
+                      <p className="font-bold text-primary">
+                        {selectedOrderForDetails.customerName || "مدیر فروشگاه (سفارش داخلی)"}
+                      </p>
                     </div>
-                    {selectedOrderForDetails.status === "WAITING_STORE_ADDRESS" || selectedOrderForDetails.status === "WAITING_SHIPPING_COST" ? (
-                      !selectedOrderForDetails.shippingAddress ? (
-                        <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex flex-col items-center justify-center gap-3">
-                          <p className="text-slate-900 dark:text-white text-xs font-bold text-center">
-                            جهت برآورد هزینه پستی توسط مدیریت مجموعه، ابتدا آدرس مقصد و روش ارسال مورد نظر خود را ثبت نمایید.
-                          </p>
-                          <button
-                            onClick={() => {
-                              setSelectedShippingOrder(selectedOrderForDetails);
-                              setShowShippingModal(true);
-                            }}
-                            className="bg-primary-default text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors cursor-pointer"
-                          >
-                            تکمیل مشخصات پستی و روش ارسال
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex flex-col gap-2.5">
-                          <p className="text-slate-900 dark:text-white text-xs font-bold text-center">
-                            مشخصات پستی با موفقیت ثبت شد. در انتظار محاسبه و ثبت هزینه پستی (کرایه) توسط مدیر کل پلتفرم.
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs border-t border-slate-200 dark:border-slate-700 pt-2 text-text-muted">
-                            <div>
-                              <span className="text-muted block mb-0.5">نشانی گیرنده:</span>
-                              <span className="font-bold text-primary">{selectedOrderForDetails.shippingAddress}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted block mb-0.5">روش ارسال انتخاب شده:</span>
-                              <span className="font-bold text-primary">
-                                {["POST", "POST_PISHTAZ"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست پیشتاز" :
-                                 ["POST_VIZHE", "POST_EXPRESS"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست ویژه (اکسپرس)" :
-                                 selectedOrderForDetails.shippingMethod === "TIPAX" ? "تیپاکس" :
-                                 selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" ? "پنل پستی اختصاصی" : "پنل ارسال پلتفرم"}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setSelectedShippingOrder(selectedOrderForDetails);
-                              setShowShippingModal(true);
-                            }}
-                            className="mt-1 text-primary-default hover:text-primary-hover text-[11px] font-bold self-start cursor-pointer hover:underline"
-                          >
-                            ویرایش مشخصات ارسال
-                          </button>
-                        </div>
-                      )
-                    ) : selectedOrderForDetails.status === "PENDING_PAYMENT" ? (
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl flex flex-col gap-2.5">
-                        <p className="text-emerald-800 text-xs font-bold text-center">
-                          هزینه پستی (کرایه) توسط مدیریت مشخص گردید. لطفاً برای نهایی‌سازی سفارش، اقدام به پرداخت صورت‌حساب نمایید.
+
+                    {selectedOrderForDetails.customerPhone && (
+                      <div>
+                        <span className="text-muted block text-[11px] mb-0.5">شماره تماس گیرنده:</span>
+                        <p className="font-mono font-bold text-primary" dir="ltr">
+                          {selectedOrderForDetails.customerPhone}
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs border-t border-emerald-500/10 pt-2 text-muted">
-                          <div>
-                            <span className="text-muted block mb-0.5">نشانی گیرنده:</span>
-                            <span className="font-bold text-primary">{selectedOrderForDetails.shippingAddress}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted block mb-0.5">روش ارسال:</span>
-                            <span className="font-bold text-primary">
-                              {["POST", "POST_PISHTAZ"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست پیشتاز" :
-                               ["POST_VIZHE", "POST_EXPRESS"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست ویژه (اکسپرس)" :
-                               selectedOrderForDetails.shippingMethod === "TIPAX" ? "تیپاکس" :
-                               selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" ? "پنل پستی اختصاصی" : "پنل ارسال پلتفرم"}
-                            </span>
-                          </div>
-                          <div className="md:col-span-2">
-                            <span className="text-muted block mb-0.5">هزینه محاسبه شده ارسال:</span>
-                            <span className="font-bold text-primary-default font-mono text-sm">
-                              {selectedOrderForDetails.shippingFee ? `${selectedOrderForDetails.shippingFee.toLocaleString()} تومان` : "رایگان / برآورد نشده"}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setSelectedShippingOrder(selectedOrderForDetails);
-                            setShowShippingModal(true);
-                          }}
-                          className="mt-1 text-primary-default hover:text-primary-hover text-[11px] font-bold self-start cursor-pointer hover:underline"
-                        >
-                          ویرایش مشخصات ارسال
-                        </button>
                       </div>
-                    ) : selectedOrderForDetails.status === "PAID" && !selectedOrderForDetails.shippingAddress ? (
-                      <div className="bg-warning/10 border border-warning/30 p-4 rounded-xl flex flex-col items-center justify-center gap-3">
-                        <p className="text-warning-dark text-xs font-bold text-center">
-                          برای ورود به مرحله ارسال، لطفاً اطلاعات پستی را تکمیل نمایید.
+                    )}
+
+                    <div>
+                      <span className="text-muted block text-[11px] mb-0.5">نشانی پستی مقصد:</span>
+                      <p className="font-medium text-primary leading-relaxed bg-card p-2.5 rounded-xl border border-subtle">
+                        {selectedOrderForDetails.shippingAddress || "هنوز آدرس پستی ثبت نشده است."}
+                      </p>
+                    </div>
+
+                    {selectedOrderForDetails.shippingPostalCode && (
+                      <div>
+                        <span className="text-muted block text-[11px] mb-0.5">کد پستی ۱۰ رقمی:</span>
+                        <p className="font-mono font-bold text-primary">
+                          {selectedOrderForDetails.shippingPostalCode}
                         </p>
-                        <button
-                          onClick={() => {
-                            setSelectedShippingOrder(selectedOrderForDetails);
-                            setShowShippingModal(true);
-                          }}
-                          className="bg-primary-default text-inverse px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary-hover transition-colors cursor-pointer"
-                        >
-                          تکمیل مشخصات پستی
-                        </button>
                       </div>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted">
-                          <div>
-                            <span className="text-muted block mb-0.5">
-                              نشانی گیرنده:
-                            </span>
-                            <span className="font-bold text-primary">
-                              {selectedOrderForDetails.shippingAddress ||
-                                "نشانی پیش‌فرض فروشگاه"}
-                            </span>
-                          </div>
-                           <div>
-                             <span className="text-muted block mb-0.5">
-                               روش ارسال:
-                             </span>
-                             <span className="font-bold text-primary">
-                               {["POST", "POST_PISHTAZ"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست پیشتاز" :
-                                ["POST_VIZHE", "POST_EXPRESS"].includes(selectedOrderForDetails.shippingMethod || "") ? "پست ویژه (اکسپرس)" :
-                                selectedOrderForDetails.shippingMethod === "TIPAX" ? "تیپاکس" :
-                                selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" ? "پنل پستی اختصاصی" : "پنل ارسال پلتفرم"}
-                             </span>
-                           </div>
-                          <div>
-                            <span className="text-muted block mb-0.5">
-                              کد رهگیری مرسوله:
-                            </span>
-                            <span className="font-mono font-bold text-primary-hover">
-                              {selectedOrderForDetails.trackingCode ||
-                                `IR-${selectedOrderForDetails.id}09218475293`}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted block mb-0.5">
-                              وضعیت حمل و نقل:
-                            </span>
-                            <span className="px-2 py-0.5 bg-primary-default/20 text-primary-hover rounded font-bold text-[10px]">
-                              {selectedOrderForDetails.status === "PAID"
-                                ? "آماده جهت بسته‌بندی"
-                                : selectedOrderForDetails.status === "PROCESSING" || selectedOrderForDetails.status === "PREPARING"
-                                  ? "در حال آماده‌سازی پستی"
-                                  : selectedOrderForDetails.status === "SHIPPED"
-                                    ? "تحویل به پستچی (ارسال شده)"
-                                    : "تحویل داده شده"}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Generate Shipping Label (Upload Label) */}
-                        {selectedOrderForDetails.status === "PAID" ? (
-                          selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" &&
-                          !selectedOrderForDetails.postalLabel && (
-                            <div className="pt-2 border-t border-primary-default/20/30">
-                              <p className="text-[11px] font-bold text-primary-hover mb-1.5 flex items-center gap-1">
-                                <Plus className="w-3.5 h-3.5" /> صدور لیبل جدید:
-                              </p>
-                              <div className="relative border border-dashed border-primary-default/40 hover:border-primary-default rounded-xl p-3 bg-card text-center transition-colors cursor-pointer">
-                                <input
-                                  type="file"
-                                  accept=".pdf,image/*"
-                                  className="absolute inset-0 opacity-0 cursor-pointer"
-                                  onChange={(e) => {
-                                     const file = e.target.files?.[0];
-                                     if (!file) return;
-                                     toast("در حال بارگذاری و پردازش لیبل...", "error");
-                                     const reader = new FileReader();
-                                     reader.onloadend = async () => {
-                                       const base64Data = reader.result as string;
-                                       try {
-                                         const res = await fetch(
-                                           `/api/orders/${selectedOrderForDetails.id}/label`,
-                                           {
-                                             credentials: "include",
-                                             method: "POST",
-                                             headers: {
-                                               "Content-Type": "application/json",
-                                               Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-                                             },
-                                             body: JSON.stringify({
-                                               labelUrl: base64Data,
-                                             }),
-                                           },
-                                         );
-                                         if (!res.ok) throw new Error("خطا");
-                                         toast("لیبل با موفقیت بارگذاری شد.", "success");
-                                         fetchOrders(); // Refresh orders
-                                         setSelectedOrderForDetails({
-                                           ...selectedOrderForDetails,
-                                           postalLabel: `/api/orders/${selectedOrderForDetails.id}/postal-label/file`,
-                                         });
-                                       } catch (err) {
-                                         toast("خطا در بارگذاری لیبل", "error");
-                                       }
-                                     };
-                                     reader.readAsDataURL(file);
-                                   }}
-                                />
-                                <div className="text-[10px] text-primary-hover font-bold">
-                                  کلیک کنید یا فایل لیبل (PDF) را جهت بارگذاری و
-                                  تولید بکشید
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        ) : (
-                          selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL" && (
-                            <div className="pt-2 border-t border-primary-default/20/30 text-center py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] text-zinc-500 font-bold">
-                              امکان بارگذاری لیبل پستی پس از پرداخت سفارش فعال خواهد شد.
-                            </div>
-                          )
-                        )}
-                        {/* Print Shipping Label */}
-                        {selectedOrderForDetails.postalLabel ? (
-                          <div className="pt-2 border-t border-primary-default/20/30 flex justify-between items-center bg-primary-default/20/20 p-2.5 rounded-xl border border-primary-default/20/40">
-                            <span className="text-primary-hover font-bold text-[11px]">
-                              {selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL"
-                                ? "لیبل پستی اختصاصی شما:"
-                                : "لیبل صادر شده توسط پلتفرم:"}
-                            </span>
-                            <a
-                              href={selectedOrderForDetails.postalLabel}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="bg-primary-default hover:bg-primary-hover text-inverse text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1"
-                            >
-                              <Printer className="w-3.5 h-3.5" /> مشاهده و چاپ
-                              لیبل پستی
-                            </a>
-                          </div>
-                        ) : (
-                          selectedOrderForDetails.shippingMethod === "PLATFORM_PANEL" && (
-                            <div className="pt-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-center">
-                              <p className="text-[11px] font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-1.5">
-                                <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
-                                در انتظار صدور و بارگذاری لیبل پستی توسط مدیریت مجموعه
-                              </p>
-                            </div>
-                          )
-                        )}
-                      </>
                     )}
                   </div>
-                )}
-              </div>
-              <div className="bg-background p-4 rounded-2xl space-y-2 border border-subtle">
-                <div className="flex justify-between text-muted text-xs">
-                  <span>مجموع ارزش کالاها:</span>
-                  <span>
-                    {selectedOrderForDetails.totalAmount?.toLocaleString()}
-                    تومان
-                  </span>
                 </div>
-                <div className="flex justify-between text-muted text-xs">
-                  <span>هزینه حمل و نقل و مالیات:</span>
-                  <span className="text-success font-semibold">رایگان</span>
-                </div>
-                <div className="h-px bg-surface my-2"></div>
-                <div className="flex justify-between text-primary font-extrabold text-base">
-                  <span>مبلغ قابل پرداخت:</span>
-                  <span className="text-primary-default font-mono">
-                    {selectedOrderForDetails.totalAmount?.toLocaleString()}
-                    تومان
-                  </span>
+
+                {/* Logistics, Shipping Method & Label Management */}
+                <div className="bg-card p-5 rounded-2xl border border-subtle space-y-4">
+                  <div className="flex items-center gap-2 border-b border-subtle pb-2.5">
+                    <Truck className="w-4 h-4 text-primary-default" />
+                    <h4 className="text-xs font-black text-primary">اطلاعات لجستیک و ارسال</h4>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted">روش ارسال:</span>
+                      <span className="font-bold text-primary">
+                        {["POST", "POST_PISHTAZ"].includes(selectedOrderForDetails.shippingMethod || "")
+                          ? "پست پیشتاز"
+                          : ["POST_VIZHE", "POST_EXPRESS"].includes(selectedOrderForDetails.shippingMethod || "")
+                          ? "پست ویژه (اکسپرس)"
+                          : selectedOrderForDetails.shippingMethod === "TIPAX"
+                          ? "تیپاکس"
+                          : selectedOrderForDetails.shippingMethod === "PERSONAL_PANEL"
+                          ? "پنل پستی اختصاصی"
+                          : "پنل ارسال پلتفرم"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted">کد رهگیری مرسوله:</span>
+                      <span className="font-mono font-bold text-primary-hover">
+                        {selectedOrderForDetails.trackingCode || "در انتظار ارسال و صدور بارنامه"}
+                      </span>
+                    </div>
+
+                    {/* Postal Label Actions */}
+                    {selectedOrderForDetails.postalLabel ? (
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center justify-between gap-2">
+                        <span className="text-emerald-800 dark:text-emerald-300 text-[11px] font-bold">
+                          لیبل پستی صادر شده است
+                        </span>
+                        <a
+                          href={selectedOrderForDetails.postalLabel}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shadow-xs"
+                        >
+                          <Printer className="w-3.5 h-3.5" /> چاپ لیبل
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="bg-surface p-3 rounded-xl border border-subtle text-center text-muted text-[11px]">
+                        لیبل پستی پس از نهایی‌سازی سفارش و بسته‌بندی توسط انبار آماده چاپ خواهد شد.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
+
             {/* Action buttons */}
-            <div className="flex gap-3 mt-8">
+            <div className="flex flex-wrap gap-3 mt-7 pt-5 border-t border-subtle">
               <button
                 onClick={() => setSelectedOrderForDetails(null)}
-                className="flex-1 py-3 bg-surface hover:bg-surface text-secondary font-bold rounded-xl text-sm transition-colors cursor-pointer text-center"
+                className="flex-1 py-2.5 bg-surface hover:bg-surface-hover text-secondary font-bold rounded-xl text-xs transition-colors cursor-pointer text-center"
               >
                 بستن پنجره جزئیات
               </button>
               <button
                 onClick={() => printOrderInvoice(selectedOrderForDetails)}
-                className="flex-1 py-3 bg-primary-default/10 hover:bg-primary-default/20 text-primary-hover border border-primary-default/30 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 py-2.5 bg-primary-default/10 hover:bg-primary-default/20 text-primary-hover border border-primary-default/30 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Printer className="w-5 h-5" /> دریافت فاکتور رسمی (PDF)
+                <Printer className="w-4 h-4" /> دریافت فاکتور رسمی
               </button>
               <button
                 onClick={() => setShowReportIssue(true)}
-                className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <AlertTriangle className="w-5 h-5" /> ثبت مشکل / پیگیری
+                <AlertTriangle className="w-4 h-4" /> ثبت مشکل / پیگیری
               </button>
-              
-            {selectedOrderForDetails.status === "WAITING_SHIPPING_PAYMENT" && (
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch(`/api/store-manager/shipping/${selectedOrderForDetails.id}/pay`, {
-                        method: 'POST',
-                        headers: {
-                          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-                        }
-                      });
-                      const data = await res.json();
-                      if (res.ok && data.payLink) {
-                        window.location.href = data.payLink;
-                      } else {
-                        toast(data.error || 'خطا در پرداخت هزینه ارسال', 'error');
-                      }
-                    } catch (e) {
-                      toast('خطای شبکه', 'error');
-                    }
-                  }}
-                  className="bg-primary-default text-inverse font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-primary-hover transition-colors shadow-md"
-                >
-                  پرداخت آنلاین هزینه ارسال
-                </button>
-              </div>
-            )}
 
-            {showReportIssue && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setShowReportIssue(false)}>
-                <div className="bg-card w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-border-subtle p-6 text-right" onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center justify-between border-b border-border-subtle pb-4 mb-4">
-                    <h3 className="font-extrabold text-lg text-rose-600 flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5" /> ثبت مشکل و پیگیری سفارش #{selectedOrderForDetails.id}
-                    </h3>
-                    <button onClick={() => setShowReportIssue(false)} className="p-2 text-text-muted hover:bg-surface rounded-full"><X className="w-5 h-5" /></button>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                        دسته‌بندی موضوع مشکل <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setIssueCategory("LOGISTICS")}
-                          className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
-                            issueCategory === "LOGISTICS"
-                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
-                              : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
-                          }`}
-                        >
-                          <span>🚚</span>
-                          <span>مشکل لجستیک و ارسال پستی</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIssueCategory("SUPPLIER")}
-                          className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
-                            issueCategory === "SUPPLIER"
-                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
-                              : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
-                          }`}
-                        >
-                          <span>📦</span>
-                          <span>مغایرت یا عدم ارسال کالا</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIssueCategory("FINANCIAL")}
-                          className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
-                            issueCategory === "FINANCIAL"
-                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
-                              : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
-                          }`}
-                        >
-                          <span>💳</span>
-                          <span>مسائل مالی و استرداد وجه</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIssueCategory("OTHER")}
-                          className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
-                            issueCategory === "OTHER"
-                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
-                              : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
-                          }`}
-                        >
-                          <span>💬</span>
-                          <span>سایر پیگیری‌ها و هماهنگی</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        شرح کامل مشکل و توضیحات <span className="text-rose-500">*</span>
-                      </label>
-                      <textarea
-                        value={issueText}
-                        onChange={(e) => setIssueText(e.target.value)}
-                        rows={4}
-                        className="w-full px-4 py-3 bg-surface border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-text-primary resize-none leading-relaxed"
-                        placeholder="لطفاً جزئیات مشکل پیش‌آمده (مانند عدم تطابق کالا، تاخیر، یا عدم ارسال) را به طور کامل شرح دهید..."
-                      />
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                      <button onClick={() => setShowReportIssue(false)} className="flex-1 py-3 bg-surface hover:bg-surface-hover text-text-primary rounded-xl text-xs font-bold transition-all">انصراف</button>
-                      <button onClick={handleReportIssue} disabled={submittingIssue || !issueText.trim()} className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50 flex justify-center items-center gap-2">
-                        {submittingIssue ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
-                        <span>ارسال و ثبت گزارش</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {!["PAID", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED", "COMPLETED", "CANCELLED", "REJECTED"].includes(selectedOrderForDetails.status) &&
-             (selectedOrderForDetails.storeInvoiceId === null || selectedOrderForDetails.storeInvoice?.status === "PENDING") && (
+              {!["PAID", "PROCESSING", "PREPARING", "SHIPPED", "DELIVERED", "COMPLETED", "CANCELLED", "REJECTED"].includes(
+                selectedOrderForDetails.status
+              ) &&
+                (selectedOrderForDetails.storeInvoiceId === null ||
+                  selectedOrderForDetails.storeInvoice?.status === "PENDING") && (
                   <button
                     onClick={() => {
                       const id = selectedOrderForDetails.id;
                       setSelectedOrderForDetails(null);
                       handlePaymentClick(id);
                     }}
-                    className="flex-1 py-3 bg-primary-default hover:bg-primary-hover text-inverse font-bold rounded-xl text-sm shadow-lg shadow-primary-default/10 transition-all cursor-pointer text-center"
+                    className="w-full sm:w-auto px-6 py-2.5 bg-primary-default hover:bg-primary-hover text-inverse font-bold rounded-xl text-xs shadow-md transition-all cursor-pointer text-center"
                   >
                     اقدام به پرداخت صورت‌حساب
                   </button>
                 )}
             </div>
+
+            {selectedOrderForDetails.status === "WAITING_SHIPPING_PAYMENT" && (
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/store-manager/shipping/${selectedOrderForDetails.id}/pay`, {
+                        method: "POST",
+                        headers: {
+                          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+                        },
+                      });
+                      const data = await res.json();
+                      if (res.ok && data.payLink) {
+                        window.location.href = data.payLink;
+                      } else {
+                        toast(data.error || "خطا در پرداخت هزینه ارسال", "error");
+                      }
+                    } catch (e) {
+                      toast("خطای شبکه", "error");
+                    }
+                  }}
+                  className="bg-primary-default text-inverse font-bold text-xs px-5 py-2.5 rounded-xl hover:bg-primary-hover transition-colors shadow-md"
+                >
+                  پرداخت آنلاین هزینه ارسال
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-{/* Complete Shipping Details Modal */}
+      {/* Report Issue Modal */}
+      {showReportIssue && selectedOrderForDetails && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setShowReportIssue(false)}
+        >
+          <div
+            className="bg-card w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-border-subtle p-6 text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border-subtle pb-4 mb-4">
+              <h3 className="font-extrabold text-lg text-rose-600 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> ثبت مشکل و پیگیری سفارش #{selectedOrderForDetails.id}
+              </h3>
+              <button
+                onClick={() => setShowReportIssue(false)}
+                className="p-2 text-text-muted hover:bg-surface rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                  دسته‌بندی موضوع مشکل <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIssueCategory("LOGISTICS")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                      issueCategory === "LOGISTICS"
+                        ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
+                        : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                    }`}
+                  >
+                    <span>🚚</span>
+                    <span>مشکل لجستیک و ارسال پستی</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIssueCategory("SUPPLIER")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                      issueCategory === "SUPPLIER"
+                        ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
+                        : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                    }`}
+                  >
+                    <span>📦</span>
+                    <span>مغایرت یا عدم ارسال کالا</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIssueCategory("FINANCIAL")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                      issueCategory === "FINANCIAL"
+                        ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
+                        : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                    }`}
+                  >
+                    <span>💳</span>
+                    <span>مسائل مالی و استرداد وجه</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIssueCategory("OTHER")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                      issueCategory === "OTHER"
+                        ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
+                        : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                    }`}
+                  >
+                    <span>💬</span>
+                    <span>سایر پیگیری‌ها و هماهنگی</span>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  شرح کامل مشکل و توضیحات <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  value={issueText}
+                  onChange={(e) => setIssueText(e.target.value)}
+                  rows={4}
+                  className="w-full px-4 py-3 bg-surface border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-text-primary resize-none leading-relaxed"
+                  placeholder="لطفاً جزئیات مشکل پیش‌آمده (مانند عدم تطابق کالا، تاخیر، یا عدم ارسال) را به طور کامل شرح دهید..."
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowReportIssue(false)}
+                  className="flex-1 py-3 bg-surface hover:bg-surface-hover text-text-primary rounded-xl text-xs font-bold transition-all"
+                >
+                  انصراف
+                </button>
+                <button
+                  onClick={handleReportIssue}
+                  disabled={submittingIssue || !issueText.trim()}
+                  className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {submittingIssue ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4" />
+                  )}
+                  <span>ارسال و ثبت گزارش</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Shipping Details Modal */}
       {showShippingModal && selectedShippingOrder && (
         <div
           className="fixed inset-0 bg-background/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"

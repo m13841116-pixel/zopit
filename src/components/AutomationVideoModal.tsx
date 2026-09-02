@@ -83,7 +83,7 @@ export const AutomationVideoModal: React.FC<AutomationVideoModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-black text-white">
-                  {isSupplier ? "اتوماسیون ۱ دقیقه‌ای تأمین‌کنندگان" : "اتوماسیون ۱ دقیقه‌ای مدیران فروشگاه"}
+                  {isSupplier ? "آموزش ۱ دقیقه‌ای تأمین‌کنندگان" : "آموزش ۱ دقیقه‌ای مدیران فروشگاه"}
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-black flex items-center gap-1">
                   <Clock className="w-3 h-3" /> ۶۰ ثانیه

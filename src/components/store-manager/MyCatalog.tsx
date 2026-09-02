@@ -303,13 +303,13 @@ export default function MyCatalog() {
           با انتخاب یکی از مبالغ زیر، سود ثابت دلخواه شما به تمام محصولات زوپیتی‌تان اضافه می‌شود (قیمت خرید زوپیتی شما ثابت باقی می‌ماند):
         </p>
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          {[10000, 20000, 30000, 50000, 100000].map((amt) => (
+          {[10000, 20000, 30000, 50000, 90000, 100000, 150000].map((amt) => (
             <button
               key={amt}
               type="button"
               disabled={submittingBatchMarkup}
               onClick={() => handleBatchMarkup(amt)}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-300 border border-blue-300 dark:border-blue-700 hover:bg-blue-600 hover:text-white transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              className="px-3 py-1.5 rounded-xl text-xs font-black bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-300 border border-blue-300 dark:border-blue-700 hover:bg-blue-600 hover:text-white transition-all shadow-sm cursor-pointer disabled:opacity-50"
             >
               +{amt.toLocaleString("fa-IR")} تومان سود
             </button>
