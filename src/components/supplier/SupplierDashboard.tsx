@@ -583,7 +583,18 @@ export function SupplierDashboard({
             o.id === itemId ? { ...o, status: newStatus } : o,
           ),
         );
-        showNotification("وضعیت سفارش بروز شد.", "success");
+        if (newStatus === "SHIPPED") {
+          showNotification("مرسوله تحویل پست داده شد و مبلغ درآمد به موجودی کیف پول شما واریز گردید! 💰", "success");
+          fetchData();
+        } else if (newStatus === "SUPPLIER_APPROVED") {
+          showNotification("موجودی کالا تایید گردید و جهت صدور فاکتور و پرداخت به سیستم ارسال شد.", "success");
+          fetchData();
+        } else if (newStatus === "REJECTED") {
+          showNotification("عدم موجودی کالا برای سفارش ثبت گردید.", "warning");
+          fetchData();
+        } else {
+          showNotification("وضعیت سفارش با موفقیت بروزرسانی شد.", "success");
+        }
       } else {
         const errorData = await res.json().catch(() => ({}));
         showNotification(errorData.error || "خطا در بروزرسانی سفارش", "error");
@@ -2079,15 +2090,52 @@ export function SupplierDashboard({
                                       <td className="px-6 py-4 flex flex-col gap-2 min-w-[170px]">
                                         {order.order?.orderSource === "direct" ? (
                                           <>
-                                            <div className="bg-emerald-500/10 border border-emerald-200 text-emerald-800 p-3 rounded-2xl text-xs space-y-1 font-bold text-center">
+                                            <div className="bg-emerald-500/10 border border-emerald-200 text-emerald-800 p-2.5 rounded-2xl text-xs space-y-1 font-bold text-center">
                                               <div className="flex items-center justify-center gap-1.5 text-emerald-700">
                                                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                                                سفارش قطعی زوپیت
+                                                سفارش پرداخت‌شده زوپیت
                                               </div>
-                                              <p className="text-[10px] font-medium text-slate-500 mt-1 leading-relaxed">
-                                                این سفارش مستقیم و پرداخت‌شده است.
+                                              <p className="text-[10px] font-medium text-slate-500 mt-0.5 leading-relaxed">
+                                                هزینه کالا و ارسال پرداخت شده است.
                                               </p>
                                             </div>
+
+                                            {/* Postal Label direct print */}
+                                            {order.order?.postalLabel && (
+                                              <a
+                                                href={order.order.postalLabel}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-rose-600/20 cursor-pointer"
+                                                title="چاپ برچسب پستی صادرشده توسط زوپیت"
+                                              >
+                                                <Printer className="w-4 h-4 shrink-0" />
+                                                <span>چاپ لیبل پستی</span>
+                                              </a>
+                                            )}
+
+                                            {/* Action button: mark shipped */}
+                                            {["PAID", "PREPARING", "PENDING_POSTAL_LABEL", "PROCESSING"].includes(order.status) && (
+                                              <button
+                                                onClick={() => updateOrderStatus(order.id, "SHIPPED")}
+                                                className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/25 cursor-pointer outline-none"
+                                                aria-label="تحویل به پست دادم"
+                                              >
+                                                <Truck className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+                                                تحویل به پست دادم (ارسال شد)
+                                              </button>
+                                            )}
+
+                                            {["SHIPPED", "DELIVERED", "COMPLETED"].includes(order.status) && (
+                                              <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-2 rounded-xl text-center text-xs font-bold space-y-0.5">
+                                                <div className="flex items-center justify-center gap-1 text-emerald-700">
+                                                  <CheckCircle className="w-3.5 h-3.5" />
+                                                  <span>ارسال شد</span>
+                                                </div>
+                                                <span className="text-[10px] text-emerald-600 block">💰 کیف پول شارژ شد</span>
+                                              </div>
+                                            )}
+
                                             <button
                                               onClick={() => {
                                                 setInventoryIssueOrder(order);
@@ -2108,28 +2156,31 @@ export function SupplierDashboard({
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-rose-600/20 cursor-pointer"
-                                                title="چاپ برچسب و بارکد پستی مرسوله"
+                                                title="چاپ برچسب پستی صادرشده توسط زوپیت"
                                               >
                                                 <Printer className="w-4 h-4 shrink-0" />
                                                 <span>چاپ لیبل پستی</span>
                                               </a>
                                             )}
 
+                                            {/* Initial confirmation stage */}
                                             {(order.status === "REQUESTED" ||
-                                              order.status === "PENDING") && (
+                                              order.status === "PENDING" ||
+                                              order.status === "WAITING_SUPPLIER_CONFIRMATION" ||
+                                              order.status === "NEW") && (
                                               <>
                                                 <button
                                                   onClick={() =>
                                                     updateOrderStatus(
                                                       order.id,
-                                                      "SHIPPED",
+                                                      "SUPPLIER_APPROVED",
                                                     )
                                                   }
                                                   className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all duration-300 shadow-sm shadow-emerald-600/20 hover:shadow-md cursor-pointer outline-none"
-                                                  aria-label={`ارسال سفارش شماره ${order.id}`}
+                                                  aria-label={`تایید موجودی کالا برای سفارش شماره ${order.id}`}
                                                 >
-                                                  <Truck className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                                                  ارسال شد
+                                                  <CheckCircle className="w-4 h-4 shrink-0" />
+                                                  تایید موجودی کالا
                                                 </button>
                                                 <button
                                                   onClick={() =>
@@ -2138,44 +2189,68 @@ export function SupplierDashboard({
                                                       "REJECTED",
                                                     )
                                                   }
-                                                  className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-danger hover:bg-rose-700 active:scale-95 text-inverse text-xs font-bold rounded-xl transition-all duration-300 shadow-sm shadow-rose-600/10 hover:shadow-rose-600/25 hover:shadow-md cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-500"
-                                                  aria-label={`رد سفارش شماره ${order.id}`}
+                                                  className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-danger hover:bg-rose-700 active:scale-95 text-inverse text-xs font-bold rounded-xl transition-all duration-300 shadow-sm shadow-rose-600/10 hover:shadow-rose-600/25 hover:shadow-md cursor-pointer outline-none"
+                                                  aria-label={`عدم موجودی سفارش شماره ${order.id}`}
                                                 >
-                                                  <XCircle className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                                                  رد سفارش
+                                                  <XCircle className="w-4 h-4 shrink-0" />
+                                                  عدم موجودی (رد)
                                                 </button>
                                               </>
                                             )}
-                                            {/* Direct Action for Paid / Preparing */}
-                                            {["PAID", "PREPARING"].includes(order.status) && (
+
+                                            {/* Stage: Paid and ready for shipping */}
+                                            {["PAID", "PREPARING", "PENDING_POSTAL_LABEL", "PROCESSING"].includes(order.status) && (
                                               <button
                                                 onClick={() => updateOrderStatus(order.id, "SHIPPED")}
-                                                className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 text-xs font-black rounded-xl transition-all duration-300 shadow-sm shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:shadow-md cursor-pointer outline-none"
-                                                aria-label="تغییر به ارسال شد"
+                                                className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all duration-300 shadow-md shadow-emerald-600/25 hover:shadow-lg cursor-pointer outline-none"
+                                                aria-label="تحویل به پست دادم (ارسال شد)"
                                               >
                                                 <Truck className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
-                                                ارسال شد
+                                                <span>تحویل به پست دادم (ارسال شد)</span>
                                               </button>
                                             )}
-                                            {["SHIPPED"].includes(order.status) ? (
+
+                                            {/* Stage: Already shipped */}
+                                            {["SHIPPED", "DELIVERED", "COMPLETED"].includes(order.status) ? (
+                                              <div className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 p-2.5 rounded-xl text-center text-xs font-bold space-y-1">
+                                                <div className="flex items-center justify-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+                                                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                                  <span>تحویل به پست داده شد</span>
+                                                </div>
+                                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black block">
+                                                  💰 درآمد به کیف پول افزوده شد
+                                                </span>
+                                                <button
+                                                  onClick={() => {
+                                                    setChangingOrder(order);
+                                                    setChangeStatus(order.status);
+                                                    setChangeTracking(order.trackingCode || "");
+                                                  }}
+                                                  className="text-[10px] text-slate-500 hover:text-slate-800 underline block mt-1 cursor-pointer"
+                                                >
+                                                  مشاهده تاریخچه و رهگیری
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              !["REQUESTED", "PENDING", "WAITING_SUPPLIER_CONFIRMATION", "NEW", "REJECTED", "PAID", "PREPARING", "PENDING_POSTAL_LABEL", "PROCESSING"].includes(order.status) && (
+                                                <div className="text-center p-2 bg-amber-50 rounded-xl border border-amber-200/60 text-amber-800 text-[11px] font-bold">
+                                                  در انتظار پرداخت فروشگاه
+                                                </div>
+                                              )
+                                            )}
+
+                                            {/* View timeline button for any other state */}
+                                            {!["SHIPPED", "DELIVERED", "COMPLETED"].includes(order.status) && (
                                               <button
                                                 onClick={() => {
                                                   setChangingOrder(order);
                                                   setChangeStatus(order.status);
-                                                  setChangeTracking(
-                                                    order.trackingCode || "",
-                                                  );
+                                                  setChangeTracking(order.trackingCode || "");
                                                 }}
-                                                className="group inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-warning hover:bg-amber-600 active:scale-95 text-inverse text-xs font-bold rounded-xl transition-all duration-300 shadow-sm shadow-amber-500/10 hover:shadow-amber-500/25 hover:shadow-md cursor-pointer outline-none"
-                                                aria-label={`درج اطلاعات ارسال برای سفارش شماره ${order.id}`}
+                                                className="text-[11px] text-muted hover:text-primary font-bold py-1 transition-colors cursor-pointer text-center"
                                               >
-                                                <Truck className="w-4 h-4 shrink-0" />
-                                                درج اطلاعات ارسال
+                                                مشاهده تاریخچه سفارش
                                               </button>
-                                            ) : (
-                                              !["REQUESTED", "PENDING", "REJECTED"].includes(order.status) && (
-                                                <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-2.5 py-1.5 rounded-xl border border-zinc-200/50">در انتظار پرداخت فروشگاه</span>
-                                              )
                                             )}
                                           </>
                                         )}
@@ -3104,114 +3179,156 @@ export function SupplierDashboard({
           </div>
         </div>
       )}
-      {/* Change Order Status & Details Modal */}
+      {/* Order Details & Postal Label Handover Modal */}
       {changingOrder && (
         <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all duration-300">
-          
-          <div className="bg-card rounded-3xl max-w-4xl w-full shadow-2xl border border-subtle transform transition-all animate-scale-up font-sans">
-            
-            <div className="p-6 border-b border-subtle flex items-center justify-between sticky top-0 bg-card/80 backdrop-blur-md z-10 rounded-t-3xl">
-              
+          <div className="bg-card rounded-3xl max-w-4xl w-full shadow-2xl border border-subtle transform transition-all animate-scale-up font-sans overflow-hidden">
+            <div className="p-6 border-b border-subtle flex items-center justify-between sticky top-0 bg-card/80 backdrop-blur-md z-10">
               <h3 className="text-lg font-extrabold text-primary flex items-center gap-2">
-                
-                <RefreshCw className="w-5 h-5 text-warning animate-spin-slow" />
-                تغییر وضعیت و اطلاعات سفارش
+                <Package className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span>جزئیات و پیگیری مرسوله سفارش #{changingOrder.id}</span>
               </h3>
               <button
                 onClick={() => setChangingOrder(null)}
-                className="w-8 h-8 rounded-full bg-surface hover:bg-surface text-muted flex items-center justify-center transition-all cursor-pointer"
+                className="w-8 h-8 rounded-full bg-surface hover:bg-subtle text-muted flex items-center justify-center transition-all cursor-pointer"
                 aria-label="بستن پنجره"
               >
-                
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x lg:divide-x-reverse divide-subtle">
-              {/* Form Column */}
-              <form
-                onSubmit={handleChangeOrderSubmit}
-                className="p-6 space-y-5 text-right"
-              >
-                
-                <div>
-                  
-                  <p className="text-xs text-muted mb-1">
-                    محصول سفارش داده شده:
-                  </p>
-                  <p className="font-bold text-sm text-primary">
-                    {changingOrder.product?.name}
-                  </p>
-                  <p className="text-xs text-primary-default font-mono mt-0.5">
-                    شناسه سفارش: #{changingOrder.id}
-                  </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x lg:divide-x-reverse divide-subtle max-h-[80vh] overflow-y-auto">
+              {/* Info and Actions Column */}
+              <div className="p-6 space-y-5 text-right">
+                {/* Product & Store info card */}
+                <div className="bg-surface p-4 rounded-2xl border border-subtle space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted">کالای سفارش داده شده:</p>
+                      <p className="font-black text-sm text-primary mt-0.5">{changingOrder.product?.name}</p>
+                      <p className="text-xs text-muted font-mono mt-0.5">SKU: {changingOrder.product?.sku || "ندارد"}</p>
+                    </div>
+                    <span className="text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-xl border border-emerald-500/20 shrink-0">
+                      تعداد: {changingOrder.quantity || 1} عدد
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-subtle flex items-center justify-between text-xs">
+                    <span className="text-muted">فروشگاه همکار:</span>
+                    <span className="font-bold text-primary">
+                      {changingOrder.order?.store?.storeName || changingOrder.order?.store?.username || "ثبت نشده"}
+                    </span>
+                  </div>
                 </div>
-                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-muted">
-                    وضعیت سفارش
-                  </label>
-                  {["PAID", "PREPARING", "SHIPPED", "COMPLETED"].includes(changingOrder.status) ? (
-                    <>
-                      <select
-                        value={changeStatus}
-                        onChange={(e) => setChangeStatus(e.target.value)}
-                        className="w-full bg-background text-primary border border-subtle rounded-xl px-4 py-3 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all font-medium"
+
+                {/* Workflow Guidance & Postal Label Card */}
+                <div className="bg-gradient-to-br from-indigo-500/5 via-blue-500/5 to-emerald-500/5 p-4 rounded-2xl border border-indigo-500/20 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-black text-indigo-700 dark:text-indigo-400">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>وضعیت صدور بارکد و لیبل پستی:</span>
+                  </div>
+
+                  {changingOrder.order?.postalLabel ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted leading-relaxed">
+                        لیبل پستی توسط پلتفرم زوپیت با مشخصات کامل فرستنده و گیرنده صادر و بارگذاری شده است.
+                      </p>
+                      <a
+                        href={changingOrder.order.postalLabel}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-rose-600/20"
                       >
-                        <option value="PAID">پرداخت شده (در انتظار بسته‌بندی)</option>
-                        <option value="PREPARING">در حال آماده‌سازی مرسوله</option>
-                        <option value="SHIPPED">ارسال شده (ثبت کد رهگیری)</option>
-                        <option value="COMPLETED">تحویل داده شده و تکمیل شده</option>
-                      </select>
-                      
-                      <div className="space-y-1.5 mt-3 pt-3 border-t border-subtle/50">
-                        <label className="block text-xs font-bold text-muted">
-                          کد رهگیری پستی مرسوله
-                        </label>
+                        <Printer className="w-4 h-4" />
+                        <span>🖨️ چاپ و دریافت برچسب پستی زوپیت</span>
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs font-bold flex items-center gap-2">
+                      <Clock className="w-4 h-4 shrink-0" />
+                      <span>لیبل پستی پس از نهایی‌سازی پرداخت توسط مدیریت بارگذاری می‌شود.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Execution Box */}
+                {["SHIPPED", "DELIVERED", "COMPLETED"].includes(changingOrder.status) ? (
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-right space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-black text-sm">
+                      <CheckCircle className="w-5 h-5" />
+                      <span>این مرسوله تحویل پست داده شده است</span>
+                    </div>
+                    <p className="text-xs text-muted leading-relaxed">
+                      وضعیت سفارش به «ارسال شد» تغییر یافته و مبلغ درآمد به صورت خودکار به کیف پول شما اضافه گردیده است.
+                    </p>
+                    {changingOrder.trackingCode && (
+                      <p className="text-xs font-mono font-bold text-primary pt-1">
+                        کد پیگیری مرسوله: <span className="text-emerald-600 dark:text-emerald-400">{changingOrder.trackingCode}</span>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <form onSubmit={handleChangeOrderSubmit} className="space-y-4">
+                    <div className="p-4 bg-surface rounded-2xl border border-subtle space-y-3">
+                      <p className="text-xs font-bold text-primary">تایید ارسال توسط تامین‌کننده:</p>
+                      <p className="text-xs text-muted leading-relaxed">
+                        پس از بسته‌بندی کالا، الصاق برچسب پستی زوپیت و تحویل بسته به اداره پست یا مامور تیپاکس، دکمه زیر را بزنید.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await updateOrderStatus(changingOrder.id, "SHIPPED");
+                          setChangingOrder(null);
+                        }}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black py-3 px-4 rounded-xl transition-all text-xs md:text-sm shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Truck className="w-4 h-4" />
+                        <span>📦 تحویل به پست دادم (ثبت ارسال و شارژ آنی کیف پول)</span>
+                      </button>
+                    </div>
+
+                    {/* Optional extra tracking if supplier has custom tipax code */}
+                    <details className="text-xs text-muted cursor-pointer bg-surface/50 p-2.5 rounded-xl border border-subtle">
+                      <summary className="font-bold text-primary hover:text-emerald-600">
+                        ثبت اختیاری شماره پیگیری تیپاکس/باربری (اختیاری)
+                      </summary>
+                      <div className="mt-2.5 pt-2 border-t border-subtle space-y-2">
                         <input
                           type="text"
                           value={changeTracking}
                           onChange={(e) => setChangeTracking(e.target.value)}
-                          placeholder="مثال: 309218475293..."
-                          className="w-full bg-background text-primary border border-subtle rounded-xl px-4 py-3 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all font-medium font-mono"
+                          placeholder="در صورت داشتن کد رهگیری دستی..."
+                          className="w-full bg-background text-primary border border-subtle rounded-xl px-3 py-2 text-xs font-mono"
                         />
+                        <button
+                          type="submit"
+                          className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-lg text-xs cursor-pointer"
+                        >
+                          ذخیره کد پیگیری
+                        </button>
                       </div>
-                    </>
-                  ) : (
-                    <select
-                      value={changeStatus}
-                      onChange={(e) => setChangeStatus(e.target.value)}
-                      className="w-full bg-background text-primary border border-subtle rounded-xl px-4 py-3 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all font-medium"
-                    >
-                      <option value="SHIPPED">
-                        تایید موجودی کالا (آماده پرداخت)
-                      </option>
-                      <option value="REJECTED">عدم موجودی کالا (رد سفارش)</option>
-                    </select>
-                  )}
-                </div>
-                <div className="pt-3 border-t border-subtle flex gap-3">
-                  
-                  <button
-                    type="submit"
-                    className="flex-1 bg-warning hover:bg-warning active:scale-95 text-inverse font-bold py-2.5 rounded-xl transition-all text-xs md:text-sm shadow-md shadow-amber-500/20 hover:shadow-lg cursor-pointer"
-                  >
-                    
-                    ثبت تغییرات سفارش
-                  </button>
+                    </details>
+                  </form>
+                )}
+
+                <div className="pt-2 flex justify-end">
                   <button
                     type="button"
                     onClick={() => setChangingOrder(null)}
-                    className="flex-1 bg-surface hover:bg-surface text-secondary font-bold py-2.5 rounded-xl transition-all text-xs md:text-sm cursor-pointer"
+                    className="px-5 py-2 bg-surface hover:bg-subtle text-muted hover:text-primary font-bold rounded-xl text-xs cursor-pointer transition-colors"
                   >
-                    
-                    انصراف
+                    بستن
                   </button>
                 </div>
-              </form>
+              </div>
 
               {/* Timeline Column */}
-              <div className="p-6 overflow-y-auto max-h-[60vh]">
-                <h4 className="text-xs font-bold text-muted mb-4">تاریخچه و رهگیری کامل سفارش:</h4>
+              <div className="p-6 overflow-y-auto max-h-[70vh]">
+                <h4 className="text-xs font-black text-primary mb-4 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-emerald-500" />
+                  <span>تاریخچه و تایم‌لاین زنده سفارش:</span>
+                </h4>
                 <OrderTimeline orderId={changingOrder.orderId} />
               </div>
             </div>

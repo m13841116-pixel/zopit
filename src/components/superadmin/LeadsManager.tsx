@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import * as XLSX from "xlsx";
 import {
   Target,
   Plus,
@@ -19,7 +20,17 @@ import {
   TrendingUp,
   X,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Download,
+  FileSpreadsheet,
+  Copy,
+  Check,
+  Send,
+  Smartphone,
+  FileText,
+  MessageSquare,
+  Share2,
+  HelpCircle
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 
@@ -96,6 +107,14 @@ export default function LeadsManager() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // SMS & Excel Export Modal State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportScope, setExportScope] = useState<"ALL" | "CURRENT_FILTER" | "PENDING" | "ASSIGNED" | "COMPLETED">("ALL");
+  const [exportIncludeAdditional, setExportIncludeAdditional] = useState(true);
+  const [exportOnlyMobiles, setExportOnlyMobiles] = useState(true);
+  const [exportDeduplicate, setExportDeduplicate] = useState(true);
+  const [copiedType, setCopiedType] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLeadsData();
@@ -333,6 +352,256 @@ export default function LeadsManager() {
     };
   }).sort((a, b) => b.completedCount - a.completedCount || b.earnedCommission - a.earnedCommission);
 
+  // Normalization and phone extraction
+  const cleanPhoneDigits = (raw: string | null | undefined): string[] => {
+    if (!raw) return [];
+    const persianDigits = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+    const arabicDigits = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+    let text = String(raw);
+    for (let i = 0; i < 10; i++) {
+      text = text.replace(persianDigits[i], String(i)).replace(arabicDigits[i], String(i));
+    }
+    const parts = text.split(/[,،\n\r/|; -]+/).map((p) => p.trim()).filter(Boolean);
+    const results: string[] = [];
+    for (const p of parts) {
+      let digits = p.replace(/\D/g, "");
+      if (!digits) continue;
+      if (digits.startsWith("0098")) {
+        digits = "0" + digits.slice(4);
+      } else if (digits.startsWith("98") && digits.length === 12) {
+        digits = "0" + digits.slice(2);
+      } else if (digits.length === 10 && digits.startsWith("9")) {
+        digits = "0" + digits;
+      }
+      if (digits.length >= 7) {
+        results.push(digits);
+      }
+    }
+    return results;
+  };
+
+  const isIranianMobile = (phone: string) => /^09[0-9]{9}$/.test(phone);
+
+  // Selected leads according to scope
+  const targetLeadsForExport = useMemo(() => {
+    switch (exportScope) {
+      case "CURRENT_FILTER":
+        return filteredLeads;
+      case "PENDING":
+        return leads.filter((l) => l.status === "PENDING");
+      case "ASSIGNED":
+        return leads.filter((l) => l.status === "ASSIGNED" || l.status === "IN_NEGOTIATION");
+      case "COMPLETED":
+        return leads.filter((l) => l.status === "COMPLETED");
+      case "ALL":
+      default:
+        return leads;
+    }
+  }, [leads, filteredLeads, exportScope]);
+
+  // Processed export items for preview and export
+  const exportData = useMemo(() => {
+    const rawItems: {
+      phone: string;
+      isMobile: boolean;
+      name: string;
+      category: string;
+      address: string;
+      statusText: string;
+      commission: number;
+      ambassadorName: string;
+      leadId: number;
+      isAdditional: boolean;
+    }[] = [];
+
+    const statusMap: Record<string, string> = {
+      PENDING: "آزاد (در انتظار تأمین‌یاب)",
+      ASSIGNED: "در حال مذاکره",
+      IN_NEGOTIATION: "در حال مذاکره",
+      COMPLETED: "جذب موفق (ثبت‌نام شده)",
+      CANCELLED: "عدم توافق / لغو"
+    };
+
+    targetLeadsForExport.forEach((lead) => {
+      const mainPhones = cleanPhoneDigits(lead.phone);
+      const additionalPhones = exportIncludeAdditional ? cleanPhoneDigits(lead.additionalPhones) : [];
+      const statusText = statusMap[lead.status] || lead.status;
+      const ambassadorName = lead.ambassador
+        ? `${lead.ambassador.firstName || lead.ambassador.username} ${lead.ambassador.lastName || ""}`.trim()
+        : "بدون تأمین‌یاب";
+
+      mainPhones.forEach((ph) => {
+        rawItems.push({
+          phone: ph,
+          isMobile: isIranianMobile(ph),
+          name: lead.name,
+          category: lead.category || "عمومی",
+          address: lead.address || "",
+          statusText,
+          commission: lead.commission || 0,
+          ambassadorName,
+          leadId: lead.id,
+          isAdditional: false
+        });
+      });
+
+      additionalPhones.forEach((ph) => {
+        rawItems.push({
+          phone: ph,
+          isMobile: isIranianMobile(ph),
+          name: lead.name,
+          category: lead.category || "عمومی",
+          address: lead.address || "",
+          statusText,
+          commission: lead.commission || 0,
+          ambassadorName,
+          leadId: lead.id,
+          isAdditional: true
+        });
+      });
+    });
+
+    let filtered = rawItems;
+    if (exportOnlyMobiles) {
+      filtered = filtered.filter((item) => item.isMobile);
+    }
+
+    if (exportDeduplicate) {
+      const seen = new Set<string>();
+      filtered = filtered.filter((item) => {
+        if (seen.has(item.phone)) return false;
+        seen.add(item.phone);
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [targetLeadsForExport, exportIncludeAdditional, exportOnlyMobiles, exportDeduplicate]);
+
+  // Export handlers
+  const handleDownloadMeliPayamakExcel = () => {
+    if (exportData.length === 0) {
+      toast.error("شماره‌ای برای استخراج یافت نشد.");
+      return;
+    }
+
+    const rows = exportData.map((item) => ({
+      "شماره موبایل": item.phone,
+      "نام مخاطب": item.name,
+      "صنف و دسته‌بندی": item.category,
+      "آدرس و موقعیت": item.address,
+      "وضعیت": item.statusText,
+      "کد پرونده": item.leadId
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet["!cols"] = [
+      { wch: 16 },
+      { wch: 30 },
+      { wch: 22 },
+      { wch: 35 },
+      { wch: 24 },
+      { wch: 12 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "مخاطبین ملی پیامک");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `melipayamak_suppliers_${dateStr}.xlsx`);
+    toast.success(`فایل اکسل با ${exportData.length.toLocaleString("fa-IR")} مخاطب با موفقیت دانلود شد.`);
+  };
+
+  const handleDownloadFullExcel = () => {
+    if (exportData.length === 0) {
+      toast.error("شماره‌ای برای استخراج یافت نشد.");
+      return;
+    }
+
+    const rows = exportData.map((item, idx) => ({
+      "ردیف": idx + 1,
+      "کد پرونده": item.leadId,
+      "نام تامین‌کننده / فروشگاه": item.name,
+      "شماره تماس": item.phone,
+      "نوع شماره": item.isMobile ? "همراه" : "ثابت / نامعتبر",
+      "شماره فرعی": item.isAdditional ? "بله" : "خیر",
+      "صنف و دسته‌بندی": item.category,
+      "آدرس": item.address,
+      "وضعیت پیگیری": item.statusText,
+      "پاداش جذب (تومان)": item.commission,
+      "تأمین‌یاب مسئول": item.ambassadorName
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet["!cols"] = [
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 30 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 22 },
+      { wch: 35 },
+      { wch: 24 },
+      { wch: 18 },
+      { wch: 22 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "تامین‌کنندگان هدف");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `suppliers_full_leads_${dateStr}.xlsx`);
+    toast.success(`فایل اکسل جامع با ${exportData.length.toLocaleString("fa-IR")} ردیف دانلود شد.`);
+  };
+
+  const handleDownloadCsv = () => {
+    if (exportData.length === 0) {
+      toast.error("شماره‌ای برای استخراج یافت نشد.");
+      return;
+    }
+
+    const headers = ["شماره موبایل", "نام تامین کننده", "دسته بندی", "آدرس", "وضعیت"];
+    const rows = exportData.map((item) => [
+      `"${item.phone}"`,
+      `"${item.name.replace(/"/g, '""')}"`,
+      `"${item.category.replace(/"/g, '""')}"`,
+      `"${item.address.replace(/"/g, '""')}"`,
+      `"${item.statusText}"`
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute("download", `melipayamak_numbers_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`فایل CSV با موفقیت دانلود شد.`);
+  };
+
+  const handleCopyPhones = (separator: "comma" | "newline") => {
+    if (exportData.length === 0) {
+      toast.error("شماره‌ای برای کپی یافت نشد.");
+      return;
+    }
+
+    const text = exportData.map((item) => item.phone).join(separator === "comma" ? "," : "\n");
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedType(separator);
+      toast.success(
+        separator === "comma"
+          ? `${exportData.length.toLocaleString("fa-IR")} شماره با کاما کپی شد (آماده برای درج در ملی پیامک).`
+          : `${exportData.length.toLocaleString("fa-IR")} شماره در خطوط مجزا کپی شد.`
+      );
+      setTimeout(() => setCopiedType(null), 2500);
+    }).catch(() => {
+      toast.error("خطا در دسترسی به حافظه موقت (Clipboard)");
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in text-primary" dir="rtl" id="leads-ambassadors-section">
       {/* Top Header */}
@@ -355,6 +624,19 @@ export default function LeadsManager() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowExportModal(true)}
+            className="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-4 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-xs group"
+            title="خروجی فایل اکسل شماره‌ها ویژه سامانه ملی پیامک و پیامک انبوه"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" />
+            <span>خروجی اکسل شماره‌ها (ملی‌پیامک)</span>
+            <span className="bg-emerald-500 text-slate-950 text-[10px] px-2 py-0.5 rounded-full font-black">
+              {leads.length.toLocaleString("fa-IR")}
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={handleAutoMatch}
@@ -511,6 +793,19 @@ export default function LeadsManager() {
                   </option>
                 ))}
               </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setExportScope("CURRENT_FILTER");
+                  setShowExportModal(true);
+                }}
+                className="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-3.5 py-2.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+                title="خروجی اکسل شماره‌های فیلتر شده"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
+                <span>خروجی اکسل</span>
+              </button>
             </div>
           </div>
 
@@ -970,6 +1265,324 @@ export default function LeadsManager() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EXPORT MODAL FOR EXCEL & MELIPAYAMAK */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-card border border-border-subtle rounded-3xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl p-6 md:p-7 space-y-6">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-border-subtle">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-xs">
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base md:text-lg font-black text-primary flex items-center gap-2">
+                    خروجی اکسل شماره‌ها و ارسال در ملی‌پیامک
+                  </h3>
+                  <p className="text-xs text-muted font-medium mt-0.5">
+                    استخراج لیست تلفن‌های همراه تامین‌کنندگان هدف با فرمت استاندارد اکسل، متنی یا کپی سریع
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="w-9 h-9 rounded-xl bg-surface hover:bg-subtle text-muted hover:text-primary flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scope Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-primary flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-emerald-500" />
+                <span>انتخاب دامنه تامین‌کنندگان برای استخراج:</span>
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                {[
+                  { id: "ALL", title: "همه تامین‌کنندگان", count: leads.length },
+                  { id: "CURRENT_FILTER", title: "فیلتر جاری جدول", count: filteredLeads.length },
+                  { id: "PENDING", title: "آزاد (در انتظار)", count: leads.filter((l) => l.status === "PENDING").length },
+                  { id: "ASSIGNED", title: "در حال مذاکره", count: leads.filter((l) => l.status === "ASSIGNED" || l.status === "IN_NEGOTIATION").length },
+                  { id: "COMPLETED", title: "جذب موفق", count: leads.filter((l) => l.status === "COMPLETED").length }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setExportScope(item.id as any)}
+                    className={`p-3 rounded-2xl border text-right transition-all flex flex-col justify-between cursor-pointer ${
+                      exportScope === item.id
+                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-black shadow-xs ring-1 ring-emerald-500/30"
+                        : "bg-surface border-subtle text-muted hover:text-primary hover:border-emerald-500/30 font-medium"
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold truncate">{item.title}</span>
+                    <span className="text-sm font-black mt-1">
+                      {item.count.toLocaleString("fa-IR")}{" "}
+                      <span className="text-[10px] font-normal opacity-70">پرونده</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Advanced Filters and Options */}
+            <div className="bg-surface/50 border border-subtle p-4 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-black text-primary">تنظیمات پردازش و پالایش شماره‌ها برای پیامک:</p>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                  🛡️ شماره‌های ثابت در سیستم باقی می‌مانند
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <label className="flex items-center gap-2.5 p-2.5 bg-card rounded-xl border border-subtle cursor-pointer hover:border-emerald-500/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={exportOnlyMobiles}
+                    onChange={(e) => setExportOnlyMobiles(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-500 cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-bold text-primary">فقط خطوط همراه در فایل پیامک</span>
+                    <span className="text-[10px] text-muted">فیلتر شماره‌های ثابت در فایل خروجی (جهت عدم خطای پنل پیامک)</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-2.5 bg-card rounded-xl border border-subtle cursor-pointer hover:border-emerald-500/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={exportIncludeAdditional}
+                    onChange={(e) => setExportIncludeAdditional(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-500 cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-bold text-primary">استخراج شماره‌های همراه فرعی</span>
+                    <span className="text-[10px] text-muted">شامل کردن موبایل مسئولین و شماره‌های همراه دوم</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-2.5 bg-card rounded-xl border border-subtle cursor-pointer hover:border-emerald-500/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={exportDeduplicate}
+                    onChange={(e) => setExportDeduplicate(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-500 cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-bold text-primary">حذف شماره‌های همراه تکراری</span>
+                    <span className="text-[10px] text-muted">جلوگیری از ارسال پیامک تکراری به یک مخاطب</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Live Count & Summary Card */}
+            <div className="bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-emerald-500/15 border border-emerald-500/30 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-xs">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted font-bold">شماره‌های آماده ارسال و استخراج:</p>
+                  <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    {exportData.length.toLocaleString("fa-IR")}{" "}
+                    <span className="text-xs font-bold text-primary">شماره معتبر تفکیک‌شده</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-bold text-muted bg-card/80 px-3 py-2 rounded-xl border border-subtle self-start sm:self-auto">
+                <span>تعداد کل پرونده‌ها:</span>
+                <span className="text-primary font-black">{targetLeadsForExport.length.toLocaleString("fa-IR")}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons Grid */}
+            <div className="space-y-3">
+              <p className="text-xs font-black text-primary">انتخاب روش دریافت و دانلود خروجی:</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* 1. Melipayamak Excel Button */}
+                <button
+                  type="button"
+                  onClick={handleDownloadMeliPayamakExcel}
+                  disabled={exportData.length === 0}
+                  className="p-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-2xl text-right transition-all flex items-start gap-3 shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50 group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-950/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <FileSpreadsheet className="w-5 h-5 text-slate-950" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black">دانلود اکسل استاندارد ملی‌پیامک (.xlsx)</span>
+                      <Download className="w-4 h-4 text-slate-950" />
+                    </div>
+                    <p className="text-[11px] font-medium opacity-80 mt-1 leading-relaxed">
+                      فرمت اختصاصی آماده جهت آپلود مستقیم در ماژول «ارسال پیامک از فایل اکسل» یا «دفترچه تلفن» ملی پیامک
+                    </p>
+                  </div>
+                </button>
+
+                {/* 2. Full CRM Excel Button */}
+                <button
+                  type="button"
+                  onClick={handleDownloadFullExcel}
+                  disabled={exportData.length === 0}
+                  className="p-4 bg-card hover:bg-surface border border-border-subtle hover:border-blue-500/40 text-primary rounded-2xl text-right transition-all flex items-start gap-3 shadow-xs cursor-pointer disabled:opacity-50 group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform border border-blue-500/20">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black">دانلود اکسل جامع پرونده‌ها (.xlsx)</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">
+                        فول دیتا
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted font-medium mt-1 leading-relaxed">
+                      شامل نام برند، تلفن اصلی و فرعی، حوزه کالا، آدرس، پاداش جذب و نام تأمین‌یاب مسئول
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                {/* 3. CSV File Download */}
+                <button
+                  type="button"
+                  onClick={handleDownloadCsv}
+                  disabled={exportData.length === 0}
+                  className="p-3 bg-surface hover:bg-subtle border border-subtle rounded-xl text-xs font-bold text-primary flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+                  title="دانلود فایل CSV با انکودینگ UTF-8 BOM"
+                >
+                  <FileText className="w-4 h-4 text-amber-500" />
+                  <span>دانلود فایل متنی CSV (.csv)</span>
+                </button>
+
+                {/* 4. Quick Copy with Comma */}
+                <button
+                  type="button"
+                  onClick={() => handleCopyPhones("comma")}
+                  disabled={exportData.length === 0}
+                  className={`p-3 border rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 ${
+                    copiedType === "comma"
+                      ? "bg-emerald-500 text-slate-950 border-emerald-500 shadow-xs"
+                      : "bg-surface hover:bg-subtle border-subtle text-primary"
+                  }`}
+                  title="کپی شماره‌ها جداشده با کاما جهت پیست کردن مستقیم در کادر ارسال سریع ملی پیامک"
+                >
+                  {copiedType === "comma" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-indigo-500" />}
+                  <span>{copiedType === "comma" ? "کپی شد! (با کاما)" : "کپی سریع شماره‌ها (با کاما)"}</span>
+                </button>
+
+                {/* 5. Quick Copy with Newline */}
+                <button
+                  type="button"
+                  onClick={() => handleCopyPhones("newline")}
+                  disabled={exportData.length === 0}
+                  className={`p-3 border rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 ${
+                    copiedType === "newline"
+                      ? "bg-emerald-500 text-slate-950 border-emerald-500 shadow-xs"
+                      : "bg-surface hover:bg-subtle border-subtle text-primary"
+                  }`}
+                  title="کپی شماره‌ها در خطوط مجزا"
+                >
+                  {copiedType === "newline" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-teal-500" />}
+                  <span>{copiedType === "newline" ? "کپی شد! (خط به خط)" : "کپی شماره‌ها (خط جدید)"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Live Data Preview */}
+            {exportData.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-muted flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>پیش‌نمایش ۵ ردیف نخست خروجی:</span>
+                  </p>
+                  <span className="text-[11px] text-muted font-medium">
+                    نمایش ۵ از {exportData.length.toLocaleString("fa-IR")} شماره
+                  </span>
+                </div>
+
+                <div className="bg-surface border border-subtle rounded-2xl overflow-hidden">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-card border-b border-subtle text-muted font-bold">
+                      <tr>
+                        <th className="p-3">شماره موبایل</th>
+                        <th className="p-3">نام تامین‌کننده</th>
+                        <th className="p-3">صنف / حوزه</th>
+                        <th className="p-3">نوع ردیف</th>
+                        <th className="p-3">وضعیت</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-subtle">
+                      {exportData.slice(0, 5).map((row, index) => (
+                        <tr key={index} className="hover:bg-card/50">
+                          <td className="p-3 font-mono font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">
+                            {row.phone}
+                          </td>
+                          <td className="p-3 font-bold text-primary">{row.name}</td>
+                          <td className="p-3 text-muted">{row.category}</td>
+                          <td className="p-3">
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                                row.isAdditional
+                                  ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                                  : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                              }`}
+                            >
+                              {row.isAdditional ? "شماره فرعی" : "شماره اصلی"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-muted text-[11px]">{row.statusText}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* MeliPayamak Help Guide Box */}
+            <div className="bg-indigo-500/5 border border-indigo-500/20 p-4 rounded-2xl flex items-start gap-3">
+              <HelpCircle className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs text-muted leading-relaxed">
+                <p className="font-bold text-primary">نحوه ارسال در پنل سامانه ملی‌پیامک (Melipayamak):</p>
+                <ul className="list-disc list-inside space-y-0.5 text-[11px] pr-1">
+                  <li>
+                    <strong className="text-primary font-bold">روش اول (فایل اکسل):</strong> در منوی پنل ملی‌پیامک وارد بخش{" "}
+                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">«ارسال پیامک ← ارسال از طریق فایل اکسل»</span> شوید، فایل دانلود شده بالا را آپلود نموده و ستون شماره موبایل را انتخاب کنید.
+                  </li>
+                  <li>
+                    <strong className="text-primary font-bold">روش دوم (دفترچه تلفن):</strong> می‌توانید با انتخاب فایل اکسل در منوی{" "}
+                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">«دفترچه تلفن ← افزودن سریع یا ورود از اکسل»</span>، گروه مخاطبین جدیدی به نام «تامین‌کنندگان هدف» بسازید.
+                  </li>
+                  <li>
+                    <strong className="text-primary font-bold">روش سوم (کپی سریع):</strong> با کلیک روی «کپی سریع با کاما»، شماره‌ها در حافظه قرار گرفته و می‌توانید مستقیماً در کادر گیرندگان ارسال پیامک معمولی پیست (Paste) کنید.
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="px-6 py-2.5 rounded-xl text-xs font-bold text-muted hover:text-primary bg-surface hover:bg-subtle cursor-pointer"
+              >
+                بستن پنجره
+              </button>
+            </div>
           </div>
         </div>
       )}
