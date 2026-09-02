@@ -1260,8 +1260,9 @@ export default function StoreOrders({
       )}
       {showModal && (
         <div
-          className="fixed inset-0 bg-background/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in"
           onClick={() => setShowModal(false)}
+          dir="rtl"
         >
           <div
             className="bg-card rounded-3xl w-full max-w-5xl shadow-2xl p-6 md:p-8 my-8 text-right relative max-h-[90vh] overflow-y-auto border border-subtle"
@@ -1278,15 +1279,16 @@ export default function StoreOrders({
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-muted hover:bg-surface p-2 rounded-full cursor-pointer transition-colors"
+                className="text-muted hover:text-primary hover:bg-surface p-2 rounded-full cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
             <form onSubmit={handleCreateOrder} className="space-y-6">
-              <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-3.5 rounded-xl text-xs leading-relaxed font-bold text-right shadow-xs">
-                🚚 نکته ارسال: تمامی محصولاتی که از یک تامین‌کننده انتخاب می‌کنید در یک سفارش گروهی ثبت و با یک هزینه ارسال مشترک فرستاده می‌شوند.
+              <div className="bg-primary-default/10 border border-primary-default/25 text-primary-hover p-3.5 rounded-2xl text-xs leading-relaxed font-bold text-right shadow-2xs flex items-center gap-2.5">
+                <Truck className="w-4 h-4 text-primary-default shrink-0" />
+                <span>🚚 نکته ارسال: تمامی محصولاتی که از یک تامین‌کننده انتخاب می‌کنید در یک بسته تجمیع شده و با یک هزینه ارسال مشترک فرستاده می‌شوند.</span>
               </div>
 
               {/* 2-Column Responsive Layout: Right (Items Selection) | Left (Shipping & Customer Details) */}
@@ -1296,41 +1298,41 @@ export default function StoreOrders({
                 <div className="lg:col-span-7 space-y-4">
                   {/* Added Items List Card */}
                   {orderItems.length > 0 && (
-                    <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl space-y-3">
-                      <div className="flex items-center justify-between text-xs font-black text-slate-900 dark:text-white">
+                    <div className="bg-surface border border-subtle p-4 rounded-2xl space-y-3 shadow-2xs">
+                      <div className="flex items-center justify-between text-xs font-black text-primary">
                         <span className="flex items-center gap-1.5">
-                          <ShoppingCart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <ShoppingCart className="w-4 h-4 text-primary-default" />
                           اقلام اضافه شده به این سفارش ({orderItems.length} کالا)
                         </span>
-                        <span className="text-[11px] font-mono font-extrabold text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-lg">
+                        <span className="text-[11px] font-mono font-bold text-primary-hover bg-primary-default/10 border border-primary-default/20 px-2.5 py-1 rounded-lg">
                           {orderItems[0]?.supplierName}
                         </span>
                       </div>
-                      <div className="divide-y divide-slate-200 dark:divide-slate-700 max-h-44 overflow-y-auto">
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                         {orderItems.map((item, idx) => (
-                          <div key={idx} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                          <div key={idx} className="p-3 bg-card rounded-xl border border-subtle flex items-center justify-between gap-3 text-xs">
                             <div className="flex items-center gap-2.5 min-w-0">
                               {item.image ? (
-                                <img src={item.image} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-300 dark:border-slate-600" alt="" />
+                                <img src={item.image} className="w-11 h-11 rounded-lg object-cover shrink-0 border border-subtle" alt="" />
                               ) : (
-                                <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center shrink-0">
-                                  <ShoppingCart className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                                <div className="w-11 h-11 bg-surface rounded-lg flex items-center justify-center shrink-0 border border-subtle">
+                                  <ShoppingCart className="w-4 h-4 text-muted" />
                                 </div>
                               )}
                               <div className="min-w-0">
-                                <p className="font-bold text-slate-900 dark:text-white truncate">{item.productName}</p>
+                                <p className="font-bold text-primary truncate">{item.productName}</p>
                                 {item.variantName && (
-                                  <p className="text-[10px] text-slate-600 dark:text-slate-400 font-medium truncate">{item.variantName}</p>
+                                  <p className="text-[10px] text-muted font-medium truncate mt-0.5">{item.variantName}</p>
                                 )}
-                                <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold mt-0.5">
-                                  {item.price?.toLocaleString()} تومان × {item.quantity} عدد = {(item.price * item.quantity)?.toLocaleString()} تومان
+                                <p className="text-[11px] text-primary-default font-mono font-bold mt-1">
+                                  {item.price?.toLocaleString("fa-IR")} تومان × {item.quantity} عدد = {((item.price || 0) * item.quantity)?.toLocaleString("fa-IR")} تومان
                                 </p>
                               </div>
                             </div>
                             <button
                               type="button"
                               onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
-                              className="text-rose-600 hover:text-rose-700 dark:text-rose-400 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer shrink-0 transition-colors"
+                              className="text-rose-600 hover:text-rose-700 dark:text-rose-400 p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer shrink-0 transition-colors"
                               title="حذف کالا"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1353,14 +1355,14 @@ export default function StoreOrders({
                         placeholder="جستجوی نام کالا یا شناسه (SKU)..."
                         value={productSearch}
                         onChange={(e) => setProductSearch(e.target.value)}
-                        className="w-full bg-background border border-subtle rounded-xl pr-10 pl-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none transition-all"
+                        className="w-full bg-card border border-subtle rounded-xl pr-10 pl-4 py-2.5 text-xs text-primary placeholder:text-muted focus:ring-2 focus:ring-primary-default outline-none transition-all"
                       />
                       <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted">
-                        <Search className="w-4 h-4 text-muted" />
+                        <Search className="w-4 h-4" />
                       </div>
                     </div>
                     
-                    <div className="max-h-52 overflow-y-auto space-y-2 border border-subtle p-2 rounded-xl bg-background">
+                    <div className="max-h-52 overflow-y-auto space-y-2 border border-subtle p-2 rounded-xl bg-card">
                       {myCatalog.length === 0 && (
                         <div className="text-center py-6 text-xs text-muted">
                           کاتالوگ زوپیتی شما خالی است. ابتدا از بخش کاوش کالا، محصولات مدنظر را اضافه کنید.
@@ -1457,7 +1459,7 @@ export default function StoreOrders({
                             انتخاب متغیر / تنوع کالا <span className="text-rose-500">*</span>
                           </label>
                           <select
-                            className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary font-bold"
+                            className="w-full bg-card border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary font-bold"
                             value={selectedVariantId}
                             onChange={(e) => setSelectedVariantId(e.target.value)}
                           >
@@ -1476,7 +1478,7 @@ export default function StoreOrders({
                               } catch (e) {}
                               return (
                                 <option key={v.id} value={v.id.toString()}>
-                                  {displayAttrs} (موجودی: {v.stock} عدد | قیمت: {v.finalPrice?.toLocaleString()} تومان)
+                                  {displayAttrs} (موجودی: {v.stock} عدد | قیمت: {v.finalPrice?.toLocaleString("fa-IR")} تومان)
                                 </option>
                               );
                             })}
@@ -1494,7 +1496,7 @@ export default function StoreOrders({
                         <input
                           type="number"
                           min="1"
-                          className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                          className="w-full bg-card border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
                           value={quantity}
                           onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                         />
@@ -1503,7 +1505,7 @@ export default function StoreOrders({
                         type="button"
                         onClick={handleAddItemToOrder}
                         disabled={!selectedProduct}
-                        className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
+                        className="flex-1 py-2.5 bg-primary-default hover:bg-primary-hover disabled:opacity-50 text-inverse rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-primary-default/20"
                       >
                         <Plus className="w-4 h-4" />
                         <span>افزودن به اقلام این سفارش</span>
@@ -1515,16 +1517,16 @@ export default function StoreOrders({
                 {/* LEFT COLUMN: Recipient Information, Postal Address, Shipping Method & Submit */}
                 <div className="lg:col-span-5 space-y-4">
                   {/* Recipient and Shipping Address Section */}
-                  <div className="bg-surface p-4 rounded-2xl border border-subtle space-y-3.5">
+                  <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-3.5 shadow-2xs">
                     <div className="flex items-center justify-between border-b border-subtle pb-2.5">
                       <span className="text-xs font-black text-primary flex items-center gap-1.5">
                         <MapPin className="w-4 h-4 text-rose-500" />
-                        مشخصات گیرنده و نشانی پستی
+                        مشخصات گیرنده و نشانی پستی مقصد
                       </span>
                       <button
                         type="button"
                         onClick={handleUseStoreAddressForNewOrder}
-                        className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                        className="text-[11px] font-bold text-primary-default hover:text-primary-hover cursor-pointer flex items-center gap-1 bg-primary-default/10 px-2.5 py-1 rounded-lg border border-primary-default/20 transition-colors"
                       >
                         ⚡ درج آدرس فروشگاه
                       </button>
@@ -1532,7 +1534,7 @@ export default function StoreOrders({
 
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        <label className="block text-[11px] font-bold text-secondary mb-1">
                           نام و نام‌خانوادگی گیرنده <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -1541,12 +1543,12 @@ export default function StoreOrders({
                           placeholder="مثال: علی رضایی"
                           value={shippingRecipientName}
                           onChange={(e) => setShippingRecipientName(e.target.value)}
-                          className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                          className="w-full bg-card border border-subtle rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary placeholder:text-muted transition-all"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        <label className="block text-[11px] font-bold text-secondary mb-1">
                           شماره تماس گیرنده <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -1556,13 +1558,13 @@ export default function StoreOrders({
                           dir="ltr"
                           value={shippingRecipientPhone}
                           onChange={(e) => setShippingRecipientPhone(e.target.value)}
-                          className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right text-primary"
+                          className="w-full bg-card border border-subtle rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right text-primary placeholder:text-muted transition-all"
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-2.5">
                         <div>
-                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          <label className="block text-[11px] font-bold text-secondary mb-1">
                             استان مقصد <span className="text-rose-500">*</span>
                           </label>
                           <select
@@ -1572,7 +1574,7 @@ export default function StoreOrders({
                               setShippingProvince(e.target.value);
                               setShippingCity("");
                             }}
-                            className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                            className="w-full bg-card border border-subtle rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary transition-all"
                           >
                             <option value="">-- انتخاب استان --</option>
                             {PROVINCES.map((p) => (
@@ -1581,7 +1583,7 @@ export default function StoreOrders({
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          <label className="block text-[11px] font-bold text-secondary mb-1">
                             شهر مقصد <span className="text-rose-500">*</span>
                           </label>
                           {shippingProvince && PROVINCES.find(p => p.name === shippingProvince)?.cities.length ? (
@@ -1589,7 +1591,7 @@ export default function StoreOrders({
                               required
                               value={shippingCity}
                               onChange={(e) => setShippingCity(e.target.value)}
-                              className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                              className="w-full bg-card border border-subtle rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary transition-all"
                             >
                               <option value="">-- انتخاب شهر --</option>
                               {PROVINCES.find(p => p.name === shippingProvince)?.cities.map((city) => (
@@ -1603,7 +1605,7 @@ export default function StoreOrders({
                               placeholder="مثال: تهران"
                               value={shippingCity}
                               onChange={(e) => setShippingCity(e.target.value)}
-                              className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                              className="w-full bg-card border border-subtle rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary placeholder:text-muted transition-all"
                             />
                           )}
                         </div>
@@ -1611,7 +1613,7 @@ export default function StoreOrders({
 
                       <div className="grid grid-cols-2 gap-2.5">
                         <div>
-                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          <label className="block text-[11px] font-bold text-secondary mb-1">
                             کد پستی (۱۰ رقم) <span className="text-rose-500">*</span>
                           </label>
                           <input
@@ -1622,17 +1624,17 @@ export default function StoreOrders({
                             dir="ltr"
                             value={shippingPostalCode}
                             onChange={(e) => setShippingPostalCode(e.target.value)}
-                            className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right text-primary"
+                            className="w-full bg-card border border-subtle rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right text-primary placeholder:text-muted transition-all"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          <label className="block text-[11px] font-bold text-secondary mb-1">
                             روش ارسال
                           </label>
                           <select
                             value={shippingMethod}
                             onChange={(e) => setShippingMethod(e.target.value)}
-                            className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                            className="w-full bg-card border border-subtle rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary transition-all"
                           >
                             <option value="POST">پست پیشتاز سراسری</option>
                             <option value="POST_VIZHE">پست ویژه / اکسپرس</option>
@@ -1642,7 +1644,7 @@ export default function StoreOrders({
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        <label className="block text-[11px] font-bold text-secondary mb-1">
                           نشانی دقیق پستی (خیابان، کوچه، پلاک، واحد) <span className="text-rose-500">*</span>
                         </label>
                         <textarea
@@ -1651,16 +1653,16 @@ export default function StoreOrders({
                           placeholder="خیابان اصلی، فرعی، پلاک، طبقه و واحد..."
                           value={shippingAddressDetail}
                           onChange={(e) => setShippingAddressDetail(e.target.value)}
-                          className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary"
+                          className="w-full bg-card border border-subtle rounded-xl px-3.5 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary placeholder:text-muted transition-all leading-relaxed"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        <label className="block text-[11px] font-bold text-secondary mb-1">
                           یادداشت برای تامین‌کننده (اختیاری)
                         </label>
                         <textarea
-                          className="w-full bg-background border border-subtle rounded-xl px-3 py-1.5 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary"
+                          className="w-full bg-card border border-subtle rounded-xl px-3.5 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary placeholder:text-muted transition-all"
                           rows={1}
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
@@ -1671,7 +1673,7 @@ export default function StoreOrders({
                   </div>
 
                   {error && (
-                    <div className="bg-danger/10 border border-rose-200 text-danger p-3 rounded-xl text-xs font-bold leading-relaxed">
+                    <div className="bg-danger/10 border border-rose-200 dark:border-rose-900/50 text-danger p-3 rounded-xl text-xs font-bold leading-relaxed">
                       {error}
                     </div>
                   )}
@@ -1805,7 +1807,7 @@ export default function StoreOrders({
                           key={id}
                           className="flex justify-between items-center text-xs text-muted py-1 border-b border-subtle/40 last:border-b-0"
                         >
-                          <span className="font-medium text-slate-700">
+                          <span className="font-medium text-primary">
                             سفارش #{Number(id).toLocaleString('fa-IR')}: {productSummary}
                           </span>
                           <span className="font-bold text-primary font-sans">
@@ -2359,35 +2361,36 @@ export default function StoreOrders({
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => setShowReportIssue(false)}
+          dir="rtl"
         >
           <div
-            className="bg-card w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-border-subtle p-6 text-right"
+            className="bg-card w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-subtle p-6 text-right"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-border-subtle pb-4 mb-4">
+            <div className="flex items-center justify-between border-b border-subtle pb-4 mb-4">
               <h3 className="font-extrabold text-lg text-rose-600 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5" /> ثبت مشکل و پیگیری سفارش #{selectedOrderForDetails.id}
               </h3>
               <button
                 onClick={() => setShowReportIssue(false)}
-                className="p-2 text-text-muted hover:bg-surface rounded-full"
+                className="p-2 text-muted hover:text-primary hover:bg-surface rounded-full cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-bold text-secondary mb-2">
                   دسته‌بندی موضوع مشکل <span className="text-rose-500">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setIssueCategory("LOGISTICS")}
-                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 cursor-pointer ${
                       issueCategory === "LOGISTICS"
                         ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
-                        : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                        : "border-subtle bg-surface text-secondary hover:bg-surface-hover"
                     }`}
                   >
                     <span>🚚</span>
@@ -2396,10 +2399,10 @@ export default function StoreOrders({
                   <button
                     type="button"
                     onClick={() => setIssueCategory("SUPPLIER")}
-                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 cursor-pointer ${
                       issueCategory === "SUPPLIER"
                         ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
-                        : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                        : "border-subtle bg-surface text-secondary hover:bg-surface-hover"
                     }`}
                   >
                     <span>📦</span>
@@ -2408,10 +2411,10 @@ export default function StoreOrders({
                   <button
                     type="button"
                     onClick={() => setIssueCategory("FINANCIAL")}
-                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 cursor-pointer ${
                       issueCategory === "FINANCIAL"
                         ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
-                        : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                        : "border-subtle bg-surface text-secondary hover:bg-surface-hover"
                     }`}
                   >
                     <span>💳</span>
@@ -2420,10 +2423,10 @@ export default function StoreOrders({
                   <button
                     type="button"
                     onClick={() => setIssueCategory("OTHER")}
-                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 ${
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center gap-2 cursor-pointer ${
                       issueCategory === "OTHER"
                         ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20"
-                        : "border-border-subtle bg-surface text-text-muted hover:bg-surface-hover"
+                        : "border-subtle bg-surface text-secondary hover:bg-surface-hover"
                     }`}
                   >
                     <span>💬</span>
@@ -2432,28 +2435,28 @@ export default function StoreOrders({
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-xs font-bold text-secondary mb-1.5">
                   شرح کامل مشکل و توضیحات <span className="text-rose-500">*</span>
                 </label>
                 <textarea
                   value={issueText}
                   onChange={(e) => setIssueText(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-3 bg-surface border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-text-primary resize-none leading-relaxed"
+                  className="w-full px-4 py-3 bg-surface border border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-primary resize-none leading-relaxed placeholder:text-muted"
                   placeholder="لطفاً جزئیات مشکل پیش‌آمده (مانند عدم تطابق کالا، تاخیر، یا عدم ارسال) را به طور کامل شرح دهید..."
                 />
               </div>
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowReportIssue(false)}
-                  className="flex-1 py-3 bg-surface hover:bg-surface-hover text-text-primary rounded-xl text-xs font-bold transition-all"
+                  className="flex-1 py-3 bg-surface hover:bg-surface-hover text-secondary rounded-xl text-xs font-bold transition-all cursor-pointer"
                 >
                   انصراف
                 </button>
                 <button
                   onClick={handleReportIssue}
                   disabled={submittingIssue || !issueText.trim()}
-                  className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50 flex justify-center items-center gap-2"
+                  className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50 flex justify-center items-center gap-2 cursor-pointer"
                 >
                   {submittingIssue ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -2471,7 +2474,7 @@ export default function StoreOrders({
       {/* Complete Shipping Details Modal */}
       {showShippingModal && selectedShippingOrder && (
         <div
-          className="fixed inset-0 bg-background/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in"
           onClick={() => {
             setShowShippingModal(false);
             setSelectedShippingOrder(null);
@@ -2479,7 +2482,7 @@ export default function StoreOrders({
           dir="rtl"
         >
           <div
-            className="bg-card rounded-3xl w-full max-w-xl shadow-2xl p-6 md:p-8 my-8 text-right relative max-h-[90vh] overflow-y-auto"
+            className="bg-card rounded-3xl w-full max-w-xl shadow-2xl p-6 md:p-8 my-8 text-right relative max-h-[90vh] overflow-y-auto border border-subtle"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6 border-b border-subtle pb-4">
@@ -2491,31 +2494,32 @@ export default function StoreOrders({
                   setShowShippingModal(false);
                   setSelectedShippingOrder(null);
                 }}
-                className="text-muted hover:bg-surface p-2 rounded-full cursor-pointer transition-colors"
+                className="text-muted hover:text-primary hover:bg-surface p-2 rounded-full cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-6">
-              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 p-3.5 rounded-xl text-xs leading-relaxed font-bold text-right mb-2">
-                🚚 توجه مهم: طبق ضوابط، کالاهایی که از یک تامین‌کننده هستند، در یک بسته تجمیع شده و هزینه ارسال آن‌ها با هم محاسبه می‌گردد.
+              <div className="bg-primary-default/10 border border-primary-default/20 text-primary-hover p-3.5 rounded-xl text-xs leading-relaxed font-bold text-right mb-2 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-primary-default shrink-0" />
+                <span>توجه مهم: طبق ضوابط، کالاهایی که از یک تامین‌کننده هستند، در یک بسته تجمیع شده و هزینه ارسال آن‌ها با هم محاسبه می‌گردد.</span>
               </div>
               <div className="mb-4">
                 <label className="block text-xs font-black text-secondary mb-1.5 flex items-center gap-1">
                   روش ارسال <span className="text-danger">*</span>
                 </label>
                 <div className="flex flex-wrap gap-3">
-                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_PISHTAZ" || shippingMethod === "POST" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
-                    <input type="radio" name="shipMethod" value="POST_PISHTAZ" checked={shippingMethod === "POST_PISHTAZ" || shippingMethod === "POST"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_PISHTAZ" || shippingMethod === "POST" ? "text-primary-hover bg-primary-default/10 border-primary-default/30" : "text-secondary bg-surface border-subtle hover:bg-surface-hover"}`}>
+                    <input type="radio" name="shipMethod" value="POST_PISHTAZ" checked={shippingMethod === "POST_PISHTAZ" || shippingMethod === "POST"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-primary-default focus:ring-primary-default" />
                     پست پیشتاز
                   </label>
-                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_VIZHE" || shippingMethod === "POST_EXPRESS" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
-                    <input type="radio" name="shipMethod" value="POST_VIZHE" checked={shippingMethod === "POST_VIZHE" || shippingMethod === "POST_EXPRESS"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "POST_VIZHE" || shippingMethod === "POST_EXPRESS" ? "text-primary-hover bg-primary-default/10 border-primary-default/30" : "text-secondary bg-surface border-subtle hover:bg-surface-hover"}`}>
+                    <input type="radio" name="shipMethod" value="POST_VIZHE" checked={shippingMethod === "POST_VIZHE" || shippingMethod === "POST_EXPRESS"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-primary-default focus:ring-primary-default" />
                     پست ویژه (اکسپرس)
                   </label>
-                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "TIPAX" ? "text-emerald-600 bg-emerald-500/5 border-emerald-500/30" : "text-muted bg-surface border-subtle hover:border-emerald-200"}`}>
-                    <input type="radio" name="shipMethod" value="TIPAX" checked={shippingMethod === "TIPAX"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                  <label className={`flex items-center gap-2 text-xs font-black px-3.5 py-2.5 rounded-xl cursor-pointer border transition-all duration-200 ${shippingMethod === "TIPAX" ? "text-primary-hover bg-primary-default/10 border-primary-default/30" : "text-secondary bg-surface border-subtle hover:bg-surface-hover"}`}>
+                    <input type="radio" name="shipMethod" value="TIPAX" checked={shippingMethod === "TIPAX"} onChange={(e) => setShippingMethod(e.target.value)} className="w-4 h-4 text-primary-default focus:ring-primary-default" />
                     تیپاکس
                   </label>
                 </div>
@@ -2525,7 +2529,7 @@ export default function StoreOrders({
                 <input
                   type="checkbox"
                   id="storeAddressCheck"
-                  className="w-4 h-4 text-primary-default bg-background border-subtle rounded focus:ring-primary-default focus:ring-2"
+                  className="w-4 h-4 text-primary-default bg-card border-subtle rounded focus:ring-primary-default focus:ring-2 cursor-pointer"
                   checked={shippingAddressType === "STORE_ADDRESS"}
                   onChange={async (e) => {
                     const isChecked = e.target.checked;
@@ -2593,7 +2597,7 @@ export default function StoreOrders({
                     placeholder="نام و نام خانوادگی گیرنده مرسوله"
                     value={shippingRecipientName}
                     onChange={(e) => setShippingRecipientName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-background border rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default"
+                    className="w-full px-4 py-2.5 bg-surface border border-subtle rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default placeholder:text-muted font-bold"
                   />
                 </div>
                 <div>
@@ -2606,7 +2610,7 @@ export default function StoreOrders({
                     placeholder="مثال: 09123456789"
                     value={shippingRecipientPhone}
                     onChange={(e) => setShippingRecipientPhone(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-background border rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default"
+                    className="w-full px-4 py-2.5 bg-surface border border-subtle rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default font-mono text-right placeholder:text-muted font-bold"
                     dir="ltr"
                   />
                 </div>
@@ -2624,7 +2628,7 @@ export default function StoreOrders({
                       setShippingProvince(e.target.value);
                       setShippingCity("");
                     }}
-                    className="w-full px-4 py-2.5 bg-background border rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default"
+                    className="w-full px-4 py-2.5 bg-surface border border-subtle rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default font-bold"
                   >
                     <option value="">انتخاب استان...</option>
                     {PROVINCES.map((p) => (
@@ -2643,7 +2647,7 @@ export default function StoreOrders({
                     value={shippingCity}
                     onChange={(e) => setShippingCity(e.target.value)}
                     disabled={!shippingProvince}
-                    className="w-full px-4 py-2.5 bg-background border rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default disabled:opacity-50"
+                    className="w-full px-4 py-2.5 bg-surface border border-subtle rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default disabled:opacity-50 font-bold"
                   >
                     <option value="">انتخاب شهر...</option>
                     {shippingProvince &&
@@ -2665,7 +2669,7 @@ export default function StoreOrders({
                     placeholder="کد پستی ۱۰ رقمی"
                     value={shippingPostalCode}
                     onChange={(e) => setShippingPostalCode(e.target.value.replace(/\D/g, ""))}
-                    className="w-full px-4 py-2.5 bg-background border rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default"
+                    className="w-full px-4 py-2.5 bg-surface border border-subtle rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default font-mono text-right placeholder:text-muted font-bold"
                     dir="ltr"
                   />
                 </div>
@@ -2680,7 +2684,7 @@ export default function StoreOrders({
                   placeholder="خیابان، کوچه، پلاک، واحد و جزئیات دقیق آدرس پستی"
                   value={shippingAddressDetail}
                   onChange={(e) => setShippingAddressDetail(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default min-h-[80px]"
+                  className="w-full px-4 py-2.5 bg-surface border border-subtle rounded-xl text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary-default min-h-[80px] placeholder:text-muted font-medium leading-relaxed"
                 />
               </div>
 
@@ -2690,7 +2694,7 @@ export default function StoreOrders({
                     setShowShippingModal(false);
                     setSelectedShippingOrder(null);
                   }}
-                  className="px-6 py-3 bg-surface hover:bg-slate-200 text-secondary font-bold rounded-xl text-xs transition-colors"
+                  className="px-6 py-3 bg-surface hover:bg-surface-hover text-secondary font-bold rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   انصراف
                 </button>
