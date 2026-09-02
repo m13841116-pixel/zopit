@@ -131,14 +131,22 @@ export default function LeadsManager() {
   const [exportDeduplicate, setExportDeduplicate] = useState(true);
   const [copiedType, setCopiedType] = useState<string | null>(null);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchLeadsData();
   }, []);
 
   const fetchLeadsData = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const token = localStorage.getItem("token") || "";
+      if (!token) {
+        setFetchError("نشست ورود شما منقضی شده یا در پنجره ناشناس (Incognito) وارد نشده‌اید. لطفاً وارد حساب مدیریت شوید.");
+        setLoading(false);
+        return;
+      }
       const res = await fetch("/api/admin/leads", {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -149,9 +157,15 @@ export default function LeadsManager() {
         if (data.stats) {
           setStats(data.stats);
         }
+      } else if (res.status === 401 || res.status === 403) {
+        setFetchError("عدم احراز هویت: لطفاً مجدداً به عنوان مدیر کل وارد سیستم شوید.");
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setFetchError(errData.error || "خطا در دریافت لیست تامین‌کنندگان هدف از سرور.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setFetchError("خطا در برقراری ارتباط با سرور. لطفاً اتصال اینترنت خود را بررسی کنید.");
       toast.error("خطا در بارگذاری اطلاعات سفیران و سرنخ‌ها");
     } finally {
       setLoading(false);
@@ -684,36 +698,36 @@ export default function LeadsManager() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-primary" dir="rtl" id="leads-ambassadors-section">
+    <div className="space-y-6 animate-fade-in text-slate-900" dir="rtl" id="leads-ambassadors-section">
       {/* Top Header */}
-      <div className="bg-white dark:bg-slate-900 p-6 md:p-7 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="bg-white p-6 md:p-7 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 text-white flex items-center justify-center shadow-lg shadow-purple-600/25 shrink-0">
             <Target className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2.5">
               تأمین‌یاب‌ها و مدیریت جذب تامین‌کنندگان هدف
-              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 font-bold">
+              <span className="text-[11px] px-3 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200 font-black">
                 توسعه بازار B2B
               </span>
             </h1>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium leading-relaxed">
+            <p className="text-xs text-slate-600 mt-1.5 font-medium leading-relaxed">
               تعریف تامین‌کنندگان هدف بازار، تعیین پاداش جذب، انتساب به تأمین‌یاب‌ها و پایش لحظه‌ای مذاکرات
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={() => setShowExportModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-md shadow-blue-600/20 group"
+            className="bg-white hover:bg-purple-50 text-purple-700 border-2 border-purple-200 hover:border-purple-300 px-4 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-xs group"
             title="خروجی فایل اکسل شماره‌ها ویژه سامانه ملی پیامک و پیامک انبوه"
           >
-            <FileSpreadsheet className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+            <FileSpreadsheet className="w-4 h-4 text-purple-600 group-hover:scale-110 transition-transform" />
             <span>خروجی اکسل شماره‌ها (ملی‌پیامک)</span>
-            <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
+            <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded-full font-black">
               {leads.length.toLocaleString("fa-IR")}
             </span>
           </button>
@@ -721,10 +735,10 @@ export default function LeadsManager() {
           <button
             type="button"
             onClick={handleAutoMatch}
-            className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white px-4 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-md shadow-indigo-600/20"
+            className="bg-purple-50 hover:bg-purple-100 text-purple-800 border-2 border-purple-200 px-4 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-xs"
             title="ارزیابی اتوماتیک شماره‌های همراه/ثابت و اسامی برندها با تامین‌کنندگان ثبت‌نامی"
           >
-            <Sparkles className="w-4 h-4 text-indigo-200 animate-pulse" />
+            <Sparkles className="w-4 h-4 text-purple-600 animate-pulse" />
             <span>تطبیق هوشمند شماره‌ها</span>
           </button>
 
@@ -746,7 +760,7 @@ export default function LeadsManager() {
               setShowAdditionalPhones(false);
               setShowAddModal(true);
             }}
-            className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-5 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all cursor-pointer shrink-0"
+            className="bg-gradient-to-r from-violet-600 via-purple-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white px-5 py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-purple-600/30 transition-all cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>افزودن تامین‌کننده هدف جدید</span>
@@ -756,64 +770,72 @@ export default function LeadsManager() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+        {/* Metric 1 */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex items-center justify-between hover:border-purple-200 transition-colors">
           <div>
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-400">کل تامین‌کنندگان هدف</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-              {stats.totalLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-slate-500 dark:text-slate-400">فروشگاه / برند</span>
+            <p className="text-xs font-bold text-slate-500">کل تامین‌کنندگان هدف</p>
+            <p className="text-2xl md:text-3xl font-black text-slate-900 mt-1.5 tracking-tight font-mono">
+              {stats.totalLeads.toLocaleString("fa-IR")}{" "}
+              <span className="text-xs font-bold text-slate-500 font-sans">فروشگاه / برند</span>
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-100 shadow-xs">
             <Building className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+        {/* Metric 2 */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex items-center justify-between hover:border-indigo-200 transition-colors">
           <div>
-            <p className="text-xs font-bold text-blue-700 dark:text-blue-300">در حال پیگیری و مذاکره</p>
-            <p className="text-2xl font-black text-blue-900 dark:text-blue-100 mt-1">
-              {stats.assignedLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-blue-600 dark:text-blue-400">مورد فعال</span>
+            <p className="text-xs font-bold text-slate-500">در حال پیگیری و مذاکره</p>
+            <p className="text-2xl md:text-3xl font-black text-slate-900 mt-1.5 tracking-tight font-mono">
+              {stats.assignedLeads.toLocaleString("fa-IR")}{" "}
+              <span className="text-xs font-bold text-indigo-600 font-sans">مورد فعال</span>
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center border border-indigo-100 shadow-xs">
             <Clock className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+        {/* Metric 3 */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex items-center justify-between hover:border-emerald-200 transition-colors">
           <div>
-            <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">جذب‌شده و ثبت‌نام موفق</p>
-            <p className="text-2xl font-black text-emerald-900 dark:text-emerald-100 mt-1">
-              {stats.completedLeads.toLocaleString("fa-IR")} <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">تامین‌کننده</span>
+            <p className="text-xs font-bold text-slate-500">جذب‌شده و ثبت‌نام موفق</p>
+            <p className="text-2xl md:text-3xl font-black text-slate-900 mt-1.5 tracking-tight font-mono">
+              {stats.completedLeads.toLocaleString("fa-IR")}{" "}
+              <span className="text-xs font-bold text-emerald-600 font-sans">تامین‌کننده</span>
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 shadow-xs">
             <CheckCircle2 className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+        {/* Metric 4 */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex items-center justify-between hover:border-amber-200 transition-colors">
           <div>
-            <p className="text-xs font-bold text-amber-700 dark:text-amber-300">پورسانت‌های پرداخت‌شده</p>
-            <p className="text-2xl font-black text-amber-900 dark:text-amber-100 mt-1">
-              {stats.paidCommissions.toLocaleString("fa-IR")} <span className="text-xs font-medium text-amber-600 dark:text-amber-400">تومان</span>
+            <p className="text-xs font-bold text-slate-500">پورسانت‌های پرداخت‌شده</p>
+            <p className="text-2xl md:text-3xl font-black text-slate-900 mt-1.5 tracking-tight font-mono">
+              {stats.paidCommissions.toLocaleString("fa-IR")}{" "}
+              <span className="text-xs font-bold text-amber-600 font-sans">تومان</span>
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-100 shadow-xs">
             <DollarSign className="w-6 h-6" />
           </div>
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 self-start w-fit">
+      <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs self-start w-fit">
         <button
           type="button"
           onClick={() => setActiveViewTab("leads")}
           className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
             activeViewTab === "leads"
-              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              ? "bg-gradient-to-r from-violet-600 to-purple-700 text-white shadow-md shadow-purple-600/25"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
           <Target className="w-4 h-4" />
@@ -825,8 +847,8 @@ export default function LeadsManager() {
           onClick={() => setActiveViewTab("ambassadors")}
           className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
             activeViewTab === "ambassadors"
-              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              ? "bg-gradient-to-r from-violet-600 to-purple-700 text-white shadow-md shadow-purple-600/25"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
           <Award className="w-4 h-4" />
@@ -836,19 +858,19 @@ export default function LeadsManager() {
 
       {/* Delay Publish & SMS Banner */}
       {(stats.draftLeads ?? 0) > 0 && (
-        <div className="bg-slate-900 text-white p-5 rounded-3xl border-2 border-emerald-600/50 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-scale-up">
+        <div className="bg-white p-5 rounded-3xl border-2 border-purple-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-scale-up">
           <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
-              <Radio className="w-6 h-6 animate-pulse" />
+            <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 border border-purple-200 shadow-xs">
+              <Radio className="w-6 h-6 animate-pulse text-purple-700" />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-black text-emerald-400">فرصت ارسال مستقیم پیامک بدون پورسانت (تاخیر انتشار)</span>
-                <span className="bg-emerald-500/20 text-emerald-300 text-[11px] px-2.5 py-0.5 rounded-full border border-emerald-400/40 font-black">
+                <span className="text-sm font-black text-purple-900">فرصت ارسال مستقیم پیامک بدون پورسانت (تاخیر انتشار)</span>
+                <span className="bg-purple-100 text-purple-800 text-[11px] px-2.5 py-0.5 rounded-full border border-purple-200 font-black">
                   {(stats.draftLeads ?? 0).toLocaleString("fa-IR")} پرونده در حالت پیش‌نویس
                 </span>
               </div>
-              <p className="text-xs text-slate-300 mt-1.5 leading-relaxed font-medium">
+              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed font-medium">
                 این شماره‌ها هنوز در پنل تأمین‌یاب‌ها منتشر نشده‌اند. می‌توانید ابتدا خروجی اکسل شماره‌ها را بگیرید و در پنل ملی‌پیامک به آن‌ها پیامک بزنید. پس از آن، برای کسانی که ثبت‌نام نکرده‌اند، با دکمه انتشار، پرونده‌ها را برای تأمین‌یاب‌ها فعال کنید تا تماس بگیرند.
               </p>
             </div>
@@ -857,9 +879,9 @@ export default function LeadsManager() {
             type="button"
             onClick={handleBulkPublish}
             disabled={isBulkPublishing}
-            className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white px-5 py-3 rounded-2xl text-xs font-black flex items-center gap-2 shrink-0 shadow-md transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
+            className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-5 py-3 rounded-2xl text-xs font-black flex items-center gap-2 shrink-0 shadow-md shadow-purple-600/20 transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
           >
-            <Zap className="w-4 h-4 text-emerald-200" />
+            <Zap className="w-4 h-4 text-purple-200" />
             <span>{isBulkPublishing ? "در حال انتشار..." : "انتشار همگانی همه پیش‌نویس‌ها"}</span>
           </button>
         </div>
@@ -869,15 +891,15 @@ export default function LeadsManager() {
       {activeViewTab === "leads" && (
         <div className="space-y-4">
           {/* Filter Bar */}
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-center gap-3">
+          <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center gap-3">
             <div className="relative flex-1 w-full">
-              <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-purple-600" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="جستجو بر اساس نام تامین‌کننده، شماره تماس، لینک سایت، دسته‌بندی یا تأمین‌یاب..."
-                className="w-full pl-4 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                className="w-full pl-4 pr-10 py-3 bg-white border-2 border-slate-200 focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 rounded-2xl text-xs font-bold text-slate-900 outline-none transition-all placeholder:text-slate-400"
               />
             </div>
 
@@ -885,7 +907,7 @@ export default function LeadsManager() {
               <select
                 value={publishFilter}
                 onChange={(e) => setPublishFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:border-blue-600 cursor-pointer"
+                className="bg-white border-2 border-slate-200 hover:border-purple-300 focus:border-purple-600 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-900 outline-none cursor-pointer transition-all shadow-xs"
               >
                 <option value="ALL">وضعیت انتشار (همه)</option>
                 <option value="PUBLISHED">🌐 منتشرشده برای تأمین‌یاب</option>
@@ -895,7 +917,7 @@ export default function LeadsManager() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:border-blue-600 cursor-pointer"
+                className="bg-white border-2 border-slate-200 hover:border-purple-300 focus:border-purple-600 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-900 outline-none cursor-pointer transition-all shadow-xs"
               >
                 <option value="ALL">همه وضعیت‌ها</option>
                 <option value="PENDING">آزاد (در انتظار تأمین‌یاب)</option>
@@ -907,7 +929,7 @@ export default function LeadsManager() {
               <select
                 value={ambassadorFilter}
                 onChange={(e) => setAmbassadorFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:border-blue-600 cursor-pointer"
+                className="bg-white border-2 border-slate-200 hover:border-purple-300 focus:border-purple-600 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-900 outline-none cursor-pointer transition-all shadow-xs"
               >
                 <option value="ALL">همه تأمین‌یاب‌ها</option>
                 <option value="NONE">بدون تأمین‌یاب (آزاد)</option>
@@ -924,36 +946,54 @@ export default function LeadsManager() {
                   setExportScope("CURRENT_FILTER");
                   setShowExportModal(true);
                 }}
-                className="bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 px-3.5 py-2.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+                className="bg-purple-50 hover:bg-purple-100 text-purple-800 border-2 border-purple-200 hover:border-purple-300 px-4 py-3 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-xs"
                 title="خروجی اکسل شماره‌های فیلتر شده"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <FileSpreadsheet className="w-3.5 h-3.5 text-purple-700" />
                 <span>خروجی اکسل</span>
               </button>
             </div>
           </div>
 
           {/* Leads Table */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs min-w-[850px]">
-                <thead className="bg-slate-100 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-black">
+                <thead className="bg-purple-50/60 border-b border-purple-100 text-slate-900 font-black">
                   <tr>
-                    <th className="p-4">نام تامین‌کننده / برند</th>
-                    <th className="p-4">دسته‌بندی و حوزه کالا</th>
-                    <th className="p-4">شماره تماس و آدرس</th>
-                    <th className="p-4">وضعیت انتشار</th>
-                    <th className="p-4">پاداش جذب</th>
-                    <th className="p-4">تأمین‌یاب مسئول</th>
-                    <th className="p-4">وضعیت پیشرفت</th>
-                    <th className="p-4 text-center">عملیات</th>
+                    <th className="p-4.5">نام تامین‌کننده / برند</th>
+                    <th className="p-4.5">دسته‌بندی و حوزه کالا</th>
+                    <th className="p-4.5">شماره تماس و آدرس</th>
+                    <th className="p-4.5">وضعیت انتشار</th>
+                    <th className="p-4.5">پاداش جذب</th>
+                    <th className="p-4.5">تأمین‌یاب مسئول</th>
+                    <th className="p-4.5">وضعیت پیشرفت</th>
+                    <th className="p-4.5 text-center">عملیات</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="p-10 text-center text-slate-500 font-bold">
-                        در حال بارگذاری اطلاعات...
+                      <td colSpan={8} className="p-12 text-center text-slate-500 font-bold">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-xs text-slate-700 font-bold">در حال بارگذاری اطلاعات پرونده‌ها و تامین‌کنندگان...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : fetchError ? (
+                    <tr>
+                      <td colSpan={8} className="p-10 text-center">
+                        <div className="max-w-md mx-auto p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col items-center gap-3">
+                          <span className="text-xs font-bold text-amber-900">{fetchError}</span>
+                          <button
+                            type="button"
+                            onClick={() => fetchLeadsData()}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs"
+                          >
+                            تلاش مجدد و بارگذاری
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ) : filteredLeads.length === 0 ? (
@@ -970,10 +1010,10 @@ export default function LeadsManager() {
                       return (
                         <tr
                           key={lead.id}
-                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                          className="hover:bg-purple-50/40 transition-colors"
                         >
-                          <td className="p-4">
-                            <div className="font-extrabold text-slate-900 dark:text-white text-sm">
+                          <td className="p-4.5">
+                            <div className="font-extrabold text-slate-900 text-sm">
                               {lead.name}
                             </div>
                             {lead.websiteUrl && (
@@ -981,7 +1021,7 @@ export default function LeadsManager() {
                                 href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 dark:text-blue-300 hover:underline mt-1 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 max-w-[220px] truncate"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:underline mt-1 bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200 max-w-[220px] truncate"
                                 title={lead.websiteUrl}
                               >
                                 <Globe className="w-3 h-3 shrink-0" />
@@ -989,46 +1029,46 @@ export default function LeadsManager() {
                                 <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-70" />
                               </a>
                             )}
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5 font-mono">
+                            <span className="text-[10px] text-slate-500 block mt-1 font-mono">
                               کد پرونده: #{lead.id}
                             </span>
                           </td>
 
-                          <td className="p-4">
-                            <span className="inline-block px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-bold">
+                          <td className="p-4.5">
+                            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-[11px] font-bold">
                               {lead.category || "عمومی"}
                             </span>
                           </td>
 
-                          <td className="p-4">
-                            <div className="flex items-center gap-1.5 font-mono text-xs font-black text-emerald-700 dark:text-emerald-400" dir="ltr">
-                              <Phone className="w-3.5 h-3.5" />
+                          <td className="p-4.5">
+                            <div className="flex items-center gap-1.5 font-mono text-xs font-black text-purple-700" dir="ltr">
+                              <Phone className="w-3.5 h-3.5 text-purple-600" />
                               <a href={`tel:${lead.phone}`} className="hover:underline">
                                 {lead.phone}
                               </a>
                             </div>
                             {lead.additionalPhones && (
-                              <div className="flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400 font-mono mt-1" dir="ltr">
-                                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-sans font-normal">شماره‌های دیگر:</span>
+                              <div className="flex items-center gap-1 text-[11px] text-amber-700 font-mono mt-1" dir="ltr">
+                                <span className="text-[10px] text-slate-500 font-sans font-normal">شماره‌های دیگر:</span>
                                 <span className="font-bold truncate max-w-[180px]" title={lead.additionalPhones}>{lead.additionalPhones}</span>
                               </div>
                             )}
                             {lead.address && (
-                              <div className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400 mt-1 max-w-xs truncate">
-                                <Building className="w-3 h-3 shrink-0" />
+                              <div className="flex items-center gap-1 text-[11px] text-slate-600 mt-1 max-w-xs truncate">
+                                <Building className="w-3 h-3 shrink-0 text-slate-400" />
                                 <span>{lead.address}</span>
                               </div>
                             )}
                           </td>
 
-                          <td className="p-4">
+                          <td className="p-4.5">
                             <button
                               type="button"
                               onClick={() => handleTogglePublish(lead.id)}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
                                 lead.isPublished
-                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-200"
-                                  : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-200"
+                                  ? "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200"
+                                  : "bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-200"
                               }`}
                               title={
                                 lead.isPublished
@@ -1038,31 +1078,31 @@ export default function LeadsManager() {
                             >
                               {lead.isPublished ? (
                                 <>
-                                  <Eye className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
+                                  <Eye className="w-3.5 h-3.5 text-purple-700" />
                                   <span>منتشرشده</span>
                                 </>
                               ) : (
                                 <>
-                                  <EyeOff className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+                                  <EyeOff className="w-3.5 h-3.5 text-slate-600" />
                                   <span>پیش‌نویس (پیامک)</span>
                                 </>
                               )}
                             </button>
                           </td>
 
-                          <td className="p-4">
-                            <span className="font-black text-emerald-700 dark:text-emerald-400 text-sm font-mono">
+                          <td className="p-4.5">
+                            <span className="font-black text-slate-900 text-sm font-mono">
                               {Number(lead.commission).toLocaleString("fa-IR")}{" "}
-                              <span className="text-[10px] font-bold">تومان</span>
+                              <span className="text-[10px] font-bold text-slate-500 font-sans">تومان</span>
                             </span>
                           </td>
 
-                          <td className="p-4">
+                          <td className="p-4.5">
                             <div className="flex items-center gap-2">
                               <select
                                 value={lead.ambassadorId ? String(lead.ambassadorId) : ""}
                                 onChange={(e) => handleAssignAmbassador(lead.id, e.target.value)}
-                                className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none focus:border-blue-600 cursor-pointer"
+                                className="bg-white border-2 border-slate-200 hover:border-purple-300 text-slate-900 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none focus:border-purple-600 cursor-pointer shadow-xs"
                               >
                                 <option value="">-- بدون تأمین‌یاب (آزاد) --</option>
                                 {ambassadors.map((amb) => (
@@ -1074,16 +1114,16 @@ export default function LeadsManager() {
                             </div>
                           </td>
 
-                          <td className="p-4">
+                          <td className="p-4.5">
                             <span
                               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border ${
                                 isCompleted
-                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                                   : isAssigned
-                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300 dark:border-blue-700"
+                                  ? "bg-purple-100 text-purple-800 border-purple-300"
                                   : lead.status === "CANCELLED"
-                                  ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-700"
-                                  : "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                                  ? "bg-rose-100 text-rose-800 border-rose-300"
+                                  : "bg-amber-100 text-amber-900 border-amber-300"
                               }`}
                             >
                               {isCompleted && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -1098,13 +1138,13 @@ export default function LeadsManager() {
                             </span>
                           </td>
 
-                          <td className="p-4 text-center">
+                          <td className="p-4.5 text-center">
                             <div className="flex items-center justify-center gap-1.5">
                               {!isCompleted && (
                                 <button
                                   type="button"
                                   onClick={() => handleStatusChange(lead.id, "COMPLETED")}
-                                  className="p-2 bg-emerald-100 hover:bg-emerald-600 text-emerald-800 hover:text-white dark:bg-emerald-950/60 dark:hover:bg-emerald-600 dark:text-emerald-300 rounded-xl transition-all cursor-pointer"
+                                  className="p-2 bg-emerald-100 hover:bg-emerald-600 text-emerald-800 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
                                   title="ثبت به عنوان جذب موفق و واریز پاداش تأمین‌یاب"
                                 >
                                   <CheckCircle2 className="w-4 h-4" />
@@ -1114,7 +1154,7 @@ export default function LeadsManager() {
                               <button
                                 type="button"
                                 onClick={() => openEditModal(lead)}
-                                className="p-2 bg-slate-100 hover:bg-slate-800 text-slate-700 hover:text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 rounded-xl transition-all cursor-pointer"
+                                className="p-2 bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
                                 title="ویرایش اطلاعات و مبلغ پاداش"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -1123,7 +1163,7 @@ export default function LeadsManager() {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteLead(lead.id)}
-                                className="p-2 bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white dark:bg-rose-950/60 dark:hover:bg-rose-600 dark:text-rose-300 rounded-xl transition-all cursor-pointer"
+                                className="p-2 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
                                 title="حذف تامین‌کننده هدف"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -1144,20 +1184,20 @@ export default function LeadsManager() {
       {/* VIEW TAB 2: AMBASSADOR LEADERBOARD */}
       {activeViewTab === "ambassadors" && (
         <div className="space-y-4">
-          <div className="bg-card rounded-2xl border border-border-subtle overflow-hidden shadow-xs">
-            <div className="p-5 border-b border-subtle">
-              <h3 className="text-base font-black text-primary flex items-center gap-2">
-                <Award className="w-5 h-5 text-amber-500" />
+          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="p-5 md:p-6 border-b border-slate-100 bg-purple-50/40">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Award className="w-5 h-5 text-purple-600" />
                 <span>رتبه‌بندی و گزارش عملکرد تأمین‌یاب‌ها</span>
               </h3>
-              <p className="text-xs text-muted mt-1 font-medium">
+              <p className="text-xs text-slate-600 mt-1 font-medium">
                 تعداد تامین‌کنندگان راضی‌شده، پرونده‌های در جریان و مجموع پاداش‌های کسب‌شده توسط هر تأمین‌یاب
               </p>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs min-w-[800px]">
-                <thead className="bg-surface border-b border-subtle text-muted font-bold">
+                <thead className="bg-purple-50/60 border-b border-purple-100 text-slate-900 font-black">
                   <tr>
                     <th className="p-4">رتبه</th>
                     <th className="p-4">نام تأمین‌یاب</th>
@@ -1168,64 +1208,64 @@ export default function LeadsManager() {
                     <th className="p-4">مجموع پاداش دریافتی</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-subtle">
+                <tbody className="divide-y divide-slate-100">
                   {ambassadorStats.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-10 text-center text-muted font-bold">
+                      <td colSpan={7} className="p-10 text-center text-slate-500 font-bold">
                         هنوز تأمین‌یاب فعالی در سیستم ثبت نشده است.
                       </td>
                     </tr>
                   ) : (
                     ambassadorStats.map((item, idx) => (
-                      <tr key={item.ambassador.id} className="hover:bg-surface/50 transition-colors">
+                      <tr key={item.ambassador.id} className="hover:bg-purple-50/30 transition-colors">
                         <td className="p-4">
                           <span className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs ${
                             idx === 0
-                              ? "bg-amber-400 text-slate-950 font-black shadow-xs"
+                              ? "bg-purple-600 text-white font-black shadow-xs"
                               : idx === 1
                               ? "bg-slate-300 text-slate-900 font-black"
                               : idx === 2
-                              ? "bg-amber-700 text-amber-50 font-black"
-                              : "bg-surface text-secondary border border-subtle"
+                              ? "bg-purple-200 text-purple-900 font-black"
+                              : "bg-slate-100 text-slate-800 border border-slate-200"
                           }`}>
                             {idx + 1}
                           </span>
                         </td>
 
                         <td className="p-4">
-                          <div className="font-extrabold text-primary text-sm">
+                          <div className="font-extrabold text-slate-900 text-sm">
                             {item.ambassador.firstName || item.ambassador.username} {item.ambassador.lastName || ""}
                           </div>
-                          <span className="text-[10px] text-muted font-mono">شناسه: #{item.ambassador.id}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">شناسه: #{item.ambassador.id}</span>
                         </td>
 
-                        <td className="p-4 font-mono text-xs font-bold text-secondary" dir="ltr">
+                        <td className="p-4 font-mono text-xs font-bold text-slate-800" dir="ltr">
                           {item.ambassador.mobile || item.ambassador.username || "-"}
                         </td>
 
-                        <td className="p-4 font-bold text-blue-500">
+                        <td className="p-4 font-bold text-purple-700">
                           {item.inProgressCount} مورد در حال مذاکره
                         </td>
 
                         <td className="p-4">
-                          <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                          <span className="font-black text-emerald-700 text-sm">
                             {item.completedCount} تامین‌کننده
                           </span>
                         </td>
 
-                        <td className="p-4 font-bold text-secondary">
+                        <td className="p-4 font-bold text-slate-800">
                           <div className="flex items-center gap-2">
-                            <div className="w-20 bg-surface border border-subtle h-2 rounded-full overflow-hidden">
+                            <div className="w-20 bg-slate-100 border border-slate-200 h-2 rounded-full overflow-hidden">
                               <div
-                                className="bg-emerald-500 h-full rounded-full"
+                                className="bg-purple-600 h-full rounded-full"
                                 style={{ width: `${item.conversionRate}%` }}
                               />
                             </div>
-                            <span className="font-mono">{item.conversionRate}%</span>
+                            <span className="font-mono text-slate-900 font-bold">{item.conversionRate}%</span>
                           </div>
                         </td>
 
-                        <td className="p-4 font-black text-primary text-sm font-mono">
+                        <td className="p-4 font-black text-slate-900 text-sm font-mono">
                           {item.earnedCommission.toLocaleString("fa-IR")} تومان
                         </td>
                       </tr>
@@ -1240,19 +1280,19 @@ export default function LeadsManager() {
 
       {/* MODAL: Add / Edit Target Supplier Lead */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up" dir="rtl">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
-              <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-                  <Target className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
+                <div className="w-9 h-9 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                  <Target className="w-4.5 h-4.5" />
                 </div>
                 <span>{editingLead ? "ویرایش تامین‌کننده هدف و پاداش" : "تعریف تامین‌کننده هدف جدید"}</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1261,8 +1301,8 @@ export default function LeadsManager() {
             <form onSubmit={handleSaveLead} className="space-y-4">
               {/* 1. Name */}
               <div>
-                <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1.5">
-                  نام تامین‌کننده / فروشگاه / برند <span className="text-rose-600">*</span>
+                <label className="block text-xs font-black text-slate-900 mb-1.5">
+                  نام تامین‌کننده / فروشگاه / برند <span className="text-purple-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -1270,15 +1310,15 @@ export default function LeadsManager() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="مثال: بازرگانی پارس دیجیتال یا عمده‌فروشی برادران احمدی"
-                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 placeholder:text-slate-400"
+                  className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
                 />
               </div>
 
               {/* 2. Phone & Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1.5">
-                    شماره تماس / موبایل مدیر <span className="text-rose-600">*</span>
+                  <label className="block text-xs font-black text-slate-900 mb-1.5">
+                    شماره تماس / موبایل مدیر <span className="text-purple-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -1287,12 +1327,12 @@ export default function LeadsManager() {
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="09123456789"
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-black text-slate-900 dark:text-white outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 text-left placeholder:text-slate-400"
+                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-mono font-black text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 text-left placeholder:text-slate-400 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1.5">
+                  <label className="block text-xs font-black text-slate-900 mb-1.5">
                     صنف و دسته‌بندی کالا
                   </label>
                   <input
@@ -1300,7 +1340,7 @@ export default function LeadsManager() {
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     placeholder="مثال: لوازم جانبی موبایل"
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 placeholder:text-slate-400"
+                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
                   />
                 </div>
               </div>
@@ -1308,8 +1348,8 @@ export default function LeadsManager() {
               {/* 3. Website & Address */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1">
-                    <Globe className="w-3.5 h-3.5 text-blue-600" />
+                  <label className="block text-xs font-black text-slate-900 mb-1.5 flex items-center gap-1">
+                    <Globe className="w-3.5 h-3.5 text-purple-600" />
                     <span>لینک وب‌سایت یا پیج تامین‌کننده</span>
                   </label>
                   <input
@@ -1318,12 +1358,12 @@ export default function LeadsManager() {
                     value={formData.websiteUrl}
                     onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
                     placeholder="example.com یا https://..."
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 text-left placeholder:text-slate-400"
+                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 text-left placeholder:text-slate-400 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1.5">
+                  <label className="block text-xs font-black text-slate-900 mb-1.5">
                     آدرس یا موقعیت بازار
                   </label>
                   <input
@@ -1331,7 +1371,7 @@ export default function LeadsManager() {
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     placeholder="مثال: تهران، پاساژ علاءالدین، طبقه ۳، پلاک ۳۱۵"
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 placeholder:text-slate-400"
+                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
                   />
                 </div>
               </div>
@@ -1339,8 +1379,8 @@ export default function LeadsManager() {
               {/* 4. Reward & Ambassador */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1.5">
-                    پاداش تأمین‌یاب به ازای ثبت‌نام (تومان) <span className="text-rose-600">*</span>
+                  <label className="block text-xs font-black text-slate-900 mb-1.5">
+                    پاداش تأمین‌یاب به ازای ثبت‌نام (تومان) <span className="text-purple-600">*</span>
                   </label>
                   <input
                     type="number"
@@ -1348,7 +1388,7 @@ export default function LeadsManager() {
                     step={10000}
                     value={formData.commission}
                     onChange={(e) => setFormData({ ...formData, commission: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-black text-emerald-700 dark:text-emerald-400 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 text-left"
+                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-mono font-black text-purple-800 outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-500/10 text-left"
                     dir="ltr"
                   />
                   {/* Quick Commission Presets */}
@@ -1358,10 +1398,10 @@ export default function LeadsManager() {
                         key={preset}
                         type="button"
                         onClick={() => setFormData({ ...formData, commission: preset })}
-                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                        className={`text-[11px] px-2.5 py-1 rounded-xl border transition-all cursor-pointer ${
                           formData.commission === preset
-                            ? "bg-emerald-600 text-white font-black border-emerald-600 shadow-sm"
-                            : "bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 font-bold"
+                            ? "bg-purple-600 text-white font-black border-purple-600 shadow-xs"
+                            : "bg-slate-100 hover:bg-purple-50 text-slate-800 border-slate-200 hover:border-purple-200 font-bold"
                         }`}
                       >
                         {(preset / 1000).toLocaleString("fa-IR")} هزار
@@ -1371,13 +1411,13 @@ export default function LeadsManager() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1.5">
+                  <label className="block text-xs font-black text-slate-900 mb-1.5">
                     تخصیص به تأمین‌یاب (اختیاری)
                   </label>
                   <select
                     value={formData.ambassadorId}
                     onChange={(e) => setFormData({ ...formData, ambassadorId: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-blue-600 cursor-pointer"
+                    className="w-full px-3.5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 cursor-pointer"
                   >
                     <option value="">-- آزاد (انتخاب توسط خود تأمین‌یاب‌ها) --</option>
                     {ambassadors.map((amb) => (
@@ -1390,13 +1430,13 @@ export default function LeadsManager() {
               </div>
 
               {/* 5. Publish Toggle (Publish Delay Setting) */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border-2 border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-between gap-3">
+              <div className="p-4 bg-purple-50/50 border-2 border-purple-200 rounded-2xl flex items-center justify-between gap-3">
                 <div>
-                  <label className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5 cursor-pointer">
-                    <Radio className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <label className="text-xs font-black text-slate-900 flex items-center gap-1.5 cursor-pointer">
+                    <Radio className="w-4 h-4 text-purple-600" />
                     <span>وضعیت انتشار برای تأمین‌یاب‌ها</span>
                   </label>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 font-medium">
+                  <p className="text-[11px] text-slate-600 mt-1 font-medium">
                     {formData.isPublished
                       ? "این پرونده فوراً در پنل تمام تأمین‌یاب‌ها برای پیگیری تماس نمایش داده می‌شود."
                       : "این پرونده در حالت پیش‌نویس می‌ماند تا ابتدا از طریق ملی‌پیامک به آن پیامک دهید."}
@@ -1407,7 +1447,7 @@ export default function LeadsManager() {
                   onClick={() => setFormData({ ...formData, isPublished: !formData.isPublished })}
                   className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shadow-xs ${
                     formData.isPublished
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      ? "bg-purple-600 hover:bg-purple-700 text-white"
                       : "bg-slate-700 hover:bg-slate-800 text-white"
                   }`}
                 >
@@ -1421,16 +1461,16 @@ export default function LeadsManager() {
                   <button
                     type="button"
                     onClick={() => setShowAdditionalPhones(true)}
-                    className="w-full border-2 border-dashed border-blue-300 dark:border-blue-700/60 hover:border-blue-500 bg-blue-50/70 dark:bg-blue-950/20 hover:bg-blue-100/70 text-blue-700 dark:text-blue-300 text-xs font-black py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    className="w-full border-2 border-dashed border-purple-200 hover:border-purple-400 bg-purple-50/50 hover:bg-purple-100/50 text-purple-800 text-xs font-black py-3 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
-                    <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <Plus className="w-4 h-4 text-purple-600" />
                     <span>+ افزودن شماره‌های تماس بیشتر / همراه دیگر (اختیاری)</span>
                   </button>
                 ) : (
-                  <div className="p-4 bg-amber-50/80 dark:bg-amber-950/20 rounded-2xl border-2 border-amber-200 dark:border-amber-800/60 space-y-2.5 transition-all">
+                  <div className="p-4 bg-purple-50/40 rounded-2xl border-2 border-purple-200 space-y-2.5 transition-all">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                        <Phone className="w-4 h-4 text-amber-600" />
+                      <label className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                        <Phone className="w-4 h-4 text-purple-600" />
                         <span>شماره‌های تماس بیشتر (همراه / ثابت دیگر)</span>
                       </label>
                       <button
@@ -1439,7 +1479,7 @@ export default function LeadsManager() {
                           setShowAdditionalPhones(false);
                           setFormData({ ...formData, additionalPhones: "" });
                         }}
-                        className="text-xs text-rose-600 hover:text-rose-700 font-black hover:bg-rose-100/80 dark:hover:bg-rose-950/50 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                        className="text-xs text-rose-600 hover:text-rose-700 font-black hover:bg-rose-50 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
                         <span>حذف و بستن</span>
@@ -1451,27 +1491,27 @@ export default function LeadsManager() {
                       value={formData.additionalPhones}
                       onChange={(e) => setFormData({ ...formData, additionalPhones: e.target.value })}
                       placeholder="مثال: 09181112233, 08734221100"
-                      className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border-2 border-amber-300 dark:border-amber-700/80 rounded-xl text-xs font-mono font-black text-slate-900 dark:text-white outline-none focus:border-blue-600 text-left placeholder:text-slate-400"
+                      className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-black text-slate-900 outline-none focus:border-purple-600 text-left placeholder:text-slate-400"
                     />
-                    <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
                       💡 با جداکننده کاما (،) یا فاصله وارد کنید. سیستم تمامی این شماره‌ها را موقع احراز هویت خودکار و اعتبارسنجی ثبت‌نام تامین‌کننده بررسی خواهد کرد.
                     </p>
                   </div>
                 )}
               </div>
 
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2.5">
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-5 py-3 rounded-2xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="px-5 py-3 rounded-2xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   انصراف
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-7 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-2xl text-xs font-black shadow-md shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50"
+                  className="px-7 py-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-2xl text-xs font-black shadow-md shadow-purple-600/25 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting ? "در حال ثبت..." : editingLead ? "ذخیره تغییرات" : "ثبت تامین‌کننده هدف"}
                 </button>
@@ -1483,19 +1523,19 @@ export default function LeadsManager() {
 
       {/* EXPORT MODAL FOR EXCEL & MELIPAYAMAK */}
       {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl p-6 md:p-8 space-y-6" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl p-6 md:p-8 space-y-6" dir="rtl">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
                   <FileSpreadsheet className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
                     خروجی اکسل شماره‌ها و ارسال در ملی‌پیامک
                   </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium mt-0.5">
+                  <p className="text-xs text-slate-600 font-medium mt-0.5">
                     استخراج لیست تلفن‌های همراه تامین‌کنندگان هدف با فرمت استاندارد اکسل، متنی یا کپی سریع
                   </p>
                 </div>
@@ -1503,7 +1543,7 @@ export default function LeadsManager() {
               <button
                 type="button"
                 onClick={() => setShowExportModal(false)}
-                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1511,8 +1551,8 @@ export default function LeadsManager() {
 
             {/* Scope Selection */}
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-blue-600" />
+              <label className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-purple-600" />
                 <span>انتخاب دامنه تامین‌کنندگان برای استخراج:</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
@@ -1527,14 +1567,14 @@ export default function LeadsManager() {
                     key={item.id}
                     type="button"
                     onClick={() => setExportScope(item.id as any)}
-                    className={`p-3 rounded-2xl border-2 text-right transition-all flex flex-col justify-between cursor-pointer ${
+                    className={`p-3.5 rounded-2xl border-2 text-right transition-all flex flex-col justify-between cursor-pointer ${
                       exportScope === item.id
-                        ? "bg-blue-50 dark:bg-blue-950/40 border-blue-600 text-blue-900 dark:text-blue-200 font-black shadow-xs ring-2 ring-blue-500/20"
-                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400 font-bold"
+                        ? "bg-purple-50 border-purple-600 text-purple-950 font-black shadow-xs ring-2 ring-purple-500/20"
+                        : "bg-white border-slate-200 text-slate-700 hover:border-purple-300 font-bold"
                     }`}
                   >
                     <span className="text-[11px] font-bold truncate">{item.title}</span>
-                    <span className="text-sm font-black mt-1">
+                    <span className="text-sm font-black mt-1 text-slate-900">
                       {item.count.toLocaleString("fa-IR")}{" "}
                       <span className="text-[10px] font-medium opacity-70">پرونده</span>
                     </span>
@@ -1544,80 +1584,80 @@ export default function LeadsManager() {
             </div>
 
             {/* Advanced Filters and Options */}
-            <div className="bg-slate-50 dark:bg-slate-800/60 border-2 border-slate-200 dark:border-slate-700 p-4 rounded-2xl space-y-3">
+            <div className="bg-purple-50/30 border-2 border-purple-100 p-4 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-black text-slate-900 dark:text-white">تنظیمات پردازش و پالایش شماره‌ها برای پیامک:</p>
-                <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-bold bg-emerald-100 dark:bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-300 dark:border-emerald-800">
+                <p className="text-xs font-black text-slate-900">تنظیمات پردازش و پالایش شماره‌ها برای پیامک:</p>
+                <span className="text-[11px] text-purple-800 font-bold bg-purple-100 px-2.5 py-1 rounded-xl border border-purple-200">
                   🛡️ شماره‌های ثابت در سیستم باقی می‌مانند
                 </span>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <label className="flex items-center gap-2.5 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-blue-500 transition-colors">
+                <label className="flex items-center gap-2.5 p-3.5 bg-white rounded-2xl border border-slate-200 cursor-pointer hover:border-purple-500 transition-colors shadow-xs">
                   <input
                     type="checkbox"
                     checked={exportOnlyMobiles}
                     onChange={(e) => setExportOnlyMobiles(e.target.checked)}
-                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 accent-purple-600 cursor-pointer"
                   />
                   <div className="flex flex-col">
-                    <span className="font-black text-slate-900 dark:text-white">فقط خطوط همراه در فایل پیامک</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">فیلتر شماره‌های ثابت در فایل خروجی (جهت عدم خطای پنل پیامک)</span>
+                    <span className="font-black text-slate-900">فقط خطوط همراه در فایل پیامک</span>
+                    <span className="text-[10px] text-slate-500 font-medium">فیلتر شماره‌های ثابت در فایل خروجی (جهت عدم خطای پنل پیامک)</span>
                   </div>
                 </label>
 
-                <label className="flex items-center gap-2.5 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-blue-500 transition-colors">
+                <label className="flex items-center gap-2.5 p-3.5 bg-white rounded-2xl border border-slate-200 cursor-pointer hover:border-purple-500 transition-colors shadow-xs">
                   <input
                     type="checkbox"
                     checked={exportIncludeAdditional}
                     onChange={(e) => setExportIncludeAdditional(e.target.checked)}
-                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 accent-purple-600 cursor-pointer"
                   />
                   <div className="flex flex-col">
-                    <span className="font-black text-slate-900 dark:text-white">استخراج شماره‌های همراه فرعی</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">شامل کردن موبایل مسئولین و شماره‌های همراه دوم</span>
+                    <span className="font-black text-slate-900">استخراج شماره‌های همراه فرعی</span>
+                    <span className="text-[10px] text-slate-500 font-medium">شامل کردن موبایل مسئولین و شماره‌های همراه دوم</span>
                   </div>
                 </label>
 
-                <label className="flex items-center gap-2.5 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-blue-500 transition-colors">
+                <label className="flex items-center gap-2.5 p-3.5 bg-white rounded-2xl border border-slate-200 cursor-pointer hover:border-purple-500 transition-colors shadow-xs">
                   <input
                     type="checkbox"
                     checked={exportDeduplicate}
                     onChange={(e) => setExportDeduplicate(e.target.checked)}
-                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 accent-purple-600 cursor-pointer"
                   />
                   <div className="flex flex-col">
-                    <span className="font-black text-slate-900 dark:text-white">حذف شماره‌های همراه تکراری</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">جلوگیری از ارسال پیامک تکراری به یک مخاطب</span>
+                    <span className="font-black text-slate-900">حذف شماره‌های همراه تکراری</span>
+                    <span className="text-[10px] text-slate-500 font-medium">جلوگیری از ارسال پیامک تکراری به یک مخاطب</span>
                   </div>
                 </label>
               </div>
             </div>
 
             {/* Live Count & Summary Card */}
-            <div className="bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-300 dark:border-emerald-800/80 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="bg-purple-50 border-2 border-purple-200 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-black shrink-0 shadow-xs">
                   <Smartphone className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 font-bold">شماره‌های آماده ارسال و استخراج:</p>
-                  <p className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">
+                  <p className="text-xs text-slate-600 font-bold">شماره‌های آماده ارسال و استخراج:</p>
+                  <p className="text-xl font-black text-purple-900 mt-0.5">
                     {exportData.length.toLocaleString("fa-IR")}{" "}
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">شماره معتبر تفکیک‌شده</span>
+                    <span className="text-xs font-bold text-slate-900">شماره معتبر تفکیک‌شده</span>
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 self-start sm:self-auto shadow-xs">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white px-3.5 py-2 rounded-xl border border-slate-200 self-start sm:self-auto shadow-xs">
                 <span>تعداد کل پرونده‌ها:</span>
-                <span className="text-slate-900 dark:text-white font-black">{targetLeadsForExport.length.toLocaleString("fa-IR")}</span>
+                <span className="text-slate-900 font-black">{targetLeadsForExport.length.toLocaleString("fa-IR")}</span>
               </div>
             </div>
 
             {/* Action Buttons Grid */}
             <div className="space-y-3">
-              <p className="text-xs font-black text-slate-900 dark:text-white">انتخاب روش دریافت و دانلود خروجی:</p>
+              <p className="text-xs font-black text-slate-900">انتخاب روش دریافت و دانلود خروجی:</p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* 1. Melipayamak Excel Button */}
@@ -1625,7 +1665,7 @@ export default function LeadsManager() {
                   type="button"
                   onClick={handleDownloadMeliPayamakExcel}
                   disabled={exportData.length === 0}
-                  className="p-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-right transition-all flex items-start gap-3 shadow-md shadow-emerald-600/20 cursor-pointer disabled:opacity-50 group"
+                  className="p-4 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-right transition-all flex items-start gap-3 shadow-md shadow-purple-600/20 cursor-pointer disabled:opacity-50 group"
                 >
                   <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                     <FileSpreadsheet className="w-5 h-5 text-white" />
@@ -1646,19 +1686,19 @@ export default function LeadsManager() {
                   type="button"
                   onClick={handleDownloadFullExcel}
                   disabled={exportData.length === 0}
-                  className="p-4 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-600 text-slate-900 dark:text-white rounded-2xl text-right transition-all flex items-start gap-3 shadow-xs cursor-pointer disabled:opacity-50 group"
+                  className="p-4 bg-white hover:bg-purple-50/50 border-2 border-slate-200 hover:border-purple-600 text-slate-900 rounded-2xl text-right transition-all flex items-start gap-3 shadow-xs cursor-pointer disabled:opacity-50 group"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                     <Download className="w-5 h-5" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black">دانلود اکسل جامع پرونده‌ها (.xlsx)</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold">
                         فول دیتا
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium mt-1 leading-relaxed">
+                    <p className="text-[11px] text-slate-600 font-medium mt-1 leading-relaxed">
                       شامل نام برند، تلفن اصلی و فرعی، حوزه کالا، آدرس، پاداش جذب و نام تأمین‌یاب مسئول
                     </p>
                   </div>
@@ -1671,10 +1711,10 @@ export default function LeadsManager() {
                   type="button"
                   onClick={handleDownloadCsv}
                   disabled={exportData.length === 0}
-                  className="p-3 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+                  className="p-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-900 flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
                   title="دانلود فایل CSV با انکودینگ UTF-8 BOM"
                 >
-                  <FileText className="w-4 h-4 text-amber-600" />
+                  <FileText className="w-4 h-4 text-purple-600" />
                   <span>دانلود فایل متنی CSV (.csv)</span>
                 </button>
 
@@ -1683,14 +1723,14 @@ export default function LeadsManager() {
                   type="button"
                   onClick={() => handleCopyPhones("comma")}
                   disabled={exportData.length === 0}
-                  className={`p-3 border-2 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 ${
+                  className={`p-3 border-2 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-xs ${
                     copiedType === "comma"
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                      : "bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                      ? "bg-purple-600 text-white border-purple-600"
+                      : "bg-white hover:bg-purple-50 border-slate-200 text-slate-900"
                   }`}
                   title="کپی شماره‌ها جداشده با کاما جهت پیست کردن مستقیم در کادر ارسال سریع ملی پیامک"
                 >
-                  {copiedType === "comma" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-blue-600" />}
+                  {copiedType === "comma" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-purple-600" />}
                   <span>{copiedType === "comma" ? "کپی شد! (با کاما)" : "کپی سریع شماره‌ها (با کاما)"}</span>
                 </button>
 
@@ -1699,14 +1739,14 @@ export default function LeadsManager() {
                   type="button"
                   onClick={() => handleCopyPhones("newline")}
                   disabled={exportData.length === 0}
-                  className={`p-3 border-2 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 ${
+                  className={`p-3 border-2 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-xs ${
                     copiedType === "newline"
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                      : "bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                      ? "bg-purple-600 text-white border-purple-600"
+                      : "bg-white hover:bg-purple-50 border-slate-200 text-slate-900"
                   }`}
                   title="کپی شماره‌ها در خطوط مجزا"
                 >
-                  {copiedType === "newline" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-teal-600" />}
+                  {copiedType === "newline" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-purple-600" />}
                   <span>{copiedType === "newline" ? "کپی شد! (خط به خط)" : "کپی شماره‌ها (خط جدید)"}</span>
                 </button>
               </div>
@@ -1716,18 +1756,18 @@ export default function LeadsManager() {
             {exportData.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <p className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
                     <span>پیش‌نمایش ۵ ردیف نخست خروجی:</span>
                   </p>
-                  <span className="text-[11px] text-slate-600 dark:text-slate-400 font-bold">
+                  <span className="text-[11px] text-slate-600 font-bold">
                     نمایش ۵ از {exportData.length.toLocaleString("fa-IR")} شماره
                   </span>
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-xs">
+                <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-xs">
                   <table className="w-full text-right text-xs">
-                    <thead className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-black">
+                    <thead className="bg-purple-50/60 border-b border-purple-100 text-slate-900 font-black">
                       <tr>
                         <th className="p-3">شماره موبایل</th>
                         <th className="p-3">نام تامین‌کننده</th>
@@ -1736,26 +1776,26 @@ export default function LeadsManager() {
                         <th className="p-3">وضعیت</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                    <tbody className="divide-y divide-slate-100">
                       {exportData.slice(0, 5).map((row, index) => (
-                        <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                          <td className="p-3 font-mono font-black text-emerald-700 dark:text-emerald-400" dir="ltr">
+                        <tr key={index} className="hover:bg-purple-50/30">
+                          <td className="p-3 font-mono font-black text-purple-700" dir="ltr">
                             {row.phone}
                           </td>
-                          <td className="p-3 font-black text-slate-900 dark:text-white">{row.name}</td>
-                          <td className="p-3 text-slate-600 dark:text-slate-300 font-bold">{row.category}</td>
+                          <td className="p-3 font-black text-slate-900">{row.name}</td>
+                          <td className="p-3 text-slate-700 font-bold">{row.category}</td>
                           <td className="p-3">
                             <span
-                              className={`text-[10px] px-2 py-0.5 rounded-md font-black ${
+                              className={`text-[10px] px-2.5 py-0.5 rounded-lg font-black ${
                                 row.isAdditional
-                                  ? "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800"
-                                  : "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800"
+                                  ? "bg-purple-100 text-purple-800 border border-purple-200"
+                                  : "bg-slate-100 text-slate-800 border border-slate-200"
                               }`}
                             >
                               {row.isAdditional ? "شماره فرعی" : "شماره اصلی"}
                             </span>
                           </td>
-                          <td className="p-3 text-slate-700 dark:text-slate-300 text-[11px] font-bold">{row.statusText}</td>
+                          <td className="p-3 text-slate-700 text-[11px] font-bold">{row.statusText}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1765,21 +1805,21 @@ export default function LeadsManager() {
             )}
 
             {/* MeliPayamak Help Guide Box */}
-            <div className="bg-blue-50/70 dark:bg-blue-950/30 border-2 border-blue-200 dark:border-blue-800/60 p-4 rounded-2xl flex items-start gap-3">
-              <HelpCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-              <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-                <p className="font-black text-slate-900 dark:text-white">نحوه ارسال در پنل سامانه ملی‌پیامک (Melipayamak):</p>
+            <div className="bg-purple-50/40 border-2 border-purple-200 p-4 rounded-2xl flex items-start gap-3">
+              <HelpCircle className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs text-slate-700 leading-relaxed font-medium">
+                <p className="font-black text-slate-900">نحوه ارسال در پنل سامانه ملی‌پیامک (Melipayamak):</p>
                 <ul className="list-disc list-inside space-y-0.5 text-[11px] pr-1">
                   <li>
-                    <strong className="text-slate-900 dark:text-white font-black">روش اول (فایل اکسل):</strong> در منوی پنل ملی‌پیامک وارد بخش{" "}
-                    <span className="text-blue-700 dark:text-blue-300 font-black">«ارسال پیامک ← ارسال از طریق فایل اکسل»</span> شوید، فایل دانلود شده بالا را آپلود نموده و ستون شماره موبایل را انتخاب کنید.
+                    <strong className="text-slate-900 font-black">روش اول (فایل اکسل):</strong> در منوی پنل ملی‌پیامک وارد بخش{" "}
+                    <span className="text-purple-700 font-black">«ارسال پیامک ← ارسال از طریق فایل اکسل»</span> شوید، فایل دانلود شده بالا را آپلود نموده و ستون شماره موبایل را انتخاب کنید.
                   </li>
                   <li>
-                    <strong className="text-slate-900 dark:text-white font-black">روش دوم (دفترچه تلفن):</strong> می‌توانید با انتخاب فایل اکسل در منوی{" "}
-                    <span className="text-blue-700 dark:text-blue-300 font-black">«دفترچه تلفن ← افزودن سریع یا ورود از اکسل»</span>، گروه مخاطبین جدیدی به نام «تامین‌کنندگان هدف» بسازید.
+                    <strong className="text-slate-900 font-black">روش دوم (دفترچه تلفن):</strong> می‌توانید با انتخاب فایل اکسل در منوی{" "}
+                    <span className="text-purple-700 font-black">«دفترچه تلفن ← افزودن سریع یا ورود از اکسل»</span>، گروه مخاطبین جدیدی به نام «تامین‌کنندگان هدف» بسازید.
                   </li>
                   <li>
-                    <strong className="text-slate-900 dark:text-white font-black">روش سوم (کپی سریع):</strong> با کلیک روی «کپی سریع با کاما»، شماره‌ها در حافظه قرار گرفته و می‌توانید مستقیماً در کادر گیرندگان ارسال پیامک معمولی پیست (Paste) کنید.
+                    <strong className="text-slate-900 font-black">روش سوم (کپی سریع):</strong> با کلیک روی «کپی سریع با کاما»، شماره‌ها در حافظه قرار گرفته و می‌توانید مستقیماً در کادر گیرندگان ارسال پیامک معمولی پیست (Paste) کنید.
                   </li>
                 </ul>
               </div>
@@ -1790,7 +1830,7 @@ export default function LeadsManager() {
               <button
                 type="button"
                 onClick={() => setShowExportModal(false)}
-                className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 بستن پنجره
               </button>
