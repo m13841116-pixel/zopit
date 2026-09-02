@@ -666,27 +666,27 @@ export default function StoreOrders({
   };
   const getStatusColor = (status: string) => {
     const colorMap: any = {
-      NEW: "text-slate-700 bg-slate-100 border border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-      PENDING_PAYMENT: "text-amber-800 bg-amber-50 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60",
-      WAITING_SUPPLIER_CONFIRMATION: "text-purple-800 bg-purple-50 border border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-700/60",
-      WAITING_STORE_ADDRESS: "text-blue-800 bg-blue-50 border border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-700/60",
-      WAITING_SHIPPING_COST: "text-sky-800 bg-sky-50 border border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-700/60",
-      WAITING_SHIPPING_PAYMENT: "text-amber-800 bg-amber-50 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60",
-      PENDING_POSTAL_LABEL: "text-indigo-800 bg-indigo-50 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-700/60",
-      READY_TO_SHIP: "text-emerald-800 bg-emerald-50 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/60",
-      SHIPPED: "text-indigo-900 bg-indigo-100/80 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-200 dark:border-indigo-700",
-      DELIVERED: "text-emerald-900 bg-emerald-100/80 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700",
-      REQUESTED: "text-amber-800 bg-amber-50 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60",
-      SUPPLIER_APPROVED: "text-blue-800 bg-blue-50 border border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-700/60",
-      WAITING_FOR_PAYMENT: "text-amber-800 bg-amber-50 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60",
-      PAID: "text-emerald-800 bg-emerald-50 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/60",
-      PROCESSING: "text-indigo-800 bg-indigo-50 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-700/60",
-      PREPARING: "text-indigo-800 bg-indigo-50 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-700/60",
-      COMPLETED: "text-emerald-900 bg-emerald-100/80 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700",
-      CANCELLED: "text-rose-800 bg-rose-50 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-700/60",
-      REJECTED: "text-rose-800 bg-rose-50 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-700/60",
+      NEW: "bg-slate-600 text-white shadow-xs",
+      PENDING_PAYMENT: "bg-amber-500 text-white shadow-xs",
+      WAITING_SUPPLIER_CONFIRMATION: "bg-purple-600 text-white shadow-xs",
+      WAITING_STORE_ADDRESS: "bg-blue-600 text-white shadow-xs",
+      WAITING_SHIPPING_COST: "bg-sky-600 text-white shadow-xs",
+      WAITING_SHIPPING_PAYMENT: "bg-amber-500 text-white shadow-xs",
+      PENDING_POSTAL_LABEL: "bg-indigo-600 text-white shadow-xs",
+      READY_TO_SHIP: "bg-emerald-600 text-white shadow-xs",
+      SHIPPED: "bg-teal-600 text-white shadow-xs",
+      DELIVERED: "bg-emerald-700 text-white shadow-xs",
+      REQUESTED: "bg-purple-600 text-white shadow-xs",
+      SUPPLIER_APPROVED: "bg-blue-600 text-white shadow-xs",
+      WAITING_FOR_PAYMENT: "bg-amber-500 text-white shadow-xs",
+      PAID: "bg-emerald-600 text-white shadow-xs",
+      PROCESSING: "bg-indigo-600 text-white shadow-xs",
+      PREPARING: "bg-indigo-600 text-white shadow-xs",
+      COMPLETED: "bg-emerald-700 text-white shadow-xs",
+      CANCELLED: "bg-rose-600 text-white shadow-xs",
+      REJECTED: "bg-rose-600 text-white shadow-xs",
     };
-    return colorMap[status] || "text-slate-700 bg-slate-100 border border-slate-300 dark:bg-slate-800 dark:text-slate-300";
+    return colorMap[status] || "bg-slate-600 text-white shadow-xs";
   };
 
   const isOrderPayable = (order: any) => {
@@ -988,16 +988,16 @@ export default function StoreOrders({
 
         {/* WooCommerce Tab Banner */}
         {orderTab === "WOOCOMMERCE" && (
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-purple-600 text-white rounded-xl shrink-0">
+          <div className="bg-gradient-to-l from-purple-50 via-indigo-50/50 to-white dark:from-purple-950/40 dark:via-indigo-950/20 dark:to-slate-900 border-2 border-purple-300 dark:border-purple-700/80 rounded-2xl p-4.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in shadow-xs">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-purple-600 text-white rounded-2xl shrink-0 shadow-md">
                 <Globe className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-black text-purple-950 dark:text-purple-200">
+                <p className="text-xs font-black text-slate-900 dark:text-white">
                   اتصال خودکار وب‌سایت ووکامرسی به زوپیت فعال است
                 </p>
-                <p className="text-[11px] text-purple-700 dark:text-purple-300 mt-0.5">
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 font-medium leading-relaxed">
                   سفارشات ثبت‌شده در سایت شما به صورت آنی پردازش و با قیمت عمده تامین‌کننده در این بخش نمایش داده می‌شوند.
                 </p>
               </div>
@@ -1006,7 +1006,7 @@ export default function StoreOrders({
             <button
               onClick={handleSyncWooCommerceOrders}
               disabled={syncingWoo}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0 shadow-sm"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0 shadow-md hover:shadow-lg"
             >
               <RefreshCw className={`w-4 h-4 ${syncingWoo ? "animate-spin" : ""}`} />
               <span>{syncingWoo ? "در حال دریافت..." : "همگام‌سازی دستی سفارشات"}</span>
@@ -1057,18 +1057,30 @@ export default function StoreOrders({
           {filteredOrders.length === 0 ? (
             <div className="text-center py-16 text-muted space-y-3">
               <ShoppingCart className="w-12 h-12 mx-auto opacity-40 text-muted" />
-              <p className="font-bold text-sm text-secondary">هیچ سفارشی در این بخش یافت نشد</p>
-              <p className="text-xs text-muted max-w-sm mx-auto">
+              <p className="font-bold text-sm text-slate-800 dark:text-slate-200">هیچ سفارشی در این بخش یافت نشد</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
                 {activeFiltersCount > 0
                   ? "با تغییر یا حذف فیلترها می‌توانید سفارشات دیگر را مشاهده کنید."
                   : orderTab === "WOOCOMMERCE"
                   ? "سفارشاتی که مشتریان در سایت ووکامرسی شما ثبت می‌کنند در اینجا قرار خواهند گرفت."
                   : "با کلیک بر روی «ثبت سفارش جدید» سفارش مد نظرتان را ایجاد کنید."}
               </p>
+              {orderTab === "WOOCOMMERCE" && (
+                <div className="pt-2">
+                  <button
+                    onClick={handleSyncWooCommerceOrders}
+                    disabled={syncingWoo}
+                    className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${syncingWoo ? "animate-spin" : ""}`} />
+                    <span>همگام‌سازی دستی از ووکامرس</span>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs text-right min-w-[850px]">
+              <table className="w-full text-xs text-right min-w-[880px]">
                 <thead className="bg-surface text-muted border-b border-subtle">
                   <tr>
                     <th className="py-3.5 px-4 w-10 text-center">
@@ -1090,9 +1102,9 @@ export default function StoreOrders({
                     </th>
                     <th className="py-3.5 px-4 font-bold">شناسه و منبع</th>
                     <th className="py-3.5 px-4 font-bold">اقلام سفارش</th>
-                    <th className="py-3.5 px-4 font-bold">مشتری / مقصد</th>
                     <th className="py-3.5 px-4 font-bold">مبلغ زوپیت (تومان)</th>
                     <th className="py-3.5 px-4 font-bold">وضعیت</th>
+                    <th className="py-3.5 px-4 font-bold">مشتری و نشانی مقصد</th>
                     <th className="py-3.5 px-4 font-bold">تاریخ ثبت</th>
                     <th className="py-3.5 px-4 font-bold text-center">عملیات</th>
                   </tr>
@@ -1141,7 +1153,7 @@ export default function StoreOrders({
                           </div>
                         </td>
 
-                        {/* Items */}
+                        {/* Items (Right side) */}
                         <td className="py-3.5 px-4 text-muted">
                           <div className="max-w-[240px]">
                             {order.items?.map((item: any) => {
@@ -1178,9 +1190,25 @@ export default function StoreOrders({
                           </div>
                         </td>
 
-                        {/* Customer / Address Destination */}
+                        {/* Total Wholesale Price */}
+                        <td className="py-3.5 px-4 font-mono font-bold text-primary text-xs whitespace-nowrap">
+                          {Number(order.totalAmount || 0).toLocaleString("fa-IR")}
+                        </td>
+
+                        {/* Status (Crisp White Text Badge) */}
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`px-3 py-1 rounded-full text-[11px] font-bold inline-block whitespace-nowrap ${getStatusColor(
+                              order.status
+                            )}`}
+                          >
+                            {getStatusText(order.status)}
+                          </span>
+                        </td>
+
+                        {/* Customer / Address Destination (Left side of data) */}
                         <td className="py-3.5 px-4 text-xs">
-                          <div className="flex flex-col gap-0.5 max-w-[180px]">
+                          <div className="flex flex-col gap-0.5 max-w-[200px]">
                             <span className="font-bold text-primary truncate">
                               {order.customerName || "مدیر فروشگاه"}
                             </span>
@@ -1190,31 +1218,15 @@ export default function StoreOrders({
                               </span>
                             )}
                             {order.shippingAddress && (
-                              <span className="text-[10px] text-muted truncate">
-                                {order.shippingAddress.slice(0, 30)}...
+                              <span className="text-[10px] text-muted truncate" title={order.shippingAddress}>
+                                {order.shippingAddress}
                               </span>
                             )}
                           </div>
                         </td>
 
-                        {/* Total Wholesale Price */}
-                        <td className="py-3.5 px-4 font-mono font-bold text-primary text-xs">
-                          {Number(order.totalAmount || 0).toLocaleString("fa-IR")}
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-block whitespace-nowrap ${getStatusColor(
-                              order.status
-                            )}`}
-                          >
-                            {getStatusText(order.status)}
-                          </span>
-                        </td>
-
                         {/* Date */}
-                        <td className="py-3.5 px-4 text-muted text-[11px]">
+                        <td className="py-3.5 px-4 text-muted text-[11px] whitespace-nowrap">
                           {new Date(order.createdAt).toLocaleDateString("fa-IR")}
                         </td>
 
@@ -1252,13 +1264,18 @@ export default function StoreOrders({
           onClick={() => setShowModal(false)}
         >
           <div
-            className="bg-card rounded-3xl w-full max-w-xl shadow-2xl p-6 md:p-8 my-8 text-right relative max-h-[90vh] overflow-y-auto"
+            className="bg-card rounded-3xl w-full max-w-5xl shadow-2xl p-6 md:p-8 my-8 text-right relative max-h-[90vh] overflow-y-auto border border-subtle"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6 border-b border-subtle pb-4">
-              <h3 className="text-xl font-black text-primary">
-                ثبت سفارش جدید
-              </h3>
+              <div>
+                <h3 className="text-xl font-black text-primary">
+                  ثبت سفارش جدید
+                </h3>
+                <p className="text-xs text-muted mt-1 font-medium">
+                  انتخاب اقلام از کاتالوگ فروشگاه و ثبت آدرس پستی گیرنده جهت ارسال توسط تامین‌کننده
+                </p>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-muted hover:bg-surface p-2 rounded-full cursor-pointer transition-colors"
@@ -1266,400 +1283,430 @@ export default function StoreOrders({
                 <X className="w-5 h-5" />
               </button>
             </div>
+            
             <form onSubmit={handleCreateOrder} className="space-y-6">
               <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-3.5 rounded-xl text-xs leading-relaxed font-bold text-right shadow-xs">
                 🚚 نکته ارسال: تمامی محصولاتی که از یک تامین‌کننده انتخاب می‌کنید در یک سفارش گروهی ثبت و با یک هزینه ارسال مشترک فرستاده می‌شوند.
               </div>
 
-              {/* Added Items List */}
-              {orderItems.length > 0 && (
-                <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between text-xs font-black text-slate-900 dark:text-white">
-                    <span className="flex items-center gap-1.5">
-                      <ShoppingCart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                      اقلام اضافه شده به این سفارش ({orderItems.length} کالا)
-                    </span>
-                    <span className="text-[11px] font-mono font-extrabold text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-lg">
-                      {orderItems[0]?.supplierName}
-                    </span>
-                  </div>
-                  <div className="divide-y divide-slate-200 dark:divide-slate-700 max-h-48 overflow-y-auto">
-                    {orderItems.map((item, idx) => (
-                      <div key={idx} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {item.image ? (
-                            <img src={item.image} className="w-9 h-9 rounded-lg object-cover shrink-0 border border-slate-300 dark:border-slate-600" alt="" />
-                          ) : (
-                            <div className="w-9 h-9 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center shrink-0">
-                              <ShoppingCart className="w-4 h-4 text-slate-700 dark:text-slate-300" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 dark:text-white truncate">{item.productName}</p>
-                            {item.variantName && (
-                              <p className="text-[10px] text-slate-600 dark:text-slate-400 font-medium truncate">{item.variantName}</p>
-                            )}
-                            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold mt-0.5">
-                              {item.price?.toLocaleString()} تومان × {item.quantity} عدد = {(item.price * item.quantity)?.toLocaleString()} تومان
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
-                          className="text-rose-600 hover:text-rose-700 dark:text-rose-400 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer shrink-0 transition-colors"
-                          title="حذف کالا"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+              {/* 2-Column Responsive Layout: Right (Items Selection) | Left (Shipping & Customer Details) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* RIGHT COLUMN: Product Catalog Selection, Variant, Quantity, and Added Items List */}
+                <div className="lg:col-span-7 space-y-4">
+                  {/* Added Items List Card */}
+                  {orderItems.length > 0 && (
+                    <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between text-xs font-black text-slate-900 dark:text-white">
+                        <span className="flex items-center gap-1.5">
+                          <ShoppingCart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          اقلام اضافه شده به این سفارش ({orderItems.length} کالا)
+                        </span>
+                        <span className="text-[11px] font-mono font-extrabold text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-lg">
+                          {orderItems[0]?.supplierName}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Product Search and Selector */}
-              <div>
-                <label className="block text-sm font-bold text-secondary mb-2">
-                  انتخاب کالا از کاتالوگ فروشگاه
-                </label>
-                {/* Search Box */}
-                <div className="relative mb-3">
-                  <input
-                    type="text"
-                    placeholder="جستجوی نام کالا یا شناسه (SKU)..."
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    className="w-full bg-background border border-subtle rounded-xl pr-10 pl-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none transition-all"
-                  />
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted">
-                    <span className="text-xs">🔍</span>
-                  </div>
-                </div>
-                <div className="max-h-48 overflow-y-auto space-y-2 border border-subtle p-2 rounded-xl bg-background">
-                  {myCatalog.length === 0 && (
-                    <div className="text-center py-6 text-xs text-muted">
-                      زوپیتی شما خالی است
+                      <div className="divide-y divide-slate-200 dark:divide-slate-700 max-h-44 overflow-y-auto">
+                        {orderItems.map((item, idx) => (
+                          <div key={idx} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {item.image ? (
+                                <img src={item.image} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-300 dark:border-slate-600" alt="" />
+                              ) : (
+                                <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center shrink-0">
+                                  <ShoppingCart className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 dark:text-white truncate">{item.productName}</p>
+                                {item.variantName && (
+                                  <p className="text-[10px] text-slate-600 dark:text-slate-400 font-medium truncate">{item.variantName}</p>
+                                )}
+                                <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold mt-0.5">
+                                  {item.price?.toLocaleString()} تومان × {item.quantity} عدد = {(item.price * item.quantity)?.toLocaleString()} تومان
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-rose-600 hover:text-rose-700 dark:text-rose-400 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer shrink-0 transition-colors"
+                              title="حذف کالا"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
-                  {myCatalog.length > 0 &&
-                    myCatalog.filter(
-                      (sel) =>
-                        sel.product.name
-                          .toLowerCase()
-                          .includes(productSearch.toLowerCase()) ||
-                        (sel.product.sku &&
-                          sel.product.sku
-                            .toLowerCase()
-                            .includes(productSearch.toLowerCase())),
-                    ).length === 0 && (
-                      <div className="text-center py-6 text-xs text-muted">
-                        محصولی با این مشخصات یافت نشد
-                      </div>
-                    )}
-                  {myCatalog
-                    .filter(
-                      (sel) =>
-                        sel.product.name
-                          .toLowerCase()
-                          .includes(productSearch.toLowerCase()) ||
-                        (sel.product.sku &&
-                          sel.product.sku
-                            .toLowerCase()
-                            .includes(productSearch.toLowerCase())),
-                    )
-                    .map((sel) => {
-                      const isSelected =
-                        selectedProduct === sel.productId.toString();
-                      return (
-                        <div
-                          key={sel.productId}
-                          onClick={() =>
-                            setSelectedProduct(sel.productId.toString())
-                          }
-                          className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border ${isSelected ? "border-primary-default bg-primary-default/10/70 ring-2 ring-primary-default/10" : "border-subtle hover:bg-surface bg-card"}`}
-                        >
-                          <div className="w-12 h-12 bg-surface rounded-lg overflow-hidden flex-shrink-0 border border-subtle">
-                            {sel.product.images?.length > 0 ? (
-                              <img
-                                src={sel.product.images[0].url}
-                                className="w-full h-full object-cover"
-                                alt=""
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-muted bg-background">
-                                <ShoppingCart className="w-4 h-4" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-xs text-primary truncate">
-                              {sel.product.name}
-                            </h4>
-                            <div className="flex justify-between items-center mt-1">
-                              <span className="text-[10px] text-muted font-mono">
-                                SKU: {sel.product.sku || "-"}
-                              </span>
-                              <span className="text-[10px] text-primary-default font-bold bg-primary-default/10 px-1.5 py-0.5 rounded">
-                                تامین‌کننده: {sel.product.supplier?.companyName || sel.product.supplierName || `SUP-${1000 + (sel.product.supplierId || sel.product.supplier?.id || 0)}`}
-                              </span>
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <div className="w-5 h-5 bg-primary-default text-inverse rounded-full flex items-center justify-center flex-shrink-0">
-                              <Check className="w-3.5 h-3.5" />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
 
-              {/* Variant Selector */}
-              {(() => {
-                const selectedProdObj = myCatalog.find(
-                  (sel) => sel.productId.toString() === selectedProduct
-                )?.product;
-                if (!selectedProdObj || !selectedProdObj.variants || selectedProdObj.variants.length === 0) {
-                  return null;
-                }
-                return (
-                  <div>
-                    <label className="block text-sm font-bold text-secondary mb-2">
-                      انتخاب متغیر کالا (الزامی)
+                  {/* Product Search and Selector */}
+                  <div className="bg-surface p-4 rounded-2xl border border-subtle space-y-3">
+                    <label className="block text-xs font-bold text-secondary">
+                      انتخاب کالا از کاتالوگ فروشگاه زوپیتی
                     </label>
-                    <select
-                      className="w-full bg-background border border-subtle rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary font-bold"
-                      value={selectedVariantId}
-                      onChange={(e) => setSelectedVariantId(e.target.value)}
-                    >
-                      <option value="">-- لطفاً یک متغیر انتخاب کنید --</option>
-                      {selectedProdObj.variants.map((v: any) => {
-                        let displayAttrs = "ساده / پیش‌فرض";
-                        try {
-                          const parsed = typeof v.attributes === "string" 
-                            ? JSON.parse(v.attributes) 
-                            : v.attributes;
-                          if (parsed && Object.keys(parsed).length > 0) {
-                            displayAttrs = Object.entries(parsed)
-                              .map(([k, val]) => `${k}: ${val}`)
-                              .join(" | ");
-                          }
-                        } catch (e) {}
-                        return (
-                          <option key={v.id} value={v.id.toString()}>
-                            {displayAttrs} (موجودی: {v.stock} عدد | قیمت: {v.finalPrice?.toLocaleString()} تومان)
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                );
-              })()}
-
-              {/* Quantity & Add Button */}
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <label className="block text-sm font-bold text-secondary mb-2">
-                    تعداد سفارش
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="w-full bg-background border border-subtle rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddItemToOrder}
-                  disabled={!selectedProduct}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-md shadow-indigo-600/20"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>افزودن به اقلام این سفارش</span>
-                </button>
-              </div>
-
-              {/* Recipient and Shipping Address Section */}
-              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2.5">
-                  <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    مشخصات گیرنده و نشانی پستی مقصد (یک آدرس واحد برای تمام اقلام این سفارش)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleUseStoreAddressForNewOrder}
-                    className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
-                  >
-                    ⚡ درج آدرس فروشگاه من
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      نام و نام‌خانوادگی گیرنده <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="مثال: علی رضایی"
-                      value={shippingRecipientName}
-                      onChange={(e) => setShippingRecipientName(e.target.value)}
-                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      شماره تماس گیرنده <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="09123456789"
-                      dir="ltr"
-                      value={shippingRecipientPhone}
-                      onChange={(e) => setShippingRecipientPhone(e.target.value)}
-                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      استان مقصد <span className="text-rose-500">*</span>
-                    </label>
-                    <select
-                      required
-                      value={shippingProvince}
-                      onChange={(e) => {
-                        setShippingProvince(e.target.value);
-                        setShippingCity("");
-                      }}
-                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
-                    >
-                      <option value="">-- انتخاب استان --</option>
-                      {PROVINCES.map((p) => (
-                        <option key={p.name} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      شهر مقصد <span className="text-rose-500">*</span>
-                    </label>
-                    {shippingProvince && PROVINCES.find(p => p.name === shippingProvince)?.cities.length ? (
-                      <select
-                        required
-                        value={shippingCity}
-                        onChange={(e) => setShippingCity(e.target.value)}
-                        className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
-                      >
-                        <option value="">-- انتخاب شهر --</option>
-                        {PROVINCES.find(p => p.name === shippingProvince)?.cities.map((city) => (
-                          <option key={city} value={city}>{city}</option>
-                        ))}
-                      </select>
-                    ) : (
+                    {/* Search Box */}
+                    <div className="relative">
                       <input
                         type="text"
-                        required
-                        placeholder="مثال: تهران / اصفهان"
-                        value={shippingCity}
-                        onChange={(e) => setShippingCity(e.target.value)}
-                        className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                        placeholder="جستجوی نام کالا یا شناسه (SKU)..."
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        className="w-full bg-background border border-subtle rounded-xl pr-10 pl-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none transition-all"
                       />
-                    )}
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted">
+                        <Search className="w-4 h-4 text-muted" />
+                      </div>
+                    </div>
+                    
+                    <div className="max-h-52 overflow-y-auto space-y-2 border border-subtle p-2 rounded-xl bg-background">
+                      {myCatalog.length === 0 && (
+                        <div className="text-center py-6 text-xs text-muted">
+                          کاتالوگ زوپیتی شما خالی است. ابتدا از بخش کاوش کالا، محصولات مدنظر را اضافه کنید.
+                        </div>
+                      )}
+                      {myCatalog.length > 0 &&
+                        myCatalog.filter(
+                          (sel) =>
+                            sel.product.name
+                              .toLowerCase()
+                              .includes(productSearch.toLowerCase()) ||
+                            (sel.product.sku &&
+                              sel.product.sku
+                                .toLowerCase()
+                                .includes(productSearch.toLowerCase())),
+                        ).length === 0 && (
+                          <div className="text-center py-6 text-xs text-muted">
+                            محصولی با این مشخصات در کاتالوگ یافت نشد
+                          </div>
+                        )}
+                      {myCatalog
+                        .filter(
+                          (sel) =>
+                            sel.product.name
+                              .toLowerCase()
+                              .includes(productSearch.toLowerCase()) ||
+                            (sel.product.sku &&
+                              sel.product.sku
+                                .toLowerCase()
+                                .includes(productSearch.toLowerCase())),
+                        )
+                        .map((sel) => {
+                          const isSelected =
+                            selectedProduct === sel.productId.toString();
+                          return (
+                            <div
+                              key={sel.productId}
+                              onClick={() =>
+                                setSelectedProduct(sel.productId.toString())
+                              }
+                              className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all border ${
+                                isSelected
+                                  ? "border-primary-default bg-primary-default/10 ring-2 ring-primary-default/20"
+                                  : "border-subtle hover:bg-surface bg-card"
+                              }`}
+                            >
+                              <div className="w-12 h-12 bg-surface rounded-lg overflow-hidden flex-shrink-0 border border-subtle">
+                                {sel.product.images?.length > 0 ? (
+                                  <img
+                                    src={sel.product.images[0].url}
+                                    className="w-full h-full object-cover"
+                                    alt=""
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-muted bg-background">
+                                    <ShoppingCart className="w-4 h-4" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-xs text-primary truncate">
+                                  {sel.product.name}
+                                </h4>
+                                <div className="flex justify-between items-center mt-1">
+                                  <span className="text-[10px] text-muted font-mono">
+                                    SKU: {sel.product.sku || "-"}
+                                  </span>
+                                  <span className="text-[10px] text-primary-default font-bold bg-primary-default/10 px-1.5 py-0.5 rounded">
+                                    تامین‌کننده: {sel.product.supplier?.companyName || sel.product.supplierName || `SUP-${1000 + (sel.product.supplierId || sel.product.supplier?.id || 0)}`}
+                                  </span>
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <div className="w-5 h-5 bg-primary-default text-inverse rounded-full flex items-center justify-center flex-shrink-0">
+                                  <Check className="w-3.5 h-3.5" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    {/* Variant Selector */}
+                    {(() => {
+                      const selectedProdObj = myCatalog.find(
+                        (sel) => sel.productId.toString() === selectedProduct
+                      )?.product;
+                      if (!selectedProdObj || !selectedProdObj.variants || selectedProdObj.variants.length === 0) {
+                        return null;
+                      }
+                      return (
+                        <div className="pt-2">
+                          <label className="block text-xs font-bold text-secondary mb-1.5">
+                            انتخاب متغیر / تنوع کالا <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary font-bold"
+                            value={selectedVariantId}
+                            onChange={(e) => setSelectedVariantId(e.target.value)}
+                          >
+                            <option value="">-- لطفاً یک متغیر انتخاب کنید --</option>
+                            {selectedProdObj.variants.map((v: any) => {
+                              let displayAttrs = "ساده / پیش‌فرض";
+                              try {
+                                const parsed = typeof v.attributes === "string" 
+                                  ? JSON.parse(v.attributes) 
+                                  : v.attributes;
+                                if (parsed && Object.keys(parsed).length > 0) {
+                                  displayAttrs = Object.entries(parsed)
+                                    .map(([k, val]) => `${k}: ${val}`)
+                                    .join(" | ");
+                                }
+                              } catch (e) {}
+                              return (
+                                <option key={v.id} value={v.id.toString()}>
+                                  {displayAttrs} (موجودی: {v.stock} عدد | قیمت: {v.finalPrice?.toLocaleString()} تومان)
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Quantity & Add Button */}
+                    <div className="flex items-end gap-3 pt-2">
+                      <div className="w-32">
+                        <label className="block text-xs font-bold text-secondary mb-1.5">
+                          تعداد سفارش
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
+                          value={quantity}
+                          onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddItemToOrder}
+                        disabled={!selectedProduct}
+                        className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>افزودن به اقلام این سفارش</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      کد پستی (۱۰ رقم) <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={10}
-                      placeholder="1234567890"
-                      dir="ltr"
-                      value={shippingPostalCode}
-                      onChange={(e) => setShippingPostalCode(e.target.value)}
-                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right"
-                    />
+                {/* LEFT COLUMN: Recipient Information, Postal Address, Shipping Method & Submit */}
+                <div className="lg:col-span-5 space-y-4">
+                  {/* Recipient and Shipping Address Section */}
+                  <div className="bg-surface p-4 rounded-2xl border border-subtle space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-subtle pb-2.5">
+                      <span className="text-xs font-black text-primary flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-rose-500" />
+                        مشخصات گیرنده و نشانی پستی
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleUseStoreAddressForNewOrder}
+                        className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        ⚡ درج آدرس فروشگاه
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          نام و نام‌خانوادگی گیرنده <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="مثال: علی رضایی"
+                          value={shippingRecipientName}
+                          onChange={(e) => setShippingRecipientName(e.target.value)}
+                          className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          شماره تماس گیرنده <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="09123456789"
+                          dir="ltr"
+                          value={shippingRecipientPhone}
+                          onChange={(e) => setShippingRecipientPhone(e.target.value)}
+                          className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right text-primary"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            استان مقصد <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            required
+                            value={shippingProvince}
+                            onChange={(e) => {
+                              setShippingProvince(e.target.value);
+                              setShippingCity("");
+                            }}
+                            className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                          >
+                            <option value="">-- انتخاب استان --</option>
+                            {PROVINCES.map((p) => (
+                              <option key={p.name} value={p.name}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            شهر مقصد <span className="text-rose-500">*</span>
+                          </label>
+                          {shippingProvince && PROVINCES.find(p => p.name === shippingProvince)?.cities.length ? (
+                            <select
+                              required
+                              value={shippingCity}
+                              onChange={(e) => setShippingCity(e.target.value)}
+                              className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                            >
+                              <option value="">-- انتخاب شهر --</option>
+                              {PROVINCES.find(p => p.name === shippingProvince)?.cities.map((city) => (
+                                <option key={city} value={city}>{city}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              required
+                              placeholder="مثال: تهران"
+                              value={shippingCity}
+                              onChange={(e) => setShippingCity(e.target.value)}
+                              className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            کد پستی (۱۰ رقم) <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={10}
+                            placeholder="1234567890"
+                            dir="ltr"
+                            value={shippingPostalCode}
+                            onChange={(e) => setShippingPostalCode(e.target.value)}
+                            className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-mono text-right text-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            روش ارسال
+                          </label>
+                          <select
+                            value={shippingMethod}
+                            onChange={(e) => setShippingMethod(e.target.value)}
+                            className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold text-primary"
+                          >
+                            <option value="POST">پست پیشتاز سراسری</option>
+                            <option value="POST_VIZHE">پست ویژه / اکسپرس</option>
+                            <option value="TIPAX">تیپاکس (ارسال سریع)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          نشانی دقیق پستی (خیابان، کوچه، پلاک، واحد) <span className="text-rose-500">*</span>
+                        </label>
+                        <textarea
+                          required
+                          rows={2}
+                          placeholder="خیابان اصلی، فرعی، پلاک، طبقه و واحد..."
+                          value={shippingAddressDetail}
+                          onChange={(e) => setShippingAddressDetail(e.target.value)}
+                          className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          یادداشت برای تامین‌کننده (اختیاری)
+                        </label>
+                        <textarea
+                          className="w-full bg-background border border-subtle rounded-xl px-3 py-1.5 text-xs focus:ring-2 focus:ring-primary-default outline-none text-primary"
+                          rows={1}
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          placeholder="رنگ، سایز یا توضیحات اضافی..."
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      روش ارسال ترجیحی
-                    </label>
-                    <select
-                      value={shippingMethod}
-                      onChange={(e) => setShippingMethod(e.target.value)}
-                      className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none font-bold"
-                    >
-                      <option value="POST">پست پیشتاز سراسری</option>
-                      <option value="POST_VIZHE">پست ویژه / اکسپرس</option>
-                      <option value="TIPAX">تیپاکس (ارسال سریع)</option>
-                    </select>
+
+                  {error && (
+                    <div className="bg-danger/10 border border-rose-200 text-danger p-3 rounded-xl text-xs font-bold leading-relaxed">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Summary & Submit Action */}
+                  <div className="bg-card p-4 rounded-2xl border border-subtle space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted">تعداد اقلام ثبت‌شده:</span>
+                      <span className="font-bold text-primary">{orderItems.length} قلم کالا</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted">مجموع ارزش سفارش:</span>
+                      <span className="font-mono font-black text-primary-default text-sm">
+                        {orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString("fa-IR")} تومان
+                      </span>
+                    </div>
+                    
+                    <div className="pt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowModal(false)}
+                        className="flex-1 py-2.5 rounded-xl font-bold text-xs text-muted bg-surface hover:bg-surface-hover transition-colors cursor-pointer"
+                      >
+                        انصراف
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submitting || (orderItems.length === 0 && !selectedProduct)}
+                        className="flex-2 py-2.5 rounded-xl font-bold text-xs text-white bg-primary-default hover:bg-primary-hover transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-primary-default/20"
+                      >
+                        {submitting ? "در حال ثبت..." : "ثبت نهایی سفارش"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    نشانی دقیق پستی (خیابان، کوچه، پلاک، واحد) <span className="text-rose-500">*</span>
-                  </label>
-                  <textarea
-                    required
-                    rows={2}
-                    placeholder="خیابان اصلی، فرعی، پلاک، طبقه و واحد..."
-                    value={shippingAddressDetail}
-                    onChange={(e) => setShippingAddressDetail(e.target.value)}
-                    className="w-full bg-background border border-subtle rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-default outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Order Notes */}
-              <div>
-                <label className="block text-sm font-bold text-secondary mb-2">
-                  یادداشت برای تامین‌کننده (اختیاری)
-                </label>
-                <textarea
-                  className="w-full bg-background border border-subtle rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-default outline-none"
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="رنگ، سایز، بسته‌بندی ویژه یا نکات اضطراری مرسوله..."
-                />
-              </div>
-
-              {error && (
-                <div className="bg-danger/10 border border-rose-200 text-danger p-3.5 rounded-xl text-xs font-bold leading-relaxed">
-                  {error}
-                </div>
-              )}
-              {/* Submit / Cancel buttons */}
-              <div className="pt-4 border-t border-subtle flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-3 rounded-xl font-bold text-xs text-muted bg-surface hover:bg-surface transition-colors cursor-pointer"
-                >
-                  انصراف
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || (orderItems.length === 0 && !selectedProduct)}
-                  className="flex-1 px-4 py-3 rounded-xl font-bold text-xs text-inverse bg-primary-default hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer shadow-md shadow-primary-default/20"
-                >
-                  {submitting ? "در حال ثبت..." : "ثبت نهایی سفارش و ارسال برای برآورد هزینه"}
-                </button>
               </div>
             </form>
           </div>
