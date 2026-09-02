@@ -37,13 +37,15 @@ import {
   Radio,
   Eye,
   EyeOff,
-  Zap
+  Zap,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 
 interface Lead {
   id: number;
   name: string;
+  managerName?: string | null;
   phone: string;
   additionalPhones?: string | null;
   websiteUrl?: string | null;
@@ -114,6 +116,7 @@ export default function LeadsManager() {
   const [viewingLeadDetails, setViewingLeadDetails] = useState<Lead | null>(null);
   const [formData, setFormData] = useState({
     name: "",
+    managerName: "",
     phone: "",
     additionalPhones: "",
     websiteUrl: "",
@@ -207,6 +210,7 @@ export default function LeadsManager() {
       const token = localStorage.getItem("token") || "";
       const payload = {
         name: formData.name.trim(),
+        managerName: formData.managerName.trim(),
         phone: formData.phone.trim(),
         additionalPhones: formData.additionalPhones.trim(),
         websiteUrl: formData.websiteUrl.trim(),
@@ -245,6 +249,7 @@ export default function LeadsManager() {
         setEditingLead(null);
         setFormData({
           name: "",
+          managerName: "",
           phone: "",
           additionalPhones: "",
           websiteUrl: "",
@@ -388,6 +393,7 @@ export default function LeadsManager() {
     setEditingLead(lead);
     setFormData({
       name: lead.name,
+      managerName: lead.managerName || "",
       phone: lead.phone,
       additionalPhones: lead.additionalPhones || "",
       websiteUrl: lead.websiteUrl || "",
@@ -406,6 +412,7 @@ export default function LeadsManager() {
   const filteredLeads = leads.filter((lead) => {
     const matchesSearch =
       lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.managerName && lead.managerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       lead.phone.includes(searchQuery) ||
       (lead.websiteUrl && lead.websiteUrl.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (lead.additionalPhones && lead.additionalPhones.includes(searchQuery)) ||
@@ -434,6 +441,66 @@ export default function LeadsManager() {
 
     return matchesSearch && matchesStatus && matchesAmbassador && matchesPublish;
   });
+
+  // Real-time duplicate check for lead creation/editing
+  const duplicateMatches = useMemo(() => {
+    const currentPhone = formData.phone.replace(/\D/g, "");
+    const currentName = formData.name.trim().toLowerCase();
+    const currentManager = formData.managerName.trim().toLowerCase();
+    const currentAddPhones = formData.additionalPhones.replace(/\D/g, "");
+
+    if (!currentPhone && !currentName && !currentManager && !currentAddPhones) return [];
+
+    const matches: { lead: Lead; reasons: string[] }[] = [];
+
+    for (const lead of leads) {
+      if (editingLead && lead.id === editingLead.id) continue;
+
+      const reasons: string[] = [];
+      const leadPhone = lead.phone.replace(/\D/g, "");
+      const leadAddPhones = (lead.additionalPhones || "").replace(/\D/g, "");
+      const leadName = lead.name.trim().toLowerCase();
+      const leadManager = (lead.managerName || "").trim().toLowerCase();
+
+      // 1. Primary phone check
+      if (currentPhone && currentPhone.length >= 7) {
+        if (leadPhone.length >= 7 && (leadPhone.endsWith(currentPhone) || currentPhone.endsWith(leadPhone))) {
+          reasons.push("شماره تماس اصلی یکسان است");
+        } else if (leadAddPhones && leadAddPhones.length >= 7 && (leadAddPhones.includes(currentPhone) || currentPhone.includes(leadAddPhones))) {
+          reasons.push("شماره تماس با شماره فرعی این تامین‌کننده یکسان است");
+        }
+      }
+
+      // 2. Secondary phone check
+      if (currentAddPhones && currentAddPhones.length >= 7) {
+        if (leadPhone.length >= 7 && (leadPhone.endsWith(currentAddPhones) || currentAddPhones.endsWith(leadPhone))) {
+          reasons.push("شماره همراه فرعی جدید با شماره اصلی این پرونده مطابقت دارد");
+        }
+      }
+
+      // 3. Name check
+      if (currentName && currentName.length >= 2) {
+        if (leadName === currentName) {
+          reasons.push("نام تامین‌کننده دقیقاً یکسان است");
+        } else if (leadName.includes(currentName) || currentName.includes(leadName)) {
+          reasons.push("تشابه اسمی در نام تامین‌کننده");
+        }
+      }
+
+      // 4. Manager name check
+      if (currentManager && currentManager.length >= 3 && leadManager) {
+        if (leadManager === currentManager) {
+          reasons.push("نام مدیر یکسان است");
+        }
+      }
+
+      if (reasons.length > 0) {
+        matches.push({ lead, reasons });
+      }
+    }
+
+    return matches;
+  }, [formData.phone, formData.name, formData.managerName, formData.additionalPhones, leads, editingLead]);
 
   // Calculate Ambassador Leaderboard Stats
   const ambassadorStats = ambassadors.map((amb) => {
@@ -753,6 +820,7 @@ export default function LeadsManager() {
               setEditingLead(null);
               setFormData({
                 name: "",
+                managerName: "",
                 phone: "",
                 additionalPhones: "",
                 websiteUrl: "",
@@ -1016,10 +1084,16 @@ export default function LeadsManager() {
                           key={lead.id}
                           className="hover:bg-purple-50/40 transition-colors"
                         >
-                          {/* 1. Name */}
+                          {/* 1. Name & Manager */}
                           <td className="p-4">
-                            <div className="font-extrabold text-slate-900 text-sm">
-                              {lead.name}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-extrabold text-slate-900 text-sm">{lead.name}</span>
+                              {lead.managerName && (
+                                <span className="text-[11px] font-bold text-purple-900 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                  <span className="text-purple-600 font-normal">مدیر:</span>
+                                  <span>{lead.managerName}</span>
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-[10px] text-slate-500 font-mono">
@@ -1201,7 +1275,14 @@ export default function LeadsManager() {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">{viewingLeadDetails.name}</h3>
-                  <span className="text-[11px] text-slate-500 font-mono">کد پرونده: #{viewingLeadDetails.id}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-500 font-mono">کد پرونده: #{viewingLeadDetails.id}</span>
+                    {viewingLeadDetails.managerName && (
+                      <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded-md">
+                        مدیر: {viewingLeadDetails.managerName}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <button
@@ -1422,19 +1503,34 @@ export default function LeadsManager() {
             </div>
 
             <form onSubmit={handleSaveLead} className="space-y-3.5">
-              {/* 1. Name */}
-              <div>
-                <label className="block text-xs font-black text-slate-900 mb-1">
-                  نام تامین‌کننده / فروشگاه / برند <span className="text-purple-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="مثال: بازرگانی پارس یا عمده‌فروشی برادران احمدی"
-                  className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
-                />
+              {/* 1. Name & Manager Name (Side by Side Grid) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-slate-900 mb-1">
+                    نام تامین‌کننده / برند <span className="text-purple-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="مثال: بازرگانی پارس"
+                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-900 mb-1">
+                    نام مدیر / مدیریت مجموعه
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.managerName}
+                    onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
+                    placeholder="مثال: جناب احمدی"
+                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 placeholder:text-slate-400 transition-all"
+                  />
+                </div>
               </div>
 
               {/* 2. Phone */}
@@ -1630,6 +1726,66 @@ export default function LeadsManager() {
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Duplicate warning alert banner */}
+              {duplicateMatches.length > 0 && (
+                <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-2xl space-y-2 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-black text-xs text-amber-900">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 animate-bounce" />
+                      <span>توجه: تامین‌کننده مشابه در سیستم یافت شد!</span>
+                    </div>
+                    <span className="text-[10px] text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-full font-black">
+                      {duplicateMatches.length} مورد
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
+                    {duplicateMatches.map(({ lead, reasons }) => (
+                      <div
+                        key={lead.id}
+                        className="p-2.5 bg-white border border-amber-200 rounded-xl text-xs flex flex-col gap-1 shadow-2xs"
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-extrabold text-slate-900">{lead.name}</span>
+                            {lead.managerName && (
+                              <span className="text-[10px] font-bold text-purple-700">({lead.managerName})</span>
+                            )}
+                            <span className="text-[10px] font-mono text-slate-500">#{lead.id}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setViewingLeadDetails(lead)}
+                            className="text-[10px] font-bold text-purple-700 hover:underline bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 shrink-0 cursor-pointer"
+                          >
+                            مشاهده ℹ️
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-600 dir-ltr">
+                          <span>📞 {lead.phone}</span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {reasons.map((reason, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[10px] font-extrabold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md"
+                            >
+                              {reason}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-[10px] text-amber-800 font-bold leading-relaxed pt-1 border-t border-amber-200/60">
+                    💡 جهت اطلاع‌رسانی: ثبت تکراری مسدود نشده و در صورت نیاز می‌توانید دکمه ثبت را بزنید.
+                  </p>
                 </div>
               )}
 

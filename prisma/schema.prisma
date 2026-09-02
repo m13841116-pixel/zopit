@@ -811,7 +811,8 @@ model PaymentLog {
 model Lead {
   id               Int      @id @default(autoincrement())
   name             String
-  phone            String   @unique
+  managerName      String?
+  phone            String
   additionalPhones String?
   websiteUrl       String?
   address          String?

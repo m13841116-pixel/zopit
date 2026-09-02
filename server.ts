@@ -1342,6 +1342,7 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `CREATE TABLE IF NOT EXISTS "Lead" (
         "id" SERIAL PRIMARY KEY,
         "name" TEXT NOT NULL,
+        "managerName" TEXT,
         "phone" TEXT UNIQUE NOT NULL,
         "additionalPhones" TEXT,
         "websiteUrl" TEXT,
@@ -1355,6 +1356,9 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
         "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );`,
+
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "managerName" TEXT;`,
+      `ALTER TABLE "Lead" DROP CONSTRAINT IF EXISTS "Lead_phone_key";`,
 
       // User table columns (ALTER TABLE ADD COLUMN IF NOT EXISTS)
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "autoApproveOrders" BOOLEAN DEFAULT true;`,
@@ -11574,7 +11578,7 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
 
 app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
-    const { name, phone, additionalPhones, websiteUrl, address, category, commission, ambassadorId, status, isPublished } = req.body;
+    const { name, managerName, phone, additionalPhones, websiteUrl, address, category, commission, ambassadorId, status, isPublished } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ error: 'نام و شماره تماس اصلی تامین‌کننده هدف اجباری است.' });
     }
@@ -11582,14 +11586,10 @@ app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, r
     const cleanPhone = String(phone).replace(/\s+/g, '');
     const cleanAddPhones = additionalPhones ? String(additionalPhones).trim() : null;
 
-    const existing = await prisma.lead.findUnique({ where: { phone: cleanPhone } });
-    if (existing) {
-      return res.status(400).json({ error: 'تامین‌کننده‌ای با این شماره تماس اصلی قبلاً ثبت شده است.' });
-    }
-
     const lead = await prisma.lead.create({
       data: {
         name: String(name).trim(),
+        managerName: managerName ? String(managerName).trim() : null,
         phone: cleanPhone,
         additionalPhones: cleanAddPhones,
         websiteUrl: websiteUrl ? String(websiteUrl).trim() : null,
@@ -11617,12 +11617,13 @@ app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, r
 app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const leadId = parseInt(req.params.id);
-    const { name, phone, additionalPhones, websiteUrl, address, category, commission, status, ambassadorId, isPublished } = req.body;
+    const { name, managerName, phone, additionalPhones, websiteUrl, address, category, commission, status, ambassadorId, isPublished } = req.body;
 
     const updated = await prisma.lead.update({
       where: { id: leadId },
       data: {
         name: name ? String(name).trim() : undefined,
+        managerName: managerName !== undefined ? (managerName ? String(managerName).trim() : null) : undefined,
         phone: phone ? String(phone).replace(/\s+/g, '') : undefined,
         additionalPhones: additionalPhones !== undefined ? (additionalPhones ? String(additionalPhones).trim() : null) : undefined,
         websiteUrl: websiteUrl !== undefined ? (websiteUrl ? String(websiteUrl).trim() : null) : undefined,
