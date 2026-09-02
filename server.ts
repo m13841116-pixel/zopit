@@ -1344,10 +1344,12 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
         "name" TEXT NOT NULL,
         "phone" TEXT UNIQUE NOT NULL,
         "additionalPhones" TEXT,
+        "websiteUrl" TEXT,
         "address" TEXT,
         "category" TEXT,
         "commission" DOUBLE PRECISION DEFAULT 100000,
         "status" TEXT DEFAULT 'PENDING',
+        "isPublished" BOOLEAN DEFAULT false,
         "ambassadorId" INTEGER,
         "supplierId" INTEGER,
         "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1495,7 +1497,19 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "DiscountCode" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true;`,
 
       // Lead table columns
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "name" TEXT;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "phone" TEXT;`,
       `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "additionalPhones" TEXT;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "websiteUrl" TEXT;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "address" TEXT;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "category" TEXT;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "commission" DOUBLE PRECISION DEFAULT 100000;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'PENDING';`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN DEFAULT false;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "ambassadorId" INTEGER;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "supplierId" INTEGER;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
 
       // StoreProductSelection custom pricing columns
       `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customPrice" DOUBLE PRECISION;`,
@@ -11453,36 +11467,79 @@ app.post('/api/admin/leads/auto-match', authenticateToken, requireAdmin, async (
 
 app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
-    await autoSyncLeadsWithRegisteredSuppliers();
-    const leads = await prisma.lead.findMany({
-      include: {
-        ambassador: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            mobile: true,
-            role: true,
-          }
-        }
-      },
-      orderBy: { id: 'desc' }
-    });
+    try {
+      await autoSyncLeadsWithRegisteredSuppliers();
+    } catch (syncErr) {
+      console.warn('[Leads Sync Notice]', syncErr);
+    }
 
-    const ambassadors = await prisma.user.findMany({
-      where: {
-        OR: [{ role: 'AMBASSADOR' }, { role: 'REFERRER' }]
-      },
-      select: {
-        id: true,
-        username: true,
-        firstName: true,
-        lastName: true,
-        mobile: true,
-        role: true,
+    let leads: any[] = [];
+    try {
+      leads = await prisma.lead.findMany({
+        include: {
+          ambassador: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              mobile: true,
+              role: true,
+            }
+          }
+        },
+        orderBy: { id: 'desc' }
+      });
+    } catch (queryErr: any) {
+      console.warn('[Leads Query Warning] Retrying with schema auto-heal:', queryErr?.message || queryErr);
+      try {
+        await ensureDatabaseSchemaColumns(getActivePrisma() || prisma, true);
+        leads = await prisma.lead.findMany({
+          include: {
+            ambassador: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                mobile: true,
+                role: true,
+              }
+            }
+          },
+          orderBy: { id: 'desc' }
+        });
+      } catch (retryErr: any) {
+        console.error('[Leads Query Fatal]', retryErr);
+        // Fallback without relations if relation fails
+        try {
+          leads = await prisma.lead.findMany({ orderBy: { id: 'desc' } });
+        } catch (rawErr) {
+          console.error('[Leads Raw Query Fatal]', rawErr);
+          leads = [];
+        }
       }
-    });
+    }
+
+    let ambassadors: any[] = [];
+    try {
+      ambassadors = await prisma.user.findMany({
+        where: {
+          OR: [{ role: 'AMBASSADOR' }, { role: 'REFERRER' }]
+        },
+        select: {
+          id: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          mobile: true,
+          role: true,
+        }
+      });
+    } catch (ambErr) {
+      console.warn('[Ambassadors Query Warning]', ambErr);
+      ambassadors = [];
+    }
 
     // Summary stats
     const totalLeads = leads.length;
@@ -11509,9 +11566,9 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
         ambassadorsCount: ambassadors.length
       }
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error fetching admin leads:', err);
-    res.status(500).json({ error: 'خطا در دریافت لیست سرنخ‌ها و سفیران' });
+    res.status(500).json({ error: 'خطا در دریافت لیست سرنخ‌ها و سفیران: ' + (err?.message || '') });
   }
 });
 
