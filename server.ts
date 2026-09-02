@@ -11486,6 +11486,8 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
 
     // Summary stats
     const totalLeads = leads.length;
+    const draftLeads = leads.filter(l => !l.isPublished).length;
+    const publishedLeads = leads.filter(l => l.isPublished).length;
     const pendingLeads = leads.filter(l => l.status === 'PENDING').length;
     const assignedLeads = leads.filter(l => l.status === 'ASSIGNED' || l.status === 'IN_NEGOTIATION').length;
     const completedLeads = leads.filter(l => l.status === 'COMPLETED').length;
@@ -11497,6 +11499,8 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
       ambassadors,
       stats: {
         totalLeads,
+        draftLeads,
+        publishedLeads,
         pendingLeads,
         assignedLeads,
         completedLeads,
@@ -11513,7 +11517,7 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
 
 app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
-    const { name, phone, additionalPhones, address, category, commission, ambassadorId, status } = req.body;
+    const { name, phone, additionalPhones, websiteUrl, address, category, commission, ambassadorId, status, isPublished } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ error: 'نام و شماره تماس اصلی تامین‌کننده هدف اجباری است.' });
     }
@@ -11531,10 +11535,12 @@ app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, r
         name: String(name).trim(),
         phone: cleanPhone,
         additionalPhones: cleanAddPhones,
+        websiteUrl: websiteUrl ? String(websiteUrl).trim() : null,
         address: address ? String(address).trim() : null,
         category: category ? String(category).trim() : 'لوازم جانبی و دیجیتال',
         commission: Number(commission) || 100000,
         status: status || (ambassadorId ? 'ASSIGNED' : 'PENDING'),
+        isPublished: isPublished !== undefined ? Boolean(isPublished) : false,
         ambassadorId: ambassadorId ? Number(ambassadorId) : null
       },
       include: {
@@ -11554,7 +11560,7 @@ app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, r
 app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const leadId = parseInt(req.params.id);
-    const { name, phone, additionalPhones, address, category, commission, status, ambassadorId } = req.body;
+    const { name, phone, additionalPhones, websiteUrl, address, category, commission, status, ambassadorId, isPublished } = req.body;
 
     const updated = await prisma.lead.update({
       where: { id: leadId },
@@ -11562,10 +11568,12 @@ app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any
         name: name ? String(name).trim() : undefined,
         phone: phone ? String(phone).replace(/\s+/g, '') : undefined,
         additionalPhones: additionalPhones !== undefined ? (additionalPhones ? String(additionalPhones).trim() : null) : undefined,
+        websiteUrl: websiteUrl !== undefined ? (websiteUrl ? String(websiteUrl).trim() : null) : undefined,
         address: address !== undefined ? String(address).trim() : undefined,
         category: category !== undefined ? String(category).trim() : undefined,
         commission: commission !== undefined ? Number(commission) : undefined,
         status: status || undefined,
+        isPublished: isPublished !== undefined ? Boolean(isPublished) : undefined,
         ambassadorId: ambassadorId !== undefined ? (ambassadorId ? Number(ambassadorId) : null) : undefined
       },
       include: { ambassador: true }
@@ -11575,6 +11583,64 @@ app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any
   } catch (err: any) {
     console.error('Error updating lead:', err);
     res.status(500).json({ error: err?.message || 'خطا در بروزرسانی سرنخ' });
+  }
+});
+
+app.post('/api/admin/leads/:id/toggle-publish', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead) return res.status(404).json({ error: 'پرونده تامین‌کننده یافت نشد.' });
+
+    const newPublished = !lead.isPublished;
+    const updated = await prisma.lead.update({
+      where: { id: leadId },
+      data: { isPublished: newPublished }
+    });
+
+    res.json({
+      success: true,
+      lead: updated,
+      message: newPublished ? 'پرونده با موفقیت برای تأمین‌یاب‌ها منتشر شد.' : 'پرونده به حالت پیش‌نویس (عدم نمایش به تأمین‌یاب‌ها) تغییر یافت.'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در تغییر وضعیت انتشار پرونده' });
+  }
+});
+
+app.post('/api/admin/leads/bulk-publish', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { leadIds } = req.body;
+    let count = 0;
+    if (Array.isArray(leadIds) && leadIds.length > 0) {
+      for (const id of leadIds) {
+        await prisma.lead.update({
+          where: { id: Number(id) },
+          data: { isPublished: true }
+        });
+        count++;
+      }
+    } else {
+      // Publish all pending unpublished leads
+      const drafts = await prisma.lead.findMany({
+        where: { isPublished: false }
+      });
+      for (const d of drafts) {
+        await prisma.lead.update({
+          where: { id: d.id },
+          data: { isPublished: true }
+        });
+        count++;
+      }
+    }
+
+    res.json({
+      success: true,
+      publishedCount: count,
+      message: `${count} پرونده با موفقیت برای تمامی تأمین‌یاب‌ها منتشر شد.`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در انتشار گروهی پرونده‌ها' });
   }
 });
 
@@ -11611,14 +11677,14 @@ app.post('/api/admin/leads/:id/status', authenticateToken, requireAdmin, async (
 app.get('/api/ambassador/leads', authenticateToken, async (req: any, res) => {
   if (req.user.role !== 'AMBASSADOR' && req.user.role !== 'REFERRER') return res.status(403).json({ error: 'عدم دسترسی' });
   try {
-    const leads = await prisma.lead.findMany({
-      where: {
-        OR: [
-          { status: 'PENDING', ambassadorId: null },
-          { ambassadorId: req.user.userId }
-        ]
-      },
+    const allLeads = await prisma.lead.findMany({
       orderBy: { id: 'desc' }
+    });
+    // Filter to only leads that are published (or assigned directly to this ambassador)
+    const leads = allLeads.filter((l: any) => {
+      if (l.ambassadorId === req.user.userId) return true;
+      const isLeadPublished = l.isPublished === true || l.isPublished === undefined;
+      return isLeadPublished && l.status === 'PENDING' && !l.ambassadorId;
     });
     res.json(leads);
   } catch (err) {

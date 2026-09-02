@@ -813,10 +813,12 @@ model Lead {
   name             String
   phone            String   @unique
   additionalPhones String?
+  websiteUrl       String?
   address          String?
   category         String?
   commission       Float    @default(100000)
   status           String   @default("PENDING") // PENDING, ASSIGNED, COMPLETED
+  isPublished      Boolean  @default(false)
   ambassadorId     Int?
   supplierId       Int?
   createdAt        DateTime @default(now())

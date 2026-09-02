@@ -270,24 +270,24 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
                 <div 
                   className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-300 relative ${
                     state === 'completed'
-                      ? 'bg-emerald-50 border-emerald-400 text-emerald-600 shadow-sm shadow-emerald-500/5'
+                      ? 'bg-emerald-950/15 border-emerald-700 text-emerald-800 dark:text-emerald-300 shadow-xs'
                       : state === 'active'
-                      ? 'bg-purple-50 border-purple-400 text-purple-600 shadow-md shadow-purple-500/10 scale-110 ring-4 ring-purple-500/10'
+                      ? 'bg-indigo-950/15 border-indigo-700 text-indigo-800 dark:text-indigo-300 shadow-md scale-110 ring-4 ring-indigo-500/20'
                       : state === 'failed'
-                      ? 'bg-rose-50 border-rose-400 text-rose-600'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-400'
+                      ? 'bg-rose-950/15 border-rose-700 text-rose-800 dark:text-rose-300'
+                      : 'bg-zinc-100 border-zinc-300 text-zinc-500 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400'
                   }`}
                 >
                   <StepIcon className={`w-4 h-4 ${state === 'active' ? 'animate-pulse' : ''}`} />
 
                   {/* Top corner completed badge */}
                   {state === 'completed' && (
-                    <span className="absolute -top-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 border border-white">
+                    <span className="absolute -top-1 -right-1 bg-emerald-700 text-white rounded-full p-0.5 border border-white">
                       <Check className="w-2 h-2 stroke-[4]" />
                     </span>
                   )}
                   {state === 'failed' && (
-                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 border border-white">
+                    <span className="absolute -top-1 -right-1 bg-rose-700 text-white rounded-full p-0.5 border border-white">
                       <X className="w-2 h-2 stroke-[4]" />
                     </span>
                   )}
@@ -296,9 +296,9 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
                 {/* Step Label */}
                 <span 
                   className={`mt-2.5 text-[11px] font-bold tracking-tight text-center whitespace-nowrap transition-colors duration-300 ${
-                    state === 'completed' ? 'text-emerald-600' :
-                    state === 'active' ? 'text-purple-600 font-extrabold' :
-                    state === 'failed' ? 'text-rose-600' : 'text-zinc-400'
+                    state === 'completed' ? 'text-emerald-800 dark:text-emerald-300' :
+                    state === 'active' ? 'text-indigo-800 dark:text-indigo-300 font-extrabold' :
+                    state === 'failed' ? 'text-rose-800 dark:text-rose-300' : 'text-zinc-500 dark:text-zinc-400'
                   }`}
                 >
                   {step.label}
