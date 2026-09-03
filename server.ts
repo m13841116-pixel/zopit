@@ -4939,9 +4939,31 @@ app.delete('/api/store-manager/my-catalog/:productId', authenticateToken, requir
     const storeId = req.user.userId || req.user.id;
     const productId = parseInt(req.params.productId);
 
-    await prisma.storeProductSelection.deleteMany({
+    const selection = await prisma.storeProductSelection.findFirst({
       where: { storeId, productId }
     });
+
+    if (selection) {
+      if (selection.wc_product_id) {
+        try {
+          const conn = await prisma.storeConnection.findUnique({ where: { storeId } });
+          if (conn && conn.status === 'CONNECTED') {
+            const auth = Buffer.from(conn.consumerKey + ':' + conn.consumerSecret).toString('base64');
+            const url = new URL('/wp-json/wc/v3/products/' + selection.wc_product_id + '?force=true', conn.storeUrl);
+            fetch(url.toString(), {
+              method: 'DELETE',
+              headers: { 'Authorization': 'Basic ' + auth }
+            }).catch(e => console.error('Failed to delete WC product:', e));
+          }
+        } catch (wcErr) {
+          console.error('WC sync delete err:', wcErr);
+        }
+      }
+
+      await prisma.storeProductSelection.deleteMany({
+        where: { storeId, productId }
+      });
+    }
 
     res.json({ message: 'محصول از زوپیتی شما حذف شد.' });
   } catch (err) {
@@ -8670,6 +8692,72 @@ app.get('/api/admin/suppliers/:id/profile', authenticateToken, requireAdmin, asy
 
 app.get('/api/admin/stores/performance', authenticateToken, requireAdmin, async (req: any, res: any) => {
   res.json([]);
+});
+
+
+app.get('/api/admin/analytics/performance', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const orderItems = await prisma.orderItem.findMany({
+      where: { order: { status: { notIn: ['CANCELLED', 'REJECTED'] } } },
+      include: {
+        order: { include: { store: true } },
+        product: { include: { supplier: true } }
+      }
+    });
+
+    const suppliersMap = new Map();
+    const storesMap = new Map();
+
+    orderItems.forEach(item => {
+      const q = item.quantity || 1;
+      const zopitPrice = item.price * q;
+      const suppPrice = item.supplierPrice * q;
+      const profit = zopitPrice - suppPrice;
+
+      if (item.product && item.product.supplier) {
+        const sup = item.product.supplier;
+        if (!suppliersMap.has(sup.id)) {
+          suppliersMap.set(sup.id, { id: sup.id, name: sup.firstName + ' ' + sup.lastName || sup.username, salesVolume: 0, profit: 0, orders: new Set(), itemsSold: 0 });
+        }
+        const s = suppliersMap.get(sup.id);
+        s.salesVolume += suppPrice;
+        s.profit += profit;
+        s.orders.add(item.orderId);
+        s.itemsSold += q;
+      }
+
+      if (item.order && item.order.store) {
+        const store = item.order.store;
+        if (!storesMap.has(store.id)) {
+          storesMap.set(store.id, { id: store.id, name: store.firstName + ' ' + store.lastName || store.username, purchaseVolume: 0, profit: 0, orders: new Set(), itemsSold: 0 });
+        }
+        const st = storesMap.get(store.id);
+        st.purchaseVolume += zopitPrice;
+        st.profit += profit;
+        st.orders.add(item.order.id);
+        st.itemsSold += q;
+      }
+    });
+
+    const supplierArray = Array.from(suppliersMap.values()).map(s => ({
+      ...s,
+      orders: s.orders.size
+    }));
+
+    const storeArray = Array.from(storesMap.values()).map(st => ({
+      ...st,
+      orders: st.orders.size
+    }));
+
+    res.json({
+      suppliers: supplierArray,
+      stores: storeArray
+    });
+
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ error: 'خطا در دریافت گزارش عملکرد' });
+  }
 });
 
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req: any, res: any) => {

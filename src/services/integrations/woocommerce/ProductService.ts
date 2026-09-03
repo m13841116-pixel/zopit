@@ -23,7 +23,7 @@ export class ProductService {
         const productData = {
           name: sel.product.name,
           type: 'simple',
-          regular_price: sel.product.finalPrice?.toString() || '0',
+          regular_price: (sel.customPrice || sel.product.finalPrice || 0).toString(),
           description: sel.product.longDescription || '',
           short_description: sel.product.shortDescription || '',
           manage_stock: true,

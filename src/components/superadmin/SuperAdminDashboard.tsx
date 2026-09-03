@@ -1,3 +1,4 @@
+import PerformanceAnalytics from "./PerformanceAnalytics";
 import { AppLink } from "../AppLink";
 import React, { useState, useEffect } from "react";
 import { useUrlQueryState } from "../../utils/routeSync";
@@ -23,7 +24,7 @@ import {
   Scale,
   GraduationCap,
   Target
-} from "lucide-react";
+, TrendingUp} from "lucide-react";
 import NotificationBell from "../NotificationBell";
 import { EducationModal } from "../EducationModal";
 import Overview from "./Overview";
@@ -126,6 +127,7 @@ export default function SuperAdminDashboard({
 
   const menuItems = [
     { id: "overview", label: "پیشخوان", icon: LayoutDashboard },
+    { id: "analytics", label: "گزارش عملکرد", icon: TrendingUp },
     { id: "all-users", label: "کل کاربران", icon: Users },
     { id: "leads", label: "تأمین‌یاب‌ها", icon: Target },
     { id: "products", label: "محصولات", icon: Package },
@@ -252,6 +254,9 @@ export default function SuperAdminDashboard({
         <div className="flex-1 min-w-0 overflow-y-auto p-4 lg:p-8 relative">
           {activeTab === "overview" && (
             <Overview onNavigateTab={handleNavigateTab} />
+          )}
+          {activeTab === "analytics" && (
+            <PerformanceAnalytics />
           )}
           {activeTab === "pro-accounts" && (
             <SuperAdminProAccounts showNotification={showNotification} />
