@@ -6556,8 +6556,9 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
       });
 
       // Generate real Zibal payLink
-      try {
-        const paymentGateway = await PaymentServiceFactory.getService();
+      req.paymentStartTime = Date.now();
+    try {
+      const paymentGateway = await PaymentServiceFactory.getService();
         const baseUrl = getCanonicalAppUrl(req);
         const callbackUrl = `${baseUrl}/api/public/store-invoice/callback?invoiceId=${invoice.id}`;
 
@@ -7018,6 +7019,7 @@ app.post('/api/wallet/deposit', authenticateToken, async (req: any, res: any) =>
 
     const callbackUrl = `${baseUrl}/api/public/wallet/deposit/callback?userId=${userId}&amount=${numericAmount}&invoiceId=${invoice.id}`;
 
+    req.paymentStartTime = Date.now();
     try {
       const paymentGateway = await PaymentServiceFactory.getService();
       const zibalResult = await paymentGateway.createPayment(
@@ -7027,6 +7029,7 @@ app.post('/api/wallet/deposit', authenticateToken, async (req: any, res: any) =>
       );
       return res.json({ payLink: zibalResult.payLink });
     } catch (paymentErr: any) {
+      console.warn('[Payment Failed] Took ' + (Date.now() - (req.paymentStartTime || 0)) + 'ms. Error:', paymentErr.message);
       console.warn('Server Zibal error for wallet deposit, providing client fallback:', paymentErr.message);
       const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
       return res.json({
@@ -7609,8 +7612,9 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
       
       const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=PRO_REGISTER&amount=${totalPayable}&invoiceId=${invoice.id}`;
 
-      try {
-        const paymentGateway = await PaymentServiceFactory.getService();
+      req.paymentStartTime = Date.now();
+    try {
+      const paymentGateway = await PaymentServiceFactory.getService();
         const zibalResult = await paymentGateway.createPayment(
           totalPayable * 10,
           `ثبت نام اکانت ${planNameFa} زوپیت - کاربر #${userId}`,
@@ -7623,7 +7627,8 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
           data: { payLink }
         });
       } catch (paymentErr: any) {
-        console.warn('Server Zibal error for pro register, providing client fallback:', paymentErr.message);
+        console.warn('[Payment Failed] Took ' + (Date.now() - (req.paymentStartTime || 0)) + 'ms. Error:', paymentErr.message);
+      console.warn('Server Zibal error for pro register, providing client fallback:', paymentErr.message);
         const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
         return res.json({
           success: true,
@@ -7668,6 +7673,7 @@ app.post('/api/store-manager/pro/renew-host', authenticateToken, requireStoreMan
 
     const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=HOST_RENEWAL&amount=${amount}&invoiceId=${invoice.id}`;
 
+    req.paymentStartTime = Date.now();
     try {
       const paymentGateway = await PaymentServiceFactory.getService();
       const zibalResult = await paymentGateway.createPayment(
@@ -7677,6 +7683,7 @@ app.post('/api/store-manager/pro/renew-host', authenticateToken, requireStoreMan
       );
       return res.json({ payLink: zibalResult.payLink, amount });
     } catch (paymentErr: any) {
+      console.warn('[Payment Failed] Took ' + (Date.now() - (req.paymentStartTime || 0)) + 'ms. Error:', paymentErr.message);
       console.warn('Server Zibal error for renew-host, providing client fallback:', paymentErr.message);
       const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
       return res.json({
@@ -7715,6 +7722,7 @@ app.post('/api/store-manager/pro/pay-torob', authenticateToken, requireStoreMana
 
     const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=TOROB_SETUP&amount=${amount}&invoiceId=${invoice.id}`;
 
+    req.paymentStartTime = Date.now();
     try {
       const paymentGateway = await PaymentServiceFactory.getService();
       const zibalResult = await paymentGateway.createPayment(
@@ -7724,6 +7732,7 @@ app.post('/api/store-manager/pro/pay-torob', authenticateToken, requireStoreMana
       );
       return res.json({ payLink: zibalResult.payLink, amount });
     } catch (paymentErr: any) {
+      console.warn('[Payment Failed] Took ' + (Date.now() - (req.paymentStartTime || 0)) + 'ms. Error:', paymentErr.message);
       console.warn('Server Zibal error for pay-torob, providing client fallback:', paymentErr.message);
       const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
       return res.json({
