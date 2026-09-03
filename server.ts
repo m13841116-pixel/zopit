@@ -7006,7 +7006,17 @@ app.post('/api/wallet/deposit', authenticateToken, async (req: any, res: any) =>
     }
 
     const baseUrl = getCanonicalAppUrl(req);
-    const callbackUrl = `${baseUrl}/api/public/wallet/deposit/callback?userId=${userId}&amount=${numericAmount}`;
+    
+    const invoice = await prisma.storeInvoice.create({
+      data: {
+        storeManagerId: userId,
+        totalAmount: numericAmount,
+        status: 'PENDING',
+        receiptNotes: 'افزایش موجودی کیف پول'
+      }
+    });
+
+    const callbackUrl = `${baseUrl}/api/public/wallet/deposit/callback?userId=${userId}&amount=${numericAmount}&invoiceId=${invoice.id}`;
 
     try {
       const paymentGateway = await PaymentServiceFactory.getService();
@@ -7074,6 +7084,8 @@ app.get('/api/public/wallet/deposit/callback', async (req: any, res: any) => {
     const verification = await paymentGateway.verifyPayment(trackId.toString(), amount * 10);
 
     if (verification && verification.success) {
+      const refId = verification.refId || trackId.toString();
+
       await prisma.$transaction(async (tx) => {
         // Ensure wallet exists
         let wallet = await tx.wallet.findUnique({
@@ -7093,7 +7105,7 @@ app.get('/api/public/wallet/deposit/callback', async (req: any, res: any) => {
             amount,
             type: 'DEPOSIT',
             status: 'COMPLETED',
-            description: `افزایش موجودی آنلاین (کد رهگیری: ${trackId})`
+            description: `افزایش موجودی آنلاین (کد رهگیری: ${refId})`
           }
         });
 
@@ -7106,9 +7118,21 @@ app.get('/api/public/wallet/deposit/callback', async (req: any, res: any) => {
             }
           }
         });
+        
+        // Update StoreInvoice if provided
+        const invoiceId = req.query.invoiceId;
+        if (invoiceId && !isNaN(parseInt(invoiceId, 10))) {
+          await tx.storeInvoice.update({
+            where: { id: parseInt(invoiceId, 10) },
+            data: {
+              status: 'PAID',
+              paidAt: new Date(),
+              trackId: refId
+            }
+          });
+        }
       });
 
-      const refId = verification.refId || trackId.toString();
       res.send(`
         <!DOCTYPE html>
         <html dir="rtl" lang="fa">
@@ -7572,10 +7596,21 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
     let payLink = null;
     if (totalPayable > 0) {
       const baseUrl = getCanonicalAppUrl(req);
-      const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=PRO_REGISTER&amount=${totalPayable}`;
+      const planNameFa = selectedPlan === 'PRO_MAX' ? 'پرو مکس' : 'پرو';
+      
+      const invoice = await prisma.storeInvoice.create({
+        data: {
+          storeManagerId: userId,
+          totalAmount: totalPayable,
+          status: 'PENDING',
+          receiptNotes: `خرید اشتراک ${planNameFa}`
+        }
+      });
+      
+      const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=PRO_REGISTER&amount=${totalPayable}&invoiceId=${invoice.id}`;
+
       try {
         const paymentGateway = await PaymentServiceFactory.getService();
-        const planNameFa = selectedPlan === 'PRO_MAX' ? 'پرو مکس' : 'پرو';
         const zibalResult = await paymentGateway.createPayment(
           totalPayable * 10,
           `ثبت نام اکانت ${planNameFa} زوپیت - کاربر #${userId}`,
@@ -7590,7 +7625,6 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
       } catch (paymentErr: any) {
         console.warn('Server Zibal error for pro register, providing client fallback:', paymentErr.message);
         const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
-        const planNameFa = selectedPlan === 'PRO_MAX' ? 'پرو مکس' : 'پرو';
         return res.json({
           success: true,
           clientPaymentRequired: true,
@@ -7622,7 +7656,17 @@ app.post('/api/store-manager/pro/renew-host', authenticateToken, requireStoreMan
     const amount = parseInt(hostDiscountedSetting?.value || '198000', 10);
 
     const baseUrl = getCanonicalAppUrl(req);
-    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=HOST_RENEWAL&amount=${amount}`;
+    
+    const invoice = await prisma.storeInvoice.create({
+      data: {
+        storeManagerId: userId,
+        totalAmount: amount,
+        status: 'PENDING',
+        receiptNotes: 'تمدید هاست ۱ ماهه اکانت پرو زوپیت'
+      }
+    });
+
+    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=HOST_RENEWAL&amount=${amount}&invoiceId=${invoice.id}`;
 
     try {
       const paymentGateway = await PaymentServiceFactory.getService();
@@ -7659,7 +7703,17 @@ app.post('/api/store-manager/pro/pay-torob', authenticateToken, requireStoreMana
     const amount = parseInt(torobPriceSetting?.value || '150000', 10);
 
     const baseUrl = getCanonicalAppUrl(req);
-    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=TOROB_SETUP&amount=${amount}`;
+    
+    const invoice = await prisma.storeInvoice.create({
+      data: {
+        storeManagerId: userId,
+        totalAmount: amount,
+        status: 'PENDING',
+        receiptNotes: 'فعال‌سازی سرویس اتصال به ترب'
+      }
+    });
+
+    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=TOROB_SETUP&amount=${amount}&invoiceId=${invoice.id}`;
 
     try {
       const paymentGateway = await PaymentServiceFactory.getService();
@@ -7785,6 +7839,18 @@ app.get('/api/public/pro/callback', async (req: any, res: any) => {
         where: { userId: parsedUserId },
         data: { torobConnected: true }
       }).catch(() => {});
+    }
+
+    const { invoiceId } = req.query;
+    if (invoiceId && !isNaN(parseInt(invoiceId, 10))) {
+      await prisma.storeInvoice.update({
+        where: { id: parseInt(invoiceId, 10) },
+        data: {
+          status: 'PAID',
+          paidAt: new Date(),
+          trackId: verification.refId || resolvedTrackId.toString()
+        }
+      }).catch((e) => console.error('Failed to update StoreInvoice in pro callback', e));
     }
 
     return res.send(`

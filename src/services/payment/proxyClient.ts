@@ -249,10 +249,10 @@ export async function executeProxyRequest(
   // Primary and secondary Iranian Proxies (both HTTP and HTTPS to handle DNS/SSL propagation gracefully)
   let lastProxyErr: any = null;
   const proxyCandidates = [
-    'http://bankkalaha.ir/zibal-proxy.php',
     'https://bankkalaha.ir/zibal-proxy.php',
-    'http://www.bankkalaha.ir/zibal-proxy.php',
+    'http://bankkalaha.ir/zibal-proxy.php',
     'https://www.bankkalaha.ir/zibal-proxy.php',
+    'http://www.bankkalaha.ir/zibal-proxy.php',
     'http://88.135.68.18/zibal-proxy.php'
   ];
 
