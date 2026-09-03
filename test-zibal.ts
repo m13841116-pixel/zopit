@@ -1,14 +1,10 @@
-import { ZibalService } from './src/services/payment/ZibalService.js';
-import { executeProxyRequest } from './src/services/payment/proxyClient.js';
-
-async function test() {
-  const service = new ZibalService('6a0213e61b27742a09938588');
-  try {
-    const res = await service.createPayment(10000, 'Test', 'https://zopit.ir');
-    console.log("Success:", res);
-  } catch (e) {
-    console.error("Error creating payment:", e);
-  }
-}
-
-test();
+import { PaymentServiceFactory } from './src/services/payment/PaymentServiceFactory.js';
+(async () => {
+  const paymentGateway = await PaymentServiceFactory.getService();
+  const zibalResult = await paymentGateway.createPayment(
+    10000,
+    `Test`,
+    'http://localhost/cb'
+  );
+  console.log(zibalResult);
+})();

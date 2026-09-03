@@ -115,12 +115,13 @@ export async function requestClientSideZibalPayment(
     }
   };
 
-  // Fast Race Strategy: Fire primary proxy and direct gateway in parallel for instant sub-second response
+  // Fast Race Strategy: Fire primary proxy and direct gateway in parallel
+  // Use generous timeouts (8s) so we don't abort a working but slightly slow connection
   try {
     const fastestResult = await Promise.any([
-      fetchFromProxy(PRIMARY_PROXY_URL, 3500),
-      fetchFromDirect(4000),
-      fetchFromProxy(BACKUP_PROXY_URL, 4000),
+      fetchFromProxy(PRIMARY_PROXY_URL, 8000),
+      fetchFromDirect(6000),
+      fetchFromProxy(BACKUP_PROXY_URL, 8000),
     ]);
 
     if (fastestResult && fastestResult.payLink) {
@@ -146,7 +147,7 @@ export async function requestClientSideZibalPayment(
 
   // Fallback sequential try if parallel failed
   try {
-    const fallbackRes = await fetchFromProxy(PRIMARY_PROXY_URL, 6000);
+    const fallbackRes = await fetchFromProxy(PRIMARY_PROXY_URL, 12000);
     if (fallbackRes && fallbackRes.payLink) {
       if (invoiceId) {
         attachTrackIdToInvoice(invoiceId, fallbackRes.trackId).catch(() => {});

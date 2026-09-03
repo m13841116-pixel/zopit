@@ -260,8 +260,8 @@ export async function executeProxyRequest(
     const targetProxyUrl = proxyCandidates[i];
     try {
       const activeSecret = defaultSecretKey;
-      // Fast timeout per candidate so we fail-over rapidly
-      const currentAttemptTimeout = 4000;
+      // Generous timeout per candidate to prevent artificial failover delays on slow proxy responses
+      const currentAttemptTimeout = (i === 0) ? 9000 : 5000;
       const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, currentAttemptTimeout);
       
       // If we got a valid response (JSON from proxy or Zibal)
