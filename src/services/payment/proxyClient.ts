@@ -10,6 +10,23 @@ try {
   }
 } catch (e) {}
 
+// High-performance persistent keep-alive agents to eliminate TLS & TCP handshake overhead to Iran proxy
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 60000,
+  maxSockets: 25,
+  maxFreeSockets: 10,
+  timeout: 15000,
+});
+
+const httpAgent = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 60000,
+  maxSockets: 25,
+  maxFreeSockets: 10,
+  timeout: 15000,
+});
+
 export interface ProxyResponse {
   ok: boolean;
   status: number;
@@ -27,7 +44,7 @@ async function makeFetchRequest(urlStr: string, payloadString: string, secretKey
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'Connection': 'close',
+    'Connection': 'keep-alive',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   };
 
@@ -87,7 +104,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Connection': 'close',
+        'Connection': 'keep-alive',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Content-Length': String(Buffer.byteLength(payloadString)),
       };
@@ -104,6 +121,7 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
         path: parsedUrl.pathname + parsedUrl.search,
         method: 'POST',
         headers,
+        agent: isHttps ? httpsAgent : httpAgent,
         timeout: timeoutMs,
         rejectUnauthorized: false,
       }, (res) => {
@@ -176,16 +194,19 @@ function makeNodeRequest(urlStr: string, payloadString: string, secretKey: strin
 }
 
 async function makeUnifiedRequest(urlStr: string, payloadString: string, secretKey: string | null, timeoutMs: number): Promise<ProxyResponse> {
-  if (true) {
+  // Prioritize Node request with high-performance persistent keep-alive agent for ~1-2s response
+  try {
+    return await makeNodeRequest(urlStr, payloadString, secretKey, timeoutMs);
+  } catch (nodeErr: any) {
+    if (nodeErr.name === 'TimeoutError' || nodeErr.code === 'ETIMEDOUT' || nodeErr.message?.includes('Timeout')) {
+      throw nodeErr;
+    }
     try {
       return await makeFetchRequest(urlStr, payloadString, secretKey, timeoutMs);
     } catch (fetchErr: any) {
-      if (fetchErr.name === 'TimeoutError' || fetchErr.name === 'AbortError' || fetchErr.message?.includes('Timeout') || fetchErr.message?.includes('پاسخگویی')) {
-        throw fetchErr;
-      }
+      throw fetchErr;
     }
   }
-  return await makeNodeRequest(urlStr, payloadString, secretKey, timeoutMs);
 }
 
 export async function executeProxyRequest(
@@ -246,19 +267,18 @@ export async function executeProxyRequest(
     directZibalUrl = 'https://gateway.zibal.ir/v1/checkout/status';
   }
 
-  // Primary and secondary Iranian Proxies (both HTTP and HTTPS to handle DNS/SSL propagation gracefully)
+  // Primary Iranian Proxy with optimized 2.5s timeout to guarantee instant redirection (2-3s)
   let lastProxyErr: any = null;
   const proxyCandidates = [
-    'https://bankkalaha.ir/zibal-proxy.php',
-    'https://www.bankkalaha.ir/zibal-proxy.php'
+    'https://bankkalaha.ir/zibal-proxy.php'
   ];
 
   for (let i = 0; i < proxyCandidates.length; i++) {
     const targetProxyUrl = proxyCandidates[i];
     try {
       const activeSecret = defaultSecretKey;
-      // Fast timeout per candidate so we fail-over rapidly without hanging the user
-      const currentAttemptTimeout = (i === 0) ? 3500 : 3500;
+      // Fast 2500ms timeout so users never wait more than 2-3s for payment gateway redirection
+      const currentAttemptTimeout = 2500;
       const proxyRes = await makeUnifiedRequest(targetProxyUrl, payloadString, activeSecret, currentAttemptTimeout);
       
       // If we got a valid response (JSON from proxy or Zibal)

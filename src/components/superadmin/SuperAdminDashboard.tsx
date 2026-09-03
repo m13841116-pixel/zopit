@@ -45,7 +45,7 @@ import LeadsManager from "./LeadsManager";
 import SuperAdminNewFeatures from "./SuperAdminNewFeatures";
 import SuperAdminProAccounts from "./SuperAdminProAccounts";
 import TopStoresManager from "./TopStoresManager";
-import { Crown, Sparkles, TrendingUp, Award } from "lucide-react";
+import { Crown, Sparkles, Award } from "lucide-react";
 import SupplierPenaltyManagement from "./SupplierPenaltyManagement";
 import AdminBanners from "./AdminBanners";
 import CodeEditor from "./CodeEditor";

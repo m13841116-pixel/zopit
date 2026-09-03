@@ -2430,6 +2430,14 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
+    if (finalRole === 'SUPPLIER') {
+      try {
+        await autoSyncLeadsWithRegisteredSuppliers();
+      } catch (e) {
+        console.warn('Auto sync on general register warning:', e);
+      }
+    }
+
     const token = jwt.sign(
       { userId: existingUser.id, username: existingUser.username, role: existingUser.role, status: existingUser.status },
       JWT_SECRET,
@@ -2565,6 +2573,13 @@ app.post('/api/auth/register/supplier', async (req, res) => {
         pending: 0
       }
     }).catch(console.error);
+
+    // Auto-match and automatically transition Lead from Leads to 'COMPLETED' (Confirmed) on successful supplier registration
+    try {
+      await autoSyncLeadsWithRegisteredSuppliers();
+    } catch (syncErr) {
+      console.warn('Auto-match lead on supplier registration non-blocking warning:', syncErr);
+    }
 
     // Issue JWT
     const token = jwt.sign(
@@ -11583,7 +11598,14 @@ async function autoSyncLeadsWithRegisteredSuppliers() {
 
     const cleanPhone = (str: string | null | undefined) => {
       if (!str) return '';
-      let p = String(str).replace(/[\s\-\+\(\)]/g, '');
+      let p = String(str);
+      const persianDigits = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+      const arabicDigits = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+      for (let i = 0; i < 10; i++) {
+        p = p.replace(persianDigits[i], String(i)).replace(arabicDigits[i], String(i));
+      }
+      p = p.replace(/[\s\-\+\(\)]/g, '');
+      if (p.startsWith('0098')) p = p.slice(4);
       if (p.startsWith('98')) p = p.slice(2);
       if (p.startsWith('0')) p = p.slice(1);
       return p;
@@ -11764,6 +11786,12 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
     const completedLeads = leads.filter(l => l.status === 'COMPLETED').length;
     const totalCommissions = leads.reduce((sum, l) => sum + (l.commission || 0), 0);
     const paidCommissions = leads.filter(l => l.status === 'COMPLETED').reduce((sum, l) => sum + (l.commission || 0), 0);
+    const inProgressCommissions = leads.filter(l => (l.status === 'ASSIGNED' || l.status === 'IN_NEGOTIATION') && l.ambassadorId).reduce((sum, l) => sum + (l.commission || 0), 0);
+    const potentialSavingsCommissions = leads.filter(l => !l.isPublished && l.status !== 'COMPLETED').reduce((sum, l) => sum + (l.commission || 0), 0);
+
+    const savedPatternConfig = await prisma.systemConfig.findUnique({
+      where: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE' }
+    }).catch(() => null);
 
     res.json({
       leads,
@@ -11777,7 +11805,10 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
         completedLeads,
         totalCommissions,
         paidCommissions,
-        ambassadorsCount: ambassadors.length
+        inProgressCommissions,
+        potentialSavingsCommissions,
+        ambassadorsCount: ambassadors.length,
+        savedInvitePattern: savedPatternConfig?.value?.trim() || ''
       }
     });
   } catch (err: any) {
@@ -11909,6 +11940,152 @@ app.post('/api/admin/leads/bulk-publish', authenticateToken, requireAdmin, async
     });
   } catch (err: any) {
     res.status(500).json({ error: 'خطا در انتشار گروهی پرونده‌ها' });
+  }
+});
+
+// Send Direct SMS or MelliPayamak Pattern to Leads
+app.post('/api/admin/leads/send-sms', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { leadIds, scope, patternCode, patternValues, messageText, autoPublishAfterSend } = req.body;
+
+    // 1. If patternCode is provided, save or update it in systemConfig as default
+    if (patternCode && String(patternCode).trim()) {
+      const cleanCode = String(patternCode).trim();
+      await prisma.systemConfig.upsert({
+        where: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE' },
+        update: { value: cleanCode },
+        create: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE', value: cleanCode }
+      }).catch((e: any) => console.warn('Could not save MELLIPAYAMAK_PATTERN_LEAD_INVITE', e));
+    }
+
+    // 2. Determine target leads
+    let targetLeads: any[] = [];
+    if (Array.isArray(leadIds) && leadIds.length > 0) {
+      targetLeads = await prisma.lead.findMany({
+        where: { id: { in: leadIds.map(Number) } }
+      });
+    } else if (scope === 'DRAFTS') {
+      targetLeads = await prisma.lead.findMany({
+        where: { isPublished: false, status: { not: 'COMPLETED' } }
+      });
+    } else if (scope === 'PENDING') {
+      targetLeads = await prisma.lead.findMany({
+        where: { status: 'PENDING' }
+      });
+    } else {
+      // ALL active non-completed
+      targetLeads = await prisma.lead.findMany({
+        where: { status: { not: 'COMPLETED' } }
+      });
+    }
+
+    if (targetLeads.length === 0) {
+      return res.status(400).json({ error: 'هیچ تامین‌کننده‌ای در دامنه انتخابی یافت نشد.' });
+    }
+
+    // 3. Extract and sanitize mobile numbers (strictly 09..., zero landlines)
+    const persianDigits = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+    const arabicDigits = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+    const cleanMobile = (raw: string | null | undefined): string | null => {
+      if (!raw) return null;
+      let text = String(raw);
+      for (let i = 0; i < 10; i++) {
+        text = text.replace(persianDigits[i], String(i)).replace(arabicDigits[i], String(i));
+      }
+      let digits = text.replace(/\D/g, '');
+      if (digits.startsWith('0098')) digits = '0' + digits.slice(4);
+      else if (digits.startsWith('98') && digits.length === 12) digits = '0' + digits.slice(2);
+      else if (digits.length === 10 && digits.startsWith('9')) digits = '0' + digits;
+      
+      if (/^09[0-9]{9}$/.test(digits)) {
+        return digits;
+      }
+      return null;
+    };
+
+    // Build recipients list: each mobile with lead info
+    const seenMobiles = new Set<string>();
+    const recipients: { mobile: string; lead: any }[] = [];
+
+    for (const lead of targetLeads) {
+      const mob = cleanMobile(lead.phone);
+      if (mob && !seenMobiles.has(mob)) {
+        seenMobiles.add(mob);
+        recipients.push({ mobile: mob, lead });
+      }
+      // Check additional phones if any
+      if (lead.additionalPhones) {
+        const parts = String(lead.additionalPhones).split(/[,;\n]/);
+        for (const p of parts) {
+          const addMob = cleanMobile(p);
+          if (addMob && !seenMobiles.has(addMob)) {
+            seenMobiles.add(addMob);
+            recipients.push({ mobile: addMob, lead });
+          }
+        }
+      }
+    }
+
+    if (recipients.length === 0) {
+      return res.status(400).json({ error: 'هیچ شماره همراه معتبر (۰۹) در پرونده‌های انتخابی یافت نشد (خطوط ثابت حذف گردیدند).' });
+    }
+
+    // 4. Dispatch SMS
+    const effectivePattern = patternCode?.trim() || (await prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE' } }).catch(() => null))?.value?.trim();
+    
+    let sentCount = 0;
+    let failedCount = 0;
+    const errors: string[] = [];
+
+    for (const item of recipients) {
+      try {
+        let result: any;
+        if (effectivePattern) {
+          // Send Pattern
+          const values = Array.isArray(patternValues) && patternValues.length > 0
+            ? patternValues.map((v: string) => v.replace('{name}', item.lead.name))
+            : [item.lead.name];
+          result = await sendMelliPayamakPattern(item.mobile, effectivePattern, values);
+        } else if (messageText && String(messageText).trim()) {
+          // Send Normal SMS
+          const text = String(messageText).replace('{name}', item.lead.name);
+          result = await sendSmsViaMelliPayamak(item.mobile, text);
+        } else {
+          return res.status(400).json({ error: 'لطفاً شناسه پترن ملی‌پیامک یا متن پیامک را مشخص فرمایید.' });
+        }
+
+        if (result && result.success) {
+          sentCount++;
+        } else {
+          failedCount++;
+          errors.push(`${item.mobile}: ${result?.error || 'خطا در ارسال'}`);
+        }
+      } catch (smsErr: any) {
+        failedCount++;
+        errors.push(`${item.mobile}: ${smsErr?.message || 'خطا'}`);
+      }
+    }
+
+    // 5. If autoPublishAfterSend requested, publish the targeted leads
+    if (autoPublishAfterSend && targetLeads.length > 0) {
+      const idsToPublish = targetLeads.map((l: any) => l.id);
+      await prisma.lead.updateMany({
+        where: { id: { in: idsToPublish } },
+        data: { isPublished: true }
+      });
+    }
+
+    return res.json({
+      success: true,
+      totalRecipients: recipients.length,
+      sentCount,
+      failedCount,
+      errors: errors.slice(0, 5),
+      message: `ارسال پیامک انجام شد: ${sentCount} پیامک با موفقیت ارسال شد${failedCount > 0 ? ` (${failedCount} ناموفق)` : ''}.`
+    });
+  } catch (err: any) {
+    console.error('Error sending SMS to leads:', err);
+    return res.status(500).json({ error: 'خطا در ارسال پیامک: ' + (err?.message || '') });
   }
 });
 

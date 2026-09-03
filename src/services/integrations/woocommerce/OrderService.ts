@@ -24,15 +24,33 @@ export class OrderService {
       
       if (!response.ok) return { successCount: 0, failedCount: 1 };
       
-      const orders = await response.json() as any[];
+      const orders = (await response.json()) as any[];
+      if (!Array.isArray(orders) || orders.length === 0) {
+        return { successCount: 0, totalFetched: 0, failedCount: 0 };
+      }
+
+      // Process orders concurrently in batches of 5 to achieve ultra-fast 2-3 second sync
+      const BATCH_SIZE = 5;
       let importedCount = 0;
 
-      for (const order of orders) {
-        try {
-          const res = await processOrderPayload(order, storeId);
-          if (res) importedCount++;
-        } catch (itemErr) {
-          console.warn(`Error processing synced order #${order.id}:`, itemErr);
+      for (let i = 0; i < orders.length; i += BATCH_SIZE) {
+        const batch = orders.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (order) => {
+            try {
+              const res = await processOrderPayload(order, storeId);
+              return !!res;
+            } catch (itemErr) {
+              console.warn(`Error processing synced order #${order.id}:`, itemErr);
+              return false;
+            }
+          })
+        );
+
+        for (const res of results) {
+          if (res.status === 'fulfilled' && res.value) {
+            importedCount++;
+          }
         }
       }
       

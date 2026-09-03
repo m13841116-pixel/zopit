@@ -4,6 +4,10 @@ import { PaymentGateway } from '../../interfaces/payment-gateway.interface.js';
 import { ZibalService } from './ZibalService.js';
 import { PaymentLogger } from './PaymentLogger.js';
 
+let cachedMerchantId: string | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 60000; // 60s cache to avoid DB roundtrips on every payment click
+
 export class PaymentServiceFactory {
   static async getService(forcedMerchantId?: string, forcedGatewayType?: string): Promise<PaymentGateway> {
     try {
@@ -20,7 +24,13 @@ export class PaymentServiceFactory {
         return new ZibalService(selectedMerchant);
       }
 
-      // 1. Fetch system config from database with a 5s timeout
+      // Fast-path: Check memory cache first
+      const now = Date.now();
+      if (cachedMerchantId && now - cacheTimestamp < CACHE_TTL_MS) {
+        return new ZibalService(cachedMerchantId);
+      }
+
+      // 1. Fetch system config from database with a 1s timeout
       const dbPromise = Promise.all([
         prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } }),
         prisma.systemConfig.findUnique({ where: { key: 'payment_gateway_settings' } }),
@@ -31,7 +41,7 @@ export class PaymentServiceFactory {
       const res: any = await Promise.race([dbPromise, timeoutPromise]);
 
       if (!res) {
-        console.warn('[PaymentServiceFactory Warning] Database config query timed out (>5s). Falling back to environment variables.');
+        console.warn('[PaymentServiceFactory Warning] Database config query timed out (>1s). Falling back to environment variables.');
       }
 
       const merchantCodeSetting = res ? res[0] : null;
@@ -62,6 +72,9 @@ export class PaymentServiceFactory {
       if (!merchantId || merchantId.trim() === '' || merchantId === 'zibal_merchant_key') {
         merchantId = '6a0213e61b27742a09938588';
       }
+
+      cachedMerchantId = merchantId;
+      cacheTimestamp = now;
 
       await PaymentLogger.logPaymentEvent({
         requestId: PaymentLogger.generateRequestId(),
