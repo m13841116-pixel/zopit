@@ -152,6 +152,18 @@ export default function LeadsManager() {
   // Direct SMS Configuration State
   const [smsMethod, setSmsMethod] = useState<"pattern" | "text">("pattern");
   const [smsPatternCode, setSmsPatternCode] = useState("");
+  const [patternVar2, setPatternVar2] = useState("");
+  const [patternVar3, setPatternVar3] = useState("");
+  const [testMobileNumber, setTestMobileNumber] = useState("");
+  const [isSendingTestSms, setIsSendingTestSms] = useState(false);
+  const [showRecipientList, setShowRecipientList] = useState(false);
+  const [bulkSmsReport, setBulkSmsReport] = useState<{
+    totalRecipients: number;
+    sentCount: number;
+    failedCount: number;
+    errors?: string[];
+    message: string;
+  } | null>(null);
   const [smsDirectText, setSmsDirectText] = useState("سلام و احترام، از شما جهت حضور به عنوان تامین‌کننده کالا در سامانه دعوت به عمل می‌آید.");
   const [autoPublishAfterSms, setAutoPublishAfterSms] = useState(true);
   const [isSendingSms, setIsSendingSms] = useState(false);
@@ -685,6 +697,20 @@ export default function LeadsManager() {
     return filtered;
   }, [targetLeadsForExport, exportIncludeAdditional, exportOnlyMobiles, exportDeduplicate]);
 
+  // Statistics on mobile vs landline / filtered
+  const phoneStats = useMemo(() => {
+    let rawTotal = 0;
+    targetLeadsForExport.forEach((lead) => {
+      rawTotal += cleanPhoneDigits(lead.phone).length;
+      if (exportIncludeAdditional) {
+        rawTotal += cleanPhoneDigits(lead.additionalPhones).length;
+      }
+    });
+    const validMobiles = exportData.filter((i) => i.isMobile).length;
+    const landlines = Math.max(0, rawTotal - validMobiles);
+    return { rawTotal, validMobiles, landlines };
+  }, [targetLeadsForExport, exportIncludeAdditional, exportData]);
+
   // Export handlers
   const handleDownloadMeliPayamakExcel = () => {
     // Strictly Iranian mobile numbers in English format (09xxxxxxxxx), under each other, single column, zero extra info
@@ -732,6 +758,52 @@ export default function LeadsManager() {
     toast.success(`فایل دفترچه تلفن ملی‌پیامک (۲ ستونه) با ${phonebookRows.length.toLocaleString("fa-IR")} مخاطب دانلود شد.`);
   };
 
+  const handleSendTestSms = async () => {
+    if (!testMobileNumber.trim()) {
+      toast.error("لطفاً شماره موبایل مقصد را جهت دریافت پیامک تستی وارد نمایید.");
+      return;
+    }
+    if (smsMethod === "pattern" && !smsPatternCode.trim()) {
+      toast.error("لطفاً شناسه پترن تایید شده ملی‌پیامک را وارد فرمایید.");
+      return;
+    }
+
+    setIsSendingTestSms(true);
+    try {
+      const token = localStorage.getItem("token");
+      const patternValues = [
+        "{name}",
+        ...(patternVar2.trim() ? [patternVar2.trim()] : []),
+        ...(patternVar3.trim() ? [patternVar3.trim()] : [])
+      ];
+
+      const res = await fetch("/api/admin/leads/send-sms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          testMobile: testMobileNumber.trim(),
+          patternCode: smsMethod === "pattern" ? smsPatternCode.trim() : undefined,
+          patternValues: smsMethod === "pattern" ? patternValues : undefined,
+          messageText: smsMethod === "text" ? smsDirectText.trim() : undefined
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "خطا در ارسال پیامک تستی به ملی‌پیامک");
+      }
+
+      toast.success(data.message || `پیامک تستی پترن با موفقیت به شماره ${testMobileNumber} ارسال شد.`);
+    } catch (err: any) {
+      toast.error(err.message || "خطا در ارسال پیامک تستی");
+    } finally {
+      setIsSendingTestSms(false);
+    }
+  };
+
   const handleSendDirectSms = async () => {
     const validMobiles = exportData.filter((item) => item.isMobile);
     if (validMobiles.length === 0) {
@@ -750,9 +822,15 @@ export default function LeadsManager() {
     }
 
     setIsSendingSms(true);
+    setBulkSmsReport(null);
     try {
       const token = localStorage.getItem("token");
       const targetLeadIds = Array.from(new Set(validMobiles.map((m) => m.leadId)));
+      const patternValues = [
+        "{name}",
+        ...(patternVar2.trim() ? [patternVar2.trim()] : []),
+        ...(patternVar3.trim() ? [patternVar3.trim()] : [])
+      ];
 
       const res = await fetch("/api/admin/leads/send-sms", {
         method: "POST",
@@ -763,6 +841,7 @@ export default function LeadsManager() {
         body: JSON.stringify({
           leadIds: targetLeadIds,
           patternCode: smsMethod === "pattern" ? smsPatternCode.trim() : undefined,
+          patternValues: smsMethod === "pattern" ? patternValues : undefined,
           messageText: smsMethod === "text" ? smsDirectText.trim() : undefined,
           autoPublishAfterSend: autoPublishAfterSms
         })
@@ -773,9 +852,16 @@ export default function LeadsManager() {
         throw new Error(data.error || "خطا در ارسال پیامک");
       }
 
+      setBulkSmsReport({
+        totalRecipients: data.totalRecipients || validMobiles.length,
+        sentCount: data.sentCount ?? 0,
+        failedCount: data.failedCount ?? 0,
+        errors: data.errors || [],
+        message: data.message || `ارسال پیامک انبوه ملی‌پیامک انجام شد: ${data.sentCount} پیامک تحویل داده شد.`
+      });
+
       toast.success(data.message || `ارسال پیامک با موفقیت انجام شد: ${data.sentCount} پیامک تحویل داده شد.`);
       await fetchLeadsData();
-      setShowExportModal(false);
     } catch (err: any) {
       toast.error(err.message || "خطا در ارسال مستقیم پیامک");
     } finally {
@@ -923,15 +1009,32 @@ export default function LeadsManager() {
               setActiveExportTab("direct_sms");
               setShowExportModal(true);
             }}
-            className="bg-white hover:bg-purple-50 text-purple-700 border-2 border-purple-200 hover:border-purple-300 px-3.5 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-xs group"
-            title="ارسال مستقیم وب‌سرویس ملی‌پیامک یا دانلود اکسل شماره‌ها"
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-sm shadow-purple-600/20 group"
+            title="ارسال پیامک انبوه از طریق وب‌سرویس ملی‌پیامک بر اساس پترن تایید شده"
           >
-            <Smartphone className="w-3.5 h-3.5 text-purple-600 group-hover:scale-110 transition-transform" />
-            <span>پیامک و اکسل ملی‌پیامک</span>
-            <span className="bg-purple-100 text-purple-800 text-[10px] px-1.5 py-0.2 rounded-full font-black">
-              {leads.length.toLocaleString("fa-IR")}
+            <Smartphone className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+            <span>ارسال پیامک انبوه ملی‌پیامک</span>
+            <span className="bg-purple-800 text-purple-100 text-[10px] px-2 py-0.5 rounded-full font-black font-mono">
+              {phoneStats.validMobiles.toLocaleString("fa-IR")}
             </span>
           </button>
+
+          {/* Quick SMS for Selected Leads */}
+          {selectedLeadIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setExportScope("SELECTED");
+                setActiveExportTab("direct_sms");
+                setShowExportModal(true);
+              }}
+              className="bg-purple-50 hover:bg-purple-100 text-purple-900 border-2 border-purple-300 px-3.5 py-2.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-xs animate-fade-in"
+              title="ارسال پیامک پترن به تامین‌کنندگان انتخاب شده"
+            >
+              <SendHorizontal className="w-3.5 h-3.5 text-purple-600" />
+              <span>ارسال پترن به ({selectedLeadIds.length.toLocaleString("fa-IR")}) انتخابی</span>
+            </button>
+          )}
 
           {/* Budget & Payout Modal */}
           <button
@@ -2168,25 +2271,130 @@ export default function LeadsManager() {
             {/* TAB 1: DIRECT SMS VIA MELIPAYAMAK */}
             {activeExportTab === "direct_sms" && (
               <div className="space-y-4 animate-fade-in">
-                <div className="bg-purple-50/50 border-2 border-purple-200 p-4 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
+                {/* Auto-Filtering Statistics Banner */}
+                <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border-2 border-purple-200 p-4 rounded-2xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <span className="text-xs font-black text-purple-950 flex items-center gap-1.5">
                       <Zap className="w-4 h-4 text-purple-600" />
-                      <span>تنظیمات ارسال مستقیم وب‌سرویس ملی‌پیامک:</span>
+                      <span>فیلتر خودکار و هوشمند شماره‌های تامین‌کنندگان جهت ارسال ملی‌پیامک:</span>
                     </span>
-                    <span className="text-[11px] bg-purple-200/80 text-purple-900 font-black px-2.5 py-0.5 rounded-full">
-                      {exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} شماره همراه معتبر (۰۹)
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowRecipientList(!showRecipientList)}
+                      className="text-[11px] text-purple-700 hover:text-purple-950 font-bold flex items-center gap-1 self-end sm:self-auto cursor-pointer underline underline-offset-4"
+                    >
+                      {showRecipientList ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      <span>{showRecipientList ? "مخفی کردن لیست شماره‌ها" : "مشاهده لیست شماره‌های فیلتر شده"}</span>
+                    </button>
                   </div>
 
+                  {/* Badges / Metrics */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                    <div className="bg-white/90 border border-emerald-200 p-2.5 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div>
+                          <p className="font-black text-emerald-950">همراه‌های معتبر (۰۹...)</p>
+                          <p className="text-[10px] text-emerald-700">آماده دریافت پیامک انبوه</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black font-mono text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                        {phoneStats.validMobiles.toLocaleString("fa-IR")}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/90 border border-amber-200 p-2.5 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <div>
+                          <p className="font-black text-amber-950">خطوط ثابت و نامعتبر</p>
+                          <p className="text-[10px] text-amber-700">فیلتر خودکار (حفظ اعتبار پنل)</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black font-mono text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200">
+                        {phoneStats.landlines.toLocaleString("fa-IR")}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/90 border border-purple-200 p-2.5 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-purple-600 shrink-0" />
+                        <div>
+                          <p className="font-black text-purple-950">کل شماره‌های ثبت‌شده</p>
+                          <p className="text-[10px] text-purple-700">اصلی و شماره‌های فرعی</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black font-mono text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200">
+                        {phoneStats.rawTotal.toLocaleString("fa-IR")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Filter Switches */}
+                  <div className="flex flex-wrap items-center gap-4 pt-1 text-[11px] text-slate-700 border-t border-purple-100/70">
+                    <label className="flex items-center gap-1.5 cursor-pointer font-bold">
+                      <input
+                        type="checkbox"
+                        checked={exportIncludeAdditional}
+                        onChange={(e) => setExportIncludeAdditional(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-purple-600 accent-purple-600"
+                      />
+                      <span>شامل کردن شماره‌های فرعی پرونده‌ها ({exportData.filter(i => i.isAdditional && i.isMobile).length} مورد)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer font-bold">
+                      <input
+                        type="checkbox"
+                        checked={exportDeduplicate}
+                        onChange={(e) => setExportDeduplicate(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-purple-600 accent-purple-600"
+                      />
+                      <span>حذف شماره‌های تکراری</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Optional Recipient List Preview Drawer */}
+                {showRecipientList && (
+                  <div className="bg-white border-2 border-purple-200 rounded-2xl p-3 max-h-56 overflow-y-auto space-y-2 animate-fade-in shadow-xs">
+                    <div className="flex items-center justify-between text-xs font-black text-slate-800 pb-1 border-b border-slate-100">
+                      <span>پیش‌نمایش شماره‌های همراه فیلتر شده ({exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} مورد):</span>
+                      <span className="text-[10px] text-emerald-700">تمامی شماره‌ها با فرمت استاندارد ۰۹... تایید شدند</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 text-xs">
+                      {exportData
+                        .filter((i) => i.isMobile)
+                        .slice(0, 30)
+                        .map((item, idx) => (
+                          <div key={idx} className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex items-center justify-between">
+                            <div className="truncate pr-1">
+                              <p className="font-bold text-slate-900 truncate text-[11px]">{item.name}</p>
+                              <p className="text-[10px] text-slate-500">{item.category}</p>
+                            </div>
+                            <span className="font-mono font-bold text-purple-900 text-[11px] shrink-0 bg-purple-100/70 px-1.5 py-0.5 rounded-md" dir="ltr">
+                              {item.phone}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                    {exportData.filter((i) => i.isMobile).length > 30 && (
+                      <p className="text-[10px] text-center text-slate-400 font-bold pt-1">
+                        ... و {(exportData.filter((i) => i.isMobile).length - 30).toLocaleString("fa-IR")} شماره همراه دیگر
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Configuration Card */}
+                <div className="bg-white border-2 border-slate-200 p-4 rounded-2xl space-y-4 shadow-xs">
                   {/* SMS Method Selection */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <label
                       onClick={() => setSmsMethod("pattern")}
                       className={`p-3 rounded-xl border-2 cursor-pointer flex items-start gap-2.5 transition-all ${
                         smsMethod === "pattern"
-                          ? "bg-white border-purple-600 text-purple-950 shadow-xs"
-                          : "bg-white/60 border-slate-200 text-slate-700"
+                          ? "bg-purple-50/60 border-purple-600 text-purple-950 shadow-xs"
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                       }`}
                     >
                       <input
@@ -2197,7 +2405,10 @@ export default function LeadsManager() {
                         className="mt-0.5 text-purple-600 accent-purple-600"
                       />
                       <div>
-                        <p className="font-black text-xs">پترن خدماتی وب‌سرویس ملی‌پیامک (پیشنهادی)</p>
+                        <p className="font-black text-xs flex items-center gap-1.5">
+                          <span>پترن تایید شده ملی‌پیامک (وب‌سرویس خدماتی)</span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">پیشنهادی</span>
+                        </p>
                         <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
                           ارسال فوری، عبور تضمینی از بلک‌لیست مخابراتی، بدون نیاز به تایید ناظر
                         </p>
@@ -2208,8 +2419,8 @@ export default function LeadsManager() {
                       onClick={() => setSmsMethod("text")}
                       className={`p-3 rounded-xl border-2 cursor-pointer flex items-start gap-2.5 transition-all ${
                         smsMethod === "text"
-                          ? "bg-white border-purple-600 text-purple-950 shadow-xs"
-                          : "bg-white/60 border-slate-200 text-slate-700"
+                          ? "bg-purple-50/60 border-purple-600 text-purple-950 shadow-xs"
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                       }`}
                     >
                       <input
@@ -2222,37 +2433,106 @@ export default function LeadsManager() {
                       <div>
                         <p className="font-black text-xs">ارسال پیامک متنی آزاد (خط اختصاصی)</p>
                         <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                          ارسال متن دلخواه بدون کد الگو به مخاطبینی که دریافت پیامک تبلیغاتی دارند
+                          ارسال متن دلخواه بدون کد الگو به شماره‌هایی که دریافت پیامک تبلیغاتی دارند
                         </p>
                       </div>
                     </label>
                   </div>
 
-                  {/* Pattern Code Input */}
+                  {/* Pattern Code Input & Variables */}
                   {smsMethod === "pattern" ? (
-                    <div className="space-y-1.5 pt-1">
-                      <label className="text-xs font-black text-slate-800 flex items-center justify-between">
-                        <span>کد پترن خدماتی ملی‌پیامک (Pattern Code):</span>
-                        {stats.savedInvitePattern && (
-                          <span className="text-[11px] text-purple-700 font-bold">
-                            الگوی پیش‌فرض سیستم: {stats.savedInvitePattern}
+                    <div className="space-y-3 pt-1 border-t border-slate-100">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                            <span>کد پترن تایید شده در پنل ملی‌پیامک (Pattern Code / BodyId):</span>
+                            <span className="text-red-500 font-bold">*</span>
+                          </label>
+                          {stats.savedInvitePattern && (
+                            <button
+                              type="button"
+                              onClick={() => setSmsPatternCode(stats.savedInvitePattern || "")}
+                              className="text-[11px] text-purple-700 hover:text-purple-900 font-black flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>استفاده از الگوی ذخیره‌شده سیستم ({stats.savedInvitePattern})</span>
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          value={smsPatternCode}
+                          onChange={(e) => setSmsPatternCode(e.target.value)}
+                          placeholder="مثلاً: 248910"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 focus:bg-white border-2 border-purple-200 focus:border-purple-600 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none transition-all shadow-2xs"
+                        />
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          این کد همان شناسه الگوی تایید شده (Body ID) در منوی «ارسال بر اساس پترن» پنل ملی‌پیامک شماست.
+                        </p>
+                      </div>
+
+                      {/* Pattern Dynamic Variables */}
+                      <div className="bg-purple-50/40 border border-purple-100 p-3 rounded-xl space-y-2 text-xs">
+                        <p className="font-black text-purple-950 text-xs flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                          <span>متغیرهای پترن تایید شده (Parameters):</span>
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                              متغیر ۱ (پیش‌فرض: نام تامین‌کننده):
+                            </label>
+                            <input
+                              type="text"
+                              disabled
+                              value="{name} (نام پرونده به صورت خودکار)"
+                              className="w-full px-2.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[11px] text-slate-600 font-bold cursor-not-allowed"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                              متغیر ۲ (اختیاری):
+                            </label>
+                            <input
+                              type="text"
+                              value={patternVar2}
+                              onChange={(e) => setPatternVar2(e.target.value)}
+                              placeholder="مثلاً: zopit.ir یا نام سامانه"
+                              className="w-full px-2.5 py-2 bg-white border border-slate-200 focus:border-purple-600 rounded-lg text-[11px] text-slate-900 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                              متغیر ۳ (اختیاری):
+                            </label>
+                            <input
+                              type="text"
+                              value={patternVar3}
+                              onChange={(e) => setPatternVar3(e.target.value)}
+                              placeholder="مثلاً: شماره پشتیبانی یا کد دعوت"
+                              className="w-full px-2.5 py-2 bg-white border border-slate-200 focus:border-purple-600 rounded-lg text-[11px] text-slate-900 outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Live Preview of first lead */}
+                      {targetLeadsForExport.length > 0 && (
+                        <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500 font-bold text-[11px]">پیش‌نمایش نام متغیر اول:</span>
+                            <strong className="text-purple-900 font-black text-xs">
+                              {targetLeadsForExport[0].name}
+                            </strong>
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            (برای تک‌تک تامین‌کنندگان نام اختصاصی جایگزین خواهد شد)
                           </span>
-                        )}
-                      </label>
-                      <input
-                        type="text"
-                        dir="ltr"
-                        value={smsPatternCode}
-                        onChange={(e) => setSmsPatternCode(e.target.value)}
-                        placeholder="مثلاً: 248910"
-                        className="w-full px-3.5 py-2.5 bg-white border-2 border-purple-200 focus:border-purple-600 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none transition-all"
-                      />
-                      <p className="text-[11px] text-slate-500">
-                        متغیر اول پترن به صورت هوشمند با «نام تامین‌کننده / فروشگاه» مقداردهی می‌شود.
-                      </p>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div className="space-y-1.5 pt-1">
+                    <div className="space-y-1.5 pt-1 border-t border-slate-100">
                       <label className="text-xs font-black text-slate-800">متن پیامک ارسالی:</label>
                       <textarea
                         rows={3}
@@ -2261,11 +2541,50 @@ export default function LeadsManager() {
                         placeholder="متن پیامک را وارد کنید..."
                         className="w-full px-3.5 py-2 bg-white border-2 border-purple-200 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none leading-relaxed"
                       />
+                      <p className="text-[11px] text-slate-500">
+                        می‌توانید از عبارت <code className="bg-slate-100 px-1 rounded text-purple-700 font-mono">{"{name}"}</code> جهت درج نام تامین‌کننده در متن استفاده نمایید.
+                      </p>
                     </div>
                   )}
 
+                  {/* Single Test SMS Section */}
+                  <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-2">
+                    <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 text-purple-600" />
+                      <span>تست ارسال تکی قبل از ارسال انبوه:</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={testMobileNumber}
+                        onChange={(e) => setTestMobileNumber(e.target.value)}
+                        placeholder="شماره موبایل تست (مثلاً: 09121234567)"
+                        className="flex-1 px-3 py-2 bg-white border border-slate-300 focus:border-purple-600 rounded-xl text-xs font-mono text-slate-900 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendTestSms}
+                        disabled={isSendingTestSms || !testMobileNumber.trim()}
+                        className="bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                      >
+                        {isSendingTestSms ? (
+                          <span>در حال تست...</span>
+                        ) : (
+                          <>
+                            <Send className="w-3 h-3" />
+                            <span>ارسال پیامک تستی</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      با این تست سریع، از تایید بودن پترن و کارکرد صحیح وب‌سرویس در پنل ملی‌پیامک اطمینان حاصل کنید.
+                    </p>
+                  </div>
+
                   {/* Auto-Publish Toggle */}
-                  <label className="flex items-center gap-2.5 p-3 bg-white rounded-xl border border-purple-200 cursor-pointer text-xs shadow-2xs">
+                  <label className="flex items-center gap-2.5 p-3 bg-purple-50/40 rounded-xl border border-purple-200 cursor-pointer text-xs shadow-2xs">
                     <input
                       type="checkbox"
                       checked={autoPublishAfterSms}
@@ -2283,27 +2602,67 @@ export default function LeadsManager() {
                   </label>
                 </div>
 
+                {/* Bulk SMS Result Report Card */}
+                {bulkSmsReport && (
+                  <div className="bg-emerald-50 border-2 border-emerald-300 p-4 rounded-2xl space-y-2 animate-fade-in text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-emerald-950 flex items-center gap-1.5 text-xs">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>گزارش نتیجه ارسال پیامک انبوه ملی‌پیامک:</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setBulkSmsReport(null)}
+                        className="text-emerald-700 hover:text-emerald-950 font-bold"
+                      >
+                        بستن گزارش
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-bold pt-1">
+                      <span className="text-emerald-800">
+                        موفق: <strong className="font-mono text-sm">{bulkSmsReport.sentCount.toLocaleString("fa-IR")}</strong> پیامک
+                      </span>
+                      {bulkSmsReport.failedCount > 0 && (
+                        <span className="text-red-700">
+                          ناموفق: <strong className="font-mono text-sm">{bulkSmsReport.failedCount.toLocaleString("fa-IR")}</strong>
+                        </span>
+                      )}
+                      <span className="text-slate-600">
+                        کل گیرندگان: <strong className="font-mono text-sm">{bulkSmsReport.totalRecipients.toLocaleString("fa-IR")}</strong>
+                      </span>
+                    </div>
+                    {bulkSmsReport.errors && bulkSmsReport.errors.length > 0 && (
+                      <div className="text-[10px] text-red-700 bg-white/80 p-2 rounded-lg border border-red-200 mt-2 space-y-0.5">
+                        <p className="font-bold">برخی خطاهای ثبت‌شده:</p>
+                        {bulkSmsReport.errors.slice(0, 3).map((err, idx) => (
+                          <p key={idx} className="font-mono">{err}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Send Button */}
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
                   <div className="text-xs text-slate-600 font-medium">
-                    <span>تعداد دریافت‌کنندگان: </span>
-                    <strong className="text-purple-700 font-bold font-mono">
+                    <span>تعداد دریافت‌کنندگان تایید شده: </span>
+                    <strong className="text-purple-700 font-bold font-mono text-sm">
                       {exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} شماره همراه
                     </strong>
-                    <span className="text-[10px] text-slate-400 mr-1.5">(خطوط ثابت ۰۲۱ و غیره مستثنی گردیدند)</span>
+                    <span className="text-[10px] text-slate-400 mr-1.5">(خطوط ثابت ۰۲۱ و نامعتبر مستثنی گردیدند)</span>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleSendDirectSms}
                     disabled={isSendingSms || exportData.filter((i) => i.isMobile).length === 0}
-                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-md shadow-purple-600/30 transition-all cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-7 py-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-purple-600/30 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <SendHorizontal className="w-4 h-4" />
                     <span>
                       {isSendingSms
-                        ? "در حال ارسال پیامک..."
-                        : `ارسال آنی پیامک به ${exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} شماره`}
+                        ? "در حال ارسال پیامک‌های پترن..."
+                        : `ارسال پیامک انبوه به ${exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} شماره همراه`}
                     </span>
                   </button>
                 </div>

@@ -11946,44 +11946,9 @@ app.post('/api/admin/leads/bulk-publish', authenticateToken, requireAdmin, async
 // Send Direct SMS or MelliPayamak Pattern to Leads
 app.post('/api/admin/leads/send-sms', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
-    const { leadIds, scope, patternCode, patternValues, messageText, autoPublishAfterSend } = req.body;
+    const { leadIds, scope, patternCode, patternValues, messageText, autoPublishAfterSend, testMobile } = req.body;
 
-    // 1. If patternCode is provided, save or update it in systemConfig as default
-    if (patternCode && String(patternCode).trim()) {
-      const cleanCode = String(patternCode).trim();
-      await prisma.systemConfig.upsert({
-        where: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE' },
-        update: { value: cleanCode },
-        create: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE', value: cleanCode }
-      }).catch((e: any) => console.warn('Could not save MELLIPAYAMAK_PATTERN_LEAD_INVITE', e));
-    }
-
-    // 2. Determine target leads
-    let targetLeads: any[] = [];
-    if (Array.isArray(leadIds) && leadIds.length > 0) {
-      targetLeads = await prisma.lead.findMany({
-        where: { id: { in: leadIds.map(Number) } }
-      });
-    } else if (scope === 'DRAFTS') {
-      targetLeads = await prisma.lead.findMany({
-        where: { isPublished: false, status: { not: 'COMPLETED' } }
-      });
-    } else if (scope === 'PENDING') {
-      targetLeads = await prisma.lead.findMany({
-        where: { status: 'PENDING' }
-      });
-    } else {
-      // ALL active non-completed
-      targetLeads = await prisma.lead.findMany({
-        where: { status: { not: 'COMPLETED' } }
-      });
-    }
-
-    if (targetLeads.length === 0) {
-      return res.status(400).json({ error: 'هیچ تامین‌کننده‌ای در دامنه انتخابی یافت نشد.' });
-    }
-
-    // 3. Extract and sanitize mobile numbers (strictly 09..., zero landlines)
+    // Helper: Normalize Iranian mobile numbers (09..., 11 digits)
     const persianDigits = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
     const arabicDigits = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
     const cleanMobile = (raw: string | null | undefined): string | null => {
@@ -12003,7 +11968,81 @@ app.post('/api/admin/leads/send-sms', authenticateToken, requireAdmin, async (re
       return null;
     };
 
-    // Build recipients list: each mobile with lead info
+    // 1. If patternCode is provided, save or update it in systemConfig as default
+    if (patternCode && String(patternCode).trim()) {
+      const cleanCode = String(patternCode).trim();
+      await prisma.systemConfig.upsert({
+        where: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE' },
+        update: { value: cleanCode },
+        create: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE', value: cleanCode }
+      }).catch((e: any) => console.warn('Could not save MELLIPAYAMAK_PATTERN_LEAD_INVITE', e));
+    }
+
+    const effectivePattern = patternCode?.trim() || (await prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE' } }).catch(() => null))?.value?.trim();
+
+    // 2. Fast Test SMS mode: Send only to testMobile without sending to leads
+    if (testMobile && String(testMobile).trim()) {
+      const cleanTest = cleanMobile(String(testMobile).trim());
+      if (!cleanTest) {
+        return res.status(400).json({ error: 'شماره موبایل تستی وارد شده معتبر نیست. لطفاً یک شماره موبایل معتبر (با ۰۹ و ۱۱ رقم) وارد نمایید.' });
+      }
+
+      const values = Array.isArray(patternValues) && patternValues.length > 0
+        ? patternValues.map((v: string) => String(v).replace(/\{name\}/g, 'تامین‌کننده نمونه').replace(/\{phone\}/g, cleanTest))
+        : ['تامین‌کننده نمونه'];
+
+      let testRes: any;
+      if (effectivePattern) {
+        testRes = await sendMelliPayamakPattern(cleanTest, effectivePattern, values);
+      } else if (messageText && String(messageText).trim()) {
+        const text = String(messageText).replace(/\{name\}/g, 'تامین‌کننده نمونه').replace(/\{phone\}/g, cleanTest);
+        testRes = await sendSmsViaMelliPayamak(cleanTest, text);
+      } else {
+        return res.status(400).json({ error: 'کد پترن تایید شده یا متن پیامک مشخص نشده است.' });
+      }
+
+      if (testRes && testRes.success) {
+        return res.json({
+          success: true,
+          isTest: true,
+          testMobile: cleanTest,
+          trackingCode: testRes.trackingCode || '',
+          message: `پیامک تستی با موفقیت به شماره ${cleanTest} ارسال شد.`
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          isTest: true,
+          error: testRes?.error || 'ارسال پیامک تستی به سامانه ملی‌پیامک با خطا مواجه شد.'
+        });
+      }
+    }
+
+    // 3. Determine target leads
+    let targetLeads: any[] = [];
+    if (Array.isArray(leadIds) && leadIds.length > 0) {
+      targetLeads = await prisma.lead.findMany({
+        where: { id: { in: leadIds.map(Number) } }
+      });
+    } else if (scope === 'DRAFTS') {
+      targetLeads = await prisma.lead.findMany({
+        where: { isPublished: false, status: { not: 'COMPLETED' } }
+      });
+    } else if (scope === 'PENDING') {
+      targetLeads = await prisma.lead.findMany({
+        where: { status: 'PENDING' }
+      });
+    } else {
+      targetLeads = await prisma.lead.findMany({
+        where: { status: { not: 'COMPLETED' } }
+      });
+    }
+
+    if (targetLeads.length === 0) {
+      return res.status(400).json({ error: 'هیچ تامین‌کننده‌ای در دامنه انتخابی یافت نشد.' });
+    }
+
+    // 4. Extract and sanitize mobile numbers (strictly 09..., zero landlines)
     const seenMobiles = new Set<string>();
     const recipients: { mobile: string; lead: any }[] = [];
 
@@ -12030,43 +12069,49 @@ app.post('/api/admin/leads/send-sms', authenticateToken, requireAdmin, async (re
       return res.status(400).json({ error: 'هیچ شماره همراه معتبر (۰۹) در پرونده‌های انتخابی یافت نشد (خطوط ثابت حذف گردیدند).' });
     }
 
-    // 4. Dispatch SMS
-    const effectivePattern = patternCode?.trim() || (await prisma.systemConfig.findUnique({ where: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE' } }).catch(() => null))?.value?.trim();
-    
+    // 5. Dispatch SMS in concurrent chunks of 5 for speed & reliability
     let sentCount = 0;
     let failedCount = 0;
     const errors: string[] = [];
 
-    for (const item of recipients) {
-      try {
-        let result: any;
-        if (effectivePattern) {
-          // Send Pattern
-          const values = Array.isArray(patternValues) && patternValues.length > 0
-            ? patternValues.map((v: string) => v.replace('{name}', item.lead.name))
-            : [item.lead.name];
-          result = await sendMelliPayamakPattern(item.mobile, effectivePattern, values);
-        } else if (messageText && String(messageText).trim()) {
-          // Send Normal SMS
-          const text = String(messageText).replace('{name}', item.lead.name);
-          result = await sendSmsViaMelliPayamak(item.mobile, text);
-        } else {
-          return res.status(400).json({ error: 'لطفاً شناسه پترن ملی‌پیامک یا متن پیامک را مشخص فرمایید.' });
-        }
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
+      const chunk = recipients.slice(i, i + CHUNK_SIZE);
+      const results = await Promise.allSettled(
+        chunk.map(async (item) => {
+          let result: any;
+          if (effectivePattern) {
+            const values = Array.isArray(patternValues) && patternValues.length > 0
+              ? patternValues.map((v: string) => String(v).replace(/\{name\}/g, item.lead.name || 'تامین‌کننده').replace(/\{phone\}/g, item.mobile))
+              : [item.lead.name || 'تامین‌کننده'];
+            result = await sendMelliPayamakPattern(item.mobile, effectivePattern, values);
+          } else if (messageText && String(messageText).trim()) {
+            const text = String(messageText).replace(/\{name\}/g, item.lead.name || 'تامین‌کننده').replace(/\{phone\}/g, item.mobile);
+            result = await sendSmsViaMelliPayamak(item.mobile, text);
+          } else {
+            throw new Error('کد پترن خدماتی یا متن پیامک مشخص نشده است.');
+          }
+          return { item, result };
+        })
+      );
 
-        if (result && result.success) {
-          sentCount++;
+      for (const res of results) {
+        if (res.status === 'fulfilled') {
+          const { item, result } = res.value;
+          if (result && result.success) {
+            sentCount++;
+          } else {
+            failedCount++;
+            errors.push(`${item.mobile}: ${result?.error || 'خطا در ارسال'}`);
+          }
         } else {
           failedCount++;
-          errors.push(`${item.mobile}: ${result?.error || 'خطا در ارسال'}`);
+          errors.push(`خطای پردازش: ${res.reason?.message || res.reason}`);
         }
-      } catch (smsErr: any) {
-        failedCount++;
-        errors.push(`${item.mobile}: ${smsErr?.message || 'خطا'}`);
       }
     }
 
-    // 5. If autoPublishAfterSend requested, publish the targeted leads
+    // 6. If autoPublishAfterSend requested, publish the targeted leads
     if (autoPublishAfterSend && targetLeads.length > 0) {
       const idsToPublish = targetLeads.map((l: any) => l.id);
       await prisma.lead.updateMany({
@@ -12075,13 +12120,22 @@ app.post('/api/admin/leads/send-sms', authenticateToken, requireAdmin, async (re
       });
     }
 
+    // Log Activity
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.userId,
+        action: 'LEAD_BULK_SMS_SENT',
+        details: `ارسال پیامک انبوه ملی‌پیامک (پترن: ${effectivePattern || 'متنی'}) به ${sentCount} تامین‌کننده (${failedCount} ناموفق)`
+      }
+    }).catch(() => {});
+
     return res.json({
       success: true,
       totalRecipients: recipients.length,
       sentCount,
       failedCount,
       errors: errors.slice(0, 5),
-      message: `ارسال پیامک انجام شد: ${sentCount} پیامک با موفقیت ارسال شد${failedCount > 0 ? ` (${failedCount} ناموفق)` : ''}.`
+      message: `ارسال پیامک انبوه ملی‌پیامک انجام شد: ${sentCount} پیامک با موفقیت تحویل داده شد${failedCount > 0 ? ` (${failedCount} شماره ناموفق)` : ''}.`
     });
   } catch (err: any) {
     console.error('Error sending SMS to leads:', err);
