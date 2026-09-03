@@ -7048,10 +7048,25 @@ app.get('/api/public/wallet/deposit/callback', async (req: any, res: any) => {
 
     if (success === '0' || !trackId) {
       return res.send(`
-        <script>
-          alert('پرداخت لغو شد یا ناموفق بود.');
-          window.location.href = '/dashboard/store/wallet';
-        </script>
+        <!DOCTYPE html>
+        <html dir="rtl" lang="fa">
+        <head>
+          <meta charset="utf-8" />
+          <title>خطا در تراکنش - زوپیت</title>
+          <style>
+            body { font-family: tahoma, sans-serif; text-align: center; padding: 50px; background: #f8fafc; color: #334155; }
+            .card { background: #ffffff; max-width: 480px; margin: 0 auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+            .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background: #ef4444; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2 style="color: #ef4444;">❌ پرداخت لغو شد</h2>
+            <p>پرداخت لغو شد یا ناموفق بود.</p>
+            <a href="/dashboard/store/wallet" class="btn">بازگشت به کیف پول</a>
+          </div>
+        </body>
+        </html>
       `);
     }
 
@@ -7093,18 +7108,50 @@ app.get('/api/public/wallet/deposit/callback', async (req: any, res: any) => {
         });
       });
 
+      const refId = verification.refId || trackId.toString();
       res.send(`
-        <script>
-          alert('موجودی کیف پول شما با موفقیت افزایش یافت.');
-          window.location.href = '/dashboard/store/wallet';
-        </script>
+        <!DOCTYPE html>
+        <html dir="rtl" lang="fa">
+        <head>
+          <meta charset="utf-8" />
+          <title>افزایش موجودی - زوپیت</title>
+          <style>
+            body { font-family: tahoma, sans-serif; text-align: center; padding: 50px; background: #f8fafc; color: #334155; }
+            .card { background: #ffffff; max-width: 480px; margin: 0 auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+            .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background: #10b981; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2 style="color: #10b981;">✅ افزایش موجودی موفق</h2>
+            <p>مبلغ ${amount.toLocaleString("fa-IR")} تومان با موفقیت به کیف پول شما اضافه شد.</p>
+            <p style="color: #64748b; font-size: 14px; font-weight: bold; margin-top: 15px;">شماره پیگیری تراکنش: ${refId}</p>
+            <a href="/dashboard/store/wallet" class="btn">بازگشت به کیف پول</a>
+          </div>
+        </body>
+        </html>
       `);
     } else {
       res.send(`
-        <script>
-          alert('تایید تراکنش با خطا مواجه شد.');
-          window.location.href = '/dashboard/store/wallet';
-        </script>
+        <!DOCTYPE html>
+        <html dir="rtl" lang="fa">
+        <head>
+          <meta charset="utf-8" />
+          <title>خطا در افزایش موجودی - زوپیت</title>
+          <style>
+            body { font-family: tahoma, sans-serif; text-align: center; padding: 50px; background: #f8fafc; color: #334155; }
+            .card { background: #ffffff; max-width: 480px; margin: 0 auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+            .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background: #ef4444; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2 style="color: #ef4444;">❌ خطا در تراکنش</h2>
+            <p>تایید تراکنش با خطا مواجه شد یا پرداخت انجام نشده است.</p>
+            <a href="/dashboard/store/wallet" class="btn">بازگشت به کیف پول</a>
+          </div>
+        </body>
+        </html>
       `);
     }
   } catch (err: any) {

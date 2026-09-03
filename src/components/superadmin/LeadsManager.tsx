@@ -129,6 +129,7 @@ export default function LeadsManager() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBulkPublishing, setIsBulkPublishing] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
 
   // SMS & Excel Export Modal State
   const [showExportModal, setShowExportModal] = useState(false);
@@ -290,12 +291,26 @@ export default function LeadsManager() {
   };
 
   const handleBulkPublish = async () => {
-    const draftCount = leads.filter(l => !l.isPublished).length;
-    if (draftCount === 0) {
-      toast.error("هیچ پرونده پیش‌نویسی برای انتشار وجود ندارد.");
-      return;
+    // If we have selections, publish those. Otherwise, default to publishing all drafts.
+    const isSelective = selectedLeadIds.length > 0;
+    
+    let countToPublish = 0;
+    let confirmMsg = "";
+
+    if (isSelective) {
+      countToPublish = selectedLeadIds.length;
+      confirmMsg = `آیا از انتشار ${countToPublish.toLocaleString("fa-IR")} پرونده انتخاب‌شده برای تأمین‌یاب‌ها اطمینان دارید؟`;
+    } else {
+      const draftCount = leads.filter(l => !l.isPublished).length;
+      if (draftCount === 0) {
+        toast.error("هیچ پرونده پیش‌نویسی برای انتشار وجود ندارد.");
+        return;
+      }
+      countToPublish = draftCount;
+      confirmMsg = `آیا از انتشار همگانی ${countToPublish.toLocaleString("fa-IR")} پرونده پیش‌نویس برای تمام تأمین‌یاب‌ها اطمینان دارید؟ (در صورت تمایل به انتشار موارد خاص، می‌توانید آنها را از لیست تیک بزنید)`;
     }
-    if (!window.confirm(`آیا از انتشار همگانی ${draftCount.toLocaleString("fa-IR")} پرونده پیش‌نویس برای تمام تأمین‌یاب‌ها اطمینان دارید؟`)) {
+
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 
@@ -308,11 +323,12 @@ export default function LeadsManager() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({})
+        body: JSON.stringify({ leadIds: isSelective ? selectedLeadIds : [] })
       });
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success(data.message || "پرونده‌ها با موفقیت برای تأمین‌یاب‌ها منتشر شدند.");
+        setSelectedLeadIds([]); // Clear selection
         fetchLeadsData();
       } else {
         toast.error(data.error || "خطا در انتشار گروهی");
@@ -956,7 +972,13 @@ export default function LeadsManager() {
             className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-5 py-3 rounded-2xl text-xs font-black flex items-center gap-2 shrink-0 shadow-md shadow-purple-600/20 transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
           >
             <Zap className="w-4 h-4 text-purple-200" />
-            <span>{isBulkPublishing ? "در حال انتشار..." : "انتشار همگانی همه پیش‌نویس‌ها"}</span>
+            <span>
+              {isBulkPublishing 
+                ? "در حال انتشار..." 
+                : selectedLeadIds.length > 0 
+                  ? `انتشار ${selectedLeadIds.length.toLocaleString("fa-IR")} پرونده انتخابی` 
+                  : "انتشار همگانی همه پیش‌نویس‌ها"}
+            </span>
           </button>
         </div>
       )}
@@ -1035,6 +1057,20 @@ export default function LeadsManager() {
               <table className="w-full text-right text-xs min-w-[750px]">
                 <thead className="bg-purple-50/60 border-b border-purple-100 text-slate-900 font-black">
                   <tr>
+                    <th className="p-4 w-10">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                        checked={filteredLeads.length > 0 && selectedLeadIds.length === filteredLeads.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedLeadIds(filteredLeads.map(l => l.id));
+                          } else {
+                            setSelectedLeadIds([]);
+                          }
+                        }}
+                      />
+                    </th>
                     <th className="p-4">نام تامین‌کننده / برند</th>
                     <th className="p-4">شماره تماس</th>
                     <th className="p-4">آدرس</th>
@@ -1046,7 +1082,7 @@ export default function LeadsManager() {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="p-12 text-center text-slate-500 font-bold">
+                      <td colSpan={7} className="p-12 text-center text-slate-500 font-bold">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
                           <span className="text-xs text-slate-700 font-bold">در حال بارگذاری اطلاعات تامین‌کنندگان...</span>
@@ -1055,7 +1091,7 @@ export default function LeadsManager() {
                     </tr>
                   ) : fetchError ? (
                     <tr>
-                      <td colSpan={6} className="p-10 text-center">
+                      <td colSpan={7} className="p-10 text-center">
                         <div className="max-w-md mx-auto p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col items-center gap-3">
                           <span className="text-xs font-bold text-amber-900">{fetchError}</span>
                           <button
@@ -1070,7 +1106,7 @@ export default function LeadsManager() {
                     </tr>
                   ) : filteredLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-12 text-center text-slate-500 font-bold">
+                      <td colSpan={7} className="p-12 text-center text-slate-500 font-bold">
                         تامین‌کننده‌ای با مشخصات مدنظر یافت نشد.
                       </td>
                     </tr>
@@ -1084,6 +1120,20 @@ export default function LeadsManager() {
                           key={lead.id}
                           className="hover:bg-purple-50/40 transition-colors"
                         >
+                          <td className="p-4">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                              checked={selectedLeadIds.includes(lead.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedLeadIds(prev => [...prev, lead.id]);
+                                } else {
+                                  setSelectedLeadIds(prev => prev.filter(id => id !== lead.id));
+                                }
+                              }}
+                            />
+                          </td>
                           {/* 1. Name & Manager */}
                           <td className="p-4">
                             <div className="flex items-center gap-2 flex-wrap">

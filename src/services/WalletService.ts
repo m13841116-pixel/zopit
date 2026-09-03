@@ -187,6 +187,10 @@ export class WalletService {
     });
   }
 
+  private static generateTrackId(): string {
+    return `TRK-${Math.floor(10000000 + Math.random() * 90000000)}`;
+  }
+
   /**
    * Request a payout (withdrawal) to a bank account (Shaba).
    * Debits the wallet immediately to reserve/lock funds and creates a PayoutRequest.
@@ -253,6 +257,7 @@ export class WalletService {
           amount: payoutAmount,
           shaba,
           status: PayoutStatus.PROCESSING,
+          trackId: WalletService.generateTrackId(),
         },
       });
 
