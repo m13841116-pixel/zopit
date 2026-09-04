@@ -73,9 +73,17 @@ export default function SuperAdminDashboard({
     return "overview";
   });
 
+  useEffect(() => {
+    const expectedPath = `/admin/${activeTab}`;
+    if (window.location.pathname !== expectedPath) {
+      window.history.pushState(null, "", expectedPath);
+    }
+  }, [activeTab]);
+
   // Valid superadmin tab IDs for route fallback protection
   const validAdminTabs = [
     "overview",
+    "analytics",
     "all-users",
     "products",
     "orders",
@@ -133,7 +141,7 @@ export default function SuperAdminDashboard({
     { id: "products", label: "محصولات", icon: Package },
     { id: "orders", label: "سفارشات", icon: ShoppingCart, badge: badges.orders },
     { id: "settlements", label: "تسویه حساب", icon: Wallet, badge: badges.settlements },
-    { id: "pro-accounts", label: "اکانت پرو و پرو مکس", icon: Crown },
+    { id: "pro-accounts", label: "اکانت پرو مکس (PRO MAX)", icon: Crown },
     { id: "tickets", label: "تیکت‌ها", icon: MessageSquare, badge: badges.tickets },
     { id: "top-stores", label: "فروشندگان برتر و VIP", icon: Award },
     { id: "announcements", label: "مدیریت اعلانات", icon: Megaphone },

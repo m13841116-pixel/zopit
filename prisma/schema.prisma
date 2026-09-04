@@ -822,6 +822,7 @@ model Lead {
   isPublished      Boolean  @default(false)
   ambassadorId     Int?
   supplierId       Int?
+  smsPatterns      String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   ambassador       User?    @relation("AmbassadorLeads", fields: [ambassadorId], references: [id])

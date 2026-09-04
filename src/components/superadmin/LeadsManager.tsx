@@ -44,6 +44,14 @@ import {
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 
+export interface SupplierSmsPattern {
+  id: string;
+  title: string;
+  code: string;
+  var2?: string;
+  var3?: string;
+}
+
 interface Lead {
   id: number;
   name: string;
@@ -57,6 +65,7 @@ interface Lead {
   status: "PENDING" | "ASSIGNED" | "IN_NEGOTIATION" | "COMPLETED" | "CANCELLED";
   isPublished?: boolean;
   ambassadorId?: number | null;
+  smsPatterns?: string | null;
   ambassador?: {
     id: number;
     username: string;
@@ -133,7 +142,8 @@ export default function LeadsManager() {
     category: "لوازم جانبی و دیجیتال",
     commission: 150000,
     ambassadorId: "",
-    isPublished: false
+    isPublished: false,
+    smsPatterns: [] as SupplierSmsPattern[]
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -251,7 +261,8 @@ export default function LeadsManager() {
         category: formData.category.trim(),
         commission: Number(formData.commission),
         isPublished: Boolean(formData.isPublished),
-        ambassadorId: formData.ambassadorId ? Number(formData.ambassadorId) : null
+        ambassadorId: formData.ambassadorId ? Number(formData.ambassadorId) : null,
+        smsPatterns: JSON.stringify(formData.smsPatterns || [])
       };
 
       let res;
@@ -290,7 +301,8 @@ export default function LeadsManager() {
           category: "لوازم جانبی و دیجیتال",
           commission: 150000,
           ambassadorId: "",
-          isPublished: false
+          isPublished: false,
+          smsPatterns: []
         });
         fetchLeadsData();
       } else {
@@ -439,6 +451,19 @@ export default function LeadsManager() {
 
   const openEditModal = (lead: Lead) => {
     setEditingLead(lead);
+
+    let parsedPatterns: SupplierSmsPattern[] = [];
+    if (lead.smsPatterns) {
+      try {
+        parsedPatterns = typeof lead.smsPatterns === "string" ? JSON.parse(lead.smsPatterns) : lead.smsPatterns;
+        if (!Array.isArray(parsedPatterns)) parsedPatterns = [];
+      } catch {
+        if (typeof lead.smsPatterns === "string" && lead.smsPatterns.trim()) {
+          parsedPatterns = [{ id: "p1", title: "الگوی اصلی", code: lead.smsPatterns.trim() }];
+        }
+      }
+    }
+
     setFormData({
       name: lead.name,
       managerName: lead.managerName || "",
@@ -449,7 +474,8 @@ export default function LeadsManager() {
       category: lead.category || "لوازم جانبی و دیجیتال",
       commission: lead.commission || 150000,
       ambassadorId: lead.ambassadorId ? String(lead.ambassadorId) : "",
-      isPublished: Boolean(lead.isPublished)
+      isPublished: Boolean(lead.isPublished),
+      smsPatterns: parsedPatterns
     });
     setShowAdditionalPhones(Boolean(lead.additionalPhones));
     setShowMoreFormFields(Boolean(lead.additionalPhones || lead.websiteUrl || lead.category !== "لوازم جانبی و دیجیتال" || lead.commission !== 150000 || lead.ambassadorId));
@@ -617,6 +643,47 @@ export default function LeadsManager() {
         return leads;
     }
   }, [leads, filteredLeads, exportScope, selectedLeadIds]);
+
+  // Available SMS patterns extracted from target leads or system defaults
+  const availableLeadPatterns = useMemo(() => {
+    const list: Array<{ id?: string; title: string; code: string; var2?: string; var3?: string; supplierName?: string }> = [];
+    const seenCodes = new Set<string>();
+
+    const targetList = targetLeadsForExport.length > 0 ? targetLeadsForExport : leads;
+    targetList.forEach((lead) => {
+      if (lead.smsPatterns) {
+        try {
+          const arr = typeof lead.smsPatterns === "string" ? JSON.parse(lead.smsPatterns) : lead.smsPatterns;
+          if (Array.isArray(arr)) {
+            arr.forEach((p: any) => {
+              if (p && p.code && !seenCodes.has(p.code)) {
+                seenCodes.add(p.code);
+                list.push({
+                  id: p.id,
+                  title: p.title || `پترن ${p.code}`,
+                  code: String(p.code).trim(),
+                  var2: p.var2,
+                  var3: p.var3,
+                  supplierName: lead.name
+                });
+              }
+            });
+          }
+        } catch {}
+      }
+    });
+
+    if (stats.savedInvitePattern && !seenCodes.has(stats.savedInvitePattern)) {
+      list.unshift({
+        title: "الگوی پیش‌فرض دعوت سامانه",
+        code: stats.savedInvitePattern,
+        var2: "zopit.ir",
+        var3: ""
+      });
+    }
+
+    return list;
+  }, [targetLeadsForExport, leads, stats.savedInvitePattern]);
 
   // Processed export items for preview and export
   const exportData = useMemo(() => {
@@ -1071,15 +1138,16 @@ export default function LeadsManager() {
                 category: "لوازم جانبی و دیجیتال",
                 commission: 150000,
                 ambassadorId: "",
-                isPublished: false
+                isPublished: false,
+                smsPatterns: []
               });
               setShowAdditionalPhones(false);
               setShowMoreFormFields(false);
               setShowAddModal(true);
             }}
-            className="bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white px-4 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/25 transition-all cursor-pointer shrink-0"
+            className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400/40 hover:ring-emerald-400 hover:scale-[1.02] transition-all cursor-pointer shrink-0"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4 stroke-[3]" />
             <span>افزودن تامین‌کننده جدید</span>
           </button>
         </div>
@@ -1434,6 +1502,27 @@ export default function LeadsManager() {
                                   {lead.category}
                                 </span>
                               )}
+                              {(() => {
+                                let patternCount = 0;
+                                try {
+                                  if (lead.smsPatterns) {
+                                    const parsed = typeof lead.smsPatterns === "string" ? JSON.parse(lead.smsPatterns) : lead.smsPatterns;
+                                    if (Array.isArray(parsed)) patternCount = parsed.length;
+                                  }
+                                } catch {}
+                                if (patternCount > 0) {
+                                  return (
+                                    <span
+                                      className="inline-flex items-center gap-1 text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200"
+                                      title={`${patternCount} الگوی پیامک ثبت شده`}
+                                    >
+                                      <MessageSquare className="w-2.5 h-2.5 shrink-0 text-indigo-600" />
+                                      <span>{patternCount} پترن</span>
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
                               {lead.websiteUrl && (
                                 <a
                                   href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
@@ -1566,6 +1655,31 @@ export default function LeadsManager() {
 
                               <button
                                 type="button"
+                                onClick={() => {
+                                  setSelectedLeadIds([lead.id]);
+                                  setExportScope("SELECTED");
+                                  setActiveExportTab("direct_sms");
+                                  // Pre-fill with lead's first pattern if available
+                                  try {
+                                    if (lead.smsPatterns) {
+                                      const parsed = typeof lead.smsPatterns === "string" ? JSON.parse(lead.smsPatterns) : lead.smsPatterns;
+                                      if (Array.isArray(parsed) && parsed.length > 0) {
+                                        setSmsPatternCode(parsed[0].code || "");
+                                        setPatternVar2(parsed[0].var2 || "");
+                                        setPatternVar3(parsed[0].var3 || "");
+                                      }
+                                    }
+                                  } catch {}
+                                  setShowExportModal(true);
+                                }}
+                                className="p-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
+                                title="ارسال پیامک پترن به این تامین‌کننده"
+                              >
+                                <SendHorizontal className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={() => openEditModal(lead)}
                                 className="p-2 bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
                                 title="ویرایش"
@@ -1688,6 +1802,80 @@ export default function LeadsManager() {
                   </span>
                 </div>
               </div>
+
+              {/* SMS Patterns configured for this supplier */}
+              {(() => {
+                let patterns: SupplierSmsPattern[] = [];
+                try {
+                  if (viewingLeadDetails.smsPatterns) {
+                    const parsed = typeof viewingLeadDetails.smsPatterns === "string" ? JSON.parse(viewingLeadDetails.smsPatterns) : viewingLeadDetails.smsPatterns;
+                    if (Array.isArray(parsed)) patterns = parsed;
+                  }
+                } catch {}
+
+                return (
+                  <div className="p-3 bg-indigo-50/70 rounded-2xl border border-indigo-200 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-indigo-950 font-black text-xs flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>الگوهای پیامک پترن ({patterns.length.toLocaleString("fa-IR")})</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = viewingLeadDetails;
+                          setViewingLeadDetails(null);
+                          setSelectedLeadIds([target.id]);
+                          setExportScope("SELECTED");
+                          setActiveExportTab("direct_sms");
+                          if (patterns.length > 0) {
+                            setSmsPatternCode(patterns[0].code || "");
+                            setPatternVar2(patterns[0].var2 || "");
+                            setPatternVar3(patterns[0].var3 || "");
+                          }
+                          setShowExportModal(true);
+                        }}
+                        className="text-[10px] font-black text-indigo-700 bg-white hover:bg-indigo-100 px-2 py-1 rounded-lg border border-indigo-200 flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <SendHorizontal className="w-3 h-3 text-indigo-600" />
+                        <span>ارسال پیامک</span>
+                      </button>
+                    </div>
+
+                    {patterns.length === 0 ? (
+                      <p className="text-[11px] text-slate-500">الگوی اختصاصی برای این تامین‌کننده تعریف نشده است.</p>
+                    ) : (
+                      <div className="space-y-1.5 pt-1 max-h-36 overflow-y-auto">
+                        {patterns.map((p, idx) => (
+                          <div key={idx} className="p-2 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-[11px]">
+                            <div>
+                              <span className="font-bold text-slate-900 block">{p.title || `الگو ${idx + 1}`}</span>
+                              <span className="font-mono text-slate-500 text-[10px] dir-ltr">کد پترن: {p.code}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = viewingLeadDetails;
+                                setViewingLeadDetails(null);
+                                setSelectedLeadIds([target.id]);
+                                setExportScope("SELECTED");
+                                setActiveExportTab("direct_sms");
+                                setSmsPatternCode(p.code || "");
+                                setPatternVar2(p.var2 || "");
+                                setPatternVar3(p.var3 || "");
+                                setShowExportModal(true);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors"
+                            >
+                              ارسال
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="pt-2 flex items-center justify-between gap-2">
@@ -1943,6 +2131,169 @@ export default function LeadsManager() {
                     className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/10 text-left placeholder:text-slate-400 transition-all"
                   />
                 </div>
+              </div>
+
+              {/* 5. SMS Patterns Section (تنظیمات پترن پیامک اختصاصی تامین‌کننده) */}
+              <div className="p-3.5 bg-gradient-to-br from-indigo-50/70 via-purple-50/50 to-white rounded-2xl border-2 border-indigo-200/90 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900">
+                        الگوهای پترن پیامک ملی‌پیامک (Pattern)
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        امکان تعریف چندین کد پترن جهت ارسال خودکار پیامک وب‌سرویس به این تامین‌کننده
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = Date.now().toString();
+                      const defaultCode = stats.savedInvitePattern || "";
+                      setFormData({
+                        ...formData,
+                        smsPatterns: [
+                          ...formData.smsPatterns,
+                          {
+                            id: newId,
+                            title: `الگوی ${formData.smsPatterns.length + 1}`,
+                            code: defaultCode,
+                            var2: "zopit.ir",
+                            var3: ""
+                          }
+                        ]
+                      });
+                    }}
+                    className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-[11px] font-black flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>افزودن پترن</span>
+                  </button>
+                </div>
+
+                {formData.smsPatterns.length === 0 ? (
+                  <div className="p-3 bg-white/80 border border-dashed border-indigo-200 rounded-xl text-center space-y-2">
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      هنوز الگوی پیامکی اختصاصی برای این تامین‌کننده ثبت نشده است.
+                    </p>
+                    {stats.savedInvitePattern && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            smsPatterns: [
+                              {
+                                id: Date.now().toString(),
+                                title: "الگوی دعوت به همکاری",
+                                code: stats.savedInvitePattern || "",
+                                var2: "zopit.ir",
+                                var3: ""
+                              }
+                            ]
+                          });
+                        }}
+                        className="text-[11px] text-indigo-700 hover:text-indigo-900 font-black inline-flex items-center gap-1.5 cursor-pointer bg-indigo-50/80 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>افزودن الگوی پیش‌فرض دعوت سامانه ({stats.savedInvitePattern})</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    {formData.smsPatterns.map((pat, idx) => (
+                      <div
+                        key={pat.id || idx}
+                        className="p-3 bg-white border border-indigo-100 rounded-xl shadow-2xs space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-black text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md shrink-0">
+                            پترن #{idx + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={pat.title}
+                            onChange={(e) => {
+                              const updated = [...formData.smsPatterns];
+                              updated[idx] = { ...updated[idx], title: e.target.value };
+                              setFormData({ ...formData, smsPatterns: updated });
+                            }}
+                            placeholder="عنوان الگو (مثلاً: دعوت همکاری، اطلاع‌رسانی هاست، یادآوری)"
+                            className="flex-1 px-2.5 py-1 text-[11px] font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = formData.smsPatterns.filter((_, i) => i !== idx);
+                              setFormData({ ...formData, smsPatterns: updated });
+                            }}
+                            className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                            title="حذف این پترن"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-700 mb-0.5">
+                              کد پترن (BodyId) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              dir="ltr"
+                              value={pat.code}
+                              onChange={(e) => {
+                                const updated = [...formData.smsPatterns];
+                                updated[idx] = { ...updated[idx], code: e.target.value };
+                                setFormData({ ...formData, smsPatterns: updated });
+                              }}
+                              placeholder="مثال: 248910"
+                              className="w-full px-2.5 py-1.5 text-xs font-mono font-black text-slate-900 bg-indigo-50/40 border border-indigo-200 rounded-lg outline-none focus:border-indigo-600 text-left"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-700 mb-0.5">
+                              متغیر ۲ (اختیاری)
+                            </label>
+                            <input
+                              type="text"
+                              value={pat.var2 || ""}
+                              onChange={(e) => {
+                                const updated = [...formData.smsPatterns];
+                                updated[idx] = { ...updated[idx], var2: e.target.value };
+                                setFormData({ ...formData, smsPatterns: updated });
+                              }}
+                              placeholder="zopit.ir"
+                              className="w-full px-2 py-1.5 text-[11px] text-slate-800 bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-600"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-700 mb-0.5">
+                              متغیر ۳ (اختیاری)
+                            </label>
+                            <input
+                              type="text"
+                              value={pat.var3 || ""}
+                              onChange={(e) => {
+                                const updated = [...formData.smsPatterns];
+                                updated[idx] = { ...updated[idx], var3: e.target.value };
+                                setFormData({ ...formData, smsPatterns: updated });
+                              }}
+                              placeholder="کد یا توضیحات"
+                              className="w-full px-2 py-1.5 text-[11px] text-slate-800 bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-600"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* EXPANDABLE SECTION BUTTON */}
@@ -2442,6 +2793,48 @@ export default function LeadsManager() {
                   {/* Pattern Code Input & Variables */}
                   {smsMethod === "pattern" ? (
                     <div className="space-y-3 pt-1 border-t border-slate-100">
+                      {/* Available Patterns Quick Selector */}
+                      {availableLeadPatterns.length > 0 && (
+                        <div className="bg-indigo-50/70 border border-indigo-200 p-3 rounded-2xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>الگوهای پترن ثبت‌شده در پرونده تامین‌کنندگان:</span>
+                            </span>
+                            <span className="text-[10px] text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-full border border-indigo-200">
+                              {availableLeadPatterns.length} الگو در دسترس
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {availableLeadPatterns.map((pat, pidx) => (
+                              <button
+                                key={pidx}
+                                type="button"
+                                onClick={() => {
+                                  setSmsPatternCode(pat.code);
+                                  if (pat.var2) setPatternVar2(pat.var2);
+                                  if (pat.var3) setPatternVar3(pat.var3);
+                                  toast.success(`الگوی «${pat.title}» انتخاب شد.`);
+                                }}
+                                className={`text-[11px] px-2.5 py-1.5 rounded-xl border font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                  smsPatternCode === pat.code
+                                    ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                    : "bg-white hover:bg-indigo-100/70 text-slate-800 border-indigo-200 hover:border-indigo-300"
+                                }`}
+                              >
+                                <span>{pat.title || `پترن ${pat.code}`}</span>
+                                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${smsPatternCode === pat.code ? "bg-indigo-700 text-white" : "bg-indigo-50 text-indigo-700 font-black"}`}>
+                                  {pat.code}
+                                </span>
+                                {pat.supplierName && (
+                                  <span className="text-[9px] opacity-75">({pat.supplierName})</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-black text-slate-900 flex items-center gap-1.5">

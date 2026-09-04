@@ -518,7 +518,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       path.startsWith("/customer") ||
       path.startsWith("/referrer");
 
-    if (!isDashboardPath && path !== newUrl) {
+    if (path !== newUrl) {
       if (path === "/" && view === "explore") {
         // keep '/' as explore
       } else {
@@ -637,8 +637,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
   };
 
   // Login form state
-  const [loginUsername, setLoginUsername] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [loginUsername, setLoginUsername] = useState(() => typeof window !== "undefined" ? localStorage.getItem("saved_username") || "" : "");
+  const [loginPassword, setLoginPassword] = useState(() => typeof window !== "undefined" ? localStorage.getItem("saved_password") || "" : "");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginShake, setLoginShake] = useState(false);
   const [publicMessages, setPublicMessages] = useState<any[]>([]);
@@ -1228,6 +1228,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
       localStorage.setItem("token", data.token);
       setToken(data.token);
       setCurrentUser(data.user);
+      
+      // Save for auto-fill on next login
+      localStorage.setItem("saved_username", loginUsername);
+      if (loginPassword) localStorage.setItem("saved_password", loginPassword);
+      
       showNotification("ورود با موفقیت انجام شد.", "success");
       
       const userRole = data.user?.role;
@@ -1936,7 +1941,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               <button
                                 type="button"
                                 onClick={() => setLoginOtpCode(loginSimulatedCode)}
-                                className="w-full p-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-bold flex items-center justify-between cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-right"
+                                className="w-full p-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-text-primary font-bold flex items-center justify-between cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-right"
                               >
                                 <span>کد تست شبیه‌سازی‌شده: <strong className="font-mono text-sm text-indigo-600 dark:text-indigo-400">{loginSimulatedCode}</strong></span>
                                 <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded font-bold">کلیک جهت درج خودکار</span>
@@ -2353,7 +2358,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                     {/* Tab 1: Direct SMS Login */}
                     {forgotTab === "sms_login" && (
                       <form onSubmit={handleForgotOtpDirectLogin} className="space-y-4">
-                        <div className="p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-medium leading-relaxed">
+                        <div className="p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-text-primary font-medium leading-relaxed">
                           با وارد کردن شماره همراه، کد تایید برای شما پیامک شده و می‌توانید بدون نیاز به رمز وارد حساب خود شوید.
                         </div>
 
@@ -2380,7 +2385,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               type="button"
                               onClick={() => handleSendForgotOtp()}
                               disabled={loading || forgotOtpTimer > 0}
-                              className="px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+                              className="px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-text-primary border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
                             >
                               {forgotOtpTimer > 0 ? (
                                 <span className="font-mono">{Math.floor(forgotOtpTimer / 60)}:{(forgotOtpTimer % 60).toString().padStart(2, '0')}</span>
@@ -2401,7 +2406,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               کد ورود با پیامک ارسال شد.
                             </span>
                             {forgotSimulatedCode && (
-                              <span className="font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-900 dark:text-slate-100">
+                              <span className="font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-text-secondary">
                                 کد تست: {forgotSimulatedCode}
                               </span>
                             )}
@@ -2474,7 +2479,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               type="button"
                               onClick={() => handleSendForgotOtp()}
                               disabled={loading || forgotOtpTimer > 0}
-                              className="px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+                              className="px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-text-primary border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
                             >
                               {forgotOtpTimer > 0 ? (
                                 <span className="font-mono">{Math.floor(forgotOtpTimer / 60)}:{(forgotOtpTimer % 60).toString().padStart(2, '0')}</span>
@@ -2495,7 +2500,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                               کد تایید پیامک شد.
                             </span>
                             {forgotSimulatedCode && (
-                              <span className="font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-900 dark:text-slate-100">
+                              <span className="font-mono font-bold bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-text-secondary">
                                 کد تست: {forgotSimulatedCode}
                               </span>
                             )}
@@ -2877,25 +2882,25 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
               {/* 3. TAMINYAB REGISTRATION FORM */}
               {view === "ambassador_form" && (
                 <div className="max-w-md mx-auto py-12 px-4 animate-fade-in text-right">
-                  <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
-                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-800">
+                  <div className="bg-card border border-border-default/80 rounded-3xl p-8 shadow-2xl shadow-indigo-500/5 relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-border-subtle">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                        <h2 className="text-2xl font-black text-text-primary flex items-center gap-3">
                           <ZopitLogo size="sm" />
                           ثبت‌نام تأمین‌یاب
                         </h2>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 font-bold">عضویت سریع و آسان به عنوان تأمین‌یاب زوپیت</p>
+                        <p className="text-xs text-text-muted mt-2 font-bold">عضویت سریع و آسان به عنوان تأمین‌یاب زوپیت</p>
                       </div>
                       <button
                         onClick={() => setView("role_select")}
-                        className="p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl transition-colors cursor-pointer"
+                        className="p-2.5 bg-surface hover:bg-border-default text-text-muted hover:text-text-primary rounded-2xl transition-colors cursor-pointer"
                       >
                         <ArrowRight className="w-5 h-5" />
                       </button>
                     </div>
                     <form onSubmit={handleReferrerRegister} className="space-y-5">
                       <div>
-                        <label className="block text-xs font-black text-slate-900 dark:text-slate-100 mb-1.5">
+                        <label className="block text-xs font-black text-text-secondary mb-1.5">
                           نام و نام خانوادگی <span className="text-indigo-600 dark:text-indigo-400">*</span>
                         </label>
                         <input
@@ -2903,13 +2908,13 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                           required
                           value={refForm.firstName}
                           onChange={(e) => setRefForm({ ...refForm, firstName: e.target.value })}
-                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-extrabold focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
+                          className="w-full px-4 py-3 bg-background border rounded-xl text-sm font-extrabold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-text-primary"
                           placeholder="مثال: علی احمدی"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-black text-slate-900 dark:text-slate-100 mb-1.5">
+                        <label className="block text-xs font-black text-text-secondary mb-1.5">
                           شماره موبایل (نام کاربری) <span className="text-indigo-600 dark:text-indigo-400">*</span>
                         </label>
                         <input
@@ -2917,14 +2922,14 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                           required
                           value={refForm.mobile}
                           onChange={(e) => setRefForm({ ...refForm, mobile: e.target.value, username: e.target.value })}
-                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono font-black text-left focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
+                          className="w-full px-4 py-3 bg-background border rounded-xl text-sm font-mono font-black text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-text-primary"
                           placeholder="0912..."
                           dir="ltr"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-black text-slate-900 dark:text-slate-100 mb-1.5">
+                        <label className="block text-xs font-black text-text-secondary mb-1.5">
                           رمز عبور <span className="text-indigo-600 dark:text-indigo-400">*</span>
                         </label>
                         <input
@@ -2932,7 +2937,7 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                           required
                           value={refForm.password}
                           onChange={(e) => setRefForm({ ...refForm, password: e.target.value })}
-                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono font-black text-left focus:outline-none focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
+                          className="w-full px-4 py-3 bg-background border rounded-xl text-sm font-mono font-black text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-text-primary"
                           placeholder="••••••••"
                           dir="ltr"
                         />
@@ -3264,11 +3269,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
               {/* SUPPLIER RULES */}
               {termsTab === "supplier" && (
                 <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white font-bold space-y-1">
+                  <div className="p-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-text-primary font-bold space-y-1">
                     <p className="text-sm font-black flex items-center gap-2">
                       <Truck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> آیین‌نامه و تعهدنامه تامین‌کنندگان کالا (عمده)
                     </p>
-                    <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                    <p className="text-[11px] font-medium text-text-muted">
                       شامل تعهدات تامین اصالت کالا، بسته‌بندی، ارسال به موقع پستی و تسویه حساب کیف پول تامین‌کننده.
                     </p>
                   </div>

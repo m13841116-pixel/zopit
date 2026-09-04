@@ -149,6 +149,13 @@ export default function StoreManagerDashboard({
     }
     return "overview";
   });
+
+  useEffect(() => {
+    const expectedPath = `/store/${activeTab}`;
+    if (window.location.pathname !== expectedPath) {
+      window.history.pushState(null, "", expectedPath);
+    }
+  }, [activeTab]);
   
   const validStoreTabs = [
     "overview",

@@ -47,18 +47,19 @@ export default function PerformanceAnalytics() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-primary-default" />
+        <span className="text-xs text-text-muted font-bold">در حال بارگذاری گزارش جامع عملکرد...</span>
       </div>
     );
   }
 
-  if (!data) return null;
-
-  const currentData = activeTab === 'suppliers' ? data.suppliers : data.stores;
+  const suppliersList = data?.suppliers || [];
+  const storesList = data?.stores || [];
+  const currentData = activeTab === 'suppliers' ? suppliersList : storesList;
   
   // Sort by profit descending
-  const sortedData = [...currentData].sort((a, b) => b.profit - a.profit);
+  const sortedData = [...currentData].sort((a, b) => (b.profit || 0) - (a.profit || 0));
   const top10 = sortedData.slice(0, 10);
   
   // Format for charts
@@ -67,10 +68,10 @@ export default function PerformanceAnalytics() {
   
   const chartData = top10.map(item => ({
     name: item.name || 'بدون نام',
-    profit: item.profit,
-    volume: item[volumeKey],
-    orders: item.orders,
-    items: item.itemsSold
+    profit: item.profit || 0,
+    volume: item[volumeKey] || 0,
+    orders: item.orders || 0,
+    items: item.itemsSold || 0
   }));
 
   return (

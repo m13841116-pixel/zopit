@@ -175,6 +175,13 @@ export function SupplierDashboard({
     return "overview";
   });
 
+  useEffect(() => {
+    const expectedPath = `/supplier/${activeTab}`;
+    if (window.location.pathname !== expectedPath) {
+      window.history.pushState(null, "", expectedPath);
+    }
+  }, [activeTab]);
+
   // Valid supplier tabs for routing fallback
   const validSupplierTabs = [
     "overview",

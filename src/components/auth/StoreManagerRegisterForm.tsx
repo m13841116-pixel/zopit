@@ -112,6 +112,10 @@ export const StoreManagerRegisterForm: React.FC<StoreManagerRegisterFormProps> =
       localStorage.setItem("userRole", "STORE_MANAGER");
       localStorage.setItem("zopit_terms_accepted_global", "true");
 
+      // Save for auto-fill on next login
+      localStorage.setItem("saved_username", formData.mobile);
+      if (formData.password) localStorage.setItem("saved_password", formData.password);
+
       onSuccess(data.user, data.token);
     } catch (err: any) {
       setError(err.message || "خطا در برقراری ارتباط با سرور");

@@ -1358,6 +1358,7 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       );`,
 
       `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "managerName" TEXT;`,
+      `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "smsPatterns" TEXT;`,
       `ALTER TABLE "Lead" DROP CONSTRAINT IF EXISTS "Lead_phone_key";`,
 
       // User table columns (ALTER TABLE ADD COLUMN IF NOT EXISTS)
@@ -7527,7 +7528,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
       return res.status(400).json({ error: 'تکمیل تمامی موارد الزام‌آور از جمله کد ملی، شماره همراه و امضای دیجیتال اجباری است.' });
     }
 
-    const selectedPlan = planType === 'PRO_MAX' ? 'PRO_MAX' : 'PRO';
+    const selectedPlan = 'PRO_MAX';
 
     // Fetch settings
     const settingsRows = await prisma.systemSettings.findMany({
@@ -7544,10 +7545,9 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
     const isAutoApprove = settingsMap['pro_auto_approve'] !== 'false';
     const initialStatus = isAutoApprove ? 'APPROVED' : 'PENDING';
 
-    // Pricing calculation
-    let defaultPrice = selectedPlan === 'PRO_MAX'
-      ? parseInt(settingsMap['promax_account_price'] || '299000', 10)
-      : parseInt(settingsMap['pro_account_price'] || '189000', 10);
+    // Incredible Offer Logic: Pro Max license & package (14.8M) is 100% FREE.
+    // Only charge for high-discount Cloud Hosting (15GB SSD, 5 Core CPU, 5GB RAM) - 299,000 Tomans
+    let defaultPrice = parseInt(settingsMap['promax_account_price'] || '299000', 10);
     
     let basePrice = defaultPrice;
     let enamadCost = hasEnamad ? 50000 : 0;
@@ -11819,7 +11819,7 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
 
 app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
-    const { name, managerName, phone, additionalPhones, websiteUrl, address, category, commission, ambassadorId, status, isPublished } = req.body;
+    const { name, managerName, phone, additionalPhones, websiteUrl, address, category, commission, ambassadorId, status, isPublished, smsPatterns } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ error: 'نام و شماره تماس اصلی تامین‌کننده هدف اجباری است.' });
     }
@@ -11839,7 +11839,8 @@ app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, r
         commission: Number(commission) || 100000,
         status: status || (ambassadorId ? 'ASSIGNED' : 'PENDING'),
         isPublished: isPublished !== undefined ? Boolean(isPublished) : false,
-        ambassadorId: ambassadorId ? Number(ambassadorId) : null
+        ambassadorId: ambassadorId ? Number(ambassadorId) : null,
+        smsPatterns: smsPatterns !== undefined ? (typeof smsPatterns === 'string' ? smsPatterns : JSON.stringify(smsPatterns)) : null
       },
       include: {
         ambassador: true
@@ -11858,7 +11859,7 @@ app.post('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, r
 app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const leadId = parseInt(req.params.id);
-    const { name, managerName, phone, additionalPhones, websiteUrl, address, category, commission, status, ambassadorId, isPublished } = req.body;
+    const { name, managerName, phone, additionalPhones, websiteUrl, address, category, commission, status, ambassadorId, isPublished, smsPatterns } = req.body;
 
     const updated = await prisma.lead.update({
       where: { id: leadId },
@@ -11873,7 +11874,8 @@ app.put('/api/admin/leads/:id', authenticateToken, requireAdmin, async (req: any
         commission: commission !== undefined ? Number(commission) : undefined,
         status: status || undefined,
         isPublished: isPublished !== undefined ? Boolean(isPublished) : undefined,
-        ambassadorId: ambassadorId !== undefined ? (ambassadorId ? Number(ambassadorId) : null) : undefined
+        ambassadorId: ambassadorId !== undefined ? (ambassadorId ? Number(ambassadorId) : null) : undefined,
+        smsPatterns: smsPatterns !== undefined ? (typeof smsPatterns === 'string' ? smsPatterns : JSON.stringify(smsPatterns)) : undefined
       },
       include: { ambassador: true }
     });
@@ -12945,11 +12947,11 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     return path.join(rootDir, 'dist');
   };
 
-  const isDev = process.env.NODE_ENV !== "production" && !safeDirname.includes("dist") && !safeDirname.includes("prod_output") && !process.env.K_SERVICE;
+  const isDev = process.env.NODE_ENV !== "production";
   if (isDev) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);

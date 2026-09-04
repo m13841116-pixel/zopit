@@ -3,7 +3,24 @@ import { LogOut, LayoutDashboard, Target, Wallet, CheckCircle, Clock, Phone, Map
 import { toast } from "../GlobalToast";
 
 export default function AmbassadorDashboard({ user, onLogout }: any) {
-  const [activeTab, setActiveTab] = useState<"leads" | "wallet">("leads");
+  const [activeTab, setActiveTab] = useState<"leads" | "wallet">(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path.startsWith("/referrer/") && path.length > "/referrer/".length) {
+        const tab = path.replace("/referrer/", "");
+        if (tab === "wallet") return "wallet";
+      }
+    }
+    return "leads";
+  });
+
+  useEffect(() => {
+    const expectedPath = `/referrer/${activeTab}`;
+    if (window.location.pathname !== expectedPath) {
+      window.history.pushState(null, "", expectedPath);
+    }
+  }, [activeTab]);
+
   const [leadSubTab, setLeadSubTab] = useState<"public" | "my">("public");
   const [leads, setLeads] = useState<any[]>([]);
   const [wallet, setWallet] = useState({ balance: 0 });

@@ -434,8 +434,8 @@ export default function AllUsersList({
                       </div>
                       {u.role === "SUPPLIER" && (
                         <div className="mt-1">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold text-xs border border-indigo-500/20">
-                            کد تامین: {(1000 + u.id).toLocaleString('fa-IR')}
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold text-xs border border-indigo-500/20" dir="ltr" style={{ fontFamily: 'monospace' }}>
+                            ZPS-{1000 + u.id}
                           </span>
                         </div>
                       )}
@@ -607,8 +607,9 @@ export default function AllUsersList({
                           فرستنده مجاز زوپیت
                         </span>
                       </div>
-                      <p className="font-black text-base text-text-primary font-mono">
-                        زوپیت تامین‌کننده #{activeModalUser.id} {activeModalUser.brandName ? `(${activeModalUser.brandName})` : ""}
+                      <p className="font-black text-base text-text-primary flex items-center gap-2">
+                        <span dir="ltr" style={{ fontFamily: 'monospace' }} className="bg-slate-100 dark:bg-slate-800 px-2 rounded">ZPS-{1000 + activeModalUser.id}</span>
+                        <span>{activeModalUser.brandName ? `(${activeModalUser.brandName})` : "تامین‌کننده"}</span>
                       </p>
                       <p className="text-xs text-text-secondary leading-relaxed bg-surface p-3 rounded-xl border border-subtle">
                         آدرس کامل انبار فرستنده جهت درج روی مرسوله پستی: {activeModalUser.province || "---"}، {activeModalUser.city || "---"}، {activeModalUser.address || "آدرس ثبت نشده"} (کد پستی: {activeModalUser.postalCode || "---"})
