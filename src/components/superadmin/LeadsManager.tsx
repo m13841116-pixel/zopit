@@ -52,6 +52,58 @@ export interface SupplierSmsPattern {
   var3?: string;
 }
 
+export interface SmsPatternPreset {
+  id: string;
+  title: string;
+  code: string;
+  template: string;
+  var0Desc?: string;
+  var2?: string;
+  var3?: string;
+  isDefault?: boolean;
+}
+
+export const DEFAULT_LEAD_PATTERNS: SmsPatternPreset[] = [
+  {
+    id: "lead-pat-1",
+    title: "الگوی اصلی: دعوت تامین‌کننده (رایگان چندبرابر)",
+    code: "248910",
+    template: `مدیریت محترم {0}؛
+فروش کالایتان را رایگان چندبرابر کنید!
+اتصال به دهها فروشگاه آنلاین.
+ثبت‌نام: zopit.ir/register/supplier`,
+    var0Desc: "نام تامین‌کننده (در صورت خالی بودن: نام مدیریت)",
+    var2: "",
+    var3: "",
+    isDefault: true
+  },
+  {
+    id: "lead-pat-2",
+    title: "الگوی دوم: فرصت فروش مستقیم و بدون کارمزد",
+    code: "248911",
+    template: `مدیریت محترم {0}؛
+فرصت فروش بی‌واسطه محصولات شما به هزاران مشتری شبکه زوپیت.
+بدون کارمزد اولیه.
+لینک ثبت‌نام: zopit.ir/register/supplier`,
+    var0Desc: "نام تامین‌کننده (در صورت خالی بودن: نام مدیریت)",
+    var2: "",
+    var3: "",
+    isDefault: false
+  },
+  {
+    id: "lead-pat-3",
+    title: "الگوی سوم: یادآوری و دعوت ویژه همکاران",
+    code: "248912",
+    template: `همکار گرامی، مدیریت محترم {0}؛
+محصولاتتان را به بازارهای اینترنتی زوپیت معرفی کنید.
+عضویت سریع: zopit.ir/register/supplier`,
+    var0Desc: "نام تامین‌کننده (در صورت خالی بودن: نام مدیریت)",
+    var2: "",
+    var3: "",
+    isDefault: false
+  }
+];
+
 interface Lead {
   id: number;
   name: string;
@@ -161,10 +213,22 @@ export default function LeadsManager() {
 
   // Direct SMS Configuration State
   const [smsMethod, setSmsMethod] = useState<"pattern" | "text">("pattern");
-  const [smsPatternCode, setSmsPatternCode] = useState("");
+  const [leadPatterns, setLeadPatterns] = useState<SmsPatternPreset[]>(DEFAULT_LEAD_PATTERNS);
+  const [selectedPatternId, setSelectedPatternId] = useState<string>("lead-pat-1");
+  const [showPatternEditorModal, setShowPatternEditorModal] = useState(false);
+  const [editingPattern, setEditingPattern] = useState<SmsPatternPreset | null>(null);
+  const [patternForm, setPatternForm] = useState({
+    title: "",
+    code: "",
+    template: "",
+    var2: "",
+    var3: ""
+  });
+  const [smsPatternCode, setSmsPatternCode] = useState("248910");
   const [patternVar2, setPatternVar2] = useState("");
   const [patternVar3, setPatternVar3] = useState("");
   const [testMobileNumber, setTestMobileNumber] = useState("");
+  const [testLeadName, setTestLeadName] = useState("");
   const [isSendingTestSms, setIsSendingTestSms] = useState(false);
   const [showRecipientList, setShowRecipientList] = useState(false);
   const [bulkSmsReport, setBulkSmsReport] = useState<{
@@ -179,6 +243,21 @@ export default function LeadsManager() {
   const [isSendingSms, setIsSendingSms] = useState(false);
 
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Helper to resolve display name according to user requirement:
+  // "این متغیر صفری که تنظیم کردم اینو باید اسم اون تامین‌کننده باشه. حالا اگر نام نداشت، چون بعضی از تامین‌کننده‌ها نام ندارند، نام مدیریت رو بیاره."
+  const getLeadDisplayNameInfo = (lead: Lead | null | undefined) => {
+    if (!lead) return { name: "تامین‌کننده نمونه", source: "default" as const };
+    const shopName = (lead.name || "").trim();
+    const managerName = (lead.managerName || "").trim();
+    if (shopName && shopName !== "بدون نام" && shopName !== "-" && shopName !== "تامین‌کننده" && shopName !== "تامین کننده") {
+      return { name: shopName, source: "shop" as const };
+    }
+    if (managerName && managerName !== "بدون نام" && managerName !== "-" && managerName !== "مدیریت") {
+      return { name: managerName, source: "manager" as const };
+    }
+    return { name: "فروشگاه", source: "default" as const };
+  };
 
   useEffect(() => {
     fetchLeadsData();
@@ -201,10 +280,20 @@ export default function LeadsManager() {
         const data = await res.json();
         setLeads(data.leads || []);
         setAmbassadors(data.ambassadors || []);
+        if (data.patterns && Array.isArray(data.patterns) && data.patterns.length > 0) {
+          setLeadPatterns(data.patterns);
+          const firstPat = data.patterns.find((p: SmsPatternPreset) => p.code === smsPatternCode) || data.patterns[0];
+          if (firstPat) {
+            setSelectedPatternId(firstPat.id);
+            if (!smsPatternCode) setSmsPatternCode(firstPat.code);
+            if (firstPat.var2 && !patternVar2) setPatternVar2(firstPat.var2);
+            if (firstPat.var3 && !patternVar3) setPatternVar3(firstPat.var3);
+          }
+        }
         if (data.stats) {
           setStats(data.stats);
-          if (data.stats.savedInvitePattern) {
-            setSmsPatternCode((prev) => prev || data.stats.savedInvitePattern);
+          if (data.stats.savedInvitePattern && !smsPatternCode) {
+            setSmsPatternCode(data.stats.savedInvitePattern);
           }
         }
       } else if (res.status === 401 || res.status === 403) {
@@ -825,6 +914,139 @@ export default function LeadsManager() {
     toast.success(`فایل دفترچه تلفن ملی‌پیامک (۲ ستونه) با ${phonebookRows.length.toLocaleString("fa-IR")} مخاطب دانلود شد.`);
   };
 
+  const handleSelectPattern = (pat: SmsPatternPreset) => {
+    setSelectedPatternId(pat.id);
+    setSmsPatternCode(pat.code);
+    if (pat.var2) setPatternVar2(pat.var2);
+    if (pat.var3) setPatternVar3(pat.var3);
+    toast.success(`الگوی «${pat.title}» (کد: ${pat.code}) انتخاب شد.`);
+  };
+
+  const handleOpenNewPatternModal = () => {
+    setEditingPattern(null);
+    setPatternForm({
+      title: `الگوی ${leadPatterns.length + 1}`,
+      code: "",
+      template: `مدیریت محترم {0}؛\nفروش کالایتان را رایگان چندبرابر کنید!\nاتصال به دهها فروشگاه آنلاین.\nثبت‌نام: zopit.ir/register/supplier`,
+      var2: "",
+      var3: ""
+    });
+    setShowPatternEditorModal(true);
+  };
+
+  const handleOpenEditPatternModal = (pat: SmsPatternPreset) => {
+    setEditingPattern(pat);
+    setPatternForm({
+      title: pat.title,
+      code: pat.code,
+      template: pat.template || "",
+      var2: pat.var2 || "",
+      var3: pat.var3 || ""
+    });
+    setShowPatternEditorModal(true);
+  };
+
+  const handleSavePatternPreset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patternForm.title.trim() || !patternForm.code.trim()) {
+      toast.error("عنوان الگو و کد پترن الزامی است.");
+      return;
+    }
+
+    let updatedList: SmsPatternPreset[] = [];
+    if (editingPattern) {
+      updatedList = leadPatterns.map((p) =>
+        p.id === editingPattern.id
+          ? {
+              ...p,
+              title: patternForm.title.trim(),
+              code: patternForm.code.trim(),
+              template: patternForm.template.trim(),
+              var2: patternForm.var2.trim(),
+              var3: patternForm.var3.trim()
+            }
+          : p
+      );
+    } else {
+      const newPat: SmsPatternPreset = {
+        id: `lead-pat-${Date.now()}`,
+        title: patternForm.title.trim(),
+        code: patternForm.code.trim(),
+        template: patternForm.template.trim() || `مدیریت محترم {0}؛\nفروش کالایتان را رایگان چندبرابر کنید!\nثبت‌نام: zopit.ir/register/supplier`,
+        var0Desc: "نام تامین‌کننده (یا نام مدیریت)",
+        var2: patternForm.var2.trim(),
+        var3: patternForm.var3.trim(),
+        isDefault: false
+      };
+      updatedList = [...leadPatterns, newPat];
+      setSelectedPatternId(newPat.id);
+      setSmsPatternCode(newPat.code);
+    }
+
+    setLeadPatterns(updatedList);
+    setShowPatternEditorModal(false);
+    setEditingPattern(null);
+
+    // Save to server
+    try {
+      const token = localStorage.getItem("token");
+      await fetch("/api/admin/leads/patterns", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ patterns: updatedList })
+      });
+      toast.success("الگوی پترن با موفقیت در سیستم ذخیره گردید.");
+    } catch {
+      toast.success("الگوی پترن در حافظه مرورگر ذخیره شد.");
+    }
+  };
+
+  const handleDeletePatternPreset = async (id: string) => {
+    if (leadPatterns.length <= 1) {
+      toast.error("حداقل یک الگوی پترن باید در سیستم باقی بماند.");
+      return;
+    }
+    const updated = leadPatterns.filter((p) => p.id !== id);
+    setLeadPatterns(updated);
+    if (selectedPatternId === id) {
+      handleSelectPattern(updated[0]);
+    }
+    try {
+      const token = localStorage.getItem("token");
+      await fetch("/api/admin/leads/patterns", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ patterns: updated })
+      });
+      toast.success("الگوی پترن با موفقیت حذف گردید.");
+    } catch {}
+  };
+
+  const activeSelectedPattern = useMemo(() => {
+    return leadPatterns.find((p) => p.id === selectedPatternId) || leadPatterns.find((p) => p.code === smsPatternCode) || leadPatterns[0];
+  }, [leadPatterns, selectedPatternId, smsPatternCode]);
+
+  const renderedPreviewText = useMemo(() => {
+    const template = activeSelectedPattern?.template || `مدیریت محترم {0}؛\nفروش کالایتان را رایگان چندبرابر کنید!\nاتصال به دهها فروشگاه آنلاین.\nثبت‌نام: zopit.ir/register/supplier`;
+    const firstLead = targetLeadsForExport.length > 0 ? targetLeadsForExport[0] : null;
+    const nameInfo = getLeadDisplayNameInfo(firstLead);
+    const var0 = nameInfo.name;
+    const var1 = patternVar2.trim() || "zopit.ir";
+    const var2 = patternVar3.trim() || "021";
+
+    let text = template.replace(/\{0\}/g, var0);
+    text = text.replace(/\{1\}/g, var1);
+    text = text.replace(/\{2\}/g, var2);
+    text = text.replace(/\{name\}/g, var0);
+    return text;
+  }, [activeSelectedPattern, targetLeadsForExport, patternVar2, patternVar3]);
+
   const handleSendTestSms = async () => {
     if (!testMobileNumber.trim()) {
       toast.error("لطفاً شماره موبایل مقصد را جهت دریافت پیامک تستی وارد نمایید.");
@@ -844,6 +1066,10 @@ export default function LeadsManager() {
         ...(patternVar3.trim() ? [patternVar3.trim()] : [])
       ];
 
+      const firstLead = targetLeadsForExport.length > 0 ? targetLeadsForExport[0] : null;
+      const sampleInfo = getLeadDisplayNameInfo(firstLead);
+      const effectiveTestName = testLeadName.trim() || sampleInfo.name;
+
       const res = await fetch("/api/admin/leads/send-sms", {
         method: "POST",
         headers: {
@@ -852,6 +1078,7 @@ export default function LeadsManager() {
         },
         body: JSON.stringify({
           testMobile: testMobileNumber.trim(),
+          testName: effectiveTestName,
           patternCode: smsMethod === "pattern" ? smsPatternCode.trim() : undefined,
           patternValues: smsMethod === "pattern" ? patternValues : undefined,
           messageText: smsMethod === "text" ? smsDirectText.trim() : undefined
@@ -2792,137 +3019,219 @@ export default function LeadsManager() {
 
                   {/* Pattern Code Input & Variables */}
                   {smsMethod === "pattern" ? (
-                    <div className="space-y-3 pt-1 border-t border-slate-100">
-                      {/* Available Patterns Quick Selector */}
-                      {availableLeadPatterns.length > 0 && (
-                        <div className="bg-indigo-50/70 border border-indigo-200 p-3 rounded-2xl space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>الگوهای پترن ثبت‌شده در پرونده تامین‌کنندگان:</span>
-                            </span>
-                            <span className="text-[10px] text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-full border border-indigo-200">
-                              {availableLeadPatterns.length} الگو در دسترس
-                            </span>
+                    <div className="space-y-4 pt-1 border-t border-slate-100">
+                      {/* Multi-Pattern Selection Shelf */}
+                      <div className="space-y-2.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-purple-50/70 border border-purple-200 p-3 rounded-2xl">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles className="w-4 h-4 text-purple-600" />
+                              <span className="text-xs font-black text-purple-950">
+                                الگوهای پترن خدماتی ملی‌پیامک (انتخاب سریع یا افزودن پترن دلخواه):
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-purple-800 mt-0.5 leading-relaxed">
+                              از میان الگوهای زیر انتخاب کنید یا الگوی جدید با کد و متن دلخواه تعریف نمایید.
+                            </p>
                           </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {availableLeadPatterns.map((pat, pidx) => (
-                              <button
-                                key={pidx}
-                                type="button"
-                                onClick={() => {
-                                  setSmsPatternCode(pat.code);
-                                  if (pat.var2) setPatternVar2(pat.var2);
-                                  if (pat.var3) setPatternVar3(pat.var3);
-                                  toast.success(`الگوی «${pat.title}» انتخاب شد.`);
-                                }}
-                                className={`text-[11px] px-2.5 py-1.5 rounded-xl border font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                  smsPatternCode === pat.code
-                                    ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-                                    : "bg-white hover:bg-indigo-100/70 text-slate-800 border-indigo-200 hover:border-indigo-300"
+                          <button
+                            type="button"
+                            onClick={handleOpenNewPatternModal}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-xs shrink-0 self-start sm:self-center"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>تعریف الگوی جدید</span>
+                          </button>
+                        </div>
+
+                        {/* Pattern Cards Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                          {leadPatterns.map((pat) => {
+                            const isSelected = selectedPatternId === pat.id || smsPatternCode === pat.code;
+                            return (
+                              <div
+                                key={pat.id}
+                                onClick={() => handleSelectPattern(pat)}
+                                className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative ${
+                                  isSelected
+                                    ? "bg-purple-50/90 border-purple-600 shadow-md ring-2 ring-purple-600/20"
+                                    : "bg-white border-slate-200 hover:border-purple-300 hover:bg-slate-50/70 shadow-2xs"
                                 }`}
                               >
-                                <span>{pat.title || `پترن ${pat.code}`}</span>
-                                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${smsPatternCode === pat.code ? "bg-indigo-700 text-white" : "bg-indigo-50 text-indigo-700 font-black"}`}>
-                                  {pat.code}
-                                </span>
-                                {pat.supplierName && (
-                                  <span className="text-[9px] opacity-75">({pat.supplierName})</span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                                <div>
+                                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span
+                                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                          isSelected ? "border-purple-600 bg-purple-600" : "border-slate-300 bg-white"
+                                        }`}
+                                      >
+                                        {isSelected && <span className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                      </span>
+                                      <span className="text-xs font-black text-slate-900 truncate">
+                                        {pat.title}
+                                      </span>
+                                    </div>
+                                    <span
+                                      className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
+                                        isSelected ? "bg-purple-200 text-purple-950" : "bg-slate-100 text-slate-700"
+                                      }`}
+                                      dir="ltr"
+                                    >
+                                      کد: {pat.code}
+                                    </span>
+                                  </div>
 
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                            <span>کد پترن تایید شده در پنل ملی‌پیامک (Pattern Code / BodyId):</span>
-                            <span className="text-red-500 font-bold">*</span>
-                          </label>
-                          {stats.savedInvitePattern && (
-                            <button
-                              type="button"
-                              onClick={() => setSmsPatternCode(stats.savedInvitePattern || "")}
-                              className="text-[11px] text-purple-700 hover:text-purple-900 font-black flex items-center gap-1 cursor-pointer"
-                            >
-                              <span>استفاده از الگوی ذخیره‌شده سیستم ({stats.savedInvitePattern})</span>
-                            </button>
-                          )}
+                                  <div className="bg-white/80 border border-slate-100 p-2 rounded-xl text-[11px] text-slate-700 leading-relaxed font-sans whitespace-pre-line mb-2">
+                                    {pat.template}
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px]">
+                                  <span className="text-purple-700 font-bold">
+                                    متغیر {'{0}'}: {pat.var0Desc || "نام تامین‌کننده/مدیریت"}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenEditPatternModal(pat);
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-purple-700 transition-colors rounded hover:bg-purple-100 cursor-pointer"
+                                      title="ویرایش الگو"
+                                    >
+                                      <Edit2 className="w-3 h-3" />
+                                    </button>
+                                    {leadPatterns.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeletePatternPreset(pat.id);
+                                        }}
+                                        className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded hover:bg-red-100 cursor-pointer"
+                                        title="حذف الگو"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <input
-                          type="text"
-                          dir="ltr"
-                          value={smsPatternCode}
-                          onChange={(e) => setSmsPatternCode(e.target.value)}
-                          placeholder="مثلاً: 248910"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 focus:bg-white border-2 border-purple-200 focus:border-purple-600 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none transition-all shadow-2xs"
-                        />
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                          این کد همان شناسه الگوی تایید شده (Body ID) در منوی «ارسال بر اساس پترن» پنل ملی‌پیامک شماست.
-                        </p>
                       </div>
 
-                      {/* Pattern Dynamic Variables */}
-                      <div className="bg-purple-50/40 border border-purple-100 p-3 rounded-xl space-y-2 text-xs">
-                        <p className="font-black text-purple-950 text-xs flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                          <span>متغیرهای پترن تایید شده (Parameters):</span>
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <div>
-                            <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                              متغیر ۱ (پیش‌فرض: نام تامین‌کننده):
+                      {/* Selected Pattern Code & Dynamic Variables */}
+                      <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <label className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                            <span>شناسه پترن فعال ملی‌پیامک (Pattern Code / BodyId):</span>
+                            <span className="text-red-500 font-bold">*</span>
+                          </label>
+                          <span className="text-[11px] text-purple-700 font-bold">
+                            الگوی انتخاب‌شده: {activeSelectedPattern?.title || "سفارشی"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                          <div className="sm:col-span-1">
+                            <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                              کد پترن (Body ID):
                             </label>
                             <input
                               type="text"
-                              disabled
-                              value="{name} (نام پرونده به صورت خودکار)"
-                              className="w-full px-2.5 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[11px] text-slate-600 font-bold cursor-not-allowed"
+                              dir="ltr"
+                              value={smsPatternCode}
+                              onChange={(e) => setSmsPatternCode(e.target.value)}
+                              placeholder="مثلاً: 248910"
+                              className="w-full px-3 py-2 bg-white border-2 border-purple-300 focus:border-purple-600 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none"
                             />
                           </div>
-                          <div>
-                            <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                              متغیر ۲ (اختیاری):
+
+                          <div className="sm:col-span-1">
+                            <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                              متغیر ۰ یا ۱ (هوشمند):
+                            </label>
+                            <div className="w-full px-2.5 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 font-bold flex items-center justify-between">
+                              <span>نام تامین‌کننده / مدیریت</span>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                            </div>
+                          </div>
+
+                          <div className="sm:col-span-1">
+                            <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                              متغیر کمکی ۲ (اختیاری):
                             </label>
                             <input
                               type="text"
                               value={patternVar2}
                               onChange={(e) => setPatternVar2(e.target.value)}
-                              placeholder="مثلاً: zopit.ir یا نام سامانه"
-                              className="w-full px-2.5 py-2 bg-white border border-slate-200 focus:border-purple-600 rounded-lg text-[11px] text-slate-900 outline-none"
+                              placeholder="مثلاً: zopit.ir"
+                              className="w-full px-2.5 py-2 bg-white border border-slate-300 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none"
                             />
                           </div>
-                          <div>
-                            <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                              متغیر ۳ (اختیاری):
+
+                          <div className="sm:col-span-1">
+                            <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                              متغیر کمکی ۳ (اختیاری):
                             </label>
                             <input
                               type="text"
                               value={patternVar3}
                               onChange={(e) => setPatternVar3(e.target.value)}
-                              placeholder="مثلاً: شماره پشتیبانی یا کد دعوت"
-                              className="w-full px-2.5 py-2 bg-white border border-slate-200 focus:border-purple-600 rounded-lg text-[11px] text-slate-900 outline-none"
+                              placeholder="مثلاً: کد یا شماره تماس"
+                              className="w-full px-2.5 py-2 bg-white border border-slate-300 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none"
                             />
                           </div>
                         </div>
-                      </div>
 
-                      {/* Live Preview of first lead */}
-                      {targetLeadsForExport.length > 0 && (
-                        <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-slate-500 font-bold text-[11px]">پیش‌نمایش نام متغیر اول:</span>
-                            <strong className="text-purple-900 font-black text-xs">
-                              {targetLeadsForExport[0].name}
-                            </strong>
+                        {/* Live SMS Smartphone Bubble Preview */}
+                        <div className="bg-white border-2 border-purple-200 p-3 rounded-xl space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-slate-100">
+                            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                              <MessageSquare className="w-3.5 h-3.5 text-purple-600" />
+                              <span>پیش‌نمایش زنده پیامک برای اولین مخاطب هدف:</span>
+                            </span>
+                            {(() => {
+                              const sampleLead = targetLeadsForExport[0] || leads[0];
+                              const info = getLeadDisplayNameInfo(sampleLead);
+                              if (info.source === "shop") {
+                                return (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 self-start sm:self-auto">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>جایگذاری متغیر {'{0}'} از نام تامین‌کننده: «{info.name}»</span>
+                                  </span>
+                                );
+                              } else if (info.source === "manager") {
+                                return (
+                                  <span className="text-[10px] bg-amber-100 text-amber-950 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 self-start sm:self-auto">
+                                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                    <span>جایگذاری متغیر {'{0}'} از نام مدیریت (نام فروشگاه خالی بود): «{info.name}»</span>
+                                  </span>
+                                );
+                              } else {
+                                return (
+                                  <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full self-start sm:self-auto">
+                                    جایگذاری متغیر {'{0}'} با عنوان پیش‌فرض «{info.name}»
+                                  </span>
+                                );
+                              }
+                            })()}
                           </div>
-                          <span className="text-[10px] text-slate-400">
-                            (برای تک‌تک تامین‌کنندگان نام اختصاصی جایگزین خواهد شد)
-                          </span>
+
+                          <div className="bg-purple-50/50 border border-purple-100 p-3 rounded-xl text-xs text-slate-900 font-sans leading-relaxed whitespace-pre-line shadow-inner">
+                            {renderedPreviewText}
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                            <span>شماره مخاطب تستی نمونه: {targetLeadsForExport[0]?.phone || "09xxxxxxxxx"}</span>
+                            <span>طول متن پیامک استاندارد و تایید شده وب‌سرویس ملی‌پیامک</span>
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-1.5 pt-1 border-t border-slate-100">
@@ -2935,44 +3244,51 @@ export default function LeadsManager() {
                         className="w-full px-3.5 py-2 bg-white border-2 border-purple-200 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none leading-relaxed"
                       />
                       <p className="text-[11px] text-slate-500">
-                        می‌توانید از عبارت <code className="bg-slate-100 px-1 rounded text-purple-700 font-mono">{"{name}"}</code> جهت درج نام تامین‌کننده در متن استفاده نمایید.
+                        می‌توانید از عبارت <code className="bg-slate-100 px-1 rounded text-purple-700 font-mono">{"{name}"}</code> یا <code className="bg-slate-100 px-1 rounded text-purple-700 font-mono">{"{0}"}</code> جهت درج نام تامین‌کننده در متن استفاده نمایید.
                       </p>
                     </div>
                   )}
 
                   {/* Single Test SMS Section */}
-                  <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-2">
+                  <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl space-y-2.5">
                     <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                       <Smartphone className="w-3.5 h-3.5 text-purple-600" />
-                      <span>تست ارسال تکی قبل از ارسال انبوه:</span>
+                      <span>ارسال یک پیامک تستی به شماره دلخواه (قبل از ارسال انبوه):</span>
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <input
                         type="text"
                         dir="ltr"
                         value={testMobileNumber}
                         onChange={(e) => setTestMobileNumber(e.target.value)}
                         placeholder="شماره موبایل تست (مثلاً: 09121234567)"
-                        className="flex-1 px-3 py-2 bg-white border border-slate-300 focus:border-purple-600 rounded-xl text-xs font-mono text-slate-900 outline-none"
+                        className="px-3 py-2 bg-white border border-slate-300 focus:border-purple-600 rounded-xl text-xs font-mono text-slate-900 outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={testLeadName}
+                        onChange={(e) => setTestLeadName(e.target.value)}
+                        placeholder="نام متغیر {0} تستی (اختیاری)"
+                        className="px-3 py-2 bg-white border border-slate-300 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none"
                       />
                       <button
                         type="button"
                         onClick={handleSendTestSms}
                         disabled={isSendingTestSms || !testMobileNumber.trim()}
-                        className="bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-xs"
                       >
                         {isSendingTestSms ? (
-                          <span>در حال تست...</span>
+                          <span>در حال ارسال تست...</span>
                         ) : (
                           <>
-                            <Send className="w-3 h-3" />
-                            <span>ارسال پیامک تستی</span>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>ارسال پیامک تستی به این شماره</span>
                           </>
                         )}
                       </button>
                     </div>
                     <p className="text-[10px] text-slate-500">
-                      با این تست سریع، از تایید بودن پترن و کارکرد صحیح وب‌سرویس در پنل ملی‌پیامک اطمینان حاصل کنید.
+                      با این تست سریع، از تایید بودن پترن انتخاب شده و جایگذاری صحیح نام مخاطب در وب‌سرویس ملی‌پیامک اطمینان حاصل کنید.
                     </p>
                   </div>
 
@@ -3404,6 +3720,130 @@ export default function LeadsManager() {
                 بستن پنجره
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pattern Editor / Add Modal */}
+      {showPatternEditorModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-purple-100 text-purple-700 rounded-xl">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    {editingPattern ? "ویرایش الگوی پترن ملی‌پیامک" : "تعریف الگوی پترن جدید ملی‌پیامک"}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    تنظیم شناسه پترن تایید شده و ساختار متغیرهای وب‌سرویس خدماتی
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPatternEditorModal(false)}
+                className="p-1.5 rounded-xl bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePatternPreset} className="space-y-3.5 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800">عنوان یا برچسب الگو:</label>
+                <input
+                  type="text"
+                  required
+                  value={patternForm.title}
+                  onChange={(e) => setPatternForm({ ...patternForm, title: e.target.value })}
+                  placeholder="مثلاً: الگوی دعوت تامین‌کننده (فروش رایگان)"
+                  className="w-full px-3 py-2 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800">
+                  شناسه پترن در پنل ملی‌پیامک (Body ID):
+                </label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  required
+                  value={patternForm.code}
+                  onChange={(e) => setPatternForm({ ...patternForm, code: e.target.value })}
+                  placeholder="مثلاً: 248910"
+                  className="w-full px-3 py-2 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-purple-600 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none"
+                />
+                <p className="text-[10px] text-slate-500">
+                  این کد عددی چند رقمی را از منوی «ارسال بر اساس پترن» در پنل ملی‌پیامک کپی کنید.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800">
+                  متن تایید شده در پنل ملی‌پیامک (با علامت متغیرها):
+                </label>
+                <textarea
+                  rows={4}
+                  value={patternForm.template}
+                  onChange={(e) => setPatternForm({ ...patternForm, template: e.target.value })}
+                  placeholder={`مدیریت محترم {0}؛\nفروش کالایتان را رایگان چندبرابر کنید!\nاتصال به دهها فروشگاه آنلاین.\nثبت‌نام: zopit.ir/register/supplier`}
+                  className="w-full px-3 py-2 bg-slate-50 focus:bg-white border-2 border-slate-200 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none leading-relaxed font-sans"
+                />
+                <div className="p-2.5 bg-purple-50/70 border border-purple-100 rounded-xl space-y-1 text-[11px] text-purple-900 leading-relaxed">
+                  <div className="flex items-center gap-1 font-bold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                    <span>عملکرد هوشمند متغیر {'{0}'}:</span>
+                  </div>
+                  <p>
+                    سامانه به صورت هوشمند متغیر <strong>{'{0}'}</strong> را با نام تامین‌کننده پر می‌کند؛ و اگر تامین‌کننده‌ای نام فروشگاه نداشته باشد، به صورت خودکار <strong>نام مدیریت</strong> جایگزین خواهد شد.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">متغیر کمکی ۲ (اختیاری):</label>
+                  <input
+                    type="text"
+                    value={patternForm.var2}
+                    onChange={(e) => setPatternForm({ ...patternForm, var2: e.target.value })}
+                    placeholder="مثلاً: zopit.ir"
+                    className="w-full px-3 py-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">متغیر کمکی ۳ (اختیاری):</label>
+                  <input
+                    type="text"
+                    value={patternForm.var3}
+                    onChange={(e) => setPatternForm({ ...patternForm, var3: e.target.value })}
+                    placeholder="مثلاً: شماره تماس یا کد دعوت"
+                    className="w-full px-3 py-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-purple-600 rounded-xl text-xs text-slate-900 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowPatternEditorModal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition-colors cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>ذخیره الگوی پترن</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

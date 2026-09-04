@@ -2149,8 +2149,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                             محصولات خود را سریع ثبت کنید و به فروشگاه‌ها در سراسر کشور بفروشید
                           </p>
                         </div>
-                        <button
-                          type="button"
+                        <button type="button"
+                          
                           onClick={() => setView("supplier_form")}
                           className="w-full sm:w-auto px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95 group"
                         >
@@ -2159,12 +2159,11 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                           <ArrowLeft className="w-4 h-4 text-slate-950 group-hover:-translate-x-1 transition-transform" />
                         </button>
                       </div>
-
                       <div className="flex items-center justify-between text-xs px-1">
                         <span className="text-text-muted">صاحب فروشگاه هستید یا نوع حساب دیگری می‌خواهید؟</span>
                         <div className="flex items-center gap-3">
-                          <button
-                            type="button"
+                          <button type="button"
+                            
                             onClick={() => setView("store_manager_form")}
                             className="text-emerald-600 dark:text-emerald-400 font-extrabold hover:underline cursor-pointer flex items-center gap-1"
                           >
@@ -2172,8 +2171,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                             ثبت‌نام فروشگاه
                           </button>
                           <span className="text-border-default">|</span>
-                          <button
-                            type="button"
+                          <button type="button"
+                            
                             onClick={() => setView("role_select")}
                             className="text-primary-default font-extrabold hover:underline cursor-pointer"
                           >
@@ -2766,8 +2765,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                   </div>
                   <div className="space-y-4">
                     {/* 1. Supplier */}
-                    <button
-                      type="button"
+                    <button type="button"
+                      
                       onClick={() => setView("supplier_form")}
                       className="w-full group bg-card border border-border-default/80 dark:border-border-subtle/40 p-4.5 rounded-2xl hover:border-primary-default hover:bg-primary-default/[0.02] hover:shadow-xl hover:shadow-primary-default/5 transition-all text-right relative overflow-hidden flex items-center justify-between gap-4 cursor-pointer"
                       aria-label="ثبت نام به عنوان تامین کننده یا عمده فروش"
@@ -2789,8 +2788,8 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                     </button>
 
                     {/* 2. Store Manager */}
-                    <button
-                      type="button"
+                    <button type="button"
+                      
                       onClick={() => setView("store_manager_form")}
                       className="w-full group bg-card border border-border-default/80 dark:border-border-subtle/40 p-4.5 rounded-2xl hover:border-success hover:bg-success/[0.02] hover:shadow-xl hover:shadow-success/5 transition-all text-right relative overflow-hidden flex items-center justify-between gap-4 cursor-pointer"
                       aria-label="ثبت نام به عنوان مدیر فروشگاه خرده فروشی"
@@ -2810,11 +2809,10 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
                       </div>
                       <ArrowLeft className="w-5 h-5 text-text-muted group-hover:text-success group-hover:-translate-x-1 transition-all duration-300 shrink-0" />
                     </button>
-
                     
                     {/* 3. TaminYab */}
-                    <button
-                      type="button"
+                    <button type="button"
+                      
                       onClick={() => setView("ambassador_form")}
                       className="w-full group bg-card border border-border-default/80 dark:border-border-subtle/40 p-4.5 rounded-2xl hover:border-indigo-500 hover:bg-indigo-500/[0.02] hover:shadow-xl hover:shadow-indigo-500/5 transition-all text-right relative overflow-hidden flex items-center justify-between gap-4 cursor-pointer"
                       aria-label="ثبت نام به عنوان تأمین‌یاب"

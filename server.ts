@@ -11793,9 +11793,23 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
       where: { key: 'MELLIPAYAMAK_PATTERN_LEAD_INVITE' }
     }).catch(() => null);
 
+    const savedLeadPatternsConfig = await prisma.systemConfig.findUnique({
+      where: { key: 'MELLIPAYAMAK_LEAD_PATTERNS' }
+    }).catch(() => null);
+    let leadPatterns = DEFAULT_LEAD_PATTERNS;
+    if (savedLeadPatternsConfig?.value) {
+      try {
+        const parsed = JSON.parse(savedLeadPatternsConfig.value);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          leadPatterns = parsed;
+        }
+      } catch (e) {}
+    }
+
     res.json({
       leads,
       ambassadors,
+      patterns: leadPatterns,
       stats: {
         totalLeads,
         draftLeads,
@@ -11808,12 +11822,101 @@ app.get('/api/admin/leads', authenticateToken, requireAdmin, async (req: any, re
         inProgressCommissions,
         potentialSavingsCommissions,
         ambassadorsCount: ambassadors.length,
-        savedInvitePattern: savedPatternConfig?.value?.trim() || ''
+        savedInvitePattern: savedPatternConfig?.value?.trim() || (leadPatterns[0]?.code || '')
       }
     });
   } catch (err: any) {
     console.error('Error fetching admin leads:', err);
     res.status(500).json({ error: 'خطا در دریافت لیست سرنخ‌ها و سفیران: ' + (err?.message || '') });
+  }
+});
+
+// DEFAULT LEAD SMS PATTERNS (Can be configured, edited, and selected by admin)
+const DEFAULT_LEAD_PATTERNS = [
+  {
+    id: 'lead-pat-1',
+    title: 'الگوی اصلی: دعوت تامین‌کننده (رایگان چندبرابر)',
+    code: '248910',
+    template: 'مدیریت محترم {0}؛\nفروش کالایتان را رایگان چندبرابر کنید!\nاتصال به دهها فروشگاه آنلاین.\nثبت‌نام: zopit.ir/register/supplier',
+    var0Desc: 'نام تامین‌کننده (در صورت خالی بودن: نام مدیریت)',
+    var2: '',
+    var3: '',
+    isDefault: true
+  },
+  {
+    id: 'lead-pat-2',
+    title: 'الگوی دوم: فرصت فروش مستقیم و بدون کارمزد',
+    code: '248911',
+    template: 'مدیریت محترم {0}؛\nفرصت فروش بی‌واسطه محصولات شما به هزاران مشتری شبکه زوپیت.\nبدون کارمزد اولیه.\nلینک ثبت‌نام: zopit.ir/register/supplier',
+    var0Desc: 'نام تامین‌کننده (در صورت خالی بودن: نام مدیریت)',
+    var2: '',
+    var3: '',
+    isDefault: false
+  },
+  {
+    id: 'lead-pat-3',
+    title: 'الگوی سوم: یادآوری و دعوت ویژه همکاران',
+    code: '248912',
+    template: 'همکار گرامی، مدیریت محترم {0}؛\nمحصولاتتان را به بازارهای اینترنتی زوپیت معرفی کنید.\nعضویت سریع: zopit.ir/register/supplier',
+    var0Desc: 'نام تامین‌کننده (در صورت خالی بودن: نام مدیریت)',
+    var2: '',
+    var3: '',
+    isDefault: false
+  }
+];
+
+// Helper to resolve display name according to user requirement:
+// "این متغیر صفری که تنظیم کردم اینو باید اسم اون تامین‌کننده باشه. حالا اگر نام نداشت، چون بعضی از تامین‌کننده‌ها نام ندارند، نام مدیریت رو بیاره."
+function resolveLeadDisplayName(lead: any): string {
+  if (!lead) return 'فروشگاه';
+  const shopName = typeof lead.name === 'string' ? lead.name.trim() : '';
+  const managerName = typeof lead.managerName === 'string' ? lead.managerName.trim() : '';
+  
+  if (shopName && shopName !== 'بدون نام' && shopName !== '-' && shopName !== 'تامین‌کننده' && shopName !== 'تامین کننده') {
+    return shopName;
+  }
+  if (managerName && managerName !== 'بدون نام' && managerName !== '-' && managerName !== 'مدیریت') {
+    return managerName;
+  }
+  return 'فروشگاه';
+}
+
+// Get Saved Lead SMS Patterns
+app.get('/api/admin/leads/patterns', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const config = await prisma.systemConfig.findUnique({
+      where: { key: 'MELLIPAYAMAK_LEAD_PATTERNS' }
+    }).catch(() => null);
+    let patterns = DEFAULT_LEAD_PATTERNS;
+    if (config?.value) {
+      try {
+        const parsed = JSON.parse(config.value);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          patterns = parsed;
+        }
+      } catch (e) {}
+    }
+    res.json({ patterns });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در دریافت لیست الگوهای پترن' });
+  }
+});
+
+// Save / Update Lead SMS Patterns
+app.post('/api/admin/leads/patterns', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { patterns } = req.body;
+    if (!Array.isArray(patterns) || patterns.length === 0) {
+      return res.status(400).json({ error: 'حداقل یک الگوی پترن باید ارسال شود.' });
+    }
+    await prisma.systemConfig.upsert({
+      where: { key: 'MELLIPAYAMAK_LEAD_PATTERNS' },
+      update: { value: JSON.stringify(patterns) },
+      create: { key: 'MELLIPAYAMAK_LEAD_PATTERNS', value: JSON.stringify(patterns) }
+    });
+    res.json({ success: true, message: 'الگوهای پترن با موفقیت ذخیره شدند.', patterns });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در ذخیره‌سازی الگوهای پترن' });
   }
 });
 
@@ -11989,15 +12092,16 @@ app.post('/api/admin/leads/send-sms', authenticateToken, requireAdmin, async (re
         return res.status(400).json({ error: 'شماره موبایل تستی وارد شده معتبر نیست. لطفاً یک شماره موبایل معتبر (با ۰۹ و ۱۱ رقم) وارد نمایید.' });
       }
 
+      const testSampleName = req.body.testName?.trim() || 'تامین‌کننده نمونه';
       const values = Array.isArray(patternValues) && patternValues.length > 0
-        ? patternValues.map((v: string) => String(v).replace(/\{name\}/g, 'تامین‌کننده نمونه').replace(/\{phone\}/g, cleanTest))
-        : ['تامین‌کننده نمونه'];
+        ? patternValues.map((v: string) => String(v).replace(/\{name\}/g, testSampleName).replace(/\{phone\}/g, cleanTest))
+        : [testSampleName];
 
       let testRes: any;
       if (effectivePattern) {
         testRes = await sendMelliPayamakPattern(cleanTest, effectivePattern, values);
       } else if (messageText && String(messageText).trim()) {
-        const text = String(messageText).replace(/\{name\}/g, 'تامین‌کننده نمونه').replace(/\{phone\}/g, cleanTest);
+        const text = String(messageText).replace(/\{name\}/g, testSampleName).replace(/\{phone\}/g, cleanTest);
         testRes = await sendSmsViaMelliPayamak(cleanTest, text);
       } else {
         return res.status(400).json({ error: 'کد پترن تایید شده یا متن پیامک مشخص نشده است.' });
@@ -12082,13 +12186,14 @@ app.post('/api/admin/leads/send-sms', authenticateToken, requireAdmin, async (re
       const results = await Promise.allSettled(
         chunk.map(async (item) => {
           let result: any;
+          const leadDisplayName = resolveLeadDisplayName(item.lead);
           if (effectivePattern) {
             const values = Array.isArray(patternValues) && patternValues.length > 0
-              ? patternValues.map((v: string) => String(v).replace(/\{name\}/g, item.lead.name || 'تامین‌کننده').replace(/\{phone\}/g, item.mobile))
-              : [item.lead.name || 'تامین‌کننده'];
+              ? patternValues.map((v: string) => String(v).replace(/\{name\}/g, leadDisplayName).replace(/\{phone\}/g, item.mobile))
+              : [leadDisplayName];
             result = await sendMelliPayamakPattern(item.mobile, effectivePattern, values);
           } else if (messageText && String(messageText).trim()) {
-            const text = String(messageText).replace(/\{name\}/g, item.lead.name || 'تامین‌کننده').replace(/\{phone\}/g, item.mobile);
+            const text = String(messageText).replace(/\{name\}/g, leadDisplayName).replace(/\{phone\}/g, item.mobile);
             result = await sendSmsViaMelliPayamak(item.mobile, text);
           } else {
             throw new Error('کد پترن خدماتی یا متن پیامک مشخص نشده است.');

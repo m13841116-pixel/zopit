@@ -109,7 +109,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [mobile, setMobile] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showProTicketModal, setShowProTicketModal] = useState(false);
-  const [ticketSubject, setTicketSubject] = useState("ارسال مدارک برای اکانت پرو");
+  const [ticketSubject, setTicketSubject] = useState("ارسال مدارک برای اکانت پرومکس");
   const [ticketMsg, setTicketMsg] = useState("");
   const [ticketAttachment, setTicketAttachment] = useState("");
   const [submittingTicket, setSubmittingTicket] = useState(false);
@@ -237,15 +237,15 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
         },
         body: JSON.stringify({
           subject: ticketSubject,
-          department: "اکانت پرو",
+          department: "اکانت پرومکس",
           priority: "HIGH",
           message: ticketMsg,
           attachmentUrl: ticketAttachment || null
         }),
       });
       if (res.ok) {
-        if (showNotification) showNotification("مدارک با موفقیت به پشتیبانی اکانت پرو ارسال شد.", "success");
-        else toast("مدارک با موفقیت به پشتیبانی اکانت پرو ارسال شد.", "success");
+        if (showNotification) showNotification("مدارک با موفقیت به پشتیبانی اکانت پرومکس ارسال شد.", "success");
+        else toast("مدارک با موفقیت به پشتیبانی اکانت پرومکس ارسال شد.", "success");
         setShowProTicketModal(false);
         setTicketMsg("");
         setTicketAttachment("");
@@ -331,7 +331,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           return;
         }
 
-        const dummyContent = `--- پلتفرم هوشمند زوپیت - پکیج اختصاصی اکانت پرو ---
+        const dummyContent = `--- پلتفرم هوشمند زوپیت - پکیج اختصاصی اکانت پرومکس ---
 عنوان پکیج: ${resource.title}
 توضیحات: ${resource.description}
 نسخه: ${resource.version || '1.0'}
@@ -673,7 +673,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mb-3" />
-        <p className="text-sm font-bold text-muted">در حال بارگذاری اطلاعات اکانت پرو...</p>
+        <p className="text-sm font-bold text-muted">در حال بارگذاری اطلاعات اکانت پرومکس...</p>
       </div>
     );
   }
@@ -695,7 +695,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       desc: "طراحی مدرن، واکنش‌گرا و بهینه‌شده برای فروش موبایلی و لود سریع",
       value: "۲,۵۰۰,۰۰۰ تومان",
       icon: Crown,
-      color: "from-amber-500/20 to-amber-600/5 text-amber-500"
+      color: "from-amber-500/20 to-amber-600/5 text-indigo-500"
     },
     {
       id: 3,
@@ -735,7 +735,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       desc: "پشتیبانی و مشاوره تخصصی در راه‌اندازی و رشد فروشگاه شما",
       value: "۱,۸۰۰,۰۰۰ تومان",
       icon: Sparkles,
-      color: "from-amber-500/20 to-amber-600/5 text-amber-500"
+      color: "from-amber-500/20 to-amber-600/5 text-indigo-500"
     },
     {
       id: 8,
@@ -782,47 +782,47 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   return (
     <div className="space-y-8 animate-fade-in pb-12" dir="rtl">
       {/* Top Banner Header with 24-Hour Countdown Timer */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-950/95 via-slate-900 to-slate-950 border-2 border-amber-500/50 p-6 md:p-8 text-white shadow-2xl space-y-6">
-        <div className="absolute -top-12 -left-12 w-80 h-80 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 -right-10 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl bg-card border border-border-default p-6 md:p-8 text-text-primary shadow-xl space-y-6">
+        <div className="absolute -top-12 -left-12 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -right-10 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* 24-Hour Countdown Badge Banner */}
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-4 bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-amber-500/20 border border-amber-500/40 p-3.5 md:p-4 rounded-2xl backdrop-blur-md">
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-4 bg-gradient-to-r from-indigo-500/10 via-indigo-500/5 to-indigo-500/10 border border-indigo-500/20 p-3.5 md:p-4 rounded-2xl backdrop-blur-md">
           <div className="flex items-center gap-3 text-right">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
               <Sparkles className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <p className="text-xs md:text-sm font-black text-amber-300">
+              <p className="text-xs md:text-sm font-black text-indigo-600">
                 فرصت طلایی ۲۴ ساعته: پکیج کامل پرو مکس (۱۴,۸۰۰,۰۰۰ تومان) ۱۰۰٪ رایگان شد!
               </p>
-              <p className="text-[11px] text-slate-300 mt-0.5">
-                زوپیت کلیه هزینه‌های پلتفرم و لایسنس‌ها را رایگان کرد؛ تنها با پرداخت هاست ابری (با ۶۷٪ تخفیف) سایت شما فعال می‌شود.
+              <p className="text-[11px] text-text-secondary mt-0.5">
+                زوپیت کلیه هزینه‌های نرم‌افزاری، لایسنس‌ها و طراحی پلتفرم را برای شما کاملاً رایگان کرده است.
               </p>
             </div>
           </div>
 
           {/* Countdown Clock */}
           <div className="flex items-center gap-2 shrink-0 font-mono" dir="ltr">
-            <div className="flex flex-col items-center bg-slate-900/90 border border-amber-500/40 px-3 py-1.5 rounded-xl shadow-inner min-w-[52px]">
-              <span className="text-lg md:text-xl font-black text-amber-400">
+            <div className="flex flex-col items-center bg-surface border border-indigo-500/20 px-3 py-1.5 rounded-xl shadow-inner min-w-[52px]">
+              <span className="text-lg md:text-xl font-black text-indigo-600">
                 {String(countdown.hours).padStart(2, "0")}
               </span>
-              <span className="text-[9px] text-slate-400 font-sans font-bold">ساعت</span>
+              <span className="text-[9px] text-text-muted font-sans font-bold">ساعت</span>
             </div>
-            <span className="text-amber-400 font-black text-lg">:</span>
-            <div className="flex flex-col items-center bg-slate-900/90 border border-amber-500/40 px-3 py-1.5 rounded-xl shadow-inner min-w-[52px]">
-              <span className="text-lg md:text-xl font-black text-amber-400">
+            <span className="text-indigo-600 font-black text-lg">:</span>
+            <div className="flex flex-col items-center bg-surface border border-indigo-500/20 px-3 py-1.5 rounded-xl shadow-inner min-w-[52px]">
+              <span className="text-lg md:text-xl font-black text-indigo-600">
                 {String(countdown.minutes).padStart(2, "0")}
               </span>
-              <span className="text-[9px] text-slate-400 font-sans font-bold">دقیقه</span>
+              <span className="text-[9px] text-text-muted font-sans font-bold">دقیقه</span>
             </div>
-            <span className="text-amber-400 font-black text-lg">:</span>
-            <div className="flex flex-col items-center bg-slate-900/90 border border-amber-500/40 px-3 py-1.5 rounded-xl shadow-inner min-w-[52px]">
+            <span className="text-indigo-600 font-black text-lg">:</span>
+            <div className="flex flex-col items-center bg-surface border border-indigo-500/20 px-3 py-1.5 rounded-xl shadow-inner min-w-[52px]">
               <span className="text-lg md:text-xl font-black text-rose-400 animate-pulse">
                 {String(countdown.seconds).padStart(2, "0")}
               </span>
-              <span className="text-[9px] text-slate-400 font-sans font-bold">ثانیه</span>
+              <span className="text-[9px] text-text-muted font-sans font-bold">ثانیه</span>
             </div>
           </div>
         </div>
@@ -830,24 +830,24 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
         {/* Main Header Content */}
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/30 to-amber-600/30 border border-amber-400/50 text-amber-300 text-xs font-black">
-              <Crown className="w-4 h-4 text-amber-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/30 to-amber-600/30 border border-amber-400/50 text-indigo-600 text-xs font-black">
+              <Crown className="w-4 h-4 text-indigo-600" />
               <span>آفر استثنایی اشتراک پرومکس زوپیت (Zopit Pro Max)</span>
             </div>
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-black text-white leading-tight">
-              دریافت ۱۰۰٪ رایگان اکانت پرومکس زوپیت + هاست ابری تخفیف‌دار
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-black text-text-primary leading-tight">
+              دریافت ۱۰۰٪ رایگان اکانت پرومکسمکس زوپیت
             </h1>
-            <p className="text-amber-100/90 text-xs md:text-sm max-w-3xl leading-relaxed">
-              با افتخار اشتراک پرو به‌طور کامل بازنشسته و با اشتراک فوق‌پیشرفته <strong className="text-amber-300 font-black">پرومکس</strong> جایگزین گردید. پکیج جامع خدمات زوپیت به ارزش ۱۴,۸۰۰,۰۰۰ تومان با تخفیف ۱۰۰٪ (کاملاً رایگان) به مدیران متعهد فروشگاه تقدیم می‌گردد و جهت استقرار سایت، فقط هزینه سخت‌افزاری هاست ابری فوق‌سریع (۲۹۹ هزار تومان) دریافت می‌شود.
+            <p className="text-text-secondary text-xs md:text-sm max-w-3xl leading-relaxed">
+              با افتخار اشتراک پرو به‌طور کامل بازنشسته و با اشتراک فوق‌پیشرفته <strong className="text-indigo-600 font-black">پرومکس</strong> جایگزین گردید. پکیج جامع خدمات زوپیت به ارزش ۱۴,۸۰۰,۰۰۰ تومان با تخفیف ۱۰۰٪ (کاملاً رایگان) به مدیران متعهد فروشگاه تقدیم می‌گردد تا بدون دغدغه هزینه‌های اولیه فروش خود را آغاز کنید.
             </p>
           </div>
 
-          <div className="bg-slate-900/95 backdrop-blur-md p-5 rounded-3xl border-2 border-amber-500/40 text-center shrink-0 w-full lg:w-auto shadow-xl space-y-2.5">
-            <span className="text-xs text-amber-200/90 block font-black">طرح استثنایی زوپیت</span>
+          <div className="bg-surface p-5 rounded-3xl border border-indigo-500/20 text-center shrink-0 w-full lg:w-auto shadow-xl space-y-2.5">
+            <span className="text-xs text-indigo-600 block font-black">طرح استثنایی زوپیت</span>
             
             <div className="flex flex-col items-center justify-center">
-              <div className="flex items-center gap-1.5 text-xs text-slate-300 mb-1">
-                <span className="text-slate-400">ارزش نرم‌افزاری پکیج:</span>
+              <div className="flex items-center gap-1.5 text-xs text-text-secondary mb-1">
+                <span className="text-text-muted">ارزش نرم‌افزاری پکیج:</span>
                 <span className="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-lg border border-rose-500/30 font-sans font-bold text-xs">
                   <span className="line-through decoration-rose-400 decoration-1">۱۴,۸۰۰,۰۰۰ تومان</span>
                 </span>
@@ -855,11 +855,10 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               <div className="text-xs text-emerald-400 font-black bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30 my-1">
                 تخفیف ۱۰۰٪ زوپیت: کاملاً رایگان (۰ تومان)
               </div>
-              <div className="pt-2 border-t border-slate-700/60 w-full">
-                <span className="text-[11px] text-slate-400 block mb-0.5">تنها هزینه پرداختی (هاست ابری ۶۷٪ تخفیف):</span>
-                <div className="text-2xl md:text-3xl font-black text-amber-400 flex items-center justify-center gap-1.5 drop-shadow-md">
-                  <span>{parseInt(settings.promaxAccountPrice || '299000').toLocaleString('fa-IR')}</span>
-                  <span className="text-xs text-amber-200">تومان</span>
+              <div className="pt-2 border-t border-border-subtle w-full mt-2">
+                <span className="text-[11px] text-text-muted block mb-0.5">دریافت این پکیج کاملا رایگان است</span>
+                <div className="text-2xl md:text-3xl font-black text-emerald-500 flex items-center justify-center gap-1.5 drop-shadow-md">
+                  <span>رایگان</span>
                 </div>
               </div>
             </div>
@@ -881,13 +880,13 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               </div>
               <div>
                 <h3 className="font-black text-base text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                  <span>اکانت پرو شما فعال می‌باشد</span>
+                  <span>اکانت پرومکس شما فعال می‌باشد</span>
                   <span className="text-xs bg-emerald-500 text-slate-950 font-black px-2.5 py-0.5 rounded-full">
                     ACTIVE PRO
                   </span>
                 </h3>
                 <p className="text-xs text-muted mt-1">
-                  شما هم‌اکنون به تمامی امکانات پکیج پرو زوپیت دسترسی کامل دارید.
+                  شما هم‌اکنون به تمامی امکانات پکیج پرومکس زوپیت دسترسی کامل دارید.
                 </p>
               </div>
             </div>
@@ -954,9 +953,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-muted flex items-center gap-1.5">
-                          <Server className="w-4 h-4 text-amber-500" /> کنترل‌پنل هاست (cPanel):
+                          <Server className="w-4 h-4 text-indigo-500" /> کنترل‌پنل هاست (cPanel):
                         </span>
-                        <span className="text-[10px] font-mono text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                        <span className="text-[10px] font-mono text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md">
                           Direct Access
                         </span>
                       </div>
@@ -1110,7 +1109,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                           href={proAccount.wpAdminUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/20"
+                          className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-text-primary rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/20"
                         >
                           <span>ورود به پیشخوان وردپرس</span>
                           <ExternalLink className="w-3.5 h-3.5" />
@@ -1123,8 +1122,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 </div>
               </div>
             ) : (
-              <div className="bg-amber-500/10 border border-amber-500/20 p-6 rounded-2xl text-center space-y-2">
-                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
+              <div className="bg-indigo-500/10 border border-indigo-500/20 p-6 rounded-2xl text-center space-y-2">
+                <p className="text-sm font-bold text-amber-700 dark:text-indigo-600">
                   در حال آماده‌سازی و کانفیگ هاست اختصاصی شما توسط دپارتمان پشتیبانی...
                 </p>
                 <p className="text-xs text-muted">
@@ -1280,7 +1279,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   <TrendingUp className="w-5 h-5 text-indigo-500" />
                   <h3 className="font-black text-primary text-base">اتصال اختصاصی به ترب (Torob)</h3>
                 </div>
-                <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                <span className="text-xs font-bold text-indigo-500 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
                   به زودی راه‌اندازی می‌شود
                 </span>
               </div>
@@ -1301,7 +1300,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               <div className="flex items-center justify-between border-b border-border-subtle pb-3">
                 <div className="flex items-center gap-2.5">
                   <Shield className="w-5 h-5 text-emerald-500" />
-                  <h3 className="font-black text-primary text-base">پشتیبانی و راهنمایی مستقیم مدیران پرو</h3>
+                  <h3 className="font-black text-primary text-base">پشتیبانی و راهنمایی مستقیم مدیران پرومکس</h3>
                 </div>
                 <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                   پاسخگویی مستقیم مدیر کل
@@ -1329,7 +1328,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black text-xs rounded-2xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
                 >
                   <FileText className="w-4 h-4" />
-                  <span>ثبت تیکت پشتیبانی و درخواست راهنمایی پرو</span>
+                  <span>ثبت تیکت پشتیبانی و درخواست راهنمایی پرومکس</span>
                 </button>
               </div>
             </div>
@@ -1349,7 +1348,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   return (
                     <div 
                       key={promo.id || pIdx}
-                      className="bg-indigo-950/90 dark:bg-slate-900 border-2 border-indigo-500/50 p-5 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-sm"
+                      className="bg-indigo-950/90 dark:bg-slate-900 border-2 border-indigo-500/50 p-5 rounded-3xl text-text-primary shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-sm"
                     >
                       <div className="flex items-center gap-3.5 text-right w-full md:w-auto">
                         <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center shrink-0">
@@ -1365,14 +1364,14 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                                 {promo.applicablePlan === 'PRO_MAX' ? 'ویژه پرومکس' : 'ویژه پرو'}
                               </span>
                             )}
-                            <h3 className="font-black text-sm md:text-base text-white">
-                              کد تخفیف <span className="font-mono text-amber-300 font-black px-1.5 py-0.5 bg-amber-950/60 rounded-md border border-amber-500/30" dir="ltr">{promo.code}</span> فعال است!
+                            <h3 className="font-black text-sm md:text-base text-text-primary">
+                              کد تخفیف <span className="font-mono text-indigo-600 font-black px-1.5 py-0.5 bg-amber-950/60 rounded-md border border-indigo-500/30" dir="ltr">{promo.code}</span> فعال است!
                             </h3>
                           </div>
                           <p className="text-xs text-slate-200 mt-1 leading-relaxed">
                             {promo.title ? <strong>{promo.title}: </strong> : null}
-                            بهره‌مندی از <strong className="text-amber-300 font-bold">{promo.discountType === 'PERCENTAGE' ? (promo.discountValue + '٪ تخفیف') : (Number(promo.discountValue)?.toLocaleString('fa-IR') + ' تومان تخفیف')}</strong> روی هزینه فعال‌سازی اشتراک.
-                            {promo.maxUses ? <span className="text-slate-400 text-[11px] mr-1">(ظرفیت محدود: {promo.maxUses - (promo.usedCount || 0)} اکانت باقی‌مانده)</span> : null}
+                            بهره‌مندی از <strong className="text-indigo-600 font-bold">{promo.discountType === 'PERCENTAGE' ? (promo.discountValue + '٪ تخفیف') : (Number(promo.discountValue)?.toLocaleString('fa-IR') + ' تومان تخفیف')}</strong> روی هزینه فعال‌سازی اشتراک.
+                            {promo.maxUses ? <span className="text-text-muted text-[11px] mr-1">(ظرفیت محدود: {promo.maxUses - (promo.usedCount || 0)} اکانت باقی‌مانده)</span> : null}
                           </p>
                         </div>
                       </div>
@@ -1382,7 +1381,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                         onClick={() => handleApplyDiscountCodeWithCode(promo.code)}
                         className={`font-black text-xs px-5 py-3 rounded-2xl transition-all shrink-0 cursor-pointer active:scale-95 flex items-center gap-2 ${
                           isCurrentApplied
-                            ? "bg-emerald-600 text-white cursor-default opacity-90 shadow-md"
+                            ? "bg-emerald-600 text-text-primary cursor-default opacity-90 shadow-md"
                             : "bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20"
                         }`}
                       >
@@ -1400,7 +1399,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 className="text-xl font-black text-primary flex items-center gap-2">
-                  <Crown className="w-6 h-6 text-amber-500" />
+                  <Crown className="w-6 h-6 text-indigo-500" />
                   <span>پکیج طلایی اشتراک پرومکس زوپیت (Zopit Pro Max)</span>
                 </h2>
                 <p className="text-xs text-muted mt-1">
@@ -1419,13 +1418,13 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center border-b border-subtle pb-6">
                 <div className="lg:col-span-8 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center border border-amber-500/30">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center border border-indigo-500/30">
                       <Crown className="w-7 h-7" />
                     </div>
                     <div>
                       <h3 className="text-xl font-black text-primary flex items-center gap-2">
                         <span>اشتراک پرومکس (Zopit Pro Max)</span>
-                        <span className="text-xs bg-amber-500 text-slate-950 font-black px-2.5 py-0.5 rounded-lg">پکیج جامع طلایی</span>
+                        <span className="text-xs bg-indigo-500 text-white font-black px-2.5 py-0.5 rounded-lg">پکیج جامع طلایی</span>
                       </h3>
                       <p className="text-xs text-muted mt-0.5">
                         کامل‌ترین سطح پلتفرم فروشگاهی زوپیت با دسترسی به کلیه امکانات، استارتاپ‌ها، قالب وودمارت و ترب
@@ -1434,7 +1433,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   </div>
                 </div>
 
-                <div className="lg:col-span-4 bg-surface/90 border border-amber-500/30 rounded-2xl p-4 text-center space-y-1">
+                <div className="lg:col-span-4 bg-surface/90 border border-indigo-500/30 rounded-2xl p-4 text-center space-y-1">
                   <span className="text-[11px] text-muted block font-bold">ارزش نرم‌افزاری و لایسنس‌ها:</span>
                   <div className="text-sm font-sans font-bold text-rose-400 line-through">
                     ۱۴,۸۰۰,۰۰۰ تومان
@@ -1448,8 +1447,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
               {/* FEATURES GRID */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs text-secondary">
-                <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-surface border border-subtle font-bold text-amber-600 dark:text-amber-400">
-                  <Globe className="w-4 h-4 text-amber-500 shrink-0" />
+                <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-surface border border-subtle font-bold text-amber-600 dark:text-indigo-600">
+                  <Globe className="w-4 h-4 text-indigo-500 shrink-0" />
                   <span>ثبت ۵ اولویت انتخاب نام دامنه اختصاصی (.ir)</span>
                 </div>
                 <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-surface border border-subtle font-bold text-purple-600 dark:text-purple-400">
@@ -1485,62 +1484,12 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   <span>راه‌اندازی کامل بدون نیاز به دانش برنامه‌نویسی</span>
                 </div>
               </div>
-
-              {/* CLOUD HOST SPECIFICATION BOX (ONLY CHARGEABLE ITEM) */}
-              <div className="bg-gradient-to-r from-emerald-950/20 via-surface to-emerald-950/20 border-2 border-emerald-500/40 rounded-3xl p-5 md:p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center border border-emerald-500/30 shrink-0">
-                      <Server className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-primary flex items-center gap-2">
-                        <span>هاست ابری فوق‌سریع اختصاصی (تنها بخش نیازمند پرداخت هزینه)</span>
-                        <span className="text-[10px] bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded-md">۶۷٪ تخفیف زوپیت</span>
-                      </h4>
-                      <p className="text-xs text-muted mt-0.5">
-                        جهت میزبانی و راه‌اندازی بدون قطعی سایت شما، هاست ابری اختصاصی روی دیتاسنترهای پرسرعت تهیه می‌گردد:
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-left sm:text-left shrink-0 bg-background/80 px-4 py-2 rounded-2xl border border-subtle">
-                    <span className="text-[11px] text-muted line-through block">تعرفه اصلی: ۹۰۰,۰۰۰ تومان</span>
-                    <div className="text-xl font-black text-emerald-500 flex items-center gap-1 font-sans">
-                      <span>{parseInt(settings.promaxAccountPrice || '299000').toLocaleString('fa-IR')}</span>
-                      <span className="text-xs font-bold text-muted font-sans">تومان</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Hard Server Hardware Specs */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
-                  <div className="bg-background/90 p-3 rounded-2xl border border-subtle text-center space-y-1">
-                    <span className="text-[11px] text-muted font-bold block">فضای ذخیره‌سازی ابری:</span>
-                    <span className="text-base font-black text-primary font-mono" dir="ltr">15 GB NVMe SSD</span>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-bold">هارد فوق‌سریع سازمانی</span>
-                  </div>
-                  <div className="bg-background/90 p-3 rounded-2xl border border-subtle text-center space-y-1">
-                    <span className="text-[11px] text-muted font-bold block">قدرت پردازش پردازنده:</span>
-                    <span className="text-base font-black text-primary font-mono" dir="ltr">5 Core CPU</span>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-bold">۵ هسته پردازنده اختصاصی</span>
-                  </div>
-                  <div className="bg-background/90 p-3 rounded-2xl border border-subtle text-center space-y-1">
-                    <span className="text-[11px] text-muted font-bold block">حافظه موقت رم:</span>
-                    <span className="text-base font-black text-primary font-mono" dir="ltr">5 GB RAM</span>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-bold">سرعت بالای لود فروشگاه</span>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-secondary leading-relaxed bg-surface/80 p-3 rounded-xl border border-subtle">
-                  💡 <strong>شفاف‌سازی زوپیت:</strong> تمام نرم‌افزارها، قالب وودمارت، سئو، لوگو و لایسنس‌های زوپیت (به ارزش ۱۴.۸ میلیون تومان) به صورت ۱۰۰٪ رایگان به شما تعلق گرفته است؛ پرداخت مبلغ ۲۹۹,۰۰۰ تومان صرفاً بابت تامین سرور سخت‌افزاری بالا به شرکت هاستینگ می‌باشد تا سایت شما بلافاصله در اینترنت مستقر شود.
-                </div>
-              </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-500/30 rounded-3xl p-6 text-right space-y-2">
-            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-black text-base">
+
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-indigo-500/30 rounded-3xl p-6 text-right space-y-2">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-indigo-600 font-black text-base">
               <TrendingUp className="w-5 h-5 shrink-0" />
               <span>انتظار شبکه زوپیت از مدیران فروشگاه پرو:</span>
             </div>
@@ -1552,8 +1501,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           {/* 9 Feature Cards Grid */}
           <div className="space-y-4">
             <h2 className="text-lg font-black text-primary flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-500" />
-              <span>۹ خدمت و هدیه استثنایی اکانت پرو:</span>
+              <Sparkles className="w-5 h-5 text-indigo-500" />
+              <span>۹ خدمت و هدیه استثنایی اکانت پرومکس:</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1562,14 +1511,14 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 return (
                   <div
                     key={item.id}
-                    className="bg-card border border-border-subtle rounded-2xl p-5 hover:border-amber-500/40 transition-all shadow-md hover:shadow-lg flex flex-col justify-between space-y-4 relative group"
+                    className="bg-card border border-border-subtle rounded-2xl p-5 hover:border-indigo-500/20 transition-all shadow-md hover:shadow-lg flex flex-col justify-between space-y-4 relative group"
                   >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-sm`}>
                           <IconComp className="w-5 h-5" />
                         </div>
-                        <span className="text-[11px] font-sans font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20">
+                        <span className="text-[11px] font-sans font-bold text-amber-600 dark:text-indigo-600 bg-indigo-500/10 px-2.5 py-0.5 rounded-lg border border-indigo-500/20">
                           خدمت #{item.id.toLocaleString('fa-IR')}
                         </span>
                       </div>
@@ -1579,7 +1528,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
                     <div className="pt-3 border-t border-border-subtle flex items-center justify-between">
                       <span className="text-[11px] font-bold text-muted">ارزش خدمت:</span>
-                      <span className="text-xs font-sans font-black text-amber-600 dark:text-amber-400">
+                      <span className="text-xs font-sans font-black text-amber-600 dark:text-indigo-600">
                         {item.value}
                       </span>
                     </div>
@@ -1596,7 +1545,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-black text-primary flex items-center gap-2">
-                    <FileText className="w-6 h-6 text-amber-500" />
+                    <FileText className="w-6 h-6 text-indigo-500" />
                     <span>مراحل دریافت اشتراک پرومکس و فعال‌سازی فروشگاه</span>
                   </h2>
                   <p className="text-xs text-muted mt-1">
@@ -1609,70 +1558,16 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   onClick={() => setShowTermsModal(true)}
                   className="px-4 py-2 bg-surface hover:bg-subtle text-primary border border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0"
                 >
-                  <Eye className="w-4 h-4 text-amber-500" />
+                  <Eye className="w-4 h-4 text-indigo-500" />
                   <span>مشاهده کامل متن قرارداد</span>
                 </button>
               </div>
-
-              {/* Wizard Steps Indicator */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setFormStep(1)}
-                  className={`p-3.5 rounded-2xl border text-right transition-all flex items-center gap-3 cursor-pointer ${
-                    formStep === 1
-                      ? "bg-amber-500/15 border-amber-500/80 shadow-md ring-1 ring-amber-500/30"
-                      : "bg-surface/80 border-subtle hover:bg-subtle text-muted"
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
-                    formStep === 1 ? "bg-amber-500 text-slate-950" : "bg-background text-muted border border-subtle"
-                  }`}>
-                    ۱
-                  </div>
-                  <div>
-                    <span className={`text-xs font-black block ${formStep === 1 ? "text-primary" : "text-secondary"}`}>
-                      گام اول: ثبت درخواست و رزرو رایگان
-                    </span>
-                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
-                      پکیج پرو مکس: ۱۰۰٪ رایگان (۰ تومان)
-                    </span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (formStep === 1) handleProceedToStep2();
-                  }}
-                  className={`p-3.5 rounded-2xl border text-right transition-all flex items-center gap-3 cursor-pointer ${
-                    formStep === 2
-                      ? "bg-emerald-500/15 border-emerald-500/80 shadow-md ring-1 ring-emerald-500/30"
-                      : "bg-surface/80 border-subtle hover:bg-subtle text-muted"
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
-                    formStep === 2 ? "bg-emerald-500 text-slate-950" : "bg-background text-muted border border-subtle"
-                  }`}>
-                    ۲
-                  </div>
-                  <div>
-                    <span className={`text-xs font-black block ${formStep === 2 ? "text-primary" : "text-secondary"}`}>
-                      گام دوم: تخصیص سرور و پرداخت هاست
-                    </span>
-                    <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">
-                      فقط هزینه هاست ابری فوق‌سریع ({parseInt(settings.promaxAccountPrice || '299000').toLocaleString('fa-IR')} تومان)
-                    </span>
-                  </div>
-                </button>
-              </div>
             </div>
-
             {/* STEP 1: INITIAL REQUEST, PROFILE & DOMAINS & SIGNATURE */}
             {formStep === 1 && (
               <div className="space-y-6 animate-fade-in">
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center gap-3 text-xs text-amber-800 dark:text-amber-300">
-                  <Sparkles className="w-5 h-5 shrink-0 text-amber-500" />
+                <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-4 flex items-center gap-3 text-xs text-indigo-700 dark:text-indigo-400">
+                  <Sparkles className="w-5 h-5 shrink-0 text-indigo-500" />
                   <span>
                     <strong>گام اول (کاملاً رایگان):</strong> مشخصات مدیر فروشگاه، ۵ اولویت نام دامنه اختصاصی دلخواه (.ir) و امضای قرارداد را وارد نموده و دکمه ادامه را بزنید.
                   </span>
@@ -1727,10 +1622,10 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 </div>
 
                 {/* Domain Proposals Section */}
-                <div className="bg-surface/80 border border-amber-500/30 rounded-2xl p-5 space-y-4">
+                <div className="bg-surface/80 border border-indigo-500/30 rounded-2xl p-5 space-y-4">
                   <div className="space-y-1">
                     <h3 className="text-sm font-black text-primary flex items-center gap-2">
-                      <Globe className="w-4 h-4 text-amber-500" />
+                      <Globe className="w-4 h-4 text-indigo-500" />
                       <span>پیشنهاد نام دامنه اختصاصی (.ir) به ترتیب اولویت (تا ۵ مورد به حروف انگلیسی):</span>
                     </h3>
                     <p className="text-xs text-muted leading-relaxed">
@@ -1812,9 +1707,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   <button
                     type="button"
                     onClick={handleProceedToStep2}
-                    className="w-full md:w-[75%] mx-auto py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.01]"
+                    className="w-full md:w-[75%] mx-auto py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-base rounded-2xl shadow-xl shadow-indigo-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.01]"
                   >
-                    <span>تایید اطلاعات و ادامه: گام دوم (تخصیص هاست ابری فوق‌سریع)</span>
+                    <span>تایید اطلاعات و ادامه</span>
                     <ArrowLeft className="w-5 h-5" />
                   </button>
                 </div>
@@ -1832,7 +1727,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     </div>
                     <div>
                       <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                        درخواست اولیه و رزرو ۱۰۰٪ رایگان پکیج پرو مکس با موفقیت ذخیره شد!
+                        درخواست اولیه و رزرو ۱۰۰٪ رایگان پکیج پرومکس مکس با موفقیت ذخیره شد!
                       </p>
                       <p className="text-[11px] text-muted mt-0.5">
                         صرفه‌جویی شما: ۱۴,۸۰۰,۰۰۰ تومان تخفیف کامل زوپیت. اکنون هاست ابری را جهت کانفیگ فوری سرور نهایی کنید.
@@ -1900,7 +1795,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                       <div className="space-y-1 text-right flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-xs font-black text-primary">دریافت ای‌نماد رسمی</span>
-                          <span className="text-[10px] font-sans font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 whitespace-nowrap">
+                          <span className="text-[10px] font-sans font-black text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 whitespace-nowrap">
                             +۵۰,۰۰۰ تومان
                           </span>
                         </div>
@@ -1922,7 +1817,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-xs font-black text-primary">درگاه پرداخت آنلاین</span>
                           <span className="text-[10px] font-sans font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 whitespace-nowrap">
-                            رایگان (هدیه پرو)
+                            رایگان (هدیه پرومکس)
                           </span>
                         </div>
                         <p className="text-[11px] text-muted leading-relaxed">
@@ -1943,7 +1838,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-xs font-black text-primary">تشکیل پرونده مالیاتی</span>
                           <span className="text-[10px] font-sans font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 whitespace-nowrap">
-                            رایگان (هدیه پرو)
+                            رایگان (هدیه پرومکس)
                           </span>
                         </div>
                         <p className="text-[11px] text-muted leading-relaxed">
@@ -2044,8 +1939,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 </div>
 
                 {/* Bottom Payable Amount & Discount Code Box Section */}
-                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-emerald-500/30 rounded-2xl p-6 text-white shadow-2xl relative overflow-hidden space-y-5">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-emerald-500/30 rounded-2xl p-6 text-text-primary shadow-2xl relative overflow-hidden space-y-5">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
                   <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none"></div>
 
                   <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
@@ -2055,17 +1950,17 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                       </span>
                       <div className="flex items-center gap-3">
                         {(isDiscountApplied || hasEnamad) && (
-                          <span className="text-sm font-sans font-bold text-slate-400 line-through decoration-rose-500/50 decoration-2">
+                          <span className="text-sm font-sans font-bold text-text-muted line-through decoration-rose-500/50 decoration-2">
                             {(parseInt(settings.promaxAccountPrice || '299000', 10) + (hasEnamad ? 50000 : 0)).toLocaleString("fa-IR")}
                           </span>
                         )}
-                        <div className="text-3xl md:text-4xl font-black text-white font-sans tracking-tight flex items-baseline gap-1.5 drop-shadow-md">
+                        <div className="text-3xl md:text-4xl font-black text-text-primary font-sans tracking-tight flex items-baseline gap-1.5 drop-shadow-md">
                           <span>{Math.max(0, parseInt(settings.promaxAccountPrice || '299000', 10) + (hasEnamad ? 50000 : 0) - appliedDiscount).toLocaleString("fa-IR")}</span>
                           <span className="text-sm font-bold text-emerald-400 tracking-normal">تومان</span>
                         </div>
                       </div>
                       {hasEnamad && (
-                        <span className="text-[11px] text-amber-300 font-bold block pt-1 flex items-center gap-1.5">
+                        <span className="text-[11px] text-indigo-600 font-bold block pt-1 flex items-center gap-1.5">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           (شامل ۵۰,۰۰۰ تومان کارمزد ثبت ای‌نماد)
                         </span>
@@ -2079,7 +1974,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                         value={discountCodeText}
                         onChange={(e) => setDiscountCodeText(e.target.value)}
                         placeholder="کد تخفیف اضافه (اختیاری)"
-                        className="flex-1 w-full lg:w-64 px-4 py-3 bg-transparent text-sm text-white placeholder-slate-500 font-mono focus:outline-none dir-ltr text-center font-bold tracking-widest uppercase"
+                        className="flex-1 w-full lg:w-64 px-4 py-3 bg-transparent text-sm text-text-primary placeholder-slate-500 font-mono focus:outline-none dir-ltr text-center font-bold tracking-widest uppercase"
                       />
                       <button
                         type="button"
@@ -2149,7 +2044,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
             
             <div className="p-6 text-sm text-secondary space-y-4 text-right" dir="rtl">
               <p className="text-xs text-muted mb-4">
-                لطفا تصاویر کارت ملی، شناسنامه و شماره شبا خود را آپلود کرده و پیام خود را جهت بررسی سریع وارد نمایید. این تیکت با اولویت بالا و مستقیما به دپارتمان اکانت پرو ارسال خواهد شد.
+                لطفا تصاویر کارت ملی، شناسنامه و شماره شبا خود را آپلود کرده و پیام خود را جهت بررسی سریع وارد نمایید. این تیکت با اولویت بالا و مستقیما به دپارتمان اکانت پرومکس ارسال خواهد شد.
               </p>
               
               <div>
@@ -2195,7 +2090,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               <button
                 onClick={handleSendProTicket}
                 disabled={submittingTicket}
-                className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-text-primary font-black rounded-xl text-xs transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 {submittingTicket ? "در حال ارسال..." : "ارسال مدارک"}
                 <PenTool className="w-4 h-4" />
@@ -2211,7 +2106,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
             <div className="p-5 border-b border-border-subtle flex items-center justify-between">
               <h3 className="font-black text-primary text-base flex items-center gap-2">
                 <FileText className="w-5 h-5 text-emerald-500" />
-                <span>متن قرارداد و قوانین رسمی اکانت پرو زوپیت</span>
+                <span>متن قرارداد و قوانین رسمی اکانت پرومکس زوپیت</span>
               </h3>
               <button
                 onClick={() => setShowTermsModal(false)}
@@ -2239,7 +2134,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
                   <div>
                     <strong className="text-primary">ماده ۲: موضوع قرارداد</strong>
-                    <p>ارائه پکیج جامع راه‌اندازی و مدیریت فروشگاه آنلاین (اکانت پرو)، شامل تامین زیرساخت‌های نرم‌افزاری (هاست و دامنه اختصاصی ir.)، نصب و پیکربندی سیستم مدیریت محتوا (قالب وودمارت)، انجام امور اداری و قانونی (اخذ اینماد، درگاه پرداخت، پرونده مالیاتی)، اتصال به موتورهای جستجوی کالا (ترب) و ارائه خدمات لجستیک، در ازای تعهد فروشنده به تامین کالا و حفظ حداقل سقف فروش ماهانه.</p>
+                    <p>ارائه پکیج جامع راه‌اندازی و مدیریت فروشگاه آنلاین (اکانت پرومکس)، شامل تامین زیرساخت‌های نرم‌افزاری (هاست و دامنه اختصاصی ir.)، نصب و پیکربندی سیستم مدیریت محتوا (قالب وودمارت)، انجام امور اداری و قانونی (اخذ اینماد، درگاه پرداخت، پرونده مالیاتی)، اتصال به موتورهای جستجوی کالا (ترب) و ارائه خدمات لجستیک، در ازای تعهد فروشنده به تامین کالا و حفظ حداقل سقف فروش ماهانه.</p>
                   </div>
 
                   <div>
@@ -2268,7 +2163,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     <strong className="text-primary">ماده ۶: شرایط اختصاصی مالکیت دامنه (بند مشروط)</strong>
                     <p>۱-۶. با توجه به قوانین ثبت دامنه در مرکز ایرنیک، دامنه موضوع این قرارداد در ابتدا توسط پلتفرم ثبت و راه‌اندازی می‌گردد اما در اختیار و انحصار فروشگاه خواهد بود.</p>
                     <p>۲-۶. انتقال قطعی: در صورتی که فروشنده بتواند برای ماه‌های متوالی حد نصاب فروش (مندرج در بند ۲-۵) را با موفقیت محقق سازد، مالکیت صددرصدی و حقوقی دامنه به شناسه ایرنیک فروشنده منتقل خواهد شد.</p>
-                    <p>۳-۶. استرداد و سلب امتیاز: چنانچه فروشنده در هر ماه از رسیدن به حداقل حد نصاب فروش باز بماند یا فعالیت فروشگاه را متوقف کند، پلتفرم این اختیار و حقِ غیرقابل‌فسخ را دارد که قرارداد اکانت پرو را لغو کرده، خدمات هاست را قطع نموده و دامنه ثبت‌شده را به مالکیت خود درآورده یا غیرفعال کند. فروشنده با تایید این قرارداد، حق هرگونه اعتراض در خصوص سلب مالکیت دامنه در صورت عدم تحقق تارگت را از خود سلب می‌نماید.</p>
+                    <p>۳-۶. استرداد و سلب امتیاز: چنانچه فروشنده در هر ماه از رسیدن به حداقل حد نصاب فروش باز بماند یا فعالیت فروشگاه را متوقف کند، پلتفرم این اختیار و حقِ غیرقابل‌فسخ را دارد که قرارداد اکانت پرومکس را لغو کرده، خدمات هاست را قطع نموده و دامنه ثبت‌شده را به مالکیت خود درآورده یا غیرفعال کند. فروشنده با تایید این قرارداد، حق هرگونه اعتراض در خصوص سلب مالکیت دامنه در صورت عدم تحقق تارگت را از خود سلب می‌نماید.</p>
                   </div>
 
                   <div>
