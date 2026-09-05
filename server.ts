@@ -7875,11 +7875,11 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
       settings: {
         autoApprove: settingsMap['pro_auto_approve'] !== 'false',
         proAccountPrice: parseInt(settingsMap['pro_account_price'] || '189000', 10),
-        promaxAccountPrice: parseInt(settingsMap['promax_account_price'] || '299000', 10),
+        promaxAccountPrice: parseInt(settingsMap['promax_account_price'] || '199000', 10),
         hostRenewalPrice: parseInt(settingsMap['pro_host_renewal_price'] || '500000', 10),
-        hostDiscountedPrice: parseInt(settingsMap['pro_host_discounted_price'] || '198000', 10),
+        hostDiscountedPrice: parseInt(settingsMap['pro_host_discounted_price'] || '199000', 10),
         torobPrice: parseInt(settingsMap['pro_torob_price'] || '150000', 10),
-        promoCode: settingsMap['pro_promo_code'] || 'ZOPIT-PRO-198',
+        promoCode: settingsMap['pro_promo_code'] || 'ZOPIT-HOST-199',
         termsContent: settingsMap['pro_terms_content'] || '',
         videoUrl: settingsMap['pro_video_url'] || '',
         audioUrl: settingsMap['pro_audio_url'] || ''
@@ -7895,7 +7895,7 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
 app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
-    const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, promoCodeInput, planType, amount } = req.body;
+    const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, hasDomainPriority, promoCodeInput, planType, amount } = req.body;
 
     if (!fullName || !nationalCode || !mobile || !signatureImage) {
       return res.status(400).json({ error: 'تکمیل تمامی موارد الزام‌آور از جمله کد ملی، شماره همراه و امضای دیجیتال اجباری است.' });
@@ -7919,17 +7919,20 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
     const initialStatus = isAutoApprove ? 'APPROVED' : 'PENDING';
 
     // Incredible Offer Logic: Pro Max license & package (14.8M) is 100% FREE.
-    // Only charge for high-discount Cloud Hosting (15GB SSD, 5 Core CPU, 5GB RAM) - 299,000 Tomans
-    let defaultPrice = parseInt(settingsMap['promax_account_price'] || '299000', 10);
+    // Cloud Hosting (15GB SSD NVMe, 5 Core CPU, 5GB RAM) - 199,000 Tomans
+    let defaultPrice = parseInt(settingsMap['promax_account_price'] || '199000', 10);
     
     let basePrice = defaultPrice;
     let enamadCost = hasEnamad ? 50000 : 0;
+    let domainPriorityCost = hasDomainPriority ? 80000 : 0;
+    let totalPayable = basePrice + enamadCost + domainPriorityCost;
     
     // Promo Code / Discount Code logic
     if (promoCodeInput && promoCodeInput.trim()) {
       const cleanCoupon = promoCodeInput.trim().toUpperCase();
       if (settingsMap['pro_promo_code'] && cleanCoupon === settingsMap['pro_promo_code'].trim().toUpperCase()) {
         basePrice = 0; // 100% legacy master promo
+        totalPayable = basePrice + enamadCost + domainPriorityCost;
       } else {
         try {
           const discount = await prisma.discountCode.findUnique({ where: { code: cleanCoupon } });
@@ -7944,6 +7947,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
               } else {
                 basePrice = Math.max(0, defaultPrice - discount.discountValue);
               }
+              totalPayable = basePrice + enamadCost + domainPriorityCost;
               // Increment usedCount
               await prisma.discountCode.update({
                 where: { id: discount.id },
@@ -7955,11 +7959,10 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
           console.error('Error applying coupon in pro register:', e);
         }
       }
-    } else if (typeof amount === 'number' && amount >= 0 && amount < defaultPrice) {
-      basePrice = amount;
+    } else if (typeof amount === 'number' && amount >= 0) {
+      // If direct valid total amount sent from client
+      totalPayable = amount;
     }
-
-    let totalPayable = basePrice + enamadCost;
     const finalStatus = (totalPayable > 0) ? 'PENDING_PAYMENT' : initialStatus;
 
     const proAccount = await prisma.proAccount.upsert({

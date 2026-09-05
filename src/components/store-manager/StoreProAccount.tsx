@@ -37,7 +37,9 @@ import {
   FileCheck,
   Layers,
   ArrowLeft,
-  UserCheck
+  UserCheck,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 import { ProAccountMediaShowcase } from "./ProAccountMediaShowcase";
@@ -104,7 +106,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     return () => clearInterval(timer);
   }, []);
 
-  // Registration form states
+  // Registration form states (Two-Step Wizard: Step 1 = Store Info & Admin, Step 2 = Cloud Host & Invoice)
   const [fullName, setFullName] = useState("");
   const [nationalCode, setNationalCode] = useState("");
   const [mobile, setMobile] = useState("");
@@ -115,6 +117,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [ticketAttachment, setTicketAttachment] = useState("");
   const [submittingTicket, setSubmittingTicket] = useState(false);
   
+  const [hasDomainPriority, setHasDomainPriority] = useState(false);
   const [hasEnamad, setHasEnamad] = useState(false);
   const [hasGateway, setHasGateway] = useState(false);
   const [hasTaxProfile, setHasTaxProfile] = useState(false);
@@ -124,7 +127,6 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [domainProposals, setDomainProposals] = useState<string[]>(["", "", "", "", ""]);
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [showTermsModal, setShowTermsModal] = useState(false);
-  const [hostOption, setHostOption] = useState<"ZOPIT_HOST" | "OWN_HOST">("ZOPIT_HOST");
   const [copiedCoupon, setCopiedCoupon] = useState<boolean>(false);
 
   // Discount code states
@@ -162,11 +164,10 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       }
 
       // Calculate applied discount amount
-      const basePrice = selectedPlan === 'PRO_MAX'
-        ? parseInt(settings.promaxAccountPrice || '299000', 10)
-        : parseInt(settings.proAccountPrice || '189000', 10);
+      const hostBasePrice = parseInt(settings.promaxAccountPrice || '199000', 10);
+      const domainCost = hasDomainPriority ? 80000 : 0;
       const adminServicesCost = hasEnamad ? 50000 : 0;
-      const totalCost = basePrice + adminServicesCost;
+      const totalCost = hostBasePrice + domainCost + adminServicesCost;
       
       let discountAmount = 0;
       if (data.discountType === 'PERCENTAGE') {
@@ -467,37 +468,29 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   };
 
   const handleProceedToStep2 = () => {
-    if (!fullName.trim() || !nationalCode.trim() || !mobile.trim()) {
-      const msg = "لطفا نام و نام خانوادگی، کد ملی و شماره همراه را وارد نمایید.";
+    if (!fullName.trim()) {
+      const msg = "لطفاً نام و نام خانوادگی مدیر فروشگاه را وارد نمایید.";
+      if (showNotification) showNotification(msg, "error");
+      else toast(msg, "error");
+      return;
+    }
+
+    if (!nationalCode.trim() || nationalCode.trim().length < 10) {
+      const msg = "لطفاً کد ملی معتبر (۱۰ رقمی) را وارد نمایید.";
+      if (showNotification) showNotification(msg, "error");
+      else toast(msg, "error");
+      return;
+    }
+
+    if (!mobile.trim() || mobile.trim().length < 10) {
+      const msg = "لطفاً شماره همراه معتبر را وارد نمایید.";
       if (showNotification) showNotification(msg, "error");
       else toast(msg, "error");
       return;
     }
 
     if (!hasSignature) {
-      const msg = "لطفا قرارداد را امضا نمایید (کشیدن امضا با دست/ماوس یا کلیک بر دکمه امضای خودکار).";
-      if (showNotification) showNotification(msg, "error");
-      else toast(msg, "error");
-      return;
-    }
-
-    setFormStep(2);
-    if (showNotification) showNotification("مشخصات و امضا با موفقیت تایید شد. اکنون مرحله تخصیص هاست ابری را تکمیل نمایید.", "success");
-    else toast("مشخصات و امضا با موفقیت تایید شد", "success");
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!fullName.trim() || !nationalCode.trim() || !mobile.trim()) {
-      const msg = "لطفا نام و نام خانوادگی، کد ملی و شماره همراه را وارد نمایید.";
-      if (showNotification) showNotification(msg, "error");
-      else toast(msg, "error");
-      return;
-    }
-
-    if (!hasSignature) {
-      const msg = "لطفا قرارداد را امضا نمایید (کشیدن امضا با دست/ماوس در کادر مربوطه).";
+      const msg = "لطفاً قرارداد را امضا نمایید (کشیدن امضا با دست/ماوس یا کلیک بر دکمه امضای خودکار).";
       if (showNotification) showNotification(msg, "error");
       else toast(msg, "error");
       return;
@@ -512,7 +505,41 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     }
 
     if (!termsAccepted) {
-      const msg = "لطفاً تیک پذیرش قوانین و قرارداد را فعال نمایید.";
+      const msg = "لطفاً تیک پذیرش قوانین و مقررات را فعال نمایید.";
+      if (showNotification) showNotification(msg, "error");
+      else toast(msg, "error");
+      return;
+    }
+
+    setFormStep(2);
+    const container = document.getElementById("pro-register-wizard-container");
+    if (container) {
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!fullName.trim() || !nationalCode.trim() || !mobile.trim()) {
+      setFormStep(1);
+      const msg = "لطفاً مشخصات مدیر فروشگاه را در مرحله اول تکمیل فرمایید.";
+      if (showNotification) showNotification(msg, "error");
+      else toast(msg, "error");
+      return;
+    }
+
+    if (!hasSignature) {
+      setFormStep(1);
+      const msg = "لطفاً قرارداد را در مرحله اول امضا نمایید.";
+      if (showNotification) showNotification(msg, "error");
+      else toast(msg, "error");
+      return;
+    }
+
+    if (!termsAccepted) {
+      setFormStep(1);
+      const msg = "لطفاً تیک پذیرش قوانین و مقررات را فعال نمایید.";
       if (showNotification) showNotification(msg, "error");
       else toast(msg, "error");
       return;
@@ -521,13 +548,11 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     const canvas = canvasRef.current;
     const signatureImage = canvas ? canvas.toDataURL("image/png") : "";
 
-    const basePrice = hostOption === 'ZOPIT_HOST'
-      ? (selectedPlan === 'PRO_MAX'
-          ? parseInt(settings.promaxAccountPrice || '299000', 10)
-          : parseInt(settings.proAccountPrice || '189000', 10))
-      : 0;
+    const hostBasePrice = parseInt(settings.promaxAccountPrice || '199000', 10);
+    const domainCost = hasDomainPriority ? 80000 : 0;
     const adminServicesCost = hasEnamad ? 50000 : 0;
-    const calculatedAmount = Math.max(0, basePrice + adminServicesCost - (hostOption === 'ZOPIT_HOST' ? appliedDiscount : 0));
+    const subtotal = hostBasePrice + domainCost + adminServicesCost;
+    const calculatedAmount = Math.max(0, subtotal - appliedDiscount);
 
     setSubmitting(true);
     try {
@@ -549,10 +574,11 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           hasPostalPanel,
           hasCustomLogo,
           logoDescription,
+          hasDomainPriority,
           planType: selectedPlan,
-          domainProposals: selectedPlan === 'PRO_MAX' ? domainProposals.map(d => d.trim()).filter(Boolean) : [],
+          domainProposals: domainProposals.map(d => d.trim()).filter(Boolean),
           amount: calculatedAmount,
-          discountCodeText: isDiscountApplied ? discountCodeText : undefined
+          promoCodeInput: isDiscountApplied ? discountCodeText : undefined
         })
       });
 
@@ -843,7 +869,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               دریافت ۱۰۰٪ رایگان اشتراک پرومکس زوپیت (Zopit Pro Max)
             </h1>
             <p className="text-text-secondary text-xs md:text-sm max-w-3xl leading-relaxed">
-              کلیه خدمات و لایسنس‌های نرم‌افزاری، طراحی قالب اختصاصی وودمارت، دامنه ملی (.ir)، افزونه‌ها و پشتیبانی به ارزش <strong className="text-primary font-black">۱۴,۸۰۰,۰۰۰ تومان به صورت ۱۰۰٪ رایگان و هدیه</strong> به شما تقدیم می‌گردد. هاستینگ سرور نیز با تخفیف ویژه ۶۷٪ (یا اتصال هاست شخصی) در اختیار شماست.
+              کلیه خدمات و لایسنس‌های نرم‌افزاری، طراحی قالب اختصاصی وودمارت، افزونه‌ها و پشتیبانی به ارزش <strong className="text-primary font-black">۱۴,۸۰۰,۰۰۰ تومان به صورت ۱۰۰٪ رایگان و هدیه</strong> به شما تقدیم می‌گردد. مشخصات خود را ثبت کرده و در مرحله بعد هاست اختصاصی ابری را با تخفیف ویژه دریافت نمایید.
             </p>
           </div>
 
@@ -1491,584 +1517,709 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
             </div>
           </div>
 
-          {/* HOSTING SPECIAL OFFER & COUPON CARD */}
-          <div className="bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/60 border border-indigo-500/30 rounded-3xl p-6 md:p-8 space-y-5 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/30">
-                  <Server className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>زیرساخت سرور و هاستینگ فروشگاه</span>
-                </div>
-                <h3 className="text-lg md:text-xl font-black text-text-primary">
-                  هاست ابری فوق‌سریع NVMe با ۶۷٪ تخفیف ویژه زوپیت
-                </h3>
-                <p className="text-xs text-text-muted max-w-2xl leading-relaxed">
-                  اشتراک نرم‌افزاری پرومکس، قالب وودمارت و دامنه اختصاصی ۱۰۰٪ رایگان است. برای میزبانی سایت، می‌توانید هاست ابری پرسرعت اختصاصی زوپیت (۱۵ گیگابایت NVMe، رم ۵ گیگ، پردازنده ۵ هسته‌ای) را با ۲۹۹ هزار تومان (به جای ۹۰۰ هزار تومان) تهیه کنید یا از هاست شخصی خودتان استفاده نمایید.
-                </p>
-              </div>
-
-              {/* Copyable Coupon Banner */}
-              <div className="bg-slate-950/80 p-4 rounded-2xl border border-indigo-500/40 shrink-0 w-full lg:w-auto text-center space-y-2 shadow-inner">
-                <span className="text-[11px] text-indigo-300 font-bold block">کد تخفیف اختصاصی هاست ابری:</span>
-                <div className="flex items-center justify-center gap-2 bg-slate-900 px-4 py-2 rounded-xl border border-indigo-500/30">
-                  <span className="font-mono font-black text-sm text-emerald-400 tracking-wider">
-                    {settings?.promoCode || "ZOPIT-HOST-67"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const code = settings?.promoCode || "ZOPIT-HOST-67";
-                      navigator.clipboard.writeText(code);
-                      setCopiedCoupon(true);
-                      setDiscountCodeText(code);
-                      toast("کد تخفیف کپی شد و در فرم قرار گرفت", "success");
-                      setTimeout(() => setCopiedCoupon(false), 3000);
-                    }}
-                    className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                    title="کپی کد تخفیف"
-                  >
-                    {copiedCoupon ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>کپی شد!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>کپی کد</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <span className="text-[10px] text-text-muted block">قابل استفاده در مرحله نهایی یا ثبت دستی</span>
-              </div>
-            </div>
-          </div>
-
           {/* UNIFIED REGISTRATION & PRO MAX ACTIVATION FORM */}
-          <div className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 space-y-8 shadow-2xl">
-            <div className="border-b border-border-subtle pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-black text-primary flex items-center gap-2">
-                  <Sparkles className="w-6 h-6 text-amber-500" />
-                  <span>فرم ثبت‌نام و دریافت ۱۰۰٪ رایگان اشتراک پرومکس</span>
-                </h2>
-                <p className="text-xs text-muted mt-1">
-                  مشخصات، اولویت‌های دامنه اختصاصی (.ir) و خدمات انتخابی خود را مشخص کرده و قرارداد را امضا نمایید:
-                </p>
+          {/* TWO-STEP REGISTRATION & PRO MAX ACTIVATION WIZARD */}
+          <div id="pro-register-wizard-container" className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 space-y-8 shadow-2xl">
+            {/* WIZARD STEP HEADER & PROGRESS INDICATOR */}
+            <div className="space-y-6">
+              <div className="border-b border-border-subtle pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-black text-primary flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-amber-500" />
+                    <span>ثبت‌نام و راه‌اندازی اشتراک پرومکس زوپیت (Zopit Pro Max)</span>
+                  </h2>
+                  <p className="text-xs text-muted mt-1">
+                    {formStep === 1
+                      ? "گام ۱ از ۲: مشخصات متقاضی، اولویت‌های دامنه اختصاصی و خدمات تکمیلی"
+                      : "گام ۲ از ۲: زیرساخت هاستینگ ابری، کد تخفیف و پیش‌فاکتور نهایی"}
+                  </p>
+                </div>
+                <span className="text-xs text-emerald-500 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto flex items-center gap-1.5">
+                  <Gift className="w-4 h-4" />
+                  <span>پکیج طلایی هدیه (ارزش ۱۴,۸۰۰,۰۰۰ تومان)</span>
+                </span>
               </div>
-              <span className="text-xs text-emerald-500 font-bold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
-                پکیج طلایی هدیه (ارزش ۱۴,۸۰۰,۰۰۰ تومان)
-              </span>
+
+              {/* Progress Steps Nav */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormStep(1)}
+                  className={`p-4 rounded-2xl border transition-all text-right flex items-center gap-3.5 cursor-pointer ${
+                    formStep === 1
+                      ? "bg-indigo-500/10 border-indigo-500/60 shadow-md ring-2 ring-indigo-500/20"
+                      : "bg-surface border-subtle hover:border-indigo-500/30 opacity-80"
+                  }`}
+                >
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                      formStep === 1
+                        ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/30"
+                        : "bg-surface border border-subtle text-secondary"
+                    }`}
+                  >
+                    ۱
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black text-primary block">
+                      گام اول: مشخصات متقاضی و خدمات تکمیلی
+                    </span>
+                    <span className="text-[11px] text-muted block">
+                      اطلاعات مدیر، اولویت دامنه، ای‌نماد و امضای قرارداد
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleProceedToStep2}
+                  className={`p-4 rounded-2xl border transition-all text-right flex items-center gap-3.5 cursor-pointer ${
+                    formStep === 2
+                      ? "bg-emerald-500/10 border-emerald-500/60 shadow-md ring-2 ring-emerald-500/20"
+                      : "bg-surface border-subtle hover:border-emerald-500/30 opacity-80"
+                  }`}
+                >
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                      formStep === 2
+                        ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30"
+                        : "bg-surface border border-subtle text-secondary"
+                    }`}
+                  >
+                    ۲
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black text-primary block">
+                      گام دوم: هاست ابری و پیش‌فاکتور نهایی
+                    </span>
+                    <span className="text-[11px] text-muted block">
+                      هاستینگ اختصاصی NVMe، کد تخفیف و پرداخت
+                    </span>
+                  </div>
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleRegister} className="space-y-8">
-              {/* SECTION 1: STORE MANAGER PROFILE */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-primary font-black text-sm border-b border-subtle/50 pb-2">
-                  <UserCheck className="w-4 h-4 text-indigo-500" />
-                  <span>۱. مشخصات مدیر فروشگاه</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-secondary block mb-1.5">
-                      نام و نام خانوادگی مدیر فروشگاه <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="مثال: محمد رضایی"
-                      className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-primary"
-                      required
-                    />
+            {/* STEP 1: APPLICANT INFO & SERVICES FORM */}
+            {formStep === 1 && (
+              <div className="space-y-8 animate-in fade-in duration-300">
+                {/* SECTION 1: STORE MANAGER PROFILE */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-primary font-black text-sm border-b border-subtle/50 pb-2">
+                    <UserCheck className="w-4 h-4 text-indigo-500" />
+                    <span>۱. مشخصات مدیر فروشگاه</span>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-secondary block mb-1.5">
-                      کد ملی <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={nationalCode}
-                      onChange={(e) => setNationalCode(e.target.value)}
-                      placeholder="۱۰ رقم کد ملی"
-                      maxLength={10}
-                      className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 text-primary"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-secondary block mb-1.5">
-                      شماره موبایل همراه <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={mobile}
-                      onChange={(e) => setMobile(e.target.value)}
-                      placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-                      maxLength={11}
-                      className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 text-primary"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 2: DOMAIN NAME PROPOSALS (.IR) */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
-                  <div className="flex items-center gap-2 text-primary font-black text-sm">
-                    <Globe className="w-4 h-4 text-blue-500" />
-                    <span>۲. پیشنهاد نام دامنه اختصاصی (.ir) به ترتیب اولویت (تا ۵ اولویت دلخواه)</span>
-                  </div>
-                  <span className="text-[11px] text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                    ثبت دامنه ۱۰۰٪ رایگان
-                  </span>
-                </div>
-
-                <p className="text-xs text-muted leading-relaxed">
-                  نام‌های پیشنهادی خود را با حروف انگلیسی وارد کنید. اولین دامنه‌ای که در سامانه ایرنیک آزاد باشد، به صورت اختصاصی برای فروشگاه شما ثبت و متصل خواهد شد:
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  {[1, 2, 3, 4, 5].map((idx) => (
-                    <div key={idx} className="space-y-1">
-                      <label className="text-[11px] font-bold text-secondary flex items-center justify-between">
-                        <span>اولویت {idx.toLocaleString('fa-IR')}:</span>
-                        {idx === 1 && <span className="text-[10px] text-amber-500 font-bold">اصلی</span>}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-secondary block mb-1.5">
+                        نام و نام خانوادگی مدیر فروشگاه <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="text"
-                        value={domainProposals[idx - 1] || ''}
-                        onChange={(e) => {
-                          const updated = [...domainProposals];
-                          updated[idx - 1] = e.target.value;
-                          setDomainProposals(updated);
-                        }}
-                        placeholder={`brand${idx}.ir`}
-                        className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono dir-ltr text-left focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="مثال: محمد رضایی"
+                        className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-primary"
+                        required
                       />
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* SECTION 3: ADMINISTRATIVE & COMPLEMENTARY OPTIONS */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
-                  <div className="flex items-center gap-2 text-primary font-black text-sm">
-                    <Building2 className="w-4 h-4 text-indigo-500" />
-                    <span>۳. خدمات و آپشن‌های تکمیلی فروشگاه (اینماد، درگاه بانکی، پرونده مالیاتی، لوگو و لجستیک)</span>
+                    <div>
+                      <label className="text-xs font-bold text-secondary block mb-1.5">
+                        کد ملی <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={nationalCode}
+                        onChange={(e) => setNationalCode(e.target.value)}
+                        placeholder="۱۰ رقم کد ملی"
+                        maxLength={10}
+                        className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 text-primary"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-secondary block mb-1.5">
+                        شماره موبایل همراه <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={mobile}
+                        onChange={(e) => setMobile(e.target.value)}
+                        placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                        maxLength={11}
+                        className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 text-primary"
+                        required
+                      />
+                    </div>
                   </div>
-                  <span className="text-[11px] text-indigo-400 font-bold">
-                    انتخاب اختیاری بر اساس نیاز
-                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* 1. Payment Gateway */}
-                  <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasGateway ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
-                    <input
-                      type="checkbox"
-                      checked={hasGateway}
-                      onChange={(e) => setHasGateway(e.target.checked)}
-                      className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
-                    />
-                    <div className="space-y-1 text-right flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-black text-primary">درگاه پرداخت مستقیم آنلاین</span>
-                        <span className="text-[10px] font-sans font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 whitespace-nowrap">
-                          رایگان (هدیه)
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted leading-relaxed">
-                        اخذ، احراز و کانفیگ درگاه شتابی اختصاصی بدون هزینه اضافی با پشتیبانی زوپیت.
-                      </p>
+                {/* SECTION 2: DOMAIN NAME PROPOSALS (.IR) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
+                    <div className="flex items-center gap-2 text-primary font-black text-sm">
+                      <Globe className="w-4 h-4 text-blue-500" />
+                      <span>۲. پیشنهاد نام دامنه اختصاصی (.ir) به ترتیب اولویت (تا ۵ اولویت دلخواه)</span>
                     </div>
-                  </label>
+                    <span className="text-[11px] text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                      ثبت دامنه ۱۰۰٪ رایگان
+                    </span>
+                  </div>
 
-                  {/* 2. Tax File Setup */}
-                  <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasTaxProfile ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
+                  <p className="text-xs text-muted leading-relaxed">
+                    نام‌های پیشنهادی خود را با حروف انگلیسی وارد کنید. اولین دامنه‌ای که در سامانه ایرنیک آزاد باشد، به صورت اختصاصی برای فروشگاه شما ثبت و متصل خواهد شد:
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    {[1, 2, 3, 4, 5].map((idx) => (
+                      <div key={idx} className="space-y-1">
+                        <label className="text-[11px] font-bold text-secondary flex items-center justify-between">
+                          <span>اولویت {idx.toLocaleString('fa-IR')}:</span>
+                          {idx === 1 && <span className="text-[10px] text-amber-500 font-bold">اصلی</span>}
+                        </label>
+                        <input
+                          type="text"
+                          value={domainProposals[idx - 1] || ''}
+                          onChange={(e) => {
+                            const updated = [...domainProposals];
+                            updated[idx - 1] = e.target.value;
+                            setDomainProposals(updated);
+                          }}
+                          placeholder={`brand${idx}.ir`}
+                          className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono dir-ltr text-left focus:ring-2 focus:ring-blue-500 outline-none text-primary"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Domain Priority Checkbox Option */}
+                  <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 mt-3 ${
+                    hasDomainPriority ? "bg-blue-500/10 border-blue-500/60 shadow-md" : "bg-surface border-subtle hover:border-blue-500/30"
+                  }`}>
                     <input
                       type="checkbox"
-                      checked={hasTaxProfile}
-                      onChange={(e) => setHasTaxProfile(e.target.checked)}
-                      className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
+                      checked={hasDomainPriority}
+                      onChange={(e) => setHasDomainPriority(e.target.checked)}
+                      className="mt-1 rounded text-blue-600 focus:ring-blue-500 shrink-0 w-4 h-4 cursor-pointer"
                     />
                     <div className="space-y-1 text-right flex-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-black text-primary">تشکیل پرونده مالیاتی</span>
-                        <span className="text-[10px] font-sans font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 whitespace-nowrap">
-                          رایگان (هدیه)
+                        <span className="text-xs font-black text-primary">سفارش اولویت‌بندی و ثبت تخصصی دامنه‌های پیشنهادی</span>
+                        <span className="text-[10px] font-sans font-black text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20 whitespace-nowrap">
+                          +۸۰,۰۰۰ تومان
                         </span>
                       </div>
                       <p className="text-[11px] text-muted leading-relaxed">
-                        ثبت‌نام و راهنمایی تشکیل پرونده در سازمان امور مالیاتی جهت اتصال درگاه مستقیم.
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* 3. eNamad option */}
-                  <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasEnamad ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
-                    <input
-                      type="checkbox"
-                      checked={hasEnamad}
-                      onChange={(e) => setHasEnamad(e.target.checked)}
-                      className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
-                    />
-                    <div className="space-y-1 text-right flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-black text-primary">اخذ ای‌نماد رسمی (نماد اعتماد)</span>
-                        <span className="text-[10px] font-sans font-black text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 whitespace-nowrap">
-                          +۵۰,۰۰۰ تومان کارمزد
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted leading-relaxed">
-                        ثبت‌نام، احراز هویت و پیگیری دریافت نشان اعتماد از مرکز توسعه تجارت الکترونیکی.
+                        استعلام لحظه‌ای، بررسی حقوقی آزاد بودن نام‌ها، اتصال فوری DNS و رزرو مستقیم دامنه‌های اولویت‌دار توسط کارشناسان زوپیت در سامانه ایرنیک.
                       </p>
                     </div>
                   </label>
                 </div>
 
-                {/* Additional Logo & Logistics Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Custom Logo Creation */}
-                  <div className={`p-4 rounded-2xl border transition-all space-y-3 ${hasCustomLogo ? 'bg-emerald-500/10 border-emerald-500/50 shadow-sm' : 'bg-surface border-subtle'}`}>
-                    <label className="flex items-start gap-3 cursor-pointer">
+                {/* SECTION 3: ADMINISTRATIVE & COMPLEMENTARY OPTIONS */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
+                    <div className="flex items-center gap-2 text-primary font-black text-sm">
+                      <Building2 className="w-4 h-4 text-indigo-500" />
+                      <span>۳. خدمات اداری و آپشن‌های تکمیلی فروشگاه</span>
+                    </div>
+                    <span className="text-[11px] text-indigo-400 font-bold">
+                      انتخاب اختیاری بر اساس نیاز
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 1. Payment Gateway */}
+                    <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasGateway ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
                       <input
                         type="checkbox"
-                        checked={hasCustomLogo}
-                        onChange={(e) => setHasCustomLogo(e.target.checked)}
-                        className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 shrink-0 w-4 h-4 cursor-pointer"
+                        checked={hasGateway}
+                        onChange={(e) => setHasGateway(e.target.checked)}
+                        className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
                       />
-                      <div className="space-y-0.5 text-right flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-black text-primary">طراحی لوگوی اختصاصی برند فروشگاه</span>
-                          <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                            هدیه ۱۰۰٪ رایگان
+                      <div className="space-y-1 text-right flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-black text-primary">درگاه پرداخت مستقیم شاپرک</span>
+                          <span className="text-[10px] font-sans font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 whitespace-nowrap">
+                            رایگان (هدیه)
                           </span>
                         </div>
                         <p className="text-[11px] text-muted leading-relaxed">
-                          طراحی هویت بصری و لوگوی فروشگاه شما توسط تیم گرافیست زوپیت.
+                          اخذ، احراز هویت و اتصال درگاه پرداخت شتابی مستقیم با پشتیبانی فنی زوپیت.
                         </p>
                       </div>
                     </label>
 
-                    {hasCustomLogo && (
-                      <div className="pt-2">
-                        <textarea
-                          value={logoDescription}
-                          onChange={(e) => setLogoDescription(e.target.value)}
-                          placeholder="توضیحات، ایده، نام انگلیسی برند یا رنگ‌های دلخواه برای طراحی لوگو..."
-                          rows={2}
-                          className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                    {/* 2. Tax File Setup */}
+                    <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasTaxProfile ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
+                      <input
+                        type="checkbox"
+                        checked={hasTaxProfile}
+                        onChange={(e) => setHasTaxProfile(e.target.checked)}
+                        className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="space-y-1 text-right flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-black text-primary">تشکیل پرونده مالیاتی</span>
+                          <span className="text-[10px] font-sans font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 whitespace-nowrap">
+                            رایگان (هدیه)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted leading-relaxed">
+                          ثبت‌نام و راهنمایی تشکیل پرونده در سامانه امور مالیاتی جهت اتصال درگاه.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* 3. eNamad option */}
+                    <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasEnamad ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
+                      <input
+                        type="checkbox"
+                        checked={hasEnamad}
+                        onChange={(e) => setHasEnamad(e.target.checked)}
+                        className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="space-y-1 text-right flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-black text-primary">اخذ ای‌نماد رسمی (نماد اعتماد)</span>
+                          <span className="text-[10px] font-sans font-black text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 whitespace-nowrap">
+                            +۵۰,۰۰۰ تومان
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted leading-relaxed">
+                          ثبت‌نام و احراز هویت در مرکز تجارت الکترونیکی (تعرفه دولتی سامانه اینماد؛ زوپیت هیچ دستمزدی دریافت نمی‌کند).
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Additional Logo & Logistics Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Custom Logo Creation */}
+                    <div className={`p-4 rounded-2xl border transition-all space-y-3 ${hasCustomLogo ? 'bg-emerald-500/10 border-emerald-500/50 shadow-sm' : 'bg-surface border-subtle'}`}>
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={hasCustomLogo}
+                          onChange={(e) => setHasCustomLogo(e.target.checked)}
+                          className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 shrink-0 w-4 h-4 cursor-pointer"
                         />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Postal & Logistics Panel */}
-                  <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasPostalPanel ? 'bg-indigo-500/10 border-indigo-500/60 shadow-sm' : 'bg-surface border-subtle'}`}>
-                    <input
-                      type="checkbox"
-                      checked={hasPostalPanel}
-                      onChange={(e) => setHasPostalPanel(e.target.checked)}
-                      className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
-                    />
-                    <div className="space-y-0.5 text-right flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-primary">سامانه پنل پستی و لجستیک یکپارچه</span>
-                        <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                          فعال‌سازی رایگان
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted leading-relaxed">
-                        اتصال به شبکه پست ملی و شرکت‌های حمل‌ونقل اختصاصی جهت ارسال سریع سفارشات سراسر کشور.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {/* SECTION 4: HOSTING PREFERENCE (ZOPIT HOST WITH 67% DISCOUNT VS OWN HOST) */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
-                  <div className="flex items-center gap-2 text-primary font-black text-sm">
-                    <Server className="w-4 h-4 text-emerald-500" />
-                    <span>۴. انتخاب وضعیت هاست و میزبانی فروشگاه</span>
-                  </div>
-                  <span className="text-[11px] text-muted">
-                    اکانت پرومکس کاملاً رایگان است و هاستینگ سرور طبق انتخاب شما تنظیم می‌شود
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Option A: Zopit NVMe Cloud Host */}
-                  <div
-                    onClick={() => setHostOption("ZOPIT_HOST")}
-                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 ${hostOption === 'ZOPIT_HOST' ? 'bg-emerald-500/10 border-emerald-500 shadow-md' : 'bg-surface border-subtle hover:border-emerald-500/40'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${hostOption === 'ZOPIT_HOST' ? 'border-emerald-500 bg-emerald-500' : 'border-subtle'}`}>
-                          {hostOption === 'ZOPIT_HOST' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950"></div>}
-                        </div>
-                        <span className="font-black text-xs text-primary">هاست ابری اختصاصی زوپیت (پیشنهادی)</span>
-                      </div>
-                      <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                        ۶۷٪ تخفیف ویژه
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-[11px] text-center font-mono">
-                      <div className="bg-background/80 p-2 rounded-xl border border-subtle">
-                        <span className="text-muted text-[10px] block font-sans">فضا:</span>
-                        <strong className="text-emerald-500">15 GB SSD</strong>
-                      </div>
-                      <div className="bg-background/80 p-2 rounded-xl border border-subtle">
-                        <span className="text-muted text-[10px] block font-sans">پردازنده:</span>
-                        <strong className="text-emerald-500">5 Core</strong>
-                      </div>
-                      <div className="bg-background/80 p-2 rounded-xl border border-subtle">
-                        <span className="text-muted text-[10px] block font-sans">رم:</span>
-                        <strong className="text-emerald-500">5 GB RAM</strong>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-subtle/50">
-                      <span className="text-muted">تعرفه ویژه ماه اول:</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-muted line-through text-[11px]">۹۰۰,۰۰۰ تومان</span>
-                        <span className="font-black text-emerald-500">۲۹۹,۰۰۰ تومان</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Option B: Use Own Existing Host */}
-                  <div
-                    onClick={() => {
-                      setHostOption("OWN_HOST");
-                      setIsDiscountApplied(false);
-                      setAppliedDiscount(0);
-                    }}
-                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 ${hostOption === 'OWN_HOST' ? 'bg-indigo-500/10 border-indigo-500 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/40'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${hostOption === 'OWN_HOST' ? 'border-indigo-500 bg-indigo-500' : 'border-subtle'}`}>
-                          {hostOption === 'OWN_HOST' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950"></div>}
-                        </div>
-                        <span className="font-black text-xs text-primary">اتصال هاست شخصی خودتان</span>
-                      </div>
-                      <span className="text-[11px] font-bold text-indigo-400 bg-indigo-500/15 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
-                        ۰ تومان (بدون هزینه)
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-muted leading-relaxed">
-                      در صورتی که از قبل هاست تهیه کرده‌اید، اطلاعات هاست شما پس از ثبت درخواست دریافت شده و فروشگاه روی سرور خودتان راه‌اندازی می‌گردد.
-                    </p>
-
-                    <div className="flex items-center justify-between text-xs pt-2 border-t border-subtle/50">
-                      <span className="text-muted">هزینه پرداختی به زوپیت:</span>
-                      <span className="font-black text-emerald-500">۰ تومان (کاملاً رایگان)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 5: SIGNATURE CANVAS */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
-                  <label className="text-xs font-bold text-secondary flex items-center gap-2">
-                    <PenTool className="w-4 h-4 text-emerald-500" />
-                    <span>۵. کادر امضای دیجیتال آنلاین قرارداد <span className="text-rose-500">*</span>:</span>
-                  </label>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={autoGenerateSignature}
-                      className="text-xs text-emerald-500 hover:text-emerald-400 flex items-center gap-1 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 cursor-pointer"
-                    >
-                      <Zap className="w-3.5 h-3.5" /> امضای خودکار با هویت دیجیتال
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={clearSignature}
-                      className="text-xs text-rose-500 hover:underline flex items-center gap-1 font-medium cursor-pointer p-1"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" /> پاکسازی
-                    </button>
-                  </div>
-                </div>
-
-                <div className="border-2 border-dashed border-emerald-500/40 rounded-2xl bg-surface p-2 relative text-center">
-                  <canvas
-                    ref={canvasRef}
-                    width={500}
-                    height={140}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerCancel={handlePointerUp}
-                    className="w-full h-32 touch-none cursor-crosshair bg-background rounded-xl border border-subtle"
-                  />
-                  {!hasSignature && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-muted text-xs p-4">
-                      <span>جهت ثبت امضا، با دست یا ماوس در این کادر بکشید</span>
-                      <span className="text-[10px] text-emerald-500 mt-1 font-bold">یا دکمه «امضای خودکار با هویت دیجیتال» را بفشارید</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* SECTION 6: TERMS ACCEPTANCE & MATH CAPTCHA */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center pt-2">
-                {/* Clean inline terms agreement note */}
-                <label className="flex items-center gap-3 cursor-pointer bg-surface p-4 rounded-2xl border border-subtle">
-                  <input
-                    type="checkbox"
-                    checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
-                  />
-                  <span className="text-xs font-bold text-primary leading-relaxed">
-                    با تأیید و ارسال این فرم،
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowTermsModal(true);
-                      }}
-                      className="text-emerald-500 hover:text-emerald-400 underline font-extrabold mx-1 cursor-pointer inline-block"
-                    >
-                      قوانین و مقررات رسمی زوپیت
-                    </button>
-                    را مطالعه نموده و می‌پذیرم.
-                  </span>
-                </label>
-
-                {/* Math Captcha */}
-                <div className="bg-surface p-3.5 rounded-2xl border border-subtle flex items-center justify-between gap-3">
-                  <span className="text-xs font-bold text-secondary whitespace-nowrap">کد امنیتی:</span>
-                  <div className="bg-slate-900 border-2 border-emerald-500/50 text-emerald-400 font-mono font-black text-base px-4 py-1.5 rounded-xl shadow-inner tracking-widest flex items-center gap-2">
-                    <span className="text-emerald-300 font-extrabold">{num1}</span>
-                    <span className="text-emerald-500 font-bold">+</span>
-                    <span className="text-emerald-300 font-extrabold">{num2}</span>
-                    <span className="text-emerald-500 font-bold">=</span>
-                  </div>
-                  <input
-                    type="text"
-                    value={captchaInput}
-                    onChange={(e) => setCaptchaInput(e.target.value)}
-                    placeholder="پاسخ"
-                    className="w-20 px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={resetCaptcha}
-                    className="text-muted hover:text-primary cursor-pointer p-1"
-                    title="تغییر سوال"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* SECTION 7: SUMMARY & SUBMIT */}
-              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-emerald-500/30 rounded-2xl p-6 text-text-primary shadow-2xl relative overflow-hidden space-y-5">
-                <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
-                  <div className="text-right w-full lg:w-auto space-y-1.5">
-                    <span className="text-xs text-emerald-300 font-black tracking-wide block uppercase">
-                      {hostOption === 'ZOPIT_HOST' ? 'مبلغ نهایی قابل پرداخت (هزینه سرور هاست ابری):' : 'مبلغ نهایی اشتراک پرومکس زوپیت:'}
-                    </span>
-                    
-                    <div className="flex items-center gap-3">
-                      {hostOption === 'ZOPIT_HOST' ? (
-                        <>
-                          <div className="text-3xl md:text-4xl font-black text-text-primary font-sans tracking-tight flex items-baseline gap-1.5 drop-shadow-md">
-                            <span>{Math.max(0, parseInt(settings.promaxAccountPrice || '299000', 10) + (hasEnamad ? 50000 : 0) - appliedDiscount).toLocaleString("fa-IR")}</span>
-                            <span className="text-sm font-bold text-emerald-400 tracking-normal">تومان</span>
-                          </div>
-                          {(isDiscountApplied || hasEnamad) && (
-                            <span className="text-sm font-sans font-bold text-text-muted line-through decoration-rose-500/50 decoration-2">
-                              {(parseInt(settings.promaxAccountPrice || '299000', 10) + (hasEnamad ? 50000 : 0)).toLocaleString("fa-IR")}
+                        <div className="space-y-0.5 text-right flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-primary">طراحی لوگوی اختصاصی برند فروشگاه</span>
+                            <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                              هدیه ۱۰۰٪ رایگان
                             </span>
-                          )}
-                        </>
-                      ) : (
-                        <div className="text-3xl md:text-4xl font-black text-emerald-400 font-sans tracking-tight flex items-baseline gap-1.5">
-                          <span>{(hasEnamad ? 50000 : 0).toLocaleString("fa-IR")}</span>
-                          <span className="text-sm font-bold text-emerald-400 tracking-normal">{hasEnamad ? 'تومان (کارمزد ای‌نماد)' : 'تومان (۱۰۰٪ رایگان)'}</span>
+                          </div>
+                          <p className="text-[11px] text-muted leading-relaxed">
+                            طراحی هویت بصری و لوگوی فروشگاه شما توسط تیم گرافیست زوپیت.
+                          </p>
+                        </div>
+                      </label>
+
+                      {hasCustomLogo && (
+                        <div className="pt-2">
+                          <textarea
+                            value={logoDescription}
+                            onChange={(e) => setLogoDescription(e.target.value)}
+                            placeholder="توضیحات، ایده، نام انگلیسی برند یا رنگ‌های دلخواه برای طراحی لوگو..."
+                            rows={2}
+                            className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-primary"
+                          />
                         </div>
                       )}
                     </div>
-                    
-                    {hasEnamad && (
-                      <span className="text-[11px] text-indigo-300 font-bold block">
-                        (شامل ۵۰,۰۰۰ تومان کارمزد اداری ثبت ای‌نماد)
-                      </span>
-                    )}
+
+                    {/* Postal & Logistics Panel */}
+                    <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasPostalPanel ? 'bg-indigo-500/10 border-indigo-500/60 shadow-sm' : 'bg-surface border-subtle'}`}>
+                      <input
+                        type="checkbox"
+                        checked={hasPostalPanel}
+                        onChange={(e) => setHasPostalPanel(e.target.checked)}
+                        className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="space-y-0.5 text-right flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-primary">سامانه پنل پستی و لجستیک یکپارچه</span>
+                          <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                            فعال‌سازی رایگان
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted leading-relaxed">
+                          اتصال به شبکه پست ملی و شرکت‌های حمل‌ونقل اختصاصی جهت ارسال سریع سفارشات سراسر کشور.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* SECTION 4: SIGNATURE CANVAS */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
+                    <label className="text-xs font-bold text-secondary flex items-center gap-2">
+                      <PenTool className="w-4 h-4 text-emerald-500" />
+                      <span>۴. کادر امضای دیجیتال آنلاین قرارداد <span className="text-rose-500">*</span>:</span>
+                    </label>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={autoGenerateSignature}
+                        className="text-xs text-emerald-500 hover:text-emerald-400 flex items-center gap-1 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 cursor-pointer"
+                      >
+                        <Zap className="w-3.5 h-3.5" /> امضای خودکار با هویت دیجیتال
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={clearSignature}
+                        className="text-xs text-rose-500 hover:underline flex items-center gap-1 font-medium cursor-pointer p-1"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> پاکسازی
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Coupon Box (Active when Zopit Host selected) */}
-                  {hostOption === 'ZOPIT_HOST' && (
-                    <div className="w-full lg:w-auto bg-slate-950/50 p-1.5 rounded-2xl border border-slate-700/50 flex items-center shadow-inner">
+                  <div className="border-2 border-dashed border-emerald-500/40 rounded-2xl bg-surface p-2 relative text-center">
+                    <canvas
+                      ref={canvasRef}
+                      width={500}
+                      height={140}
+                      onPointerDown={handlePointerDown}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={handlePointerUp}
+                      onPointerCancel={handlePointerUp}
+                      className="w-full h-32 touch-none cursor-crosshair bg-background rounded-xl border border-subtle"
+                    />
+                    {!hasSignature && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-muted text-xs p-4">
+                        <span>جهت ثبت امضا، با دست یا ماوس در این کادر بکشید</span>
+                        <span className="text-[10px] text-emerald-500 mt-1 font-bold">یا دکمه «امضای خودکار با هویت دیجیتال» را بفشارید</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* SECTION 5: TERMS ACCEPTANCE & MATH CAPTCHA */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center pt-2">
+                  {/* Clean inline terms agreement note */}
+                  <label className="flex items-center gap-3 cursor-pointer bg-surface p-4 rounded-2xl border border-subtle">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                    />
+                    <span className="text-xs font-bold text-primary leading-relaxed">
+                      با تأیید و ارسال این فرم،
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowTermsModal(true);
+                        }}
+                        className="text-emerald-500 hover:text-emerald-400 underline font-extrabold mx-1 cursor-pointer inline-block"
+                      >
+                        قوانین و مقررات رسمی زوپیت
+                      </button>
+                      را مطالعه نموده و می‌پذیرم.
+                    </span>
+                  </label>
+
+                  {/* Math Captcha */}
+                  <div className="bg-surface p-3.5 rounded-2xl border border-subtle flex items-center justify-between gap-3">
+                    <span className="text-xs font-bold text-secondary whitespace-nowrap">کد امنیتی:</span>
+                    <div className="bg-slate-900 border-2 border-emerald-500/50 text-emerald-400 font-mono font-black text-base px-4 py-1.5 rounded-xl shadow-inner tracking-widest flex items-center gap-2">
+                      <span className="text-emerald-300 font-extrabold">{num1}</span>
+                      <span className="text-emerald-500 font-bold">+</span>
+                      <span className="text-emerald-300 font-extrabold">{num2}</span>
+                      <span className="text-emerald-500 font-bold">=</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={captchaInput}
+                      onChange={(e) => setCaptchaInput(e.target.value)}
+                      placeholder="پاسخ"
+                      className="w-20 px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none text-primary"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={resetCaptcha}
+                      className="text-muted hover:text-primary cursor-pointer p-1"
+                      title="تغییر سوال"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Step 1 Submit / Next Button */}
+                <div className="pt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={handleProceedToStep2}
+                    className="w-full md:w-[75%] mx-auto py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black text-base rounded-2xl shadow-xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.01]"
+                  >
+                    <span>تایید اطلاعات و ورود به مرحله هاستینگ ابری و صدور فاکتور</span>
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: CLOUD HOSTING, DISCOUNT COUPON & FINAL INVOICE */}
+            {formStep === 2 && (
+              <div className="space-y-8 animate-in fade-in duration-300">
+                {/* Back to Step 1 Bar */}
+                <div className="flex items-center justify-between bg-surface p-4 rounded-2xl border border-subtle">
+                  <button
+                    type="button"
+                    onClick={() => setFormStep(1)}
+                    className="text-xs font-bold text-indigo-500 hover:text-indigo-400 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>بازگشت به مرحله اول و ویرایش مشخصات متقاضی</span>
+                  </button>
+                  <span className="text-xs text-muted font-bold">
+                    مدیر فروشگاه: <strong className="text-primary">{fullName || "نامشخص"}</strong> ({mobile || "---"})
+                  </span>
+                </div>
+
+                {/* 1. CLOUD HOSTING FEATURE & PRICING CARD */}
+                <div className="bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-950/80 border border-indigo-500/40 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                  <div className="relative z-10 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/30">
+                        <Server className="w-4 h-4 text-indigo-400" />
+                        <span>زیرساخت سرور و هاستینگ ابری اختصاصی زوپیت</span>
+                      </div>
+                      <span className="text-xs font-sans font-bold text-emerald-400 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30">
+                        ۷۸٪ تخفیف ویژه اختصاصی زوپیت
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                      <div className="space-y-2">
+                        <h3 className="text-xl md:text-2xl font-black text-text-primary">
+                          هاست ابری فوق‌سریع NVMe بهینه‌سازی‌شده برای وودمارت
+                        </h3>
+                        <p className="text-xs text-text-muted max-w-2xl leading-relaxed">
+                          هاست ابری زوپیت با سخت‌افزار مدرن، کش هوشمند و وب‌سرور پرسرعت LiteSpeed کانفیگ شده تا فروشگاه وودمارت شما بدون قطعی و با نهایت سرعت بارگذاری شود. نیازی به ورود به کنترل‌پنل پیچیده cPanel یا دانش فنی سرور ندارید؛ کلیه تنظیمات فنی به صورت خودکار توسط زوپیت انجام می‌پذیرد.
+                        </p>
+                      </div>
+
+                      {/* Pricing Tag */}
+                      <div className="bg-slate-900/90 p-4 rounded-2xl border border-indigo-500/40 text-center shrink-0 min-w-[200px] shadow-inner space-y-1">
+                        <span className="text-[11px] text-text-muted block">تعرفه ماهانه هاست ابری:</span>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-xs text-text-muted line-through font-sans">۹۰۰,۰۰۰</span>
+                          <span className="text-2xl font-black text-emerald-400 font-sans">۱۹۹,۰۰۰</span>
+                          <span className="text-xs font-bold text-text-secondary">تومان</span>
+                        </div>
+                        <span className="text-[10px] text-indigo-300 font-bold block bg-indigo-500/20 py-0.5 rounded-md">
+                          سرمایه‌گذاری روی سرعت فروشگاه
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Server Hardware Specs */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                      <div className="bg-slate-900/70 p-3 rounded-xl border border-indigo-500/20 text-center">
+                        <span className="text-muted text-[10px] block mb-0.5">فضای ذخیره‌سازی:</span>
+                        <strong className="text-emerald-400 text-xs font-mono font-bold">15 GB NVMe SSD</strong>
+                      </div>
+                      <div className="bg-slate-900/70 p-3 rounded-xl border border-indigo-500/20 text-center">
+                        <span className="text-muted text-[10px] block mb-0.5">حافظه رم اختصاصی:</span>
+                        <strong className="text-emerald-400 text-xs font-mono font-bold">5 GB RAM</strong>
+                      </div>
+                      <div className="bg-slate-900/70 p-3 rounded-xl border border-indigo-500/20 text-center">
+                        <span className="text-muted text-[10px] block mb-0.5">پردازنده پردازش ابری:</span>
+                        <strong className="text-emerald-400 text-xs font-mono font-bold">5 Core CPU</strong>
+                      </div>
+                      <div className="bg-slate-900/70 p-3 rounded-xl border border-indigo-500/20 text-center">
+                        <span className="text-muted text-[10px] block mb-0.5">وب‌سرور و کش:</span>
+                        <strong className="text-emerald-400 text-xs font-mono font-bold">LiteSpeed + Redis</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. PROMO DISCOUNT CODE CARD */}
+                <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-subtle/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      <span className="text-xs font-black text-primary">کد تخفیف و کوپن اشتراک هاستینگ:</span>
+                    </div>
+
+                    {/* Quick Copy Promo Code */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-muted font-bold">کد تخفیف پیش‌فرض:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const code = settings?.promoCode || "ZOPIT-HOST-199";
+                          navigator.clipboard.writeText(code);
+                          setCopiedCoupon(true);
+                          setDiscountCodeText(code);
+                          handleApplyDiscountCodeWithCode(code);
+                          setTimeout(() => setCopiedCoupon(false), 3000);
+                        }}
+                        className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {copiedCoupon ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{settings?.promoCode || "ZOPIT-HOST-199"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="relative w-full sm:flex-1">
                       <input
                         type="text"
                         value={discountCodeText}
                         onChange={(e) => setDiscountCodeText(e.target.value)}
-                        placeholder="کد تخفیف (مثال: ZOPIT-HOST-67)"
-                        className="flex-1 w-full lg:w-64 px-4 py-3 bg-transparent text-sm text-text-primary placeholder-slate-500 font-mono focus:outline-none dir-ltr text-center font-bold tracking-widest uppercase"
+                        placeholder="کد تخفیف خود را وارد کنید (مثال: ZOPIT-HOST-199)"
+                        className="w-full px-4 py-3 bg-background border border-subtle rounded-xl text-xs font-mono text-center sm:text-right font-bold text-primary focus:ring-2 focus:ring-emerald-500 outline-none uppercase tracking-wider"
                       />
-                      <button
-                        type="button"
-                        onClick={handleApplyDiscountCode}
-                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all shrink-0 cursor-pointer shadow-lg shadow-emerald-500/20"
-                      >
-                        اعمال کد
-                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleApplyDiscountCode}
+                      className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+                    >
+                      اعمال کد تخفیف
+                    </button>
+                  </div>
+
+                  {isDiscountApplied && (
+                    <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-2 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>کد تخفیف با موفقیت اعمال شد و مبلغ {appliedDiscount.toLocaleString("fa-IR")} تومان از فاکتور کسر گردید.</span>
                     </div>
                   )}
                 </div>
 
-                {isDiscountApplied && hostOption === 'ZOPIT_HOST' && (
-                  <div className="relative z-10 text-xs text-emerald-400 font-black flex items-center gap-2 pt-3 border-t border-slate-700/50 bg-emerald-500/5 p-3 rounded-xl">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                    <span>کد تخفیف با موفقیت اعمال گردید ({appliedDiscount.toLocaleString("fa-IR")} تومان کسر شد).</span>
+                {/* 3. ITEMIZED BREAKDOWN INVOICE */}
+                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-emerald-500/30 rounded-3xl p-6 text-text-primary shadow-2xl space-y-5">
+                  <div className="border-b border-slate-700/80 pb-3 flex items-center justify-between">
+                    <h4 className="text-sm font-black text-text-primary flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-emerald-400" />
+                      <span>پیش‌فاکتور تفکیک‌شده و نهایی راه‌اندازی فروشگاه</span>
+                    </h4>
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-bold">
+                      فاکتور رسمی آنی
+                    </span>
                   </div>
-                )}
-              </div>
 
-              {/* Final Submit Button */}
-              <div className="pt-2 text-center">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full md:w-[75%] mx-auto py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/30 transition-all flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer transform hover:scale-[1.01]"
-                >
-                  {submitting ? (
-                    <RefreshCw className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <Zap className="w-6 h-6 fill-slate-950" />
-                  )}
-                  <span>
-                    {hostOption === 'ZOPIT_HOST'
-                      ? `ثبت نهایی و دریافت اشتراک پرومکس (${Math.max(0, parseInt(settings.promaxAccountPrice || '299000', 10) + (hasEnamad ? 50000 : 0) - appliedDiscount).toLocaleString("fa-IR")} تومان)`
-                      : `ثبت نهایی و دریافت ۱۰۰٪ رایگان اشتراک پرومکس (${(hasEnamad ? 50000 : 0).toLocaleString("fa-IR")} تومان)`}
-                  </span>
-                </button>
+                  {/* Invoice Rows */}
+                  <div className="space-y-2.5 text-xs">
+                    {/* Software package row */}
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>پکیج طلایی اشتراک پرومکس (قالب وودمارت، لایسنس‌ها، افزونه‌ها و پشتیبانی):</span>
+                      <div className="flex items-center gap-2">
+                        <span className="line-through text-slate-500 font-sans">۱۴,۸۰۰,۰۰۰</span>
+                        <span className="font-bold text-emerald-400">۱۰۰٪ رایگان (هدیه)</span>
+                      </div>
+                    </div>
+
+                    {/* Hosting row */}
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>هاست ابری فوق‌سریع NVMe زوپیت (۱۵ گیگ SSD + ۵ گیگ رم + ۵ هسته):</span>
+                      <div className="flex items-center gap-2">
+                        <span className="line-through text-slate-500 font-sans">۹۰۰,۰۰۰</span>
+                        <span className="font-sans font-bold text-emerald-400">
+                          {parseInt(settings.promaxAccountPrice || "199000", 10).toLocaleString("fa-IR")} تومان
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Domain Priority row */}
+                    {hasDomainPriority && (
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>کارمزد اولویت‌بندی، استعلام و ثبت تخصصی دامنه (.ir):</span>
+                        <span className="font-sans font-bold text-blue-400">۸۰,۰۰۰ تومان</span>
+                      </div>
+                    )}
+
+                    {/* Enamad fee row */}
+                    {hasEnamad && (
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>تعرفه رسمی سامانه دولتی ای‌نماد (حق‌الزحمه زوپیت: ۰ ریال):</span>
+                        <span className="font-sans font-bold text-indigo-400">۵۰,۰۰۰ تومان</span>
+                      </div>
+                    )}
+
+                    {/* Free administrative items */}
+                    {(hasGateway || hasTaxProfile || hasCustomLogo || hasPostalPanel) && (
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>خدمات منتخب هدیه (درگاه شاپرک، مالیات، طراحی لوگو و پنل پستی):</span>
+                        <span className="font-bold text-emerald-400">رایگان (۰ تومان)</span>
+                      </div>
+                    )}
+
+                    {/* Applied Discount row */}
+                    {isDiscountApplied && appliedDiscount > 0 && (
+                      <div className="flex items-center justify-between text-emerald-400 font-bold pt-1 border-t border-slate-700/50">
+                        <span>تخفیف ویژه اعمال‌شده:</span>
+                        <span className="font-sans font-black">- {appliedDiscount.toLocaleString("fa-IR")} تومان</span>
+                      </div>
+                    )}
+
+                    {/* Total Row */}
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-700 font-black text-sm text-text-primary">
+                      <span className="text-xs sm:text-sm text-emerald-300">مبلغ کل قابل پرداخت نهایی:</span>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-sans drop-shadow-md">
+                          {Math.max(
+                            0,
+                            parseInt(settings.promaxAccountPrice || "199000", 10) +
+                              (hasDomainPriority ? 80000 : 0) +
+                              (hasEnamad ? 50000 : 0) -
+                              appliedDiscount
+                          ).toLocaleString("fa-IR")}
+                        </span>
+                        <span className="text-xs text-emerald-400 font-bold">تومان</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Final Submit & Pay Button */}
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={handleRegister}
+                    disabled={submitting}
+                    className="w-full md:w-[80%] mx-auto py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/30 transition-all flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer transform hover:scale-[1.01]"
+                  >
+                    {submitting ? (
+                      <RefreshCw className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <Zap className="w-6 h-6 fill-slate-950" />
+                    )}
+                    <span>
+                      پرداخت آنلاین و راه‌اندازی فروشگاه پرومکس (
+                      {Math.max(
+                        0,
+                        parseInt(settings.promaxAccountPrice || "199000", 10) +
+                          (hasDomainPriority ? 80000 : 0) +
+                          (hasEnamad ? 50000 : 0) -
+                          appliedDiscount
+                      ).toLocaleString("fa-IR")}{" "}
+                      تومان)
+                    </span>
+                  </button>
+                </div>
               </div>
-            </form>
+            )}
           </div>
         </div>
       )}
