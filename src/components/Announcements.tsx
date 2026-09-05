@@ -37,30 +37,28 @@ export default function Announcements({ role }: { role: string }) {
 
   return (
     <>
-      <div className="space-y-4 mb-6 text-right w-full">
+      <div className="space-y-3 mb-6 text-right w-full">
         {announcements.map((ann, idx) => (
           <div
             key={ann.id}
             onClick={() => setSelectedAnnouncement(ann)}
-            className="relative overflow-hidden w-full bg-card border-2 border-primary-default/20 p-5 rounded-3xl flex justify-between items-start shadow-md hover:shadow-lg hover:border-primary-default/40 transition-all duration-300 cursor-pointer break-words"
+            className="w-full bg-card border border-subtle hover:border-indigo-500/40 p-4 sm:p-5 rounded-2xl flex justify-between items-start shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer break-words"
             style={{ animationDelay: `${idx * 100}ms` }}
           >
-            <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-primary-default to-secondary rounded-r-3xl"></div>
-            
-            <div className="flex gap-4 pr-3 w-full">
-              <div className="p-3 bg-primary-default/10 text-primary-default rounded-2xl shrink-0 self-start shadow-sm">
-                <Megaphone className="w-5 h-5" />
+            <div className="flex gap-3.5 w-full">
+              <div className="p-2.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0 self-start shadow-2xs">
+                <Megaphone className="w-4.5 h-4.5" />
               </div>
               <div className="w-full font-sans min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between pb-2 border-b border-subtle/50 mb-2">
-                  <h4 className="font-black text-sm md:text-base text-primary truncate">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between pb-2 border-b border-subtle/50 mb-2">
+                  <h4 className="font-black text-xs sm:text-sm text-primary truncate">
                     {ann.title}
                   </h4>
-                  <span className="shrink-0 w-fit inline-flex items-center gap-1.5 text-[10px] bg-primary-default/10 text-primary-hover font-black px-3 py-1 rounded-full border border-primary-default/10">
+                  <span className="shrink-0 w-fit inline-flex items-center gap-1.5 text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/20">
                     <Calendar className="w-3 h-3" /> اطلاعیه رسمی پلتفرم
                   </span>
                 </div>
-                <p className="text-xs md:text-sm text-secondary leading-relaxed font-semibold line-clamp-3">
+                <p className="text-xs text-secondary leading-relaxed font-medium line-clamp-2">
                   {ann.content}
                 </p>
               </div>

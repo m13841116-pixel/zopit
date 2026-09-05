@@ -7897,9 +7897,13 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
     const userId = req.user.userId;
     const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, hasDomainPriority, promoCodeInput, planType, amount } = req.body;
 
-    if (!fullName || !nationalCode || !mobile || !signatureImage) {
-      return res.status(400).json({ error: 'تکمیل تمامی موارد الزام‌آور از جمله کد ملی، شماره همراه و امضای دیجیتال اجباری است.' });
+    if (!fullName || !nationalCode || !mobile) {
+      return res.status(400).json({ error: 'تکمیل تمامی موارد الزام‌آور از جمله نام، کد ملی و شماره همراه اجباری است.' });
     }
+
+    const effectiveSignature = (signatureImage && typeof signatureImage === 'string' && signatureImage.trim().length > 20)
+      ? signatureImage.trim()
+      : `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80"><text x="150" y="45" font-family="Tahoma,Arial" font-size="20" fill="%2310b981" text-anchor="middle">${encodeURIComponent(fullName.trim())}</text></svg>`;
 
     const selectedPlan = 'PRO_MAX';
 
@@ -7971,7 +7975,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
         fullName,
         nationalCode,
         mobile,
-        signatureImage,
+        signatureImage: effectiveSignature,
         planType: selectedPlan,
         acceptedTerms: true,
         hasEnamad: !!hasEnamad,
@@ -7984,7 +7988,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
         fullName,
         nationalCode,
         mobile,
-        signatureImage,
+        signatureImage: effectiveSignature,
         planType: selectedPlan,
         acceptedTerms: true,
         hasEnamad: !!hasEnamad,
@@ -11960,7 +11964,7 @@ registerAdminShippingRoutes(app, prisma, authenticateToken, requireSuperAdmin);
 registerStoreShippingRoutes(app, prisma, authenticateToken, requireStoreManager);
 registerAnnouncements(app);
 registerOrderLabel(app, prisma);
-registerPenaltyRoutes(app, prisma);
+registerPenaltyRoutes(app, prisma, authenticateToken);
 registerDiscountRoutes(app, authenticateToken, requireSuperAdmin);
 
 
@@ -12846,92 +12850,7 @@ app.get('/api/referrer/stats', authenticateToken, async (req: any, res) => {
   }
 });
 
-app.get('/api/supplier/performance', authenticateToken, requireSupplier, async (req: any, res) => {
-  try {
-    const supplierId = req.user.userId;
-    const productsCount = await prisma.product.count({ where: { supplierId } });
-    const ordersCount = await prisma.orderItem.count({ where: { supplierId } });
-    const completedOrders = await prisma.orderItem.count({ where: { supplierId, status: 'DELIVERED' } });
-    
-    // Compute Penalties
-    // 1. Delayed Orders (older than 24h and still PENDING/PROCESSING)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const delayedOrdersCount = await prisma.orderItem.count({
-      where: {
-        supplierId,
-        status: { in: ['PENDING', 'PROCESSING'] },
-        order: {
-          createdAt: {
-            lt: twentyFourHoursAgo
-          }
-        }
-      }
-    });
-
-    // 2. Returned Orders
-    const returnedOrdersCount = await prisma.orderItem.count({
-      where: {
-        supplierId,
-        status: 'RETURNED'
-      }
-    });
-
-    // 3. Cancelled Orders
-    const cancelledOrdersCount = await prisma.orderItem.count({
-      where: {
-        supplierId,
-        status: 'CANCELLED'
-      }
-    });
-
-    // Scoring logic
-    let score = 100;
-    const delayPenalty = delayedOrdersCount * 10;
-    const returnPenalty = returnedOrdersCount * 15;
-    const cancelPenalty = cancelledOrdersCount * 5;
-    
-    score -= (delayPenalty + returnPenalty + cancelPenalty);
-    if (score < 0) score = 0;
-
-    let grade = 'A+';
-    if (score < 50) grade = 'F';
-    else if (score < 60) grade = 'D';
-    else if (score < 70) grade = 'C';
-    else if (score < 80) grade = 'B';
-    else if (score < 90) grade = 'A';
-
-    let status = 'ACTIVE';
-    if (score < 50) status = 'BLOCKED';
-    else if (score < 70) status = 'UNDER_REVIEW';
-
-    let warningLevel = 'NONE';
-    if (score < 50) warningLevel = 'CRITICAL';
-    else if (score < 70) warningLevel = 'HIGH';
-    else if (score < 80) warningLevel = 'MEDIUM';
-    else if (score < 90) warningLevel = 'LOW';
-
-    res.json({
-      score,
-      grade,
-      status,
-      warningLevel,
-      totalProducts: productsCount,
-      totalOrders: ordersCount,
-      completedOrders,
-      fulfillmentRate: ordersCount > 0 ? Math.round(((ordersCount - cancelledOrdersCount - returnedOrdersCount) / ordersCount) * 100) : 100,
-      cancellationRate: ordersCount > 0 ? Math.round((cancelledOrdersCount / ordersCount) * 100) : 0,
-      onTimeDeliveryRate: ordersCount > 0 ? Math.round(((ordersCount - delayedOrdersCount) / ordersCount) * 100) : 100,
-      penaltiesCount: delayedOrdersCount + returnedOrdersCount + cancelledOrdersCount,
-      walletBalance: 0,
-      delayedOrders: delayedOrdersCount,
-      returnedOrders: returnedOrdersCount
-    });
-  } catch (err: any) {
-    console.error('Error in /api/supplier/performance:', err);
-    res.status(500).json({ error: 'خطا در دریافت کارنامه عملکرد تامین‌کننده' });
-  }
-});
-// ----------------------------
+// Note: /api/supplier/performance is handled authoritatively by registerPenaltyRoutes with full supplier performance metrics and penalties history.
 
 startCronJobs();
 

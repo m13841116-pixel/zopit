@@ -552,23 +552,23 @@ export function SupplierWooCommerceImport({
 
           {/* Side Guide & Visual Help */}
           <div className="lg:col-span-5 space-y-5">
-            <div className="bg-gradient-to-br from-indigo-50/70 via-purple-50/40 to-card p-6 md:p-7 rounded-3xl border-2 border-indigo-200/80 space-y-4">
-              <div className="flex items-center gap-2.5 text-indigo-900 dark:text-indigo-300">
-                <div className="p-2 rounded-xl bg-indigo-600 text-white">
+            <div className="bg-surface border border-subtle p-6 md:p-7 rounded-3xl space-y-4 shadow-sm">
+              <div className="flex items-center gap-2.5 text-primary">
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h4 className="text-sm font-black">
+                <h4 className="text-sm font-black text-primary">
                   آموزش ۲ دقیقه‌ای ساخت کلید ووکامرس (بدون افزونه)
                 </h4>
               </div>
 
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+              <p className="text-xs text-secondary leading-relaxed font-medium">
                 ووکامرس به صورت پیش‌فرض قابلیت اتصال ایمن دارد و نیازی به نصب هیچ افزونه‌ای نیست:
               </p>
 
               <div className="space-y-3">
-                <div className="p-3 bg-white/90 dark:bg-card/90 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 flex items-start gap-3 shadow-2xs">
-                  <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0">
+                <div className="p-3 bg-background rounded-2xl border border-subtle flex items-start gap-3 shadow-2xs">
+                  <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-black flex items-center justify-center shrink-0 border border-indigo-500/20">
                     ۱
                   </span>
                   <div className="text-xs space-y-0.5">
@@ -618,36 +618,35 @@ export function SupplierWooCommerceImport({
       {/* STEP 2: Product Staging Desk & Bulk Quick Pricing */}
       {currentStep === 2 && (
         <div className="space-y-6">
-          {/* COMPETITIVE MOTIVATIONAL BANNER (ترغیب تامین‌کننده به قیمت رقابتی و فروش حداکثری) */}
-          <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 text-white p-6 md:p-7 rounded-3xl shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl pointer-events-none -ml-20 -mt-20"></div>
+          {/* COMPETITIVE MOTIVATIONAL BANNER */}
+          <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/5 border border-indigo-500/20 text-primary p-6 md:p-7 rounded-3xl shadow-xs relative overflow-hidden">
             <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
               <div className="space-y-2 max-w-2xl">
-                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/30 to-amber-600/30 border border-amber-400/40 px-3 py-1 rounded-full text-amber-300 text-xs font-black">
-                  <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full text-amber-600 dark:text-amber-400 text-xs font-black">
+                  <Flame className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
                   <span>راز فروش ۵ تا ۱۰ برابری در پلتفرم زوپیت</span>
                 </div>
-                <h3 className="text-xl font-black text-white">
+                <h3 className="text-xl font-black text-primary">
                   قیمت عمده رقابتی‌تر = انتخاب توسط صدها فروشگاه آنلاین فعال!
                 </h3>
-                <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-medium">
+                <p className="text-xs md:text-sm text-secondary leading-relaxed font-medium">
                   مدیران فروشگاه‌های زوپیت روزانه کالاهایی را برای صفحه اصلی سایت، تبلیغات اینستاگرام و کمپین‌های ترب خود انتخاب می‌کنند که <strong>بین ۲۰٪ تا ۳۵٪ حاشیه سود</strong> داشته باشند. هر چقدر قیمت همکاری منصفانه‌تر باشد، کاتالوگ شما سریع‌تر منفجر خواهد شد!
                 </p>
               </div>
 
               {/* Stats pill */}
-              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 text-center min-w-[200px] shrink-0 space-y-1">
-                <span className="text-[11px] text-slate-300 font-bold block">
+              <div className="bg-surface border border-subtle p-4 rounded-2xl text-center min-w-[200px] shrink-0 space-y-1">
+                <span className="text-[11px] text-muted font-bold block">
                   میانگین حاشیه سود فعلی شما
                 </span>
-                <div className="text-2xl font-black text-amber-300">
+                <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
                   {avgMargin > 0 ? `${avgMargin}٪` : "۲۰٪"}
                 </div>
                 <span
                   className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full inline-block ${
                     avgMargin >= 20
-                      ? "bg-emerald-500/30 text-emerald-200"
-                      : "bg-amber-500/30 text-amber-200"
+                      ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
+                      : "bg-amber-500/15 text-amber-600 border border-amber-500/30"
                   }`}
                 >
                   {avgMargin >= 20 ? "🔥 بسیار جذاب برای فروشگاه‌ها" : "✨ قابل قبول"}

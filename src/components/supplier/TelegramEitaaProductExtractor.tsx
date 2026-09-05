@@ -264,23 +264,23 @@ export function TelegramEitaaProductExtractor({
   };
 
   return (
-    <div className="bg-white rounded-3xl border-2 border-indigo-200 overflow-hidden shadow-xl animate-fade-in text-slate-900">
+    <div className="bg-card rounded-3xl border border-subtle overflow-hidden shadow-xl animate-fade-in text-text-primary">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white p-5 flex items-center justify-between">
+      <div className="bg-surface border-b border-subtle p-5 flex items-center justify-between text-text-primary">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xs">
-            <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+          <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shadow-xs">
+            <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm md:text-base font-black">
+              <h3 className="text-sm md:text-base font-black text-primary">
                 ایجنت استخراج هوشمند محصول از کانال‌های تلگرام و ایتا
               </h3>
-              <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+              <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-black px-2.5 py-0.5 rounded-full">
                 هوش مصنوعی زوپیت
               </span>
             </div>
-            <p className="text-xs text-indigo-200 mt-0.5 font-medium">
+            <p className="text-xs text-secondary mt-0.5 font-medium">
               بدون نیاز به تایپ دستی! فقط متن پست‌ها یا لیست قیمت کانال را پیست کنید؛ سیستم قیمت عمده، نام، تیراژ و مشخصات را فوراً استخراج می‌کند.
             </p>
           </div>
@@ -290,7 +290,7 @@ export function TelegramEitaaProductExtractor({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-white/70 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-2 text-secondary hover:text-primary rounded-xl hover:bg-surface transition-colors cursor-pointer"
           >
             ✕
           </button>
@@ -299,23 +299,23 @@ export function TelegramEitaaProductExtractor({
 
       <div className="p-5 space-y-5">
         {/* Quick Test Presets */}
-        <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-indigo-950">
-            <Tag className="w-4 h-4 text-indigo-600 shrink-0" />
+        <div className="bg-surface border border-subtle rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-primary">
+            <Tag className="w-4 h-4 text-indigo-500 shrink-0" />
             <span>تست سریع با نمونه‌های واقعی کانال‌های عمده‌فروشی بازار:</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
               onClick={() => setInputText(sampleTelegramPost1)}
-              className="px-3 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              className="px-3 py-1.5 bg-card hover:bg-surface border border-subtle text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
               نمونه ۱: تک‌محصول با مشخصات کامل
             </button>
             <button
               type="button"
               onClick={() => setInputText(sampleTelegramPost2)}
-              className="px-3 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              className="px-3 py-1.5 bg-card hover:bg-surface border border-subtle text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
               نمونه ۲: لیست چندتایی بنکداری
             </button>
@@ -324,16 +324,16 @@ export function TelegramEitaaProductExtractor({
 
         {/* Input Text Area */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+          <div className="flex items-center justify-between text-xs font-bold text-secondary">
             <label className="flex items-center gap-1.5">
-              <MessageCircle className="w-4 h-4 text-purple-600" />
+              <MessageCircle className="w-4 h-4 text-indigo-500" />
               <span>متن پست، کپشن یا لیست قیمت ارسالی در تلگرام / ایتا را اینجا پیست کنید:</span>
             </label>
             {inputText && (
               <button
                 type="button"
                 onClick={() => setInputText("")}
-                className="text-rose-600 hover:underline text-[11px]"
+                className="text-rose-500 hover:underline text-[11px]"
               >
                 پاک کردن متن
               </button>
@@ -345,18 +345,18 @@ export function TelegramEitaaProductExtractor({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="مثال: بار جدید کابل شارژر رسید. قیمت عمده همکار: 185,000 تومان - کارتن 50 تایی - رنگ‌بندی مشکی و سفید - گارانتی 6 ماهه..."
-            className="w-full p-4 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white rounded-2xl text-xs font-medium outline-none transition-all resize-y leading-relaxed text-slate-900"
+            className="w-full p-4 bg-background border border-subtle focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-2xl text-xs font-medium outline-none transition-all resize-y leading-relaxed text-primary placeholder:text-muted"
           />
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-xs text-slate-500 font-bold shrink-0">یا لینک کانال:</span>
+              <span className="text-xs text-muted font-bold shrink-0">یا لینک کانال:</span>
               <input
                 type="text"
                 value={channelLink}
                 onChange={(e) => setChannelLink(e.target.value)}
                 placeholder="https://t.me/your_channel یا eitaa.com/channel"
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono w-full sm:w-64 outline-none focus:border-indigo-500"
+                className="px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono w-full sm:w-64 outline-none focus:border-indigo-500 text-primary"
               />
             </div>
 
@@ -364,7 +364,7 @@ export function TelegramEitaaProductExtractor({
               type="button"
               onClick={handleAnalyze}
               disabled={isAnalyzing}
-              className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 cursor-pointer disabled:opacity-50 transition-all"
+              className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-700 hover:to-emerald-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 cursor-pointer disabled:opacity-50 transition-all"
             >
               {isAnalyzing ? (
                 <>
@@ -383,11 +383,11 @@ export function TelegramEitaaProductExtractor({
 
         {/* Extracted Products Result View */}
         {extractedProducts.length > 0 && (
-          <div className="space-y-4 pt-4 border-t border-slate-200">
+          <div className="space-y-4 pt-4 border-t border-subtle">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <h4 className="text-xs sm:text-sm font-black text-slate-900">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <h4 className="text-xs sm:text-sm font-black text-primary">
                   محصولات استخراج‌شده ({extractedProducts.length.toLocaleString("fa-IR")} قلم کالا آماده ثبت)
                 </h4>
               </div>
@@ -396,15 +396,15 @@ export function TelegramEitaaProductExtractor({
                 <button
                   type="button"
                   onClick={() => setSelectedIds(new Set(extractedProducts.map((p) => p.id)))}
-                  className="text-indigo-600 font-bold hover:underline cursor-pointer"
+                  className="text-indigo-500 font-bold hover:underline cursor-pointer"
                 >
                   انتخاب همه
                 </button>
-                <span className="text-slate-300">|</span>
+                <span className="text-muted">|</span>
                 <button
                   type="button"
                   onClick={() => setSelectedIds(new Set())}
-                  className="text-slate-500 font-bold hover:underline cursor-pointer"
+                  className="text-muted font-bold hover:underline cursor-pointer"
                 >
                   عدم انتخاب
                 </button>
@@ -418,10 +418,10 @@ export function TelegramEitaaProductExtractor({
                 return (
                   <div
                     key={p.id}
-                    className={`p-4 rounded-2xl border-2 transition-all space-y-3 relative ${
+                    className={`p-4 rounded-2xl border transition-all space-y-3 relative ${
                       isSelected
-                        ? "border-indigo-500 bg-indigo-50/30 shadow-xs"
-                        : "border-slate-200 bg-white opacity-70"
+                        ? "border-indigo-500/60 bg-indigo-500/5 shadow-xs"
+                        : "border-subtle bg-surface opacity-80"
                     }`}
                   >
                     {/* Header Row */}
@@ -431,17 +431,17 @@ export function TelegramEitaaProductExtractor({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleSelect(p.id)}
-                          className="mt-1 w-4 h-4 rounded-md text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          className="mt-1 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                         />
                         <div className="flex-1 space-y-1">
                           <input
                             type="text"
                             value={p.name}
                             onChange={(e) => handleUpdateProduct(p.id, "name", e.target.value)}
-                            className="w-full font-black text-xs text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white px-1 py-0.5 rounded-sm outline-none"
+                            className="w-full font-black text-xs text-primary bg-transparent border-b border-transparent hover:border-subtle focus:border-indigo-500 focus:bg-background px-1 py-0.5 rounded-sm outline-none"
                             placeholder="نام محصول..."
                           />
-                          <span className="inline-block text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-md">
+                          <span className="inline-block text-[10px] bg-subtle text-secondary font-bold px-2 py-0.5 rounded-md">
                             {p.category}
                           </span>
                         </div>
@@ -450,7 +450,7 @@ export function TelegramEitaaProductExtractor({
                       <button
                         type="button"
                         onClick={() => handleRemoveProduct(p.id)}
-                        className="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition-colors"
+                        className="text-muted hover:text-rose-500 p-1 rounded-lg transition-colors"
                         title="حذف این آیتم"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -459,50 +459,50 @@ export function TelegramEitaaProductExtractor({
 
                     {/* Numeric Inputs (Price, MOQ, Stock) */}
                     <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div className="bg-white p-2 rounded-xl border border-slate-200">
-                        <span className="block text-[10px] text-slate-500 font-bold">قیمت عمده (تومان):</span>
+                      <div className="bg-background p-2 rounded-xl border border-subtle">
+                        <span className="block text-[10px] text-muted font-bold">قیمت عمده (تومان):</span>
                         <input
                           type="number"
                           value={p.wholesalePrice}
                           onChange={(e) =>
                             handleUpdateProduct(p.id, "wholesalePrice", Number(e.target.value))
                           }
-                          className="w-full font-mono font-black text-xs text-emerald-700 outline-none mt-0.5"
+                          className="w-full font-mono font-black text-xs text-emerald-500 outline-none mt-0.5 bg-transparent"
                         />
                       </div>
 
-                      <div className="bg-white p-2 rounded-xl border border-slate-200">
-                        <span className="block text-[10px] text-slate-500 font-bold">حداقل سفارش (MOQ):</span>
+                      <div className="bg-background p-2 rounded-xl border border-subtle">
+                        <span className="block text-[10px] text-muted font-bold">حداقل سفارش (MOQ):</span>
                         <input
                           type="number"
                           value={p.minOrderQuantity}
                           onChange={(e) =>
                             handleUpdateProduct(p.id, "minOrderQuantity", Number(e.target.value))
                           }
-                          className="w-full font-mono font-black text-xs text-slate-800 outline-none mt-0.5"
+                          className="w-full font-mono font-black text-xs text-primary outline-none mt-0.5 bg-transparent"
                         />
                       </div>
 
-                      <div className="bg-white p-2 rounded-xl border border-slate-200">
-                        <span className="block text-[10px] text-slate-500 font-bold">موجودی انبار:</span>
+                      <div className="bg-background p-2 rounded-xl border border-subtle">
+                        <span className="block text-[10px] text-muted font-bold">موجودی انبار:</span>
                         <input
                           type="number"
                           value={p.stock}
                           onChange={(e) =>
                             handleUpdateProduct(p.id, "stock", Number(e.target.value))
                           }
-                          className="w-full font-mono font-black text-xs text-slate-800 outline-none mt-0.5"
+                          className="w-full font-mono font-black text-xs text-primary outline-none mt-0.5 bg-transparent"
                         />
                       </div>
                     </div>
 
                     {/* Colors & Specs */}
                     {p.colors && p.colors.length > 0 && (
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                      <div className="flex items-center gap-1.5 text-[11px] text-secondary">
                         <span className="font-bold">رنگ‌بندی:</span>
                         <div className="flex items-center gap-1">
                           {p.colors.map((c, i) => (
-                            <span key={i} className="px-2 py-0.5 bg-slate-100 rounded-md text-[10px] font-bold">
+                            <span key={i} className="px-2 py-0.5 bg-surface border border-subtle rounded-md text-[10px] font-bold">
                               {c}
                             </span>
                           ))}
@@ -515,10 +515,10 @@ export function TelegramEitaaProductExtractor({
             </div>
 
             {/* Bottom Action */}
-            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200">
-              <div className="text-xs text-slate-600">
+            <div className="flex items-center justify-between bg-surface p-4 rounded-2xl border border-subtle">
+              <div className="text-xs text-secondary">
                 <span>تعداد کالای انتخابی جهت درج در زوپیت: </span>
-                <strong className="text-indigo-700 font-mono text-sm">
+                <strong className="text-indigo-500 font-mono text-sm">
                   {selectedIds.size.toLocaleString("fa-IR")}
                 </strong>
                 <span> از {extractedProducts.length.toLocaleString("fa-IR")} کالا</span>

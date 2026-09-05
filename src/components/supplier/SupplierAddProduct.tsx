@@ -593,19 +593,6 @@ export function SupplierAddProduct({
     "بررسی و ثبت",
   ];
 
-  if (showWcImport) {
-    return (
-      <SupplierWooCommerceImport
-        onSuccess={() => {
-          setShowWcImport(false);
-          onSuccess();
-        }}
-        onCancel={() => setShowWcImport(false)}
-        showNotification={showNotification}
-      />
-    );
-  }
-
   return (
     <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in max-w-4xl mx-auto my-8">
       
@@ -619,25 +606,25 @@ export function SupplierAddProduct({
           </p>
         </div>
 
-        {/* Compact Excel & WooCommerce Import Tools in Header */}
+        {/* Compact Import Tools in Header */}
         {!initialData?.id && (
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setShowAiExtractorModal(true)}
-              className="px-3.5 py-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-600/25 cursor-pointer active:scale-95"
+              className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               <span>ایجنت تلگرام و ایتا (AI)</span>
             </button>
 
             <button
               type="button"
               onClick={() => setShowWcImport(true)}
-              className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer active:scale-95"
+              className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
             >
               <Globe className="w-3.5 h-3.5" />
-              <span>انتقال مستقیم از ووکامرس (API)</span>
+              <span>انتقال از ووکامرس (API)</span>
             </button>
 
             <input
@@ -652,49 +639,23 @@ export function SupplierAddProduct({
               type="button"
               onClick={handleDownloadSampleCsv}
               title="دانلود فایل اکسل نمونه"
-              className="px-3 py-2 bg-surface hover:bg-border-subtle text-text-secondary hover:text-text-primary border border-border-default rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-2.5 py-1.5 bg-surface hover:bg-subtle text-secondary border border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <Download className="w-3.5 h-3.5 text-primary-default" />
+              <Download className="w-3.5 h-3.5 text-muted" />
               <span>اکسل نمونه</span>
             </button>
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-2 bg-surface hover:bg-subtle text-secondary border border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1.5 bg-surface hover:bg-subtle text-secondary border border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <FileUp className="w-3.5 h-3.5" />
-              <span>ورود با فایل اکسل</span>
+              <FileUp className="w-3.5 h-3.5 text-muted" />
+              <span>ورود اکسل</span>
             </button>
           </div>
         )}
       </div>
-
-      {/* Motivational WooCommerce Notice Banner for New Products */}
-      {!initialData?.id && (
-        <div className="mx-6 mt-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-50/90 via-purple-50/50 to-background border border-indigo-200/80 dark:border-indigo-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-600/20">
-              <Globe className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-xs font-black text-indigo-950 dark:text-indigo-200">
-                آیا محصولات شما در یک فروشگاه ووکامرسی ثبت شده‌اند؟
-              </h4>
-              <p className="text-[11px] text-muted font-medium mt-0.5">
-                نیازی به ثبت دستی و تک‌به‌تک کالاها نیست! با اتصال API، تمام کالاها و تصاویر را در چند ثانیه منتقل کنید.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowWcImport(true)}
-            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
-          >
-            شروع انتقال از ووکامرس ⚡
-          </button>
-        </div>
-      )}
 
       {/* Success / Error Feedback Alert Bar if any */}
       {bulkFeedback && (
@@ -1775,6 +1736,22 @@ export function SupplierAddProduct({
             <TelegramEitaaProductExtractor
               onAddProducts={handleExtractedProductsFromAi}
               onClose={() => setShowAiExtractorModal(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* WooCommerce Import Modal */}
+      {showWcImport && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-6xl w-full my-auto max-h-[92vh] overflow-y-auto bg-card rounded-3xl p-2 border border-subtle shadow-2xl">
+            <SupplierWooCommerceImport
+              onSuccess={() => {
+                setShowWcImport(false);
+                onSuccess();
+              }}
+              onCancel={() => setShowWcImport(false)}
+              showNotification={showNotification}
             />
           </div>
         </div>

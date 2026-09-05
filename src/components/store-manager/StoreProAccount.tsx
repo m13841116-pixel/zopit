@@ -197,6 +197,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string>("");
   const [payingTorob, setPayingTorob] = useState(false);
 
   useEffect(() => {
@@ -421,6 +422,10 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       canvas.releasePointerCapture(e.pointerId);
     }
     setIsDrawing(false);
+    if (canvas) {
+      setSignatureDataUrl(canvas.toDataURL("image/png"));
+      setHasSignature(true);
+    }
   };
 
   const clearSignature = () => {
@@ -430,6 +435,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasSignature(false);
+    setSignatureDataUrl("");
   };
 
   const autoGenerateSignature = () => {
@@ -456,6 +462,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     ctx.stroke();
 
     setHasSignature(true);
+    const dataUrl = canvas.toDataURL("image/png");
+    setSignatureDataUrl(dataUrl);
     if (showNotification) showNotification("امضای دیجیتال خودکار ثبت شد", "success");
     else toast("امضای دیجیتال خودکار ثبت شد", "success");
   };
@@ -490,11 +498,21 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       return;
     }
 
-    if (!hasSignature) {
+    if (!hasSignature && !signatureDataUrl) {
       const msg = "لطفاً قرارداد را امضا نمایید (کشیدن امضا با دست/ماوس یا کلیک بر دکمه امضای خودکار).";
       if (showNotification) showNotification(msg, "error");
       else toast(msg, "error");
       return;
+    }
+
+    if (canvasRef.current) {
+      try {
+        const sig = canvasRef.current.toDataURL("image/png");
+        if (sig && sig.length > 50) {
+          setSignatureDataUrl(sig);
+          setHasSignature(true);
+        }
+      } catch (err) {}
     }
 
     if (parseInt(captchaInput, 10) !== num1 + num2) {
@@ -530,7 +548,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       return;
     }
 
-    if (!hasSignature) {
+    if (!hasSignature && !signatureDataUrl) {
       setFormStep(1);
       const msg = "لطفاً قرارداد را در مرحله اول امضا نمایید.";
       if (showNotification) showNotification(msg, "error");
@@ -547,7 +565,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     }
 
     const canvas = canvasRef.current;
-    const signatureImage = canvas ? canvas.toDataURL("image/png") : "";
+    const signatureImage = signatureDataUrl || (canvas ? canvas.toDataURL("image/png") : "");
 
     const hostBasePrice = parseInt(settings.promaxAccountPrice || '199000', 10);
     const domainCost = hasDomainPriority ? 80000 : 0;
@@ -1865,16 +1883,24 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 {/* SECTION 4: SIGNATURE CANVAS */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
-                    <label className="text-xs font-bold text-secondary flex items-center gap-2">
-                      <PenTool className="w-4 h-4 text-emerald-500" />
-                      <span>۴. کادر امضای دیجیتال آنلاین قرارداد <span className="text-rose-500">*</span>:</span>
-                    </label>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-secondary flex items-center gap-2">
+                        <PenTool className="w-4 h-4 text-emerald-500" />
+                        <span>۴. کادر امضای دیجیتال آنلاین قرارداد <span className="text-rose-500">*</span>:</span>
+                      </label>
+                      {(hasSignature || signatureDataUrl) && (
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                          <span>امضای رسمی ثبت شد</span>
+                        </span>
+                      )}
+                    </div>
 
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={autoGenerateSignature}
-                        className="text-xs text-emerald-500 hover:text-emerald-400 flex items-center gap-1 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 cursor-pointer"
+                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 flex items-center gap-1 font-bold bg-emerald-500/10 hover:bg-emerald-500/15 px-3 py-1.5 rounded-xl border border-emerald-500/20 cursor-pointer transition-all active:scale-95"
                       >
                         <Zap className="w-3.5 h-3.5" /> امضای خودکار با هویت دیجیتال
                       </button>
@@ -1882,14 +1908,14 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                       <button
                         type="button"
                         onClick={clearSignature}
-                        className="text-xs text-rose-500 hover:underline flex items-center gap-1 font-medium cursor-pointer p-1"
+                        className="text-xs text-rose-500 hover:text-rose-600 flex items-center gap-1 font-medium cursor-pointer p-1 transition-colors"
                       >
                         <RefreshCw className="w-3.5 h-3.5" /> پاکسازی
                       </button>
                     </div>
                   </div>
 
-                  <div className="border-2 border-dashed border-emerald-500/40 rounded-2xl bg-surface p-2 relative text-center">
+                  <div className="border border-emerald-500/30 rounded-2xl bg-surface p-2.5 relative text-center shadow-xs">
                     <canvas
                       ref={canvasRef}
                       width={500}
@@ -1900,7 +1926,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                       onPointerCancel={handlePointerUp}
                       className="w-full h-32 touch-none cursor-crosshair bg-background rounded-xl border border-subtle"
                     />
-                    {!hasSignature && (
+                    {!hasSignature && !signatureDataUrl && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-muted text-xs p-4">
                         <span>جهت ثبت امضا، با دست یا ماوس در این کادر بکشید</span>
                         <span className="text-[10px] text-emerald-500 mt-1 font-bold">یا دکمه «امضای خودکار با هویت دیجیتال» را بفشارید</span>
@@ -1939,10 +1965,10 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   {/* Math Captcha */}
                   <div className="bg-surface p-3.5 rounded-2xl border border-subtle flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-secondary whitespace-nowrap">کد امنیتی:</span>
-                    <div className="bg-slate-900 border-2 border-emerald-500/50 text-emerald-400 font-mono font-black text-base px-4 py-1.5 rounded-xl shadow-inner tracking-widest flex items-center gap-2">
-                      <span className="text-emerald-300 font-extrabold">{num1}</span>
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-black text-base px-4 py-1.5 rounded-xl shadow-xs tracking-widest flex items-center gap-2">
+                      <span className="text-emerald-700 dark:text-emerald-300 font-extrabold">{num1}</span>
                       <span className="text-emerald-500 font-bold">+</span>
-                      <span className="text-emerald-300 font-extrabold">{num2}</span>
+                      <span className="text-emerald-700 dark:text-emerald-300 font-extrabold">{num2}</span>
                       <span className="text-emerald-500 font-bold">=</span>
                     </div>
                     <input
@@ -1969,7 +1995,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   <button
                     type="button"
                     onClick={handleProceedToStep2}
-                    className="w-full md:w-[75%] mx-auto py-4 bg-gradient-to-r from-slate-900 to-slate-950 hover:from-slate-800 hover:to-slate-900 text-white font-black text-base rounded-2xl shadow-xl shadow-slate-900/20 transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.01]"
+                    className="w-full md:w-[75%] mx-auto py-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-emerald-600 hover:from-indigo-700 hover:to-emerald-700 text-white font-black text-base rounded-2xl shadow-xl shadow-indigo-600/20 transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.01]"
                   >
                     <span>تایید اطلاعات و ورود به مرحله هاستینگ ابری و صدور فاکتور</span>
                     <ChevronLeft className="w-5 h-5" />
