@@ -64,12 +64,15 @@ import {
   ArrowUpDown,
   CheckCheck,
   Menu,
-  Play
+  Play,
+  Gift,
+  ArrowLeft
 } from "lucide-react";
 import { EducationModal } from "../EducationModal";
 import { SupplierOnboardingWidget } from "./SupplierOnboardingWidget";
 import { AutomationVideoModal } from "../AutomationVideoModal";
 import { ZopitLogo } from "../ZopitLogo";
+import { SupplierReferralProgram } from "./SupplierReferralProgram";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -778,6 +781,11 @@ export function SupplierDashboard({
       icon: <MessageSquare className="w-5 h-5" />,
     },
     {
+      id: "referral",
+      label: "طرح معرف همکار (کارمزد ۰٪) 🎁",
+      icon: <Gift className="w-5 h-5 text-emerald-500" />,
+    },
+    {
       id: "announcements",
       label: "اطلاعیه‌ها و پیام‌ها",
       icon: <Bell className="w-5 h-5" />,
@@ -1038,6 +1046,75 @@ export function SupplierDashboard({
                       >
                         افزودن محصول جدید
                       </button>
+                    </div>
+                  </div>
+
+                  {/* High Value Promo Cards: Referral 0% Commission & Free Onboarding Service */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Card 1: Referral Program */}
+                    <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 border border-emerald-500/30 p-5 rounded-3xl text-white shadow-md flex flex-col justify-between gap-4">
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 flex items-center justify-center shrink-0 font-black shadow-md">
+                          <Gift className="w-6 h-6" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-black text-white">طرح ویژه معرف همکار (کارمزد ۰٪)</h4>
+                            <span className="bg-emerald-400 text-emerald-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                              ۱ ماه رایگان
+                            </span>
+                          </div>
+                          <p className="text-xs text-emerald-200/90 leading-relaxed">
+                            به ازای معرفی هر تأمین‌کننده عمده، ۱ ماه کارمزد ۱.۵٪ پلتفرم برای شما صفر خواهد شد (تا ۱۲ ماه کارمزد ۰٪ رایگان).
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("referral")}
+                        className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      >
+                        <span>مشاهده طرح و دریافت لینک معرفی اختصاصی</span>
+                        <ArrowLeft className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Card 2: Done-For-You Free Product Onboarding */}
+                    <div className="bg-gradient-to-br from-purple-950 via-slate-900 to-indigo-950 border border-purple-500/30 p-5 rounded-3xl text-white shadow-md flex flex-col justify-between gap-4">
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-purple-600 text-slate-950 flex items-center justify-center shrink-0 font-black shadow-md">
+                          <Sparkles className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-black text-white">ثبت ۱۰۰٪ رایگان کاتالوگ توسط زوپیت</h4>
+                            <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                              خدمات اختصاصی
+                            </span>
+                          </div>
+                          <p className="text-xs text-purple-200/90 leading-relaxed">
+                            اگر وقت ثبت دستی ندارید، عکس لیست قیمت، پی‌دی‌اف یا کانال خود را ارسال کنید تا کارشناسان زوپیت رایگان ثبت کنند!
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("tickets")}
+                          className="flex-1 py-2.5 px-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span>ارسال در تیکت</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("add-product")}
+                          className="flex-1 py-2.5 px-3 bg-white/10 hover:bg-white/20 text-indigo-200 border border-white/20 font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <Sparkles className="w-4 h-4 text-amber-300" />
+                          <span>ایجنت تلگرام / ایتا</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -2960,6 +3037,7 @@ export function SupplierDashboard({
                     }}
                     onCancel={() => setActiveTab("products")}
                     showNotification={showNotification}
+                    onNavigateToTickets={() => setActiveTab("tickets")}
                   />
                 ))}
               {/* WOOCOMMERCE IMPORT TAB */}
@@ -2987,11 +3065,16 @@ export function SupplierDashboard({
                     setProductToEdit(null);
                   }}
                   showNotification={showNotification}
+                  onNavigateToTickets={() => setActiveTab("tickets")}
                 />
               )}
               {/* TICKETS TAB */}
               {activeTab === "tickets" && (
                 <SupplierTickets showNotification={showNotification} />
+              )}
+              {/* REFERRAL PROGRAM TAB */}
+              {activeTab === "referral" && (
+                <SupplierReferralProgram user={user} />
               )}
               {/* PERFORMANCE TAB */}
               {activeTab === "performance" && (

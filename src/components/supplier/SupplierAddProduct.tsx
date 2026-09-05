@@ -33,19 +33,25 @@ import {
   CheckCircle2,
   FileUp,
   Check,
-  Globe
+  Globe,
+  MessageCircle,
+  Gift,
+  Send
 } from "lucide-react";
 import { SupplierWooCommerceImport } from "./SupplierWooCommerceImport";
+import { TelegramEitaaProductExtractor, ExtractedProduct } from "./TelegramEitaaProductExtractor";
 
 export function SupplierAddProduct({
   onSuccess,
   onCancel,
   showNotification,
   initialData,
+  onNavigateToTickets,
 }: any) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showWcImport, setShowWcImport] = useState(false);
+  const [showAiExtractorModal, setShowAiExtractorModal] = useState(false);
 
   // Bulk Product Import State
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -271,6 +277,39 @@ export function SupplierAddProduct({
     } finally {
       setIsBulkImporting(false);
     }
+  };
+
+  const handleExtractedProductsFromAi = (products: ExtractedProduct[]) => {
+    if (products.length === 0) return;
+
+    if (products.length === 1) {
+      const p = products[0];
+      setFormData((prev) => ({
+        ...prev,
+        name: p.name || prev.name,
+        supplierBasePrice: p.wholesalePrice ? p.wholesalePrice.toString() : prev.supplierBasePrice,
+        longDescription: p.description || prev.longDescription,
+        shortDescription: p.name || prev.shortDescription,
+        stock: p.stock ? p.stock.toString() : prev.stock,
+        minStock: p.minOrderQuantity ? p.minOrderQuantity.toString() : prev.minStock,
+      }));
+      toast.success(`مشخصات محصول «${p.name}» در فرم بارگذاری گردید.`);
+    } else {
+      const mapped = products.map((p, index) => ({
+        name: p.name,
+        category: p.category || "لوازم جانبی",
+        model: "عمومی",
+        color: p.colors?.[0] || "مشکی",
+        wholesalePrice: p.wholesalePrice,
+        stock: p.stock || 50,
+        minOrderQuantity: p.minOrderQuantity || 5,
+        rowNumber: index + 1,
+      }));
+      setPreviewProducts(mapped);
+      setShowBulkPreviewModal(true);
+      toast.success(`تعداد ${mapped.length.toLocaleString("fa-IR")} محصول استخراج‌شده در پیش‌نمایش بارگذاری گردید.`);
+    }
+    setShowAiExtractorModal(false);
   };
   const [categories, setCategories] = useState<any[]>([
     { id: 1, name: "موبایل" },
@@ -585,6 +624,15 @@ export function SupplierAddProduct({
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
+              onClick={() => setShowAiExtractorModal(true)}
+              className="px-3.5 py-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-600/25 cursor-pointer active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>ایجنت تلگرام و ایتا (AI)</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setShowWcImport(true)}
               className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer active:scale-95"
             >
@@ -621,6 +669,52 @@ export function SupplierAddProduct({
           </div>
         )}
       </div>
+
+      {/* Special Onboarding Banner: Can't enter products manually? */}
+      {!initialData?.id && (
+        <div className="mx-6 mt-4 p-5 rounded-3xl bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 text-white border border-purple-500/30 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shrink-0 shadow-md font-black">
+              <Gift className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs sm:text-sm font-black text-white">
+                  وقت یا حوصله ثبت دستی و تک‌به‌تک کالاها را ندارید؟
+                </h4>
+                <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                  ۲ راهکار فوری
+                </span>
+              </div>
+              <p className="text-[11px] text-purple-200 leading-relaxed max-w-2xl">
+                عکس لیست قیمت، پی‌دی‌اف کاتالوگ یا آدرس کانالتان را در تیکت بفرستید تا <strong className="text-amber-300">پشتیبانی زوپیت ۱۰۰٪ رایگان برایتان ثبت کند</strong>؛ یا از <strong className="text-indigo-300">ایجنت هوشمند</strong> جهت استخراج خودکار از تلگرام و ایتا استفاده نمایید!
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+            <button
+              type="button"
+              onClick={() => setShowAiExtractorModal(true)}
+              className="flex-1 md:flex-initial px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>استخراج با ایجنت AI</span>
+            </button>
+
+            {onNavigateToTickets && (
+              <button
+                type="button"
+                onClick={onNavigateToTickets}
+                className="flex-1 md:flex-initial px-4 py-2.5 bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/40 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Gift className="w-4 h-4" />
+                <span>ارسال تیکت ثبت رایگان</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Motivational WooCommerce Notice Banner for New Products */}
       {!initialData?.id && (
@@ -1719,6 +1813,18 @@ export function SupplierAddProduct({
           {initialData?.id ? "ویرایش نهایی" : "ثبت نهایی محصول"}
         </button>
       </div>
+
+      {/* Telegram & Eitaa AI Extractor Modal */}
+      {showAiExtractorModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-4xl w-full my-auto">
+            <TelegramEitaaProductExtractor
+              onAddProducts={handleExtractedProductsFromAi}
+              onClose={() => setShowAiExtractorModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

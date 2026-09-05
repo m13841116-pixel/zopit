@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { MessageSquare, Plus, X, Send, Paperclip } from "lucide-react";
-export function SupplierTickets({ showNotification }: any) {
+import { MessageSquare, Plus, X, Send, Paperclip, Gift, Sparkles, HelpCircle, FileText } from "lucide-react";
+export function SupplierTickets({ showNotification, initialDepartment }: any) {
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   /* New ticket state */ const [subject, setSubject] = useState("");
-  const [department, setDepartment] = useState("مدیرکل (مدیریت ارشد) 👑");
+  const [department, setDepartment] = useState(
+    initialDepartment || "مدیرکل (مدیریت ارشد) 👑"
+  );
   const [priority, setPriority] = useState("عادی");
   const [message, setMessage] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState("");
@@ -234,6 +236,42 @@ export function SupplierTickets({ showNotification }: any) {
   return (
     <div className="space-y-6">
       
+      {/* Special Service Banner for Catalog / Product Onboarding */}
+      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-5 rounded-3xl border border-purple-500/30 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shrink-0 shadow-md font-black">
+            <Gift className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-black text-white">
+                خدمت ویژه: ثبت ۱۰۰٪ رایگان محصولات توسط پشتیبانی زوپیت
+              </h3>
+              <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                ویژه تأمین‌کنندگان
+              </span>
+            </div>
+            <p className="text-xs text-purple-200 mt-1 leading-relaxed max-w-2xl">
+              اگر وقت یا امکان تایپ و ثبت دستی اقلام خود را ندارید، عکس لیست قیمت، فایل PDF کاتالوگ، فایل اکسل یا آدرس کانال تلگرام/ایتای خود را ارسال کنید تا کارشناسان زوپیت ظرف کمتر از ۲۴ ساعت تمام محصولاتتان را رایگان ثبت کنند!
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setDepartment("🎁 ثبت رایگان محصولات توسط زوپیت (ارسال لیست قیمت / کاتالوگ)");
+            setSubject("درخواست ثبت رایگان کاتالوگ و محصولات");
+            setMessage("سلام و احترام،\nفایل لیست قیمت / کاتالوگ محصولات اینجانب ضمیمه گردید (یا آدرس کانال ما در تلگرام/ایتا: ... می‌باشد).\nلطفاً نسبت به ثبت این اقلام در فروشگاه عمده ما اقدام فرمایید.\nبا تشکر");
+            setShowNewTicket(true);
+          }}
+          className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 rounded-xl text-xs font-black shrink-0 transition-all flex items-center gap-2 shadow-md cursor-pointer"
+        >
+          <FileText className="w-4 h-4" />
+          <span>ارسال کاتالوگ در تیکت</span>
+        </button>
+      </div>
+
       <div className="flex justify-between items-center bg-card p-4 rounded-2xl shadow-sm border border-subtle">
         
         <h2 className="text-lg font-bold text-primary flex items-center gap-2">
@@ -345,7 +383,9 @@ export function SupplierTickets({ showNotification }: any) {
                     onChange={(e) => setDepartment(e.target.value)}
                     className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none cursor-pointer"
                   >
-                    
+                    <option value="🎁 ثبت رایگان محصولات توسط زوپیت (ارسال لیست قیمت / کاتالوگ)">
+                      🎁 ثبت رایگان محصولات توسط زوپیت (ارسال لیست قیمت / کاتالوگ)
+                    </option>
                     <option value="مدیرکل (مدیریت ارشد) 👑">مدیرکل (مدیریت ارشد) 👑</option>
                     <option value="پشتیبانی فنی">پشتیبانی فنی</option>
                     <option value="امور مالی">امور مالی</option>
@@ -368,6 +408,16 @@ export function SupplierTickets({ showNotification }: any) {
                   </select>
                 </div>
               </div>
+
+              {department.includes("ثبت رایگان محصولات") && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 leading-relaxed animate-fade-in">
+                  <Sparkles className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-black mb-0.5">ثبت ۱۰۰٪ رایگان توسط کارشناسان زوپیت:</strong>
+                    فایل عکس لیست قیمت، پی‌دی‌اف، اکسل یا آدرس کانال تلگرام/ایتای خود را در بخش زیر ضمیمه یا در متن پیام وارد کنید. کارشناسان ما تمامی اقلام و قیمت‌ها را برای شما وارد پنل خواهند کرد.
+                  </div>
+                </div>
+              )}
               <div>
                 
                 <label className="block text-sm font-semibold text-secondary mb-1.5">

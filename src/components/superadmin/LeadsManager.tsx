@@ -40,7 +40,15 @@ import {
   Zap,
   AlertTriangle,
   Calculator,
-  SendHorizontal
+  SendHorizontal,
+  Lightbulb,
+  BookOpen,
+  ShieldAlert,
+  Gift,
+  FileCheck,
+  MessageCircle,
+  Layers,
+  CheckSquare
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 
@@ -204,12 +212,13 @@ export default function LeadsManager() {
 
   // SMS & Excel Export Modal State
   const [showExportModal, setShowExportModal] = useState(false);
-  const [activeExportTab, setActiveExportTab] = useState<"direct_sms" | "excel_export" | "telegram">("direct_sms");
+  const [activeExportTab, setActiveExportTab] = useState<"direct_sms" | "excel_export" | "telegram" | "strategy_guide">("excel_export");
   const [exportScope, setExportScope] = useState<"ALL" | "CURRENT_FILTER" | "DRAFTS" | "SELECTED" | "PENDING" | "ASSIGNED" | "COMPLETED">("DRAFTS");
   const [exportIncludeAdditional, setExportIncludeAdditional] = useState(true);
   const [exportOnlyMobiles, setExportOnlyMobiles] = useState(true);
   const [exportDeduplicate, setExportDeduplicate] = useState(true);
   const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [meliNumberFormat, setMeliNumberFormat] = useState<"no_zero" | "with_zero">("no_zero");
 
   // Direct SMS Configuration State
   const [smsMethod, setSmsMethod] = useState<"pattern" | "text">("pattern");
@@ -868,50 +877,76 @@ export default function LeadsManager() {
   }, [targetLeadsForExport, exportIncludeAdditional, exportData]);
 
   // Export handlers
-  const handleDownloadMeliPayamakExcel = () => {
-    // Strictly Iranian mobile numbers in English format (09xxxxxxxxx), under each other, single column, zero extra info
-    const mobileRows = exportData
-      .filter((item) => item.isMobile)
-      .map((item) => ({
-        "شماره تلفن": item.phone
-      }));
+  const handleDownloadMeliPayamakExcel = (fileFormat: "xlsx" | "xls" = "xlsx") => {
+    // Strictly Iranian mobile numbers formatted for MeliPayamak numbers.xls/xlsx
+    const rawMobiles = exportData.filter((item) => item.isMobile);
 
-    if (mobileRows.length === 0) {
+    if (rawMobiles.length === 0) {
       toast.error("شماره موبایل معتبری (همراه ۰۹) برای فایل ملی‌پیامک یافت نشد (شماره‌های ثابت تفکیک شدند).");
       return;
     }
+
+    const mobileRows = rawMobiles.map((item) => {
+      let ph = item.phone.trim();
+      if (meliNumberFormat === "no_zero") {
+        // Without leading zero (e.g. 9122... like MeliPayamak sample template)
+        ph = ph.startsWith("0") ? ph.slice(1) : ph;
+      } else {
+        ph = ph.startsWith("0") ? ph : "0" + ph;
+      }
+      return {
+        "شماره موبایل ها": ph
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(mobileRows);
     worksheet["!cols"] = [{ wch: 18 }];
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "شماره‌ها");
-    const dateStr = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(workbook, `melipayamak_numbers_${dateStr}.xlsx`);
-    toast.success(`فایل استاندارد ملی‌پیامک (تک‌ستونه شماره‌ها زیر هم) با ${mobileRows.length.toLocaleString("fa-IR")} شماره دانلود شد.`);
+    // Standard MeliPayamak sample file uses Sheet1
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+    
+    if (fileFormat === "xls") {
+      XLSX.writeFile(workbook, "numbers.xls", { bookType: "biff8" });
+      toast.success(`فایل سازگار اکسل (numbers.xls) با ${mobileRows.length.toLocaleString("fa-IR")} شماره دانلود شد.`);
+    } else {
+      XLSX.writeFile(workbook, "numbers.xlsx");
+      toast.success(`فایل استاندارد ملی‌پیامک (numbers.xlsx) با ${mobileRows.length.toLocaleString("fa-IR")} شماره دانلود شد.`);
+    }
   };
 
-  const handleDownloadMeliPayamakPhonebook = () => {
-    const phonebookRows = exportData
-      .filter((item) => item.isMobile)
-      .map((item) => ({
-        "شماره همراه": item.phone,
-        "نام مخاطب": item.name
-      }));
+  const handleDownloadMeliPayamakPhonebook = (fileFormat: "xlsx" | "xls" = "xlsx") => {
+    const rawMobiles = exportData.filter((item) => item.isMobile);
 
-    if (phonebookRows.length === 0) {
+    if (rawMobiles.length === 0) {
       toast.error("شماره موبایلی برای دفترچه تلفن یافت نشد.");
       return;
     }
+
+    const phonebookRows = rawMobiles.map((item) => {
+      let ph = item.phone.trim();
+      if (meliNumberFormat === "no_zero") {
+        ph = ph.startsWith("0") ? ph.slice(1) : ph;
+      } else {
+        ph = ph.startsWith("0") ? ph : "0" + ph;
+      }
+      return {
+        "شماره موبایل ها": ph,
+        "نام مخاطب": item.name
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(phonebookRows);
     worksheet["!cols"] = [{ wch: 18 }, { wch: 30 }];
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "دفترچه تلفن");
-    const dateStr = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(workbook, `melipayamak_phonebook_${dateStr}.xlsx`);
-    toast.success(`فایل دفترچه تلفن ملی‌پیامک (۲ ستونه) با ${phonebookRows.length.toLocaleString("fa-IR")} مخاطب دانلود شد.`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+    if (fileFormat === "xls") {
+      XLSX.writeFile(workbook, "numbers_phonebook.xls", { bookType: "biff8" });
+    } else {
+      XLSX.writeFile(workbook, "numbers_phonebook.xlsx");
+    }
+    toast.success(`فایل دفترچه تلفن ملی‌پیامک با ${phonebookRows.length.toLocaleString("fa-IR")} مخاطب دانلود شد.`);
   };
 
   const handleSelectPattern = (pat: SmsPatternPreset) => {
@@ -1240,12 +1275,21 @@ export default function LeadsManager() {
       return;
     }
 
-    const text = exportData.map((item) => item.phone).join(separator === "comma" ? "," : "\n");
+    const text = exportData
+      .map((item) => {
+        let ph = item.phone.trim();
+        if (meliNumberFormat === "no_zero" && item.isMobile) {
+          ph = ph.startsWith("0") ? ph.slice(1) : ph;
+        }
+        return ph;
+      })
+      .join(separator === "comma" ? "," : "\n");
+
     navigator.clipboard.writeText(text).then(() => {
       setCopiedType(separator);
       toast.success(
         separator === "comma"
-          ? `${exportData.length.toLocaleString("fa-IR")} شماره با کاما کپی شد (آماده برای درج در ملی پیامک).`
+          ? `${exportData.length.toLocaleString("fa-IR")} شماره با کاما کپی شد (آماده برای درج در پنل ملی پیامک).`
           : `${exportData.length.toLocaleString("fa-IR")} شماره در خطوط مجزا کپی شد.`
       );
       setTimeout(() => setCopiedType(null), 2500);
@@ -2602,44 +2646,57 @@ export default function LeadsManager() {
             </div>
 
             {/* Modal Tabs */}
-            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl">
-              <button
-                type="button"
-                onClick={() => setActiveExportTab("direct_sms")}
-                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeExportTab === "direct_sms"
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <SendHorizontal className="w-3.5 h-3.5" />
-                <span>ارسال مستقیم وب‌سرویس ملی‌پیامک</span>
-              </button>
-
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-2xl">
               <button
                 type="button"
                 onClick={() => setActiveExportTab("excel_export")}
-                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeExportTab === "excel_export"
                     ? "bg-purple-600 text-white shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>دانلود اکسل استاندارد ملی‌پیامک</span>
+                <span>اکسل ملی‌پیامک (numbers.xls)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveExportTab("direct_sms")}
+                className={`py-2.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeExportTab === "direct_sms"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <SendHorizontal className="w-3.5 h-3.5" />
+                <span>ارسال پترنی ملی‌پیامک</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveExportTab("telegram")}
-                className={`py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeExportTab === "telegram"
                     ? "bg-sky-600 text-white shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 <Share2 className="w-3.5 h-3.5" />
-                <span>تلگرام</span>
+                <span>تلگرام و ایتا</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveExportTab("strategy_guide")}
+                className={`py-2.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeExportTab === "strategy_guide"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "text-amber-800 bg-amber-50 hover:bg-amber-100"
+                }`}
+              >
+                <Lightbulb className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                <span>راهنمای جذب ارزان</span>
               </button>
             </div>
 
@@ -3218,8 +3275,48 @@ export default function LeadsManager() {
             {/* TAB 2: EXCEL EXPORT (Single Column MeliPayamak format) */}
             {activeExportTab === "excel_export" && (
               <div className="space-y-4 animate-fade-in">
+                {/* Number Format Selector Box */}
+                <div className="bg-purple-50/70 border border-purple-200 p-3.5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-purple-950">فرمت پیش‌فرض ارقام شماره موبایل در فایل:</p>
+                      <p className="text-[11px] text-purple-700 font-medium">
+                        دقیقاً مطابق فایل نمونه numbers.xls ملی‌پیامک، شماره‌ها بدون صفر اولیه (9xxxxxxxxx) است.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-purple-200 self-stretch sm:self-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setMeliNumberFormat("no_zero")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                        meliNumberFormat === "no_zero"
+                          ? "bg-purple-600 text-white shadow-xs"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      بدون صفر (9xxxxxxxxx) - نمونه ملی‌پیامک
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMeliNumberFormat("with_zero")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                        meliNumberFormat === "with_zero"
+                          ? "bg-purple-600 text-white shadow-xs"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      با صفر (09xxxxxxxxx) - کشوری
+                    </button>
+                  </div>
+                </div>
+
                 {/* Advanced Filters */}
-                <div className="bg-purple-50/40 border-2 border-purple-100 p-3.5 rounded-2xl">
+                <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <label className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer shadow-2xs">
                       <input
@@ -3253,68 +3350,89 @@ export default function LeadsManager() {
                   </div>
                 </div>
 
-                {/* Primary Download Buttons */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Button 1: Single Column MeliPayamak format */}
+                {/* Primary Download Buttons Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {/* Button 1: numbers.xlsx */}
                   <button
                     type="button"
-                    onClick={handleDownloadMeliPayamakExcel}
+                    onClick={() => handleDownloadMeliPayamakExcel("xlsx")}
                     disabled={exportData.filter((i) => i.isMobile).length === 0}
-                    className="p-4 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-right transition-all flex flex-col justify-between shadow-md shadow-purple-600/20 cursor-pointer disabled:opacity-50 group"
+                    className="p-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-right transition-all flex flex-col justify-between shadow-md shadow-purple-600/20 cursor-pointer disabled:opacity-50 group"
                   >
                     <div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black">اکسل تک‌ستونه ملی‌پیامک</span>
+                        <span className="text-xs font-black">دانلود numbers.xlsx</span>
                         <Download className="w-4 h-4 text-white" />
                       </div>
-                      <p className="text-[11px] font-medium opacity-90 mt-1.5 leading-relaxed">
-                        دقیقاً مطابق استاندارد ماژول «ارسال پیامک از فایل اکسل»: شماره‌های انگلیسی زیر هم در یک ستون، بدون نام و بدون ستون اضافه
+                      <p className="text-[11px] font-medium opacity-90 mt-1 leading-relaxed">
+                        تک‌ستونه دقیق با عنوان سرستون «شماره موبایل ها» و شیت Sheet1
                       </p>
                     </div>
-                    <span className="mt-3 text-[10px] bg-white/20 px-2 py-0.5 rounded-md self-start font-mono font-bold">
-                      {exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} شماره همراه زیر هم
+                    <span className="mt-2.5 text-[10px] bg-white/20 px-2 py-0.5 rounded-md self-start font-mono font-bold">
+                      {exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} شماره همراه
                     </span>
                   </button>
 
-                  {/* Button 2: Two Column Phonebook */}
+                  {/* Button 2: numbers.xls (Office 97-2003) */}
                   <button
                     type="button"
-                    onClick={handleDownloadMeliPayamakPhonebook}
+                    onClick={() => handleDownloadMeliPayamakExcel("xls")}
                     disabled={exportData.filter((i) => i.isMobile).length === 0}
-                    className="p-4 bg-white hover:bg-purple-50 border-2 border-purple-200 hover:border-purple-600 text-slate-900 rounded-2xl text-right transition-all flex flex-col justify-between shadow-xs cursor-pointer disabled:opacity-50"
+                    className="p-3.5 bg-white hover:bg-purple-50 border-2 border-purple-200 hover:border-purple-600 text-slate-900 rounded-2xl text-right transition-all flex flex-col justify-between shadow-xs cursor-pointer disabled:opacity-50"
                   >
                     <div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-purple-900">اکسل دفترچه تلفن ملی‌پیامک</span>
-                        <Users className="w-4 h-4 text-purple-600" />
+                        <span className="text-xs font-black text-purple-900">دانلود numbers.xls</span>
+                        <FileSpreadsheet className="w-4 h-4 text-purple-600" />
                       </div>
-                      <p className="text-[11px] text-slate-600 font-medium mt-1.5 leading-relaxed">
-                        دو ستونه (شماره همراه + نام تامین‌کننده) ویژه ورود مخاطبین جدید در دفترچه تلفن سامانه پیامک
+                      <p className="text-[11px] text-slate-600 font-medium mt-1 leading-relaxed">
+                        فرمت سازگار بدون اخطار فرمت در آفیس‌ها و سامانه‌های قدیمی
                       </p>
                     </div>
-                    <span className="mt-3 text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md self-start font-mono font-bold">
+                    <span className="mt-2.5 text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md self-start font-mono font-bold">
+                      فرمت BIFF8 (سازگار)
+                    </span>
+                  </button>
+
+                  {/* Button 3: Two Column Phonebook */}
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadMeliPayamakPhonebook("xlsx")}
+                    disabled={exportData.filter((i) => i.isMobile).length === 0}
+                    className="p-3.5 bg-white hover:bg-purple-50 border-2 border-slate-200 hover:border-purple-600 text-slate-900 rounded-2xl text-right transition-all flex flex-col justify-between shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-900">دفترچه تلفن ملی‌پیامک</span>
+                        <Users className="w-4 h-4 text-slate-700" />
+                      </div>
+                      <p className="text-[11px] text-slate-600 font-medium mt-1 leading-relaxed">
+                        ۲ ستونه ویژه ماژول ورود دسته‌جمعی مخاطبین (شماره + نام)
+                      </p>
+                    </div>
+                    <span className="mt-2.5 text-[10px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md self-start font-mono font-bold">
                       ۲ ستونه: شماره + نام
                     </span>
                   </button>
 
-                  {/* Button 3: Full CRM Excel */}
+                  {/* Button 4: Full CRM Excel */}
                   <button
                     type="button"
                     onClick={handleDownloadFullExcel}
                     disabled={exportData.length === 0}
-                    className="p-4 bg-white hover:bg-purple-50 border-2 border-slate-200 hover:border-purple-600 text-slate-900 rounded-2xl text-right transition-all flex flex-col justify-between shadow-xs cursor-pointer disabled:opacity-50"
+                    className="p-3.5 bg-white hover:bg-purple-50 border-2 border-slate-200 hover:border-purple-600 text-slate-900 rounded-2xl text-right transition-all flex flex-col justify-between shadow-xs cursor-pointer disabled:opacity-50"
                   >
                     <div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-900">اکسل جامع پرونده‌ها (CRM)</span>
-                        <FileSpreadsheet className="w-4 h-4 text-slate-700" />
+                        <span className="text-xs font-black text-slate-900">اکسل کامل پرونده‌ها</span>
+                        <FileText className="w-4 h-4 text-slate-700" />
                       </div>
-                      <p className="text-[11px] text-slate-600 font-medium mt-1.5 leading-relaxed">
-                        فول دیتا شامل نام برند، صنف، تلفن ثابت و همراه، پاداش جذب، وضعیت مذاکره و سفیر مسئول
+                      <p className="text-[11px] text-slate-600 font-medium mt-1 leading-relaxed">
+                        فول دیتا شامل صنف، آدرس، تلفن ثابت، پورسانت و سفیر مسئول
                       </p>
                     </div>
-                    <span className="mt-3 text-[10px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md self-start font-mono font-bold">
-                      کلیه مشخصات
+                    <span className="mt-2.5 text-[10px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md self-start font-mono font-bold">
+                      فول دیتا CRM
                     </span>
                   </button>
                 </div>
@@ -3342,7 +3460,7 @@ export default function LeadsManager() {
                     }`}
                   >
                     {copiedType === "comma" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 text-purple-600" />}
-                    <span>{copiedType === "comma" ? "کپی شد (با کاما)" : "کپی شماره‌ها (با کاما)"}</span>
+                    <span>{copiedType === "comma" ? "کپی شد (با کاما)" : "کپی شماره‌ها (با کاما برای پنل)"}</span>
                   </button>
 
                   <button
@@ -3360,57 +3478,142 @@ export default function LeadsManager() {
                   </button>
                 </div>
 
-                {/* Live Preview of Single Column MeliPayamak */}
+                {/* Realistic Excel Sheet Mockup (Matching user's numbers.xls screenshot) */}
                 {exportData.length > 0 && (
                   <div className="space-y-2 pt-1">
-                    <p className="text-xs font-black text-slate-900 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-black text-slate-900 flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                        <span>پیش‌نمایش ستون اکسل ملی‌پیامک (شماره‌های همراه انگلیسی زیر هم):</span>
+                        <span>پیش‌نمایش عینی ساختار فایل اکسل (دقیقاً مطابق فایل نمونه ملی‌پیامک):</span>
+                      </p>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-bold border border-emerald-200">
+                        تک‌ستونه استاندارد ملی‌پیامک
                       </span>
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        نمایش ۵ از {exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} شماره همراه
-                      </span>
-                    </p>
+                    </div>
 
-                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                      <table className="w-full text-right text-xs">
-                        <thead className="bg-purple-50/70 border-b border-purple-100 text-slate-900 font-black">
-                          <tr>
-                            <th className="p-2.5 w-16">ردیف</th>
-                            <th className="p-2.5">ستون A: شماره تلفن (فقط شماره همراه انگلیسی)</th>
-                            <th className="p-2.5">نام تامین‌کننده در سیستم</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-mono">
-                          {exportData
-                            .filter((i) => i.isMobile)
-                            .slice(0, 5)
-                            .map((row, idx) => (
-                              <tr key={idx} className="hover:bg-purple-50/20">
-                                <td className="p-2.5 text-slate-400 text-center">{idx + 1}</td>
-                                <td className="p-2.5 font-black text-purple-800 dir-ltr text-right">{row.phone}</td>
-                                <td className="p-2.5 font-sans font-bold text-slate-700">{row.name}</td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
+                    {/* Windows / Excel Frame */}
+                    <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs bg-white text-slate-900 text-xs">
+                      {/* Excel Title Bar */}
+                      <div className="bg-[#107c41] text-white px-3 py-1.5 flex items-center justify-between text-[11px] font-mono">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 bg-white/20 rounded-xs flex items-center justify-center text-[9px] font-black">X</span>
+                          <span className="font-sans font-bold">numbers.xls [Compatibility Mode] - Excel</span>
+                        </div>
+                        <span className="text-[10px] opacity-80 font-sans">SheetJS Engine</span>
+                      </div>
+
+                      {/* Excel Formula Bar */}
+                      <div className="bg-slate-100 border-b border-slate-200 px-3 py-1 flex items-center gap-3 font-mono text-[11px] text-slate-600">
+                        <span className="bg-white border border-slate-300 px-2 py-0.5 rounded-xs font-bold text-slate-900">A1</span>
+                        <span className="text-slate-400 italic">fx</span>
+                        <span className="text-slate-800 font-sans font-bold">شماره موبایل ها</span>
+                      </div>
+
+                      {/* Excel Grid Header */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-right border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100 border-b border-slate-300 text-slate-600 text-[11px] font-mono select-none">
+                              <th className="w-12 p-1.5 text-center border-l border-slate-300 bg-slate-200/70"></th>
+                              <th className="p-1.5 text-center border-l border-slate-300 font-bold bg-slate-100 text-slate-800 w-64">A</th>
+                              <th className="p-1.5 text-center border-l border-slate-300 font-bold bg-slate-100 text-slate-400">B (توضیح سیستم)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 font-mono text-xs">
+                            {/* Row 1: Header */}
+                            <tr className="bg-purple-50/40">
+                              <td className="p-1.5 text-center text-slate-500 bg-slate-100 border-l border-slate-300 text-[11px] select-none font-bold">
+                                1
+                              </td>
+                              <td className="p-1.5 border-l border-slate-300 font-sans font-black text-purple-900 bg-purple-50/70">
+                                شماره موبایل ها
+                              </td>
+                              <td className="p-1.5 border-l border-slate-300 font-sans text-[11px] text-slate-400 italic">
+                                عنوان ستون اول در ملی‌پیامک
+                              </td>
+                            </tr>
+
+                            {/* Data Rows */}
+                            {exportData
+                              .filter((i) => i.isMobile)
+                              .slice(0, 5)
+                              .map((row, idx) => {
+                                const formattedNum =
+                                  meliNumberFormat === "no_zero"
+                                    ? row.phone.startsWith("0")
+                                      ? row.phone.slice(1)
+                                      : row.phone
+                                    : row.phone.startsWith("0")
+                                    ? row.phone
+                                    : "0" + row.phone;
+
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50">
+                                    <td className="p-1.5 text-center text-slate-500 bg-slate-100 border-l border-slate-300 text-[11px] select-none">
+                                      {idx + 2}
+                                    </td>
+                                    <td className="p-1.5 border-l border-slate-300 font-bold text-slate-900 dir-ltr text-right">
+                                      {formattedNum}
+                                    </td>
+                                    <td className="p-1.5 border-l border-slate-300 font-sans text-xs text-slate-600 font-medium">
+                                      {row.name} ({row.category || "تامین‌کننده"})
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Excel Sheet Tabs at Bottom */}
+                      <div className="bg-slate-100 border-t border-slate-300 px-3 py-1 flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1 font-sans">
+                          <span className="bg-white border-t-2 border-[#107c41] px-3 py-1 font-bold text-slate-900 shadow-2xs">
+                            Sheet1
+                          </span>
+                          <span className="px-3 py-1 text-slate-500 hover:text-slate-800 cursor-pointer">
+                            Sheet2
+                          </span>
+                          <span className="px-3 py-1 text-slate-500 hover:text-slate-800 cursor-pointer">
+                            Sheet3
+                          </span>
+                          <span className="px-2 text-slate-400 font-bold">+</span>
+                        </div>
+                        <span className="text-slate-500 text-[10px]">
+                          آماده برای بارگذاری در بخش «ارسال از طریق فایل اکسل» ملی‌پیامک
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Notice Banner */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 flex items-center justify-between text-xs text-amber-900">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>برای آموزش نحوه آپلود در ملی‌پیامک و ترفندهای جذب ارزان تأمین‌کننده، تب راهنما را ببینید:</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveExportTab("strategy_guide")}
+                        className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold transition-colors cursor-pointer shrink-0"
+                      >
+                        مشاهده راهنما و ترفندها
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* TAB 3: TELEGRAM INTEGRATION */}
+            {/* TAB 3: TELEGRAM & SOCIAL INTEGRATION */}
             {activeExportTab === "telegram" && (
               <div className="space-y-4 animate-fade-in">
                 <div className="bg-sky-50/60 border-2 border-sky-200 p-4 rounded-2xl space-y-3">
                   <div className="flex items-center gap-2.5 font-black text-xs text-sky-900">
                     <Share2 className="w-4 h-4 text-sky-600" />
-                    <span>اشتراک‌گذاری دعوت‌نامه و اطلاع‌رسانی در تلگرام (Telegram)</span>
+                    <span>اشتراک‌گذاری دعوت‌نامه و اطلاع‌رسانی در تلگرام و ایتا</span>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    می‌توانید پیام دعوت تامین‌کنندگان را به طور مستقیم در کانال‌ها، گروه‌های صنفی یا چت خصوصی تلگرام تامین‌کنندگان به اشتراک بگذارید.
+                    می‌توانید پیام دعوت تامین‌کنندگان را به طور مستقیم در کانال‌ها، گروه‌های صنفی بازار یا چت خصوصی تامین‌کنندگان به اشتراک بگذارید.
                   </p>
 
                   <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -3429,15 +3632,279 @@ export default function LeadsManager() {
                     <button
                       type="button"
                       onClick={() => {
-                        const inviteText = `سلام و احترام، از شما به عنوان تامین‌کننده برتر جهت حضور در پلتفرم دعوت به عمل می‌آید.\nلینک ثبت‌نام: ${window.location.origin}/supplier-onboarding`;
+                        const inviteText = `مدیریت محترم؛\nاز شما جهت عرضه عمده و مستقیم محصولاتتان در پلتفرم زوپیت دعوت به عمل می‌آید.\nاتصال به فروشگاه‌های آنلاین سراسر کشور و تسویه تضمین‌شده.\nثبت‌نام مستقیم: ${window.location.origin}/supplier-onboarding`;
                         navigator.clipboard.writeText(inviteText);
-                        toast.success("متن دعوت تلگرام با موفقیت کپی شد.");
+                        toast.success("متن پیام دعوت تلگرام و ایتا با موفقیت کپی شد.");
                       }}
                       className="bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" />
-                      <span>کپی متن پیام تلگرام</span>
+                      <span>کپی متن پیام پیام‌رسان‌ها</span>
                     </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: COMPREHENSIVE STRATEGY & MELIPAYAMAK GUIDE */}
+            {activeExportTab === "strategy_guide" && (
+              <div className="space-y-4 animate-fade-in">
+                {/* 1. MeliPayamak Step-by-Step Tutorial */}
+                <div className="bg-white border-2 border-purple-200 rounded-2xl p-4 md:p-5 space-y-4 shadow-xs">
+                  <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+                    <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900">
+                        راهنمای گام‌به‌گام ارسال پیامک با فایل اکسل در سامانه ملی‌پیامک
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        چگونه فایل اکسل دانلود شده از زوپیت را در پنل ملی‌پیامک بارگذاری و ارسال کنیم؟
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-1">
+                      <div className="flex items-center gap-2 font-black text-purple-950">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-[10px] flex items-center justify-center font-mono">۱</span>
+                        <span>دانلود فایل استاندارد</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed pr-7">
+                        از تب قبلی روی <strong>دانلود numbers.xlsx</strong> کلیک کنید. این فایل شماره‌ها را دقیقاً با هدر استاندارد «شماره موبایل ها» آماده می‌کند.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-1">
+                      <div className="flex items-center gap-2 font-black text-purple-950">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-[10px] flex items-center justify-center font-mono">۲</span>
+                        <span>ورود به ماژول ارسال فایل</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed pr-7">
+                        در پنل ملی‌پیامک وارد منوی <strong>ارسال پیامک</strong> &gt; <strong>ارسال از طریق فایل اکسل و متنی</strong> شوید.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-1">
+                      <div className="flex items-center gap-2 font-black text-purple-950">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-[10px] flex items-center justify-center font-mono">۳</span>
+                        <span>انتخاب فایل و ستون شماره‌ها</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed pr-7">
+                        فایل اکسل را آپلود کنید. سیستم ملی‌پیامک ستون «شماره موبایل ها» را به عنوان گیرندگان شناسایی می‌کند.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-1">
+                      <div className="flex items-center gap-2 font-black text-purple-950">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-[10px] flex items-center justify-center font-mono">۴</span>
+                        <span>تنظیم خط و زمان ارسال</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed pr-7">
+                        خط ارسالی پنل را انتخاب کرده، متن پیامک را درج نمایید و زمان ارسال را ترجیحاً بین ساعت ۱۰ صبح تا ۴ بعدازظهر تنظیم کنید.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Telecom Blacklist Warning Banner */}
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs space-y-1.5">
+                    <div className="flex items-center gap-2 font-black text-rose-950">
+                      <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>هشدار مهم: بلک‌لیست مخابرات (کد مسدودی پیامک‌های تبلیغاتی #۸۰۰*)</span>
+                    </div>
+                    <p className="text-slate-700 text-[11px] leading-relaxed">
+                      بیش از <strong>۵۰ تا ۶۰ درصد</strong> بنکداران و فروشندگان خطوط همراه خود را برای پیامک‌های تبلیغاتی بسته‌اند. اگر از خطوط عادی (۳۰۰۰ یا ۵۰۰۰ عمومی) بفرستید، پیامک به دست آن‌ها نخواهد رسید!
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                      <span className="font-bold text-rose-900">راهکارهای عبور از بلک‌لیست:</span>
+                      <span className="bg-white px-2 py-0.5 rounded-md border border-rose-200 text-rose-800 font-bold">
+                        ۱. ارسال پترنی خدماتی در تب اول زوپیت (تضمینی)
+                      </span>
+                      <span className="bg-white px-2 py-0.5 rounded-md border border-rose-200 text-rose-800 font-bold">
+                        ۲. ارسال در پیام‌رسان‌های ایتا / تلگرام
+                      </span>
+                      <span className="bg-white px-2 py-0.5 rounded-md border border-rose-200 text-rose-800 font-bold">
+                        ۳. پیامک صوتی (IVR) ملی‌پیامک
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Why Taminyab is Expensive & 6 High-ROI Alternative Strategies */}
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50/40 border-2 border-amber-200 rounded-2xl p-4 md:p-5 space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-amber-200/70">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Lightbulb className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-amber-950">
+                          راهکارهای ارزان و فوق‌العاده موثر برای جذب تامین‌کننده عمده (بدون نیاز به تامین‌یاب‌های پرهزینه)
+                        </h4>
+                        <p className="text-[11px] text-amber-800 font-medium">
+                          چرا هزینه تامین‌یاب تلفنی بالاست و چه سیستم‌هایی بالاترین بازدهی را ایجاد می‌کنند؟
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* The Problem Analysis */}
+                  <div className="bg-white/90 border border-amber-200 p-3 rounded-xl text-xs space-y-1">
+                    <p className="font-black text-slate-900">چرا استخدام تأمین‌یاب تلفنی معمولاً گران تمام می‌شود؟</p>
+                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                      تأمین‌یاب‌ها حقوق ثابت و پورسانت می‌خواهند، روزانه بیشتر از ۳۰ تا ۵۰ تماس موثر نمی‌توانند بگیرند و بازاری‌های عمده‌فروش به تماس‌های ناشناس بدبین هستند یا وقت صحبت طولانی پای تلفن را ندارند (نرخ جذب زیر ۵ درصد).
+                    </p>
+                  </div>
+
+                  {/* 6 Actionable Growth Strategies */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    {/* Strategy 1 */}
+                    <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-2xs space-y-1.5">
+                      <div className="flex items-center gap-2 font-black text-amber-950">
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-mono">۱</span>
+                        <span>شعار جادویی: «ورود رایگان کاتالوگ شما توسط تیم زوپیت»</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed">
+                        بزرگ‌ترین مانع تامین‌کننده عمده تنبلی در تایپ و ثبت محصولات است! در پیام یا تماس بگویید: <strong>«فقط عکس لیست قیمت یا کاتالوگت را در ایتا یا تلگرام بفرست، ما همه محصولاتت را رایگان وارد پنل می‌کنیم!»</strong> این کار نرخ تبدیل را ۵ برابر می‌کند.
+                      </p>
+                    </div>
+
+                    {/* Strategy 2 */}
+                    <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-2xs space-y-1.5">
+                      <div className="flex items-center gap-2 font-black text-amber-950">
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-mono">۲</span>
+                        <span>تماس مستقیم در پیام‌رسان‌ها (ایتا، بله، تلگرام)</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed">
+                        بیش از ۹۰٪ بنکداران بازار بزرگ، شوش، صالح‌آباد و چراغ برق کانال ایتا یا تلگرام دارند. ارسال پیام مستقیم به ادمین کانال‌های عمده‌فروشی <strong>هزینه صفر</strong> دارد، بلک‌لیست مخابرات ندارد و می‌توانید عکس و بنر جذاب ارسال کنید.
+                      </p>
+                    </div>
+
+                    {/* Strategy 3 */}
+                    <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-2xs space-y-1.5">
+                      <div className="flex items-center gap-2 font-black text-amber-950">
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-mono">۳</span>
+                        <span>تکنیک قلاب تقاضای مشتری آماده (Buyer Demand Hook)</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed">
+                        تأمین‌کننده به ثبت‌نام علاقه ندارد، به <strong>فروش نقد</strong> علاقه دارد! پیامی بفرستید با این لحن: «سلام، برای ۳ قلم از کالاهای [صنف تامین‌کننده] از چندین فروشگاه تقاضای سفارش عمده داریم؛ جهت ثبت موجودی و تحویل سفارش وارد شوید.»
+                      </p>
+                    </div>
+
+                    {/* Strategy 4 */}
+                    <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-2xs space-y-1.5">
+                      <div className="flex items-center gap-2 font-black text-amber-950">
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-mono">۴</span>
+                        <span>تبلیغ اسپانسری در کانال‌های صنفی تلگرام و روبیکا</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed">
+                        به جای استخدام تامین‌یاب ماهانه ۱۵ میلیون تومان، با ۵۰۰ هزار تا ۱ میلیون تومان در کانال‌های تخصصی عمده‌فروشان یک بنر با لینک ثبت‌نام بزنید تا ده‌ها تولیدکننده دست‌اول خودشان مستقیم ثبت‌نام کنند.
+                      </p>
+                    </div>
+
+                    {/* Strategy 5 */}
+                    <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-2xs space-y-1.5">
+                      <div className="flex items-center gap-2 font-black text-amber-950">
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-mono">۵</span>
+                        <span>استخراج آگهی‌های «فروش عمده و تولیدی» دیوار و شیپور</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed">
+                        در بخش «فروش عمده» دیوار روزانه ده‌ها تولیدکننده واقعی در شهرهای تهران، مشهد، اصفهان و تبریز آگهی می‌گذارند. شماره آن‌ها کاملاً فعال است و آماده همکاری هستند.
+                      </p>
+                    </div>
+
+                    {/* Strategy 6 */}
+                    <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-2xs space-y-1.5">
+                      <div className="flex items-center gap-2 font-black text-amber-950">
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-mono">۶</span>
+                        <span>سیستم معرف همکار (پورسانت و پاداش شبکه)</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-relaxed">
+                        به هر تأمین‌کننده‌ای که وارد شد بگویید: «به ازای معرفی هر همکار بنکدار یا تولیدکننده، ۵۰ هزار تومان اعتبار نقدی یا یک ماه کارمزد صفر دریافت می‌کنی.» این مدل شبکه شما را خودبه‌خود گسترش می‌دهد.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Tested High-Conversion SMS Templates */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-black text-xs text-slate-900">
+                      <MessageSquare className="w-4 h-4 text-purple-600" />
+                      <span>۳ نمونه متن پیامک با بالاترین نرخ پاسخگویی (آماده برای کپی فوری):</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    {/* Template 1 */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between space-y-2">
+                      <div>
+                        <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-md">
+                          الگوی ۱: قلاب سفارش عمده
+                        </span>
+                        <p className="text-[11px] text-slate-700 leading-relaxed mt-2 font-medium">
+                          «همکار گرامی؛ تقاضای خرید عمده برای کالاهای شما در پلتفرم زوپیت ثبت شده است. جهت مشاهده استعلام و فروش بدون واسطه وارد شوید: zopit.ir/supplier»
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText("همکار گرامی؛ تقاضای خرید عمده برای کالاهای شما در پلتفرم زوپیت ثبت شده است. جهت مشاهده استعلام و فروش بدون واسطه وارد شوید: zopit.ir/supplier");
+                          toast.success("متن پیامک ۱ کپی شد.");
+                        }}
+                        className="w-full py-1.5 bg-white hover:bg-purple-50 border border-slate-200 text-purple-700 font-bold rounded-lg text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>کپی متن پیامک</span>
+                      </button>
+                    </div>
+
+                    {/* Template 2 */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between space-y-2">
+                      <div>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md">
+                          الگوی ۲: ثبت رایگان کاتالوگ
+                        </span>
+                        <p className="text-[11px] text-slate-700 leading-relaxed mt-2 font-medium">
+                          «مدیریت محترم؛ کاتالوگ یا لیست قیمت خود را در ایتا یا تلگرام بفرستید، تیم زوپیت رایگان غرفه عمده‌فروشی شما را راه‌اندازی می‌کند: ۰۹xxxxxxxxx»
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText("مدیریت محترم؛ کاتالوگ یا لیست قیمت خود را در ایتا یا تلگرام بفرستید، تیم زوپیت رایگان غرفه عمده‌فروشی شما را راه‌اندازی می‌کند: ۰۹xxxxxxxxx");
+                          toast.success("متن پیامک ۲ کپی شد.");
+                        }}
+                        className="w-full py-1.5 bg-white hover:bg-emerald-50 border border-slate-200 text-emerald-700 font-bold rounded-lg text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>کپی متن پیامک</span>
+                      </button>
+                    </div>
+
+                    {/* Template 3 */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between space-y-2">
+                      <div>
+                        <span className="text-[10px] bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded-md">
+                          الگوی ۳: اتصال به فروشگاه‌ها
+                        </span>
+                        <p className="text-[11px] text-slate-700 leading-relaxed mt-2 font-medium">
+                          «فروش مستقیم به صدها فروشگاه سراسر کشور با تسویه نقدی تضمین‌شده. ثبت‌نام رایگان تأمین‌کننده در مارکت‌پلیس زوپیت: zopit.ir/register»
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText("فروش مستقیم به صدها فروشگاه سراسر کشور با تسویه نقدی تضمین‌شده. ثبت‌نام رایگان تأمین‌کننده در مارکت‌پلیس زوپیت: zopit.ir/register");
+                          toast.success("متن پیامک ۳ کپی شد.");
+                        }}
+                        className="w-full py-1.5 bg-white hover:bg-sky-50 border border-slate-200 text-sky-700 font-bold rounded-lg text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>کپی متن پیامک</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

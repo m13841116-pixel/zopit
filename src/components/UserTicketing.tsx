@@ -140,6 +140,8 @@ export function UserTicketing({ user }: { user: any }) {
 
   const getDepartmentLabel = (dep: string) => {
     switch (dep) {
+      case "PRODUCT_ONBOARDING":
+        return "🎁 ثبت رایگان محصولات توسط پشتیبانی زوپیت";
       case "ORDER_DELAY_LOGISTICS":
         return "🚚 پیگیری تأخیر در ارسال و پست (لجستیک)";
       case "ORDER_DELAY_SUPPLIER":
@@ -281,6 +283,7 @@ export function UserTicketing({ user }: { user: any }) {
                   onChange={(e) => setDepartment(e.target.value)}
                   className="w-full px-4 py-3 bg-surface border border-border-subtle rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary-default/20 text-text-primary cursor-pointer"
                 >
+                  <option value="PRODUCT_ONBOARDING">🎁 ثبت رایگان محصولات توسط زوپیت (ارسال عکس / اکسل / لیست قیمت / کانال)</option>
                   <option value="ORDER_DELAY_LOGISTICS">🚚 پیگیری تأخیر در ارسال و مسائل پستی (لجستیک)</option>
                   <option value="ORDER_DELAY_SUPPLIER">📦 پیگیری تأخیر و عدم ارسال توسط تأمین‌کننده</option>
                   <option value="GENERAL_MANAGER">👑 ارسال مستقیم به مدیرکل (مدیریت ارشد)</option>
