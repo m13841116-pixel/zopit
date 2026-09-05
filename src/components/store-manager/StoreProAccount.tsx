@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { toast } from "../GlobalToast";
 import { ProAccountMediaShowcase } from "./ProAccountMediaShowcase";
+import { StoreProAccountStep2 } from "./StoreProAccountStep2";
 import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
 
 interface StoreProAccountProps {
@@ -902,31 +903,34 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       {/* IF ALREADY APPROVED / ACTIVE PRO ACCOUNT */}
       {isProApproved ? (
         <div className="space-y-8">
-          {/* Status Badge */}
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+          {/* VIP Status Badge */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-950 border border-amber-500/30 rounded-[2rem] p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-[80px] pointer-events-none"></div>
+            <div className="flex items-center gap-5 relative z-10">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30">
+                <Crown className="w-8 h-8 text-slate-950" />
               </div>
               <div>
-                <h3 className="font-black text-base text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                  <span>اکانت پرومکس شما فعال می‌باشد</span>
-                  <span className="text-xs bg-emerald-500 text-slate-950 font-black px-2.5 py-0.5 rounded-full">
-                    ACTIVE PRO
+                <h3 className="font-black text-xl text-white flex items-center gap-3">
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-200 to-amber-500">اکانت پرومکس فعال است</span>
+                  <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-md uppercase tracking-widest">
+                    Zopit PRO MAX
                   </span>
                 </h3>
-                <p className="text-xs text-muted mt-1">
-                  شما هم‌اکنون به تمامی امکانات پکیج پرومکس زوپیت دسترسی کامل دارید.
+                <p className="text-sm text-slate-300 mt-1">
+                  شما در حال استفاده از قدرتمندترین زیرساخت اختصاصی زوپیت هستید.
                 </p>
               </div>
             </div>
             {proAccount.createdAt && (
-              <span className="text-xs font-mono text-muted bg-surface px-3 py-1.5 rounded-xl border border-subtle">
-                تاریخ فعال‌سازی: {new Date(proAccount.createdAt).toLocaleDateString("fa-IR")}
-              </span>
+              <div className="relative z-10 flex flex-col items-end gap-1">
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">تاریخ فعال‌سازی</span>
+                <span className="text-sm font-mono text-amber-400 bg-slate-900/80 px-4 py-2 rounded-xl border border-amber-500/20 shadow-inner">
+                  {new Date(proAccount.createdAt).toLocaleDateString("fa-IR")}
+                </span>
+              </div>
             )}
           </div>
-
           {/* Credentials Card */}
           <div className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-border-subtle pb-4">
@@ -1519,8 +1523,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
           {/* UNIFIED REGISTRATION & PRO MAX ACTIVATION FORM */}
           {/* TWO-STEP REGISTRATION & PRO MAX ACTIVATION WIZARD */}
-          <div id="pro-register-wizard-container" className="bg-card border border-border-subtle rounded-3xl p-6 md:p-8 space-y-8 shadow-2xl">
+          <div id="pro-register-wizard-container" className={formStep === 2 ? "space-y-8" : "bg-card border border-border-subtle rounded-[2.5rem] p-6 sm:p-10 space-y-10 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] border-indigo-500/10"}>
             {/* WIZARD STEP HEADER & PROGRESS INDICATOR */}
+            {formStep === 1 && (
             <div className="space-y-6">
               <div className="border-b border-border-subtle pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
@@ -1574,14 +1579,14 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   type="button"
                   onClick={handleProceedToStep2}
                   className={`p-4 rounded-2xl border transition-all text-right flex items-center gap-3.5 cursor-pointer ${
-                    formStep === 2
+                    false
                       ? "bg-emerald-500/10 border-emerald-500/60 shadow-md ring-2 ring-emerald-500/20"
                       : "bg-surface border-subtle hover:border-emerald-500/30 opacity-80"
                   }`}
                 >
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
-                      formStep === 2
+                      false
                         ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30"
                         : "bg-surface border border-subtle text-secondary"
                     }`}
@@ -1600,6 +1605,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
               </div>
             </div>
 
+            )}
             {/* STEP 1: APPLICANT INFO & SERVICES FORM */}
             {formStep === 1 && (
               <div className="space-y-8 animate-in fade-in duration-300">
@@ -1963,7 +1969,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   <button
                     type="button"
                     onClick={handleProceedToStep2}
-                    className="w-full md:w-[75%] mx-auto py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black text-base rounded-2xl shadow-xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.01]"
+                    className="w-full md:w-[75%] mx-auto py-4 bg-gradient-to-r from-slate-900 to-slate-950 hover:from-slate-800 hover:to-slate-900 text-white font-black text-base rounded-2xl shadow-xl shadow-slate-900/20 transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.01]"
                   >
                     <span>تایید اطلاعات و ورود به مرحله هاستینگ ابری و صدور فاکتور</span>
                     <ChevronLeft className="w-5 h-5" />
@@ -1974,251 +1980,23 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
             {/* STEP 2: CLOUD HOSTING, DISCOUNT COUPON & FINAL INVOICE */}
             {formStep === 2 && (
-              <div className="space-y-8 animate-in fade-in duration-300">
-                {/* Back to Step 1 Bar */}
-                <div className="flex items-center justify-between bg-surface p-4 rounded-2xl border border-subtle">
-                  <button
-                    type="button"
-                    onClick={() => setFormStep(1)}
-                    className="text-xs font-bold text-indigo-500 hover:text-indigo-400 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                    <span>بازگشت به مرحله اول و ویرایش مشخصات متقاضی</span>
-                  </button>
-                  <span className="text-xs text-muted font-bold">
-                    مدیر فروشگاه: <strong className="text-primary">{fullName || "نامشخص"}</strong> ({mobile || "---"})
-                  </span>
-                </div>
-
-                {/* 1. CLOUD HOSTING FEATURE & PRICING CARD */}
-                <div className="bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-950/80 border border-indigo-500/40 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-                  <div className="relative z-10 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/30">
-                        <Server className="w-4 h-4 text-indigo-400" />
-                        <span>زیرساخت سرور و هاستینگ ابری اختصاصی زوپیت</span>
-                      </div>
-                      <span className="text-xs font-sans font-bold text-emerald-400 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30">
-                        ۷۸٪ تخفیف ویژه اختصاصی زوپیت
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                      <div className="space-y-2">
-                        <h3 className="text-xl md:text-2xl font-black text-text-primary">
-                          هاست ابری فوق‌سریع NVMe بهینه‌سازی‌شده برای وودمارت
-                        </h3>
-                        <p className="text-xs text-text-muted max-w-2xl leading-relaxed">
-                          هاست ابری زوپیت با سخت‌افزار مدرن، کش هوشمند و وب‌سرور پرسرعت LiteSpeed کانفیگ شده تا فروشگاه وودمارت شما بدون قطعی و با نهایت سرعت بارگذاری شود. نیازی به ورود به کنترل‌پنل پیچیده cPanel یا دانش فنی سرور ندارید؛ کلیه تنظیمات فنی به صورت خودکار توسط زوپیت انجام می‌پذیرد.
-                        </p>
-                      </div>
-
-                      {/* Pricing Tag */}
-                      <div className="bg-slate-900/90 p-4 rounded-2xl border border-indigo-500/40 text-center shrink-0 min-w-[200px] shadow-inner space-y-1">
-                        <span className="text-[11px] text-text-muted block">تعرفه ماهانه هاست ابری:</span>
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-xs text-text-muted line-through font-sans">۹۰۰,۰۰۰</span>
-                          <span className="text-2xl font-black text-emerald-400 font-sans">۱۹۹,۰۰۰</span>
-                          <span className="text-xs font-bold text-text-secondary">تومان</span>
-                        </div>
-                        <span className="text-[10px] text-indigo-300 font-bold block bg-indigo-500/20 py-0.5 rounded-md">
-                          سرمایه‌گذاری روی سرعت فروشگاه
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Server Hardware Specs */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                      <div className="bg-slate-900/70 p-3 rounded-xl border border-indigo-500/20 text-center">
-                        <span className="text-muted text-[10px] block mb-0.5">فضای ذخیره‌سازی:</span>
-                        <strong className="text-emerald-400 text-xs font-mono font-bold">15 GB NVMe SSD</strong>
-                      </div>
-                      <div className="bg-slate-900/70 p-3 rounded-xl border border-indigo-500/20 text-center">
-                        <span className="text-muted text-[10px] block mb-0.5">حافظه رم اختصاصی:</span>
-                        <strong className="text-emerald-400 text-xs font-mono font-bold">5 GB RAM</strong>
-                      </div>
-                      <div className="bg-slate-900/70 p-3 rounded-xl border border-indigo-500/20 text-center">
-                        <span className="text-muted text-[10px] block mb-0.5">پردازنده پردازش ابری:</span>
-                        <strong className="text-emerald-400 text-xs font-mono font-bold">5 Core CPU</strong>
-                      </div>
-                      <div className="bg-slate-900/70 p-3 rounded-xl border border-indigo-500/20 text-center">
-                        <span className="text-muted text-[10px] block mb-0.5">وب‌سرور و کش:</span>
-                        <strong className="text-emerald-400 text-xs font-mono font-bold">LiteSpeed + Redis</strong>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. PROMO DISCOUNT CODE CARD */}
-                <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-subtle/60 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                      <span className="text-xs font-black text-primary">کد تخفیف و کوپن اشتراک هاستینگ:</span>
-                    </div>
-
-                    {/* Quick Copy Promo Code */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted font-bold">کد تخفیف پیش‌فرض:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const code = settings?.promoCode || "ZOPIT-HOST-199";
-                          navigator.clipboard.writeText(code);
-                          setCopiedCoupon(true);
-                          setDiscountCodeText(code);
-                          handleApplyDiscountCodeWithCode(code);
-                          setTimeout(() => setCopiedCoupon(false), 3000);
-                        }}
-                        className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        {copiedCoupon ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{settings?.promoCode || "ZOPIT-HOST-199"}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <div className="relative w-full sm:flex-1">
-                      <input
-                        type="text"
-                        value={discountCodeText}
-                        onChange={(e) => setDiscountCodeText(e.target.value)}
-                        placeholder="کد تخفیف خود را وارد کنید (مثال: ZOPIT-HOST-199)"
-                        className="w-full px-4 py-3 bg-background border border-subtle rounded-xl text-xs font-mono text-center sm:text-right font-bold text-primary focus:ring-2 focus:ring-emerald-500 outline-none uppercase tracking-wider"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleApplyDiscountCode}
-                      className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
-                    >
-                      اعمال کد تخفیف
-                    </button>
-                  </div>
-
-                  {isDiscountApplied && (
-                    <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-2 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <span>کد تخفیف با موفقیت اعمال شد و مبلغ {appliedDiscount.toLocaleString("fa-IR")} تومان از فاکتور کسر گردید.</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. ITEMIZED BREAKDOWN INVOICE */}
-                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-emerald-500/30 rounded-3xl p-6 text-text-primary shadow-2xl space-y-5">
-                  <div className="border-b border-slate-700/80 pb-3 flex items-center justify-between">
-                    <h4 className="text-sm font-black text-text-primary flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-emerald-400" />
-                      <span>پیش‌فاکتور تفکیک‌شده و نهایی راه‌اندازی فروشگاه</span>
-                    </h4>
-                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-bold">
-                      فاکتور رسمی آنی
-                    </span>
-                  </div>
-
-                  {/* Invoice Rows */}
-                  <div className="space-y-2.5 text-xs">
-                    {/* Software package row */}
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>پکیج طلایی اشتراک پرومکس (قالب وودمارت، لایسنس‌ها، افزونه‌ها و پشتیبانی):</span>
-                      <div className="flex items-center gap-2">
-                        <span className="line-through text-slate-500 font-sans">۱۴,۸۰۰,۰۰۰</span>
-                        <span className="font-bold text-emerald-400">۱۰۰٪ رایگان (هدیه)</span>
-                      </div>
-                    </div>
-
-                    {/* Hosting row */}
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>هاست ابری فوق‌سریع NVMe زوپیت (۱۵ گیگ SSD + ۵ گیگ رم + ۵ هسته):</span>
-                      <div className="flex items-center gap-2">
-                        <span className="line-through text-slate-500 font-sans">۹۰۰,۰۰۰</span>
-                        <span className="font-sans font-bold text-emerald-400">
-                          {parseInt(settings.promaxAccountPrice || "199000", 10).toLocaleString("fa-IR")} تومان
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Domain Priority row */}
-                    {hasDomainPriority && (
-                      <div className="flex items-center justify-between text-slate-300">
-                        <span>کارمزد اولویت‌بندی، استعلام و ثبت تخصصی دامنه (.ir):</span>
-                        <span className="font-sans font-bold text-blue-400">۸۰,۰۰۰ تومان</span>
-                      </div>
-                    )}
-
-                    {/* Enamad fee row */}
-                    {hasEnamad && (
-                      <div className="flex items-center justify-between text-slate-300">
-                        <span>تعرفه رسمی سامانه دولتی ای‌نماد (حق‌الزحمه زوپیت: ۰ ریال):</span>
-                        <span className="font-sans font-bold text-indigo-400">۵۰,۰۰۰ تومان</span>
-                      </div>
-                    )}
-
-                    {/* Free administrative items */}
-                    {(hasGateway || hasTaxProfile || hasCustomLogo || hasPostalPanel) && (
-                      <div className="flex items-center justify-between text-slate-300">
-                        <span>خدمات منتخب هدیه (درگاه شاپرک، مالیات، طراحی لوگو و پنل پستی):</span>
-                        <span className="font-bold text-emerald-400">رایگان (۰ تومان)</span>
-                      </div>
-                    )}
-
-                    {/* Applied Discount row */}
-                    {isDiscountApplied && appliedDiscount > 0 && (
-                      <div className="flex items-center justify-between text-emerald-400 font-bold pt-1 border-t border-slate-700/50">
-                        <span>تخفیف ویژه اعمال‌شده:</span>
-                        <span className="font-sans font-black">- {appliedDiscount.toLocaleString("fa-IR")} تومان</span>
-                      </div>
-                    )}
-
-                    {/* Total Row */}
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-700 font-black text-sm text-text-primary">
-                      <span className="text-xs sm:text-sm text-emerald-300">مبلغ کل قابل پرداخت نهایی:</span>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-sans drop-shadow-md">
-                          {Math.max(
-                            0,
-                            parseInt(settings.promaxAccountPrice || "199000", 10) +
-                              (hasDomainPriority ? 80000 : 0) +
-                              (hasEnamad ? 50000 : 0) -
-                              appliedDiscount
-                          ).toLocaleString("fa-IR")}
-                        </span>
-                        <span className="text-xs text-emerald-400 font-bold">تومان</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Final Submit & Pay Button */}
-                <div className="pt-2 text-center">
-                  <button
-                    type="button"
-                    onClick={handleRegister}
-                    disabled={submitting}
-                    className="w-full md:w-[80%] mx-auto py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/30 transition-all flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer transform hover:scale-[1.01]"
-                  >
-                    {submitting ? (
-                      <RefreshCw className="w-6 h-6 animate-spin" />
-                    ) : (
-                      <Zap className="w-6 h-6 fill-slate-950" />
-                    )}
-                    <span>
-                      پرداخت آنلاین و راه‌اندازی فروشگاه پرومکس (
-                      {Math.max(
-                        0,
-                        parseInt(settings.promaxAccountPrice || "199000", 10) +
-                          (hasDomainPriority ? 80000 : 0) +
-                          (hasEnamad ? 50000 : 0) -
-                          appliedDiscount
-                      ).toLocaleString("fa-IR")}{" "}
-                      تومان)
-                    </span>
-                  </button>
-                </div>
-              </div>
+              <StoreProAccountStep2
+                fullName={fullName}
+                mobile={mobile}
+                setFormStep={setFormStep}
+                settings={settings}
+                hasDomainPriority={hasDomainPriority}
+                hasEnamad={hasEnamad}
+                discountCodeText={discountCodeText}
+                setDiscountCodeText={setDiscountCodeText}
+                isDiscountApplied={isDiscountApplied}
+                setIsDiscountApplied={setIsDiscountApplied}
+                applyDiscount={handleApplyDiscountCode}
+                appliedDiscount={appliedDiscount}
+                calculatedAmount={Math.max(0, parseInt(settings.promaxAccountPrice || "199000", 10) + (hasDomainPriority ? 80000 : 0) + (hasEnamad ? 50000 : 0) - appliedDiscount)}
+                handleRegisterPro={handleRegister}
+                submitting={submitting}
+              />
             )}
           </div>
         </div>

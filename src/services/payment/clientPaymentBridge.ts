@@ -117,6 +117,7 @@ export async function requestClientSideZibalPayment(
 
   // Fast Race Strategy: Fire primary proxy and direct gateway in parallel
   try {
+    // @ts-ignore
     const fastestResult = await Promise.any([
       fetchFromProxy(PRIMARY_PROXY_URL, 3500),
       fetchFromDirect(3500),

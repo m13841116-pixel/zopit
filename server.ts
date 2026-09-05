@@ -12853,17 +12853,78 @@ app.get('/api/supplier/performance', authenticateToken, requireSupplier, async (
     const ordersCount = await prisma.orderItem.count({ where: { supplierId } });
     const completedOrders = await prisma.orderItem.count({ where: { supplierId, status: 'DELIVERED' } });
     
+    // Compute Penalties
+    // 1. Delayed Orders (older than 24h and still PENDING/PROCESSING)
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const delayedOrdersCount = await prisma.orderItem.count({
+      where: {
+        supplierId,
+        status: { in: ['PENDING', 'PROCESSING'] },
+        order: {
+          createdAt: {
+            lt: twentyFourHoursAgo
+          }
+        }
+      }
+    });
+
+    // 2. Returned Orders
+    const returnedOrdersCount = await prisma.orderItem.count({
+      where: {
+        supplierId,
+        status: 'RETURNED'
+      }
+    });
+
+    // 3. Cancelled Orders
+    const cancelledOrdersCount = await prisma.orderItem.count({
+      where: {
+        supplierId,
+        status: 'CANCELLED'
+      }
+    });
+
+    // Scoring logic
+    let score = 100;
+    const delayPenalty = delayedOrdersCount * 10;
+    const returnPenalty = returnedOrdersCount * 15;
+    const cancelPenalty = cancelledOrdersCount * 5;
+    
+    score -= (delayPenalty + returnPenalty + cancelPenalty);
+    if (score < 0) score = 0;
+
+    let grade = 'A+';
+    if (score < 50) grade = 'F';
+    else if (score < 60) grade = 'D';
+    else if (score < 70) grade = 'C';
+    else if (score < 80) grade = 'B';
+    else if (score < 90) grade = 'A';
+
+    let status = 'ACTIVE';
+    if (score < 50) status = 'BLOCKED';
+    else if (score < 70) status = 'UNDER_REVIEW';
+
+    let warningLevel = 'NONE';
+    if (score < 50) warningLevel = 'CRITICAL';
+    else if (score < 70) warningLevel = 'HIGH';
+    else if (score < 80) warningLevel = 'MEDIUM';
+    else if (score < 90) warningLevel = 'LOW';
+
     res.json({
-      score: 95,
-      grade: 'A+',
+      score,
+      grade,
+      status,
+      warningLevel,
       totalProducts: productsCount,
       totalOrders: ordersCount,
       completedOrders,
-      fulfillmentRate: ordersCount > 0 ? Math.round((completedOrders / ordersCount) * 100) : 100,
-      cancellationRate: 2,
-      onTimeDeliveryRate: 98,
-      penaltiesCount: 0,
-      walletBalance: 0
+      fulfillmentRate: ordersCount > 0 ? Math.round(((ordersCount - cancelledOrdersCount - returnedOrdersCount) / ordersCount) * 100) : 100,
+      cancellationRate: ordersCount > 0 ? Math.round((cancelledOrdersCount / ordersCount) * 100) : 0,
+      onTimeDeliveryRate: ordersCount > 0 ? Math.round(((ordersCount - delayedOrdersCount) / ordersCount) * 100) : 100,
+      penaltiesCount: delayedOrdersCount + returnedOrdersCount + cancelledOrdersCount,
+      walletBalance: 0,
+      delayedOrders: delayedOrdersCount,
+      returnedOrders: returnedOrdersCount
     });
   } catch (err: any) {
     console.error('Error in /api/supplier/performance:', err);

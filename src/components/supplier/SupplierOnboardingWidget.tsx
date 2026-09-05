@@ -261,7 +261,184 @@ export const SupplierOnboardingWidget: React.FC<SupplierOnboardingWidgetProps> =
         {/* Steps List */}
         <div className="mt-5 space-y-4">
           
-          {/* STEP 1: Bank & Settlement Information (High Priority) */}
+          {/* LEVEL 1: Basic Identity Information */}
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.02] overflow-hidden">
+            <div className="w-full p-4 flex items-center justify-between gap-3 text-right">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs bg-emerald-500 text-white">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                      سطح ۱: اطلاعات هویتی اولیه
+                    </span>
+                    <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                      تکمیل شده ✓
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                    شماره موبایل و اطلاعات کاربری پایه در هنگام ثبت نام تأیید شده است.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* LEVEL 2: Address & Logistics */}
+          <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${hasAddressInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "address" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}`}>
+            <button
+              type="button"
+              onClick={() => setActiveStep(activeStep === "address" ? null : "address")}
+              className="w-full p-4 flex items-center justify-between gap-3 text-right cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${hasAddressInfo ? "bg-emerald-500 text-white" : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"}`}>
+                  {hasAddressInfo ? <CheckCircle2 className="w-5 h-5" /> : "۲"}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                      سطح ۲: نشانی و کد پستی (لجستیک)
+                    </span>
+                    {hasAddressInfo ? (
+                      <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                        تکمیل شده ✓
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-md">
+                        جهت صدور لیبل و بارنامه
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                    {hasAddressInfo ? `${user.province || ''}، ${user.city || ''} - ${user.address}` : "آدرس دقیق محل تحویل بار به مامور پست یا پیک زوپیت"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hidden sm:inline">
+                  {activeStep === "address" ? "بستن فرم" : hasAddressInfo ? "مشاهده / ویرایش" : "ثبت آدرس انبار"}
+                </span>
+                {activeStep === "address" ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+              </div>
+            </button>
+
+            {/* Step Body (Form) */}
+            {activeStep === "address" && (
+              <div className="p-5 pt-1 border-t border-slate-100 dark:border-slate-800 animate-fade-in">
+                <form onSubmit={handleSaveAddress} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Province */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                        استان محل انبار / تولیدی *
+                      </label>
+                      <select
+                        value={addressData.province}
+                        onChange={(e) => {
+                          const newProv = e.target.value;
+                          const found = PROVINCES.find(p => p.name === newProv);
+                          setAddressData({
+                            ...addressData,
+                            province: newProv,
+                            city: found && found.cities.length > 0 ? found.cities[0] : ""
+                          });
+                        }}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none cursor-pointer"
+                      >
+                        {PROVINCES.map((p) => (
+                          <option key={p.name} value={p.name}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* City */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                        شهر / منطقه *
+                      </label>
+                      <select
+                        value={addressData.city}
+                        onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none cursor-pointer"
+                      >
+                        {availableCities.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Full Address */}
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                        نشانی کامل، خیابان، پلاک، طبقه، واحد انبار *
+                      </label>
+                      <textarea
+                        rows={2}
+                        required
+                        placeholder="مثال: خیابان ۱۵ خرداد، بازار بزرگ، سرای چیت‌ساز، طبقه اول، پلاک ۴۲"
+                        value={addressData.address}
+                        onChange={(e) => setAddressData({ ...addressData, address: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                      ></textarea>
+                    </div>
+
+                    {/* Postal Code */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                        کد پستی ۱۰ رقمی انبار
+                      </label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        maxLength={10}
+                        placeholder="1234567890"
+                        value={addressData.postalCode}
+                        onChange={(e) => setAddressData({ ...addressData, postalCode: e.target.value.replace(/\D/g, '') })}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-left"
+                      />
+                    </div>
+
+                    {/* Warehouse Telephone */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                        تلفن ثابت انبار / هماهنگی
+                      </label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        placeholder="021-xxxxxxxx"
+                        value={addressData.telephone}
+                        onChange={(e) => setAddressData({ ...addressData, telephone: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-left"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                      در صورت تمایل، هر زمان از بخش تنظیمات حساب می‌توانید این اطلاعات را تغییر دهید.
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={isSavingAddress}
+                      className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSavingAddress ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      <span>ذخیره نشانی و اتمام</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+
+          {/* LEVEL 3: Bank & Settlement Information (High Priority) */}
           <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${hasBankInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "bank" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}`}>
             {/* Step Header Toggle */}
             <button
@@ -271,12 +448,12 @@ export const SupplierOnboardingWidget: React.FC<SupplierOnboardingWidgetProps> =
             >
               <div className="flex items-center gap-3">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${hasBankInfo ? "bg-emerald-500 text-white" : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"}`}>
-                  {hasBankInfo ? <CheckCircle2 className="w-5 h-5" /> : "۱"}
+                  {hasBankInfo ? <CheckCircle2 className="w-5 h-5" /> : "۳"}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                      مرحله ۱: اطلاعات حساب بانکی و تسویه حساب مالی
+                      سطح ۳: اطلاعات حساب بانکی و تسویه حساب مالی
                     </span>
                     {hasBankInfo ? (
                       <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
@@ -399,161 +576,6 @@ export const SupplierOnboardingWidget: React.FC<SupplierOnboardingWidgetProps> =
                         <Save className="w-4 h-4" />
                       )}
                       <span>ذخیره و تایید اطلاعات بانکی</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-          </div>
-
-          {/* STEP 2: Address & Logistics Details */}
-          <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${hasAddressInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "address" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}`}>
-            {/* Step Header Toggle */}
-            <button
-              type="button"
-              onClick={() => setActiveStep(activeStep === "address" ? null : "address")}
-              className="w-full p-4 flex items-center justify-between gap-3 text-right cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${hasAddressInfo ? "bg-emerald-500 text-white" : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30"}`}>
-                  {hasAddressInfo ? <CheckCircle2 className="w-5 h-5" /> : "۲"}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                      مرحله ۲: نشانی دقیق انبار / کارگاه و کد پستی (لجستیک)
-                    </span>
-                    {hasAddressInfo ? (
-                      <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                        تکمیل شده ✓
-                      </span>
-                    ) : (
-                      <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-md">
-                        جهت صدور لیبل و بارنامه
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                    {hasAddressInfo ? `${user.province || ''}، ${user.city || ''} - ${user.address}` : "آدرس دقیق محل تحویل بار به مامور پست یا پیک زوپیت"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hidden sm:inline">
-                  {activeStep === "address" ? "بستن فرم" : hasAddressInfo ? "مشاهده / ویرایش" : "ثبت آدرس انبار"}
-                </span>
-                {activeStep === "address" ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-              </div>
-            </button>
-
-            {/* Step Body (Form) */}
-            {activeStep === "address" && (
-              <div className="p-5 pt-1 border-t border-slate-100 dark:border-slate-800 animate-fade-in">
-                <form onSubmit={handleSaveAddress} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Province */}
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
-                        استان محل انبار / تولیدی *
-                      </label>
-                      <select
-                        value={addressData.province}
-                        onChange={(e) => {
-                          const newProv = e.target.value;
-                          const found = PROVINCES.find(p => p.name === newProv);
-                          setAddressData({
-                            ...addressData,
-                            province: newProv,
-                            city: found && found.cities.length > 0 ? found.cities[0] : ""
-                          });
-                        }}
-                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none cursor-pointer"
-                      >
-                        {PROVINCES.map((p) => (
-                          <option key={p.name} value={p.name}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* City */}
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
-                        شهر / منطقه *
-                      </label>
-                      <select
-                        value={addressData.city}
-                        onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none cursor-pointer"
-                      >
-                        {availableCities.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Full Address */}
-                    <div className="space-y-1.5 md:col-span-2">
-                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
-                        نشانی کامل، خیابان، پلاک، طبقه، واحد انبار *
-                      </label>
-                      <textarea
-                        rows={2}
-                        required
-                        placeholder="مثال: خیابان ۱۵ خرداد، بازار بزرگ، سرای چیت‌ساز، طبقه اول، پلاک ۴۲"
-                        value={addressData.address}
-                        onChange={(e) => setAddressData({ ...addressData, address: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                      ></textarea>
-                    </div>
-
-                    {/* Postal Code */}
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
-                        کد پستی ۱۰ رقمی انبار
-                      </label>
-                      <input
-                        type="text"
-                        dir="ltr"
-                        maxLength={10}
-                        placeholder="1234567890"
-                        value={addressData.postalCode}
-                        onChange={(e) => setAddressData({ ...addressData, postalCode: e.target.value.replace(/\D/g, '') })}
-                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-left"
-                      />
-                    </div>
-
-                    {/* Warehouse Telephone */}
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
-                        تلفن ثابت انبار / هماهنگی
-                      </label>
-                      <input
-                        type="text"
-                        dir="ltr"
-                        placeholder="021-xxxxxxxx"
-                        value={addressData.telephone}
-                        onChange={(e) => setAddressData({ ...addressData, telephone: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-left"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                      در صورت تمایل، هر زمان از بخش تنظیمات حساب می‌توانید این اطلاعات را تغییر دهید.
-                    </p>
-                    <button
-                      type="submit"
-                      disabled={isSavingAddress}
-                      className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSavingAddress ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                      <span>ذخیره نشانی و اتمام</span>
                     </button>
                   </div>
                 </form>

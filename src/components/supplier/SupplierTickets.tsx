@@ -236,42 +236,6 @@ export function SupplierTickets({ showNotification, initialDepartment }: any) {
   return (
     <div className="space-y-6">
       
-      {/* Special Service Banner for Catalog / Product Onboarding */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-5 rounded-3xl border border-purple-500/30 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shrink-0 shadow-md font-black">
-            <Gift className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm sm:text-base font-black text-white">
-                خدمت ویژه: ثبت ۱۰۰٪ رایگان محصولات توسط پشتیبانی زوپیت
-              </h3>
-              <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full">
-                ویژه تأمین‌کنندگان
-              </span>
-            </div>
-            <p className="text-xs text-purple-200 mt-1 leading-relaxed max-w-2xl">
-              اگر وقت یا امکان تایپ و ثبت دستی اقلام خود را ندارید، عکس لیست قیمت، فایل PDF کاتالوگ، فایل اکسل یا آدرس کانال تلگرام/ایتای خود را ارسال کنید تا کارشناسان زوپیت ظرف کمتر از ۲۴ ساعت تمام محصولاتتان را رایگان ثبت کنند!
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setDepartment("🎁 ثبت رایگان محصولات توسط زوپیت (ارسال لیست قیمت / کاتالوگ)");
-            setSubject("درخواست ثبت رایگان کاتالوگ و محصولات");
-            setMessage("سلام و احترام،\nفایل لیست قیمت / کاتالوگ محصولات اینجانب ضمیمه گردید (یا آدرس کانال ما در تلگرام/ایتا: ... می‌باشد).\nلطفاً نسبت به ثبت این اقلام در فروشگاه عمده ما اقدام فرمایید.\nبا تشکر");
-            setShowNewTicket(true);
-          }}
-          className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 rounded-xl text-xs font-black shrink-0 transition-all flex items-center gap-2 shadow-md cursor-pointer"
-        >
-          <FileText className="w-4 h-4" />
-          <span>ارسال کاتالوگ در تیکت</span>
-        </button>
-      </div>
-
       <div className="flex justify-between items-center bg-card p-4 rounded-2xl shadow-sm border border-subtle">
         
         <h2 className="text-lg font-bold text-primary flex items-center gap-2">
@@ -280,7 +244,12 @@ export function SupplierTickets({ showNotification, initialDepartment }: any) {
           پشتیبانی
         </h2>
         <button
-          onClick={() => setShowNewTicket(true)}
+          onClick={() => {
+            setDepartment("مدیرکل (مدیریت ارشد) 👑");
+            setSubject("");
+            setMessage("");
+            setShowNewTicket(true);
+          }}
           className="bg-primary-default text-inverse px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-2"
         >
           

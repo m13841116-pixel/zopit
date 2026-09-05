@@ -670,52 +670,6 @@ export function SupplierAddProduct({
         )}
       </div>
 
-      {/* Special Onboarding Banner: Can't enter products manually? */}
-      {!initialData?.id && (
-        <div className="mx-6 mt-4 p-5 rounded-3xl bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 text-white border border-purple-500/30 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shrink-0 shadow-md font-black">
-              <Gift className="w-6 h-6" />
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-xs sm:text-sm font-black text-white">
-                  وقت یا حوصله ثبت دستی و تک‌به‌تک کالاها را ندارید؟
-                </h4>
-                <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full">
-                  ۲ راهکار فوری
-                </span>
-              </div>
-              <p className="text-[11px] text-purple-200 leading-relaxed max-w-2xl">
-                عکس لیست قیمت، پی‌دی‌اف کاتالوگ یا آدرس کانالتان را در تیکت بفرستید تا <strong className="text-amber-300">پشتیبانی زوپیت ۱۰۰٪ رایگان برایتان ثبت کند</strong>؛ یا از <strong className="text-indigo-300">ایجنت هوشمند</strong> جهت استخراج خودکار از تلگرام و ایتا استفاده نمایید!
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
-            <button
-              type="button"
-              onClick={() => setShowAiExtractorModal(true)}
-              className="flex-1 md:flex-initial px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
-            >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>استخراج با ایجنت AI</span>
-            </button>
-
-            {onNavigateToTickets && (
-              <button
-                type="button"
-                onClick={onNavigateToTickets}
-                className="flex-1 md:flex-initial px-4 py-2.5 bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/40 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <Gift className="w-4 h-4" />
-                <span>ارسال تیکت ثبت رایگان</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Motivational WooCommerce Notice Banner for New Products */}
       {!initialData?.id && (
         <div className="mx-6 mt-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-50/90 via-purple-50/50 to-background border border-indigo-200/80 dark:border-indigo-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
