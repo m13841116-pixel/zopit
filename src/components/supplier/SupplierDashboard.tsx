@@ -128,6 +128,7 @@ const getIconComponent = (iconName: any) => {
 import UserDashboardWidgets from "../UserDashboardWidgets";
 import LatestAnnouncementsWidget from "../LatestAnnouncementsWidget";
 import { SupplierAddProduct } from "./SupplierAddProduct";
+import { SupplierWooCommerceImport } from "./SupplierWooCommerceImport";
 import { SupplierTickets } from "./SupplierTickets";
 import { SupplierProfile } from "./SupplierProfile";
 import SupplierPerformancePanel from "./SupplierPerformancePanel";
@@ -187,6 +188,7 @@ export function SupplierDashboard({
     "overview",
     "products",
     "add-product",
+    "woocommerce-import",
     "orders",
     "wallet",
     "performance",
@@ -749,6 +751,11 @@ export function SupplierDashboard({
       id: "add-product",
       label: "افزودن محصول",
       icon: <PlusCircle className="w-5 h-5" />,
+    },
+    {
+      id: "woocommerce-import",
+      label: "دریافت از ووکامرس (API)",
+      icon: <Globe className="w-5 h-5 text-indigo-500" />,
     },
     {
       id: "orders",
@@ -1530,13 +1537,20 @@ export function SupplierDashboard({
                         />
                         <Search className="w-4 h-4 text-muted absolute left-3 top-2.5" />
                       </div>
-                      <button
-                        onClick={() => setActiveTab("add-product")}
-                        className="bg-primary-default text-inverse px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-2"
-                      >
-                        
-                        <Plus className="w-4 h-4" /> افزودن محصول جدید
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setActiveTab("woocommerce-import")}
+                          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+                        >
+                          <Globe className="w-4 h-4" /> دریافت خودکار از ووکامرس
+                        </button>
+                        <button
+                          onClick={() => setActiveTab("add-product")}
+                          className="bg-primary-default text-inverse px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-2 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" /> افزودن محصول دستی
+                        </button>
+                      </div>
                     </div>
                     <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden">
                       
@@ -2948,6 +2962,17 @@ export function SupplierDashboard({
                     showNotification={showNotification}
                   />
                 ))}
+              {/* WOOCOMMERCE IMPORT TAB */}
+              {activeTab === "woocommerce-import" && (
+                <SupplierWooCommerceImport
+                  onSuccess={() => {
+                    fetchData();
+                    setActiveTab("products");
+                  }}
+                  onCancel={() => setActiveTab("products")}
+                  showNotification={showNotification}
+                />
+              )}
               {/* EDIT PRODUCT TAB */}
               {activeTab === "edit-product" && productToEdit && (
                 <SupplierAddProduct

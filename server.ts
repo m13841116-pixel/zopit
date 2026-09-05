@@ -3765,6 +3765,379 @@ app.post('/api/supplier/products/bulk', authenticateToken, requireSupplier, asyn
   }
 });
 
+// --- Supplier WooCommerce REST API Integration Routes ---
+// 1. Test connection to supplier's WooCommerce store
+app.post('/api/supplier/woocommerce/test-connection', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    let { storeUrl, consumerKey, consumerSecret } = req.body;
+    if (!storeUrl || !consumerKey || !consumerSecret) {
+      return res.status(400).json({ error: 'آدرس سایت و کلیدهای دسترسی (Consumer Key و Consumer Secret) اجباری هستند.' });
+    }
+
+    storeUrl = storeUrl.trim();
+    if (!storeUrl.startsWith('http://') && !storeUrl.startsWith('https://')) {
+      storeUrl = 'https://' + storeUrl;
+    }
+    storeUrl = storeUrl.replace(/\/+$/, '');
+
+    const auth = Buffer.from(`${consumerKey.trim()}:${consumerSecret.trim()}`).toString('base64');
+    
+    // Test with products endpoint (per_page=1)
+    const testUrl = new URL('/wp-json/wc/v3/products?per_page=1', storeUrl);
+    const response = await fetch(testUrl.toString(), {
+      signal: AbortSignal.timeout(12000),
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json',
+        'User-Agent': 'Zopit-Marketplace-Bridge/1.0'
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return res.status(400).json({ error: 'خطای احراز هویت: کلیدهای Consumer Key یا Consumer Secret نامعتبر هستند یا دسترسی Read ندارند.' });
+      } else if (response.status === 404) {
+        return res.status(400).json({ error: 'وب‌سرویس ووکامرس در این آدرس یافت نشد. لطفاً بررسی کنید که افزونه WooCommerce فعال بوده و پیوند‌های یکتا (Permalinks) در حالت نام نوشته باشد.' });
+      } else {
+        return res.status(400).json({ error: `خطا در ارتباط با سایت مقصد (کد وضعیت: ${response.status})` });
+      }
+    }
+
+    const totalProducts = response.headers.get('x-wp-total') || '10+';
+    const totalPages = response.headers.get('x-wp-totalpages') || '1';
+
+    // Optional store name fetch from /wp-json
+    let storeName = 'فروشگاه ووکامرسی';
+    try {
+      const infoUrl = new URL('/wp-json', storeUrl);
+      const infoRes = await fetch(infoUrl.toString(), { signal: AbortSignal.timeout(5000) });
+      if (infoRes.ok) {
+        const infoData = await infoRes.json() as any;
+        if (infoData.name) storeName = infoData.name;
+      }
+    } catch {}
+
+    res.json({
+      success: true,
+      storeName,
+      totalProducts: parseInt(totalProducts) || 0,
+      totalPages: parseInt(totalPages) || 1,
+      message: `اتصال با موفقیت برقرار شد! تعداد ${totalProducts} محصول در سایت شناسایی گردید.`
+    });
+  } catch (err: any) {
+    console.error('WooCommerce test connection error:', err);
+    res.status(500).json({
+      error: 'امکان برقراری ارتباط با سایت ووکامرسی وجود ندارد. لطفاً از صحت آدرس دامنه و فعال بودن SSL اطمینان حاصل نمایید.',
+      details: err?.message || String(err)
+    });
+  }
+});
+
+// 2. Fetch products from WooCommerce with details, variations, and images
+app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    let { storeUrl, consumerKey, consumerSecret, page = 1, perPage = 50, currencyUnit = 'toman' } = req.body;
+    if (!storeUrl || !consumerKey || !consumerSecret) {
+      return res.status(400).json({ error: 'اطلاعات اتصال به ووکامرس ارسال نشده است.' });
+    }
+
+    storeUrl = storeUrl.trim();
+    if (!storeUrl.startsWith('http://') && !storeUrl.startsWith('https://')) {
+      storeUrl = 'https://' + storeUrl;
+    }
+    storeUrl = storeUrl.replace(/\/+$/, '');
+
+    const auth = Buffer.from(`${consumerKey.trim()}:${consumerSecret.trim()}`).toString('base64');
+    const safePage = Math.max(1, safeParseInt(page, 1));
+    const safePerPage = Math.min(100, Math.max(10, safeParseInt(perPage, 50)));
+
+    const fetchUrl = new URL(`/wp-json/wc/v3/products?per_page=${safePerPage}&page=${safePage}&status=publish`, storeUrl);
+    
+    const response = await fetch(fetchUrl.toString(), {
+      signal: AbortSignal.timeout(20000),
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json',
+        'User-Agent': 'Zopit-Marketplace-Bridge/1.0'
+      }
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      return res.status(400).json({ error: `خطا در دریافت کالاها از ووکامرس: ${response.status}`, details: errText });
+    }
+
+    const totalProducts = parseInt(response.headers.get('x-wp-total') || '0');
+    const totalPages = parseInt(response.headers.get('x-wp-totalpages') || '1');
+    const rawProducts = (await response.json()) as any[];
+
+    if (!Array.isArray(rawProducts)) {
+      return res.status(400).json({ error: 'پاسخ دریافتی از ووکامرس حاوی لیست محصولات معتبر نیست.' });
+    }
+
+    const stripHtml = (html: string) => {
+      if (!html) return '';
+      return html.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    };
+
+    // Helper for currency divisor (if user store is Rial, divide by 10 to get Toman)
+    const currencyDivisor = currencyUnit === 'rial' ? 10 : 1;
+
+    // Process raw products
+    const processedProducts: any[] = [];
+
+    for (const raw of rawProducts) {
+      // Parse main prices
+      const regPriceRaw = safeParseFloat(raw.regular_price || raw.price, 0);
+      const salePriceRaw = safeParseFloat(raw.sale_price, 0);
+      const originalPrice = Math.round(regPriceRaw / currencyDivisor);
+      const originalSalePrice = salePriceRaw > 0 ? Math.round(salePriceRaw / currencyDivisor) : 0;
+
+      // Default suggested supply wholesale price: 20% discount below original consumer price (or sale price)
+      const baseForDiscount = originalSalePrice > 0 ? originalSalePrice : originalPrice;
+      let suggestedWholesalePrice = baseForDiscount > 0 ? Math.round((baseForDiscount * 0.8) / 1000) * 1000 : 0;
+      if (suggestedWholesalePrice <= 0 && originalPrice > 0) {
+        suggestedWholesalePrice = Math.round((originalPrice * 0.8) / 1000) * 1000;
+      }
+
+      // Stock
+      let stockQuantity = 0;
+      if (raw.manage_stock && raw.stock_quantity !== null && raw.stock_quantity !== undefined) {
+        stockQuantity = Math.max(0, safeParseInt(raw.stock_quantity, 0));
+      } else if (raw.in_stock || raw.stock_status === 'instock') {
+        stockQuantity = 50; // Default healthy stock for in-stock non-managed items
+      }
+
+      // Images
+      const imagesList = Array.isArray(raw.images) ? raw.images.map((img: any) => img.src).filter(Boolean) : [];
+      const mainImage = imagesList[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+
+      // Categories
+      const categories = Array.isArray(raw.categories) ? raw.categories.map((c: any) => c.name) : [];
+      const primaryCategory = categories[0] || 'عمومی';
+
+      // Technical Specs from attributes
+      const technicalSpecs: { key: string; value: string }[] = [];
+      if (Array.isArray(raw.attributes)) {
+        for (const attr of raw.attributes) {
+          if (attr.name && Array.isArray(attr.options) && attr.options.length > 0) {
+            technicalSpecs.push({
+              key: attr.name,
+              value: attr.options.join('، ')
+            });
+          }
+        }
+      }
+
+      // Handle Variations if product is variable
+      const variations: any[] = [];
+      if (raw.type === 'variable' && Array.isArray(raw.variations) && raw.variations.length > 0) {
+        // If variations list has IDs, we can map basic attribute combinations
+        if (Array.isArray(raw.attributes)) {
+          const varAttributes = raw.attributes.filter((a: any) => a.variation === true || a.options?.length > 1);
+          if (varAttributes.length > 0) {
+            // Create default variation matrix
+            const attr = varAttributes[0];
+            for (const opt of attr.options || []) {
+              variations.push({
+                id: `var_${raw.id}_${opt}`,
+                name: `${raw.name} - ${attr.name}: ${opt}`,
+                attributeName: attr.name,
+                attributeValue: opt,
+                attributes: JSON.stringify({ [attr.name]: opt }),
+                stock: stockQuantity > 0 ? Math.max(1, Math.floor(stockQuantity / (attr.options.length || 1))) : 20,
+                originalPrice,
+                wholesalePrice: suggestedWholesalePrice,
+                sku: raw.sku ? `${raw.sku}-${opt}` : `SKU-${raw.id}-${opt}`
+              });
+            }
+          }
+        }
+      }
+
+      processedProducts.push({
+        wcId: raw.id,
+        name: raw.name || 'بدون عنوان',
+        slug: raw.slug || '',
+        type: raw.type || 'simple',
+        sku: raw.sku || `WC-${raw.id}`,
+        primaryCategory,
+        categories,
+        mainImage,
+        images: imagesList,
+        originalPrice,
+        originalSalePrice,
+        wholesalePrice: suggestedWholesalePrice,
+        stock: stockQuantity,
+        shortDescription: stripHtml(raw.short_description || ''),
+        longDescription: stripHtml(raw.description || raw.short_description || ''),
+        technicalSpecs,
+        variations,
+        hasVariations: variations.length > 0,
+        isSelected: true // Default selected for convenience
+      });
+    }
+
+    res.json({
+      success: true,
+      totalProducts,
+      totalPages,
+      currentPage: safePage,
+      perPage: safePerPage,
+      products: processedProducts
+    });
+  } catch (err: any) {
+    console.error('WooCommerce fetch products error:', err);
+    res.status(500).json({
+      error: 'خطا در واکشی محصولات از ووکامرس',
+      details: err?.message || String(err)
+    });
+  }
+});
+
+// 3. Batch Import WooCommerce Products into Zopit Catalog
+app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    const { products, defaultMarginPercent = 20 } = req.body;
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ error: 'هیچ محصولی جهت انتقال به کاتالوگ انتخاب نشده است.' });
+    }
+
+    let supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    if (!supplierId || supplierId <= 0) {
+      const firstSupplier = await prisma.user.findFirst({ where: { role: 'SUPPLIER' } });
+      if (firstSupplier) {
+        supplierId = firstSupplier.id;
+      }
+    }
+
+    const createdProducts: any[] = [];
+    const errors: { name: string; error: string }[] = [];
+
+    // Pre-cache existing categories
+    const existingCategories = await prisma.category.findMany();
+    const categoryMap = new Map<string, number>();
+    for (const cat of existingCategories) {
+      categoryMap.set(cat.name.trim().toLowerCase(), cat.id);
+    }
+
+    for (const item of products) {
+      try {
+        const name = item.name ? String(item.name).trim() : 'محصول وارداتی';
+        const categoryName = item.primaryCategory || (Array.isArray(item.categories) && item.categories[0]) || 'عمومی';
+        
+        const wholesalePrice = safeParseFloat(item.wholesalePrice || item.supplierBasePrice, 0);
+        if (wholesalePrice <= 0) {
+          errors.push({ name, error: 'قیمت تامین عمده باید بزرگتر از صفر باشد.' });
+          continue;
+        }
+
+        const stock = safeParseInt(item.stock, 10);
+        const originalPrice = safeParseFloat(item.originalPrice, wholesalePrice * 1.25);
+        const sku = item.sku ? String(item.sku).trim() : `WC-${item.wcId || Date.now()}`;
+
+        // Resolve or create Category
+        let categoryId = categoryMap.get(categoryName.trim().toLowerCase());
+        if (!categoryId) {
+          try {
+            const newCat = await prisma.category.create({
+              data: { name: categoryName.trim(), isActive: true, sortOrder: 0 }
+            });
+            categoryId = newCat.id;
+            categoryMap.set(categoryName.trim().toLowerCase(), categoryId);
+          } catch {
+            const fallbackCat = existingCategories[0] || (await prisma.category.findFirst());
+            categoryId = fallbackCat ? fallbackCat.id : 1;
+          }
+        }
+
+        const imagesList = Array.isArray(item.images) && item.images.length > 0
+          ? item.images
+          : (item.mainImage ? [item.mainImage] : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80']);
+
+        // Format technical specs
+        const techSpecsStr = Array.isArray(item.technicalSpecs) && item.technicalSpecs.length > 0
+          ? JSON.stringify(item.technicalSpecs)
+          : '[]';
+
+        // Prepare variations
+        let variantsData: any[] = [];
+        if (Array.isArray(item.variations) && item.variations.length > 0) {
+          variantsData = item.variations.map((v: any) => ({
+            attributes: typeof v.attributes === 'object' ? JSON.stringify(v.attributes) : (v.attributes || JSON.stringify({ [v.attributeName || 'ویژگی']: v.attributeValue || 'پیش‌فرض' })),
+            supplierBasePrice: safeParseFloat(v.wholesalePrice || wholesalePrice),
+            stock: safeParseInt(v.stock, stock),
+            sku: v.sku || `${sku}-${Math.random().toString(36).substring(7)}`,
+            imageUrl: v.imageUrl || null
+          }));
+        } else {
+          variantsData = [{
+            attributes: JSON.stringify({}),
+            supplierBasePrice: wholesalePrice,
+            stock,
+            sku,
+            imageUrl: null
+          }];
+        }
+
+        const totalInventory = variantsData.reduce((sum, v) => sum + safeParseInt(v.stock, 0), 0);
+
+        const newProduct = await prisma.product.create({
+          data: {
+            supplierId,
+            categoryId: categoryId || 1,
+            name,
+            shortDescription: item.shortDescription || '',
+            longDescription: item.longDescription || item.shortDescription || `محصول با کیفیت ${name} با بهترین قیمت تامین مستقیم.`,
+            technicalSpecs: techSpecsStr,
+            supplierBasePrice: wholesalePrice,
+            discount: 0,
+            sku,
+            brand: item.brand || 'اصلی',
+            status: 'PENDING_APPROVAL', // Set to PENDING_APPROVAL for admin marketplace validation
+            inventory: totalInventory,
+            images: {
+              create: imagesList.map((url: string) => ({ url }))
+            },
+            variants: {
+              create: variantsData
+            }
+          }
+        });
+
+        createdProducts.push(newProduct);
+      } catch (err: any) {
+        errors.push({ name: item.name || 'نامشخص', error: err?.message || 'خطا در ثبت پایگاه داده' });
+      }
+    }
+
+    // Save notification for supplier and admin
+    try {
+      if (createdProducts.length > 0) {
+        await prisma.notification.create({
+          data: {
+            userId: supplierId,
+            title: 'انتقال موفق کالاها از ووکامرس 🎉',
+            message: `تعداد ${createdProducts.length} محصول با موفقیت از فروشگاه ووکامرسی شما به کاتالوگ زوپیت منتقل گردید.`,
+            type: 'PRODUCT_STATUS'
+          }
+        });
+      }
+    } catch {}
+
+    res.json({
+      success: true,
+      count: createdProducts.length,
+      errorsCount: errors.length,
+      errors,
+      message: `تعداد ${createdProducts.length} محصول با موفقیت از ووکامرس دریافت و در کاتالوگ زوپیت ثبت گردید.`
+    });
+  } catch (err: any) {
+    console.error('WooCommerce import batch error:', err);
+    res.status(500).json({ error: 'خطا در ثبت دسته‌جمعی محصولات ووکامرس', details: err?.message || String(err) });
+  }
+});
+
 // Edit a product
 app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
