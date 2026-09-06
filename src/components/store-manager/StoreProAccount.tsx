@@ -118,14 +118,12 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [ticketAttachment, setTicketAttachment] = useState("");
   const [submittingTicket, setSubmittingTicket] = useState(false);
   
-  const [hasDomainPriority, setHasDomainPriority] = useState(false);
   const [hasEnamad, setHasEnamad] = useState(false);
   const [hasGateway, setHasGateway] = useState(false);
   const [hasTaxProfile, setHasTaxProfile] = useState(false);
   const [hasPostalPanel, setHasPostalPanel] = useState(false);
   const [hasCustomLogo, setHasCustomLogo] = useState(false);
   const [logoDescription, setLogoDescription] = useState("");
-  const [domainProposals, setDomainProposals] = useState<string[]>(["", "", "", "", ""]);
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [copiedCoupon, setCopiedCoupon] = useState<boolean>(false);
@@ -165,10 +163,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       }
 
       // Calculate applied discount amount
-      const hostBasePrice = parseInt(settings.promaxAccountPrice || '199000', 10);
-      const domainCost = hasDomainPriority ? 80000 : 0;
+      const hostBasePrice = parseInt(settings.promaxAccountPrice || '299000', 10);
       const adminServicesCost = hasEnamad ? 50000 : 0;
-      const totalCost = hostBasePrice + domainCost + adminServicesCost;
+      const totalCost = hostBasePrice + adminServicesCost;
       
       let discountAmount = 0;
       if (data.discountType === 'PERCENTAGE') {
@@ -567,10 +564,9 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     const canvas = canvasRef.current;
     const signatureImage = signatureDataUrl || (canvas ? canvas.toDataURL("image/png") : "");
 
-    const hostBasePrice = parseInt(settings.promaxAccountPrice || '199000', 10);
-    const domainCost = hasDomainPriority ? 80000 : 0;
+    const hostBasePrice = parseInt(settings.promaxAccountPrice || '299000', 10);
     const adminServicesCost = hasEnamad ? 50000 : 0;
-    const subtotal = hostBasePrice + domainCost + adminServicesCost;
+    const subtotal = hostBasePrice + adminServicesCost;
     const calculatedAmount = Math.max(0, subtotal - appliedDiscount);
 
     setSubmitting(true);
@@ -593,9 +589,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           hasPostalPanel,
           hasCustomLogo,
           logoDescription,
-          hasDomainPriority,
           planType: selectedPlan,
-          domainProposals: domainProposals.map(d => d.trim()).filter(Boolean),
           amount: calculatedAmount,
           promoCodeInput: isDiscountApplied ? discountCodeText : undefined
         })
@@ -733,11 +727,11 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const proFeaturesList = [
     {
       id: 1,
-      title: "ثبت دامنه ملی اختصاصی (.ir)",
-      desc: "ثبت و اعطای دامنه اختصاصی با نام برند شما جهت برندسازی مستقل",
-      value: "۱۱۰,۰۰۰ تومان",
-      icon: Globe,
-      color: "from-blue-500/20 to-blue-600/5 text-blue-500"
+      title: "قالب وودمارت اورجینال اختصاصی زوپیت",
+      desc: "طراحی مدرن، فوق واکنش‌گرا و بهینه‌شده برای فروش حداکثری و لود زیر ۲ ثانیه",
+      value: "۲,۵۰۰,۰۰۰ تومان",
+      icon: Crown,
+      color: "from-amber-500/20 to-amber-600/5 text-amber-500"
     },
     {
       id: 2,
@@ -1553,7 +1547,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   </h2>
                   <p className="text-xs text-muted mt-1">
                     {formStep === 1
-                      ? "گام ۱ از ۲: مشخصات متقاضی، اولویت‌های دامنه اختصاصی و خدمات تکمیلی"
+                      ? "گام ۱ از ۲: مشخصات متقاضی، خدمات تکمیلی و امضای قرارداد"
                       : "گام ۲ از ۲: زیرساخت هاستینگ ابری، کد تخفیف و پیش‌فاکتور نهایی"}
                   </p>
                 </div>
@@ -1588,7 +1582,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                       گام اول: مشخصات متقاضی و خدمات تکمیلی
                     </span>
                     <span className="text-[11px] text-muted block">
-                      اطلاعات مدیر، اولویت دامنه، ای‌نماد و امضای قرارداد
+                      اطلاعات مدیر، ای‌نماد و امضای آنلاین قرارداد
                     </span>
                   </div>
                 </button>
@@ -1681,82 +1675,41 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                   </div>
                 </div>
 
-                {/* SECTION 2: DOMAIN NAME PROPOSALS (.IR) */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
-                    <div className="flex items-center gap-2 text-primary font-black text-sm">
-                      <Globe className="w-4 h-4 text-blue-500" />
-                      <span>۲. پیشنهاد نام دامنه اختصاصی (.ir) به ترتیب اولویت (تا ۵ اولویت دلخواه)</span>
-                    </div>
-                    <span className="text-[11px] text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                      ثبت دامنه ۱۰۰٪ رایگان
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-muted leading-relaxed">
-                    نام‌های پیشنهادی خود را با حروف انگلیسی وارد کنید. اولین دامنه‌ای که در سامانه ایرنیک آزاد باشد، به صورت اختصاصی برای فروشگاه شما ثبت و متصل خواهد شد:
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                    {[1, 2, 3, 4, 5].map((idx) => (
-                      <div key={idx} className="space-y-1">
-                        <label className="text-[11px] font-bold text-secondary flex items-center justify-between">
-                          <span>اولویت {idx.toLocaleString('fa-IR')}:</span>
-                          {idx === 1 && <span className="text-[10px] text-amber-500 font-bold">اصلی</span>}
-                        </label>
-                        <input
-                          type="text"
-                          value={domainProposals[idx - 1] || ''}
-                          onChange={(e) => {
-                            const updated = [...domainProposals];
-                            updated[idx - 1] = e.target.value;
-                            setDomainProposals(updated);
-                          }}
-                          placeholder={`brand${idx}.ir`}
-                          className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono dir-ltr text-left focus:ring-2 focus:ring-blue-500 outline-none text-primary"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Domain Priority Checkbox Option */}
-                  <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 mt-3 ${
-                    hasDomainPriority ? "bg-blue-500/10 border-blue-500/60 shadow-md" : "bg-surface border-subtle hover:border-blue-500/30"
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={hasDomainPriority}
-                      onChange={(e) => setHasDomainPriority(e.target.checked)}
-                      className="mt-1 rounded text-blue-600 focus:ring-blue-500 shrink-0 w-4 h-4 cursor-pointer"
-                    />
-                    <div className="space-y-1 text-right flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-black text-primary">سفارش اولویت‌بندی و ثبت تخصصی دامنه‌های پیشنهادی</span>
-                        <span className="text-[10px] font-sans font-black text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20 whitespace-nowrap">
-                          +۸۰,۰۰۰ تومان
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted leading-relaxed">
-                        استعلام لحظه‌ای، بررسی حقوقی آزاد بودن نام‌ها، اتصال فوری DNS و رزرو مستقیم دامنه‌های اولویت‌دار توسط کارشناسان زوپیت در سامانه ایرنیک.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-
-                {/* SECTION 3: ADMINISTRATIVE & COMPLEMENTARY OPTIONS */}
+                {/* SECTION 2: ADMINISTRATIVE & ENAMAD OPTIONS */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-2 border-b border-subtle/50 pb-2">
                     <div className="flex items-center gap-2 text-primary font-black text-sm">
                       <Building2 className="w-4 h-4 text-indigo-500" />
-                      <span>۳. خدمات اداری و آپشن‌های تکمیلی فروشگاه</span>
+                      <span>۲. خدمات اداری و آپشن‌های تکمیلی فروشگاه</span>
                     </div>
                     <span className="text-[11px] text-indigo-400 font-bold">
-                      انتخاب اختیاری بر اساس نیاز
+                      انتخاب اختیاری بر اساس نیاز شما
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* 1. Payment Gateway */}
+                    {/* 1. eNamad option (Highlighted as +50,000 Tomans) */}
+                    <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 relative ${hasEnamad ? 'bg-amber-500/10 border-amber-500/60 shadow-md ring-1 ring-amber-500/30' : 'bg-surface border-subtle hover:border-amber-500/30'}`}>
+                      <input
+                        type="checkbox"
+                        checked={hasEnamad}
+                        onChange={(e) => setHasEnamad(e.target.checked)}
+                        className="mt-1 rounded text-amber-500 focus:ring-amber-500 shrink-0 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="space-y-1 text-right flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-black text-primary">اخذ ای‌نماد رسمی (نماد اعتماد)</span>
+                          <span className="text-[10px] font-sans font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 whitespace-nowrap">
+                            +۵۰,۰۰۰ تومان
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted leading-relaxed">
+                          ثبت‌نام، احراز هویت و اخذ نماد اعتماد الکترونیکی توسط کارشناسان زوپیت (تعرفه رسمی سامانه دولتی اینماد).
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* 2. Payment Gateway */}
                     <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasGateway ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
                       <input
                         type="checkbox"
@@ -1777,7 +1730,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                       </div>
                     </label>
 
-                    {/* 2. Tax File Setup */}
+                    {/* 3. Tax File Setup */}
                     <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasTaxProfile ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
                       <input
                         type="checkbox"
@@ -1794,27 +1747,6 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                         </div>
                         <p className="text-[11px] text-muted leading-relaxed">
                           ثبت‌نام و راهنمایی تشکیل پرونده در سامانه امور مالیاتی جهت اتصال درگاه.
-                        </p>
-                      </div>
-                    </label>
-
-                    {/* 3. eNamad option */}
-                    <label className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${hasEnamad ? 'bg-indigo-500/10 border-indigo-500/60 shadow-md' : 'bg-surface border-subtle hover:border-indigo-500/30'}`}>
-                      <input
-                        type="checkbox"
-                        checked={hasEnamad}
-                        onChange={(e) => setHasEnamad(e.target.checked)}
-                        className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 w-4 h-4 cursor-pointer"
-                      />
-                      <div className="space-y-1 text-right flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-xs font-black text-primary">اخذ ای‌نماد رسمی (نماد اعتماد)</span>
-                          <span className="text-[10px] font-sans font-black text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 whitespace-nowrap">
-                            +۵۰,۰۰۰ تومان
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-muted leading-relaxed">
-                          ثبت‌نام و احراز هویت در مرکز تجارت الکترونیکی (تعرفه دولتی سامانه اینماد؛ زوپیت هیچ دستمزدی دریافت نمی‌کند).
                         </p>
                       </div>
                     </label>
@@ -1997,7 +1929,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     onClick={handleProceedToStep2}
                     className="w-full md:w-[75%] mx-auto py-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-emerald-600 hover:from-indigo-700 hover:to-emerald-700 text-white font-black text-base rounded-2xl shadow-xl shadow-indigo-600/20 transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.01]"
                   >
-                    <span>تایید اطلاعات و ورود به مرحله هاستینگ ابری و صدور فاکتور</span>
+                    <span>تایید اطلاعات و ورود به مرحله هاست ابری و صدور فاکتور ({(parseInt(settings.promaxAccountPrice || "299000", 10) + (hasEnamad ? 50000 : 0)).toLocaleString()} تومان)</span>
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                 </div>
@@ -2011,7 +1943,6 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 mobile={mobile}
                 setFormStep={setFormStep}
                 settings={settings}
-                hasDomainPriority={hasDomainPriority}
                 hasEnamad={hasEnamad}
                 discountCodeText={discountCodeText}
                 setDiscountCodeText={setDiscountCodeText}
@@ -2019,8 +1950,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 setIsDiscountApplied={setIsDiscountApplied}
                 applyDiscount={handleApplyDiscountCode}
                 appliedDiscount={appliedDiscount}
-                calculatedAmount={Math.max(0, parseInt(settings.promaxAccountPrice || "199000", 10) + (hasDomainPriority ? 80000 : 0) + (hasEnamad ? 50000 : 0) - appliedDiscount)}
-                handleRegisterPro={handleRegister}
+                calculatedAmount={Math.max(0, parseInt(settings.promaxAccountPrice || "299000", 10) + (hasEnamad ? 50000 : 0) - appliedDiscount)}
+                handleRegisterPro={() => handleRegister({ preventDefault: () => {} } as any)}
                 submitting={submitting}
               />
             )}

@@ -39,7 +39,6 @@ import {
   Send
 } from "lucide-react";
 import { SupplierWooCommerceImport } from "./SupplierWooCommerceImport";
-import { TelegramEitaaProductExtractor, ExtractedProduct } from "./TelegramEitaaProductExtractor";
 
 export function SupplierAddProduct({
   onSuccess,
@@ -51,7 +50,6 @@ export function SupplierAddProduct({
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showWcImport, setShowWcImport] = useState(false);
-  const [showAiExtractorModal, setShowAiExtractorModal] = useState(false);
 
   // Bulk Product Import State
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -279,38 +277,6 @@ export function SupplierAddProduct({
     }
   };
 
-  const handleExtractedProductsFromAi = (products: ExtractedProduct[]) => {
-    if (products.length === 0) return;
-
-    if (products.length === 1) {
-      const p = products[0];
-      setFormData((prev) => ({
-        ...prev,
-        name: p.name || prev.name,
-        supplierBasePrice: p.wholesalePrice ? p.wholesalePrice.toString() : prev.supplierBasePrice,
-        longDescription: p.description || prev.longDescription,
-        shortDescription: p.name || prev.shortDescription,
-        stock: p.stock ? p.stock.toString() : prev.stock,
-        minStock: p.minOrderQuantity ? p.minOrderQuantity.toString() : prev.minStock,
-      }));
-      toast.success(`مشخصات محصول «${p.name}» در فرم بارگذاری گردید.`);
-    } else {
-      const mapped = products.map((p, index) => ({
-        name: p.name,
-        category: p.category || "لوازم جانبی",
-        model: "عمومی",
-        color: p.colors?.[0] || "مشکی",
-        wholesalePrice: p.wholesalePrice,
-        stock: p.stock || 50,
-        minOrderQuantity: p.minOrderQuantity || 5,
-        rowNumber: index + 1,
-      }));
-      setPreviewProducts(mapped);
-      setShowBulkPreviewModal(true);
-      toast.success(`تعداد ${mapped.length.toLocaleString("fa-IR")} محصول استخراج‌شده در پیش‌نمایش بارگذاری گردید.`);
-    }
-    setShowAiExtractorModal(false);
-  };
   const [categories, setCategories] = useState<any[]>([
     { id: 1, name: "موبایل" },
     { id: 2, name: "لپ‌تاپ" },
@@ -611,11 +577,11 @@ export function SupplierAddProduct({
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setShowAiExtractorModal(true)}
-              className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              onClick={onNavigateToTickets}
+              className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>ایجنت تلگرام و ایتا (AI)</span>
+              <Gift className="w-3.5 h-3.5 text-rose-500" />
+              <span>ثبت رایگان توسط کارشناس (VIP)</span>
             </button>
 
             <button
@@ -1728,18 +1694,6 @@ export function SupplierAddProduct({
           {initialData?.id ? "ویرایش نهایی" : "ثبت نهایی محصول"}
         </button>
       </div>
-
-      {/* Telegram & Eitaa AI Extractor Modal */}
-      {showAiExtractorModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="max-w-4xl w-full my-auto">
-            <TelegramEitaaProductExtractor
-              onAddProducts={handleExtractedProductsFromAi}
-              onClose={() => setShowAiExtractorModal(false)}
-            />
-          </div>
-        </div>
-      )}
 
       {/* WooCommerce Import Modal */}
       {showWcImport && (

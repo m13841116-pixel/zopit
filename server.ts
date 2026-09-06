@@ -7875,11 +7875,11 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
       settings: {
         autoApprove: settingsMap['pro_auto_approve'] !== 'false',
         proAccountPrice: parseInt(settingsMap['pro_account_price'] || '189000', 10),
-        promaxAccountPrice: parseInt(settingsMap['promax_account_price'] || '199000', 10),
-        hostRenewalPrice: parseInt(settingsMap['pro_host_renewal_price'] || '500000', 10),
-        hostDiscountedPrice: parseInt(settingsMap['pro_host_discounted_price'] || '199000', 10),
+        promaxAccountPrice: parseInt(settingsMap['promax_account_price'] || '299000', 10),
+        hostRenewalPrice: parseInt(settingsMap['pro_host_renewal_price'] || '900000', 10),
+        hostDiscountedPrice: parseInt(settingsMap['pro_host_discounted_price'] || '299000', 10),
         torobPrice: parseInt(settingsMap['pro_torob_price'] || '150000', 10),
-        promoCode: settingsMap['pro_promo_code'] || 'ZOPIT-HOST-199',
+        promoCode: settingsMap['pro_promo_code'] || 'ZOPIT-PRO-299',
         termsContent: settingsMap['pro_terms_content'] || '',
         videoUrl: settingsMap['pro_video_url'] || '',
         audioUrl: settingsMap['pro_audio_url'] || ''
@@ -7891,11 +7891,75 @@ app.get('/api/store-manager/pro/status', authenticateToken, requireStoreManager,
   }
 });
 
+// 1.1 Apply discount code for Store Manager Pro registration
+app.post('/api/store-manager/pro/apply-discount', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const { code, planType } = req.body;
+    if (!code || !code.trim()) {
+      return res.status(400).json({ error: 'کد تخفیف الزامی است.' });
+    }
+    const cleanCode = code.trim().toUpperCase();
+
+    // Check system master promo code
+    const masterPromo = await prisma.systemSettings.findUnique({ where: { key: 'pro_promo_code' } });
+    if (masterPromo && masterPromo.value && cleanCode === masterPromo.value.trim().toUpperCase()) {
+      return res.json({
+        valid: true,
+        discountType: 'PERCENTAGE',
+        discountValue: 100,
+        message: 'کد تخفیف ویژه ۱۰۰٪ زوپیت با موفقیت اعمال شد.'
+      });
+    }
+
+    // Check discountCode table
+    const discount = await prisma.discountCode.findUnique({ where: { code: cleanCode } });
+    if (!discount || !discount.isActive) {
+      return res.status(404).json({ error: 'کد تخفیف وارد شده معتبر نمی‌باشد یا منقضی گردیده است.' });
+    }
+
+    if (discount.expiryDate && new Date(discount.expiryDate) < new Date()) {
+      return res.status(400).json({ error: 'مهلت استفاده از این کد تخفیف به پایان رسیده است.' });
+    }
+
+    if (discount.maxUses && discount.usedCount >= discount.maxUses) {
+      return res.status(400).json({ error: 'ظرفیت استفاده از این کد تخفیف تکمیل شده است.' });
+    }
+
+    if (discount.applicablePlan && discount.applicablePlan !== 'ALL' && discount.applicablePlan !== planType) {
+      return res.status(400).json({ error: 'این کد تخفیف برای پلن انتخابی شما معتبر نمی‌باشد.' });
+    }
+
+    return res.json({
+      valid: true,
+      discountType: discount.discountType || 'PERCENTAGE',
+      discountValue: discount.discountValue,
+      message: `کد تخفیف ${cleanCode} با موفقیت اعمال گردید.`
+    });
+  } catch (err: any) {
+    console.error('Error in apply-discount:', err);
+    res.status(500).json({ error: 'خطا در بررسی کد تخفیف' });
+  }
+});
+
+// 1.2 Get public promotions list
+app.get('/api/public/discounts/promotions', async (req: any, res: any) => {
+  try {
+    const discounts = await prisma.discountCode.findMany({
+      where: { isActive: true },
+      take: 5,
+      orderBy: { id: 'desc' }
+    });
+    res.json(discounts);
+  } catch (err) {
+    res.json([]);
+  }
+});
+
 // 2. Register for Pro / Pro Max Account
 app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
-    const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, hasDomainPriority, promoCodeInput, planType, amount } = req.body;
+    const { fullName, nationalCode, mobile, signatureImage, hasEnamad, hasGateway, hasTaxProfile, promoCodeInput, planType, amount } = req.body;
 
     if (!fullName || !nationalCode || !mobile) {
       return res.status(400).json({ error: 'تکمیل تمامی موارد الزام‌آور از جمله نام، کد ملی و شماره همراه اجباری است.' });
@@ -7923,20 +7987,19 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
     const initialStatus = isAutoApprove ? 'APPROVED' : 'PENDING';
 
     // Incredible Offer Logic: Pro Max license & package (14.8M) is 100% FREE.
-    // Cloud Hosting (15GB SSD NVMe, 5 Core CPU, 5GB RAM) - 199,000 Tomans
-    let defaultPrice = parseInt(settingsMap['promax_account_price'] || '199000', 10);
+    // Cloud Hosting (15GB SSD NVMe, 5 Core CPU, 5GB RAM) - 299,000 Tomans (Discounted from 900,000 Tomans)
+    let defaultPrice = parseInt(settingsMap['promax_account_price'] || '299000', 10);
     
     let basePrice = defaultPrice;
     let enamadCost = hasEnamad ? 50000 : 0;
-    let domainPriorityCost = hasDomainPriority ? 80000 : 0;
-    let totalPayable = basePrice + enamadCost + domainPriorityCost;
+    let totalPayable = basePrice + enamadCost; // No domain fee
     
     // Promo Code / Discount Code logic
     if (promoCodeInput && promoCodeInput.trim()) {
       const cleanCoupon = promoCodeInput.trim().toUpperCase();
       if (settingsMap['pro_promo_code'] && cleanCoupon === settingsMap['pro_promo_code'].trim().toUpperCase()) {
-        basePrice = 0; // 100% legacy master promo
-        totalPayable = basePrice + enamadCost + domainPriorityCost;
+        basePrice = 0; // 100% master promo
+        totalPayable = basePrice + enamadCost;
       } else {
         try {
           const discount = await prisma.discountCode.findUnique({ where: { code: cleanCoupon } });
@@ -7951,7 +8014,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
               } else {
                 basePrice = Math.max(0, defaultPrice - discount.discountValue);
               }
-              totalPayable = basePrice + enamadCost + domainPriorityCost;
+              totalPayable = basePrice + enamadCost;
               // Increment usedCount
               await prisma.discountCode.update({
                 where: { id: discount.id },
@@ -8075,7 +8138,7 @@ app.post('/api/store-manager/pro/renew-host', authenticateToken, requireStoreMan
   try {
     const userId = req.user.userId;
     const hostDiscountedSetting = await prisma.systemSettings.findUnique({ where: { key: 'pro_host_discounted_price' } });
-    const amount = parseInt(hostDiscountedSetting?.value || '198000', 10);
+    const amount = parseInt(hostDiscountedSetting?.value || '299000', 10);
 
     const baseUrl = getCanonicalAppUrl(req);
     
@@ -8210,7 +8273,7 @@ app.get('/api/public/pro/callback', async (req: any, res: any) => {
       expectedAmountRials = Math.round(parseFloat(amount as string) * 10);
     } else if (type === 'HOST_RENEWAL') {
       const hostDiscountedSetting = await prisma.systemSettings.findUnique({ where: { key: 'pro_host_discounted_price' } });
-      expectedAmountRials = parseInt(hostDiscountedSetting?.value || '198000', 10) * 10;
+      expectedAmountRials = parseInt(hostDiscountedSetting?.value || '299000', 10) * 10;
     } else if (type === 'TOROB_SETUP') {
       const torobPriceSetting = await prisma.systemSettings.findUnique({ where: { key: 'pro_torob_price' } });
       expectedAmountRials = parseInt(torobPriceSetting?.value || '150000', 10) * 10;
@@ -8399,10 +8462,10 @@ app.get('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async (
       autoApprove: map['pro_auto_approve'] !== 'false',
       proAccountPrice: map['pro_account_price'] || '189000',
       promaxAccountPrice: map['promax_account_price'] || '299000',
-      hostRenewalPrice: map['pro_host_renewal_price'] || '500000',
-      hostDiscountedPrice: map['pro_host_discounted_price'] || '198000',
+      hostRenewalPrice: map['pro_host_renewal_price'] || '900000',
+      hostDiscountedPrice: map['pro_host_discounted_price'] || '299000',
       torobPrice: map['pro_torob_price'] || '150000',
-      promoCode: map['pro_promo_code'] || 'ZOPIT-PRO-198',
+      promoCode: map['pro_promo_code'] || 'ZOPIT-PRO-299',
       termsContent: map['pro_terms_content'] || '',
       videoUrl: map['pro_video_url'] || '',
       audioUrl: map['pro_audio_url'] || ''
@@ -8432,10 +8495,10 @@ app.post('/api/superadmin/pro/settings', authenticateToken, requireAdmin, async 
       { key: 'pro_auto_approve', value: String(autoApprove) },
       { key: 'pro_account_price', value: String(proAccountPrice ?? '189000') },
       { key: 'promax_account_price', value: String(promaxAccountPrice ?? '299000') },
-      { key: 'pro_host_renewal_price', value: String(hostRenewalPrice ?? '500000') },
-      { key: 'pro_host_discounted_price', value: String(hostDiscountedPrice ?? '198000') },
+      { key: 'pro_host_renewal_price', value: String(hostRenewalPrice ?? '900000') },
+      { key: 'pro_host_discounted_price', value: String(hostDiscountedPrice ?? '299000') },
       { key: 'pro_torob_price', value: String(torobPrice ?? '150000') },
-      { key: 'pro_promo_code', value: String(promoCode ?? 'ZOPIT-PRO-198') },
+      { key: 'pro_promo_code', value: String(promoCode ?? 'ZOPIT-PRO-299') },
       { key: 'pro_terms_content', value: String(termsContent ?? '') },
       { key: 'pro_video_url', value: String(videoUrl ?? '') },
       { key: 'pro_audio_url', value: String(audioUrl ?? '') }
@@ -11966,6 +12029,7 @@ registerAnnouncements(app);
 registerOrderLabel(app, prisma);
 registerPenaltyRoutes(app, prisma, authenticateToken);
 registerDiscountRoutes(app, authenticateToken, requireSuperAdmin);
+registerAIStudioRoute(app);
 
 
 // Helper function: Auto-match Leads (تامینیاب‌ها) with registered suppliers by mobile/landline or brand name
