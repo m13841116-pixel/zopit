@@ -48,9 +48,16 @@ import {
   FileCheck,
   MessageCircle,
   Layers,
-  CheckSquare
+  CheckSquare,
+  Contact
 } from "lucide-react";
 import { toast } from "../GlobalToast";
+import {
+  downloadVcfContacts,
+  getTelegramLink,
+  getEitaaLink,
+  normalizePhone
+} from "../../utils/contactExport";
 
 export interface SupplierSmsPattern {
   id: string;
@@ -210,15 +217,19 @@ export default function LeadsManager() {
   const [isBulkPublishing, setIsBulkPublishing] = useState(false);
   const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
 
-  // SMS & Excel Export Modal State
+  // SMS, Excel & VCF Contacts Modal State
   const [showExportModal, setShowExportModal] = useState(false);
-  const [activeExportTab, setActiveExportTab] = useState<"direct_sms" | "excel_export" | "telegram" | "strategy_guide">("excel_export");
-  const [exportScope, setExportScope] = useState<"ALL" | "CURRENT_FILTER" | "DRAFTS" | "SELECTED" | "PENDING" | "ASSIGNED" | "COMPLETED">("DRAFTS");
+  const [activeExportTab, setActiveExportTab] = useState<"vcf_contacts" | "direct_sms" | "excel_export" | "telegram" | "strategy_guide">("vcf_contacts");
+  const [exportScope, setExportScope] = useState<"ALL" | "CURRENT_FILTER" | "DRAFTS" | "SELECTED" | "PENDING" | "ASSIGNED" | "COMPLETED">("ALL");
   const [exportIncludeAdditional, setExportIncludeAdditional] = useState(true);
   const [exportOnlyMobiles, setExportOnlyMobiles] = useState(true);
   const [exportDeduplicate, setExportDeduplicate] = useState(true);
   const [copiedType, setCopiedType] = useState<string | null>(null);
   const [meliNumberFormat, setMeliNumberFormat] = useState<"no_zero" | "with_zero">("no_zero");
+  const [vcfPrefix, setVcfPrefix] = useState<string>("تامین‌کننده - ");
+  const [telegramCustomMsg, setTelegramCustomMsg] = useState<string>(
+    "سلام و احترام، از مدیریت پلتفرم زوپیت در ارتباط هستم. از شما به عنوان تامین‌کننده برتر جهت ثبت‌نام و فروش بی‌واسطه کالا در شبکه فروشگاه‌های سراسر کشور دعوت به عمل می‌آید:\nhttps://zopit.ir/register/supplier"
+  );
 
   // Direct SMS Configuration State
   const [smsMethod, setSmsMethod] = useState<"pattern" | "text">("pattern");
@@ -1655,6 +1666,41 @@ export default function LeadsManager() {
                 ))}
               </select>
 
+              {/* Quick Bulk VCF Export Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const targetList = filteredLeads.length > 0 ? filteredLeads : leads;
+                  if (!targetList.length) {
+                    toast.error("تامین‌کننده‌ای برای خروجی وجود ندارد.");
+                    return;
+                  }
+                  const contactsToExport = targetList.map((l) => ({
+                    name: l.name,
+                    managerName: l.managerName,
+                    phone: l.phone,
+                    additionalPhones: l.additionalPhones,
+                    category: l.category,
+                    address: l.address
+                  }));
+                  const ok = downloadVcfContacts(
+                    contactsToExport,
+                    `Zopit_Suppliers_${targetList.length}_Contacts.vcf`,
+                    vcfPrefix
+                  );
+                  if (ok) {
+                    toast.success(
+                      `فایل مخاطبین (${targetList.length} تامین‌کننده با پیشوند «${vcfPrefix}») با موفقیت دانلود شد. برای ذخیره در دفترچه تلفن، فایل را در موبایل باز کنید.`
+                    );
+                  }
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-2xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shadow-sm shadow-emerald-600/20"
+                title="دانلود همه تامین‌کنندگان به عنوان مخاطبین گوشی (VCF) با پیشوند دلخواه"
+              >
+                <Smartphone className="w-4 h-4" />
+                <span>ذخیره گروهی در مخاطبین گوشی (VCF)</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -1923,6 +1969,52 @@ export default function LeadsManager() {
                                   <CheckCircle2 className="w-4 h-4" />
                                 </button>
                               )}
+
+                              {/* Single VCF Contact Export */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  downloadVcfContacts(
+                                    [{
+                                      name: lead.name,
+                                      managerName: lead.managerName,
+                                      phone: lead.phone,
+                                      additionalPhones: lead.additionalPhones,
+                                      category: lead.category,
+                                      address: lead.address
+                                    }],
+                                    `Contact_${normalizePhone(lead.phone)}.vcf`,
+                                    vcfPrefix
+                                  );
+                                  toast.success(`مخاطب «${vcfPrefix}${lead.name}» آماده ذخیره در گوشی است.`);
+                                }}
+                                className="p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs"
+                                title="ذخیره این تامین‌کننده در مخاطبین گوشی (VCF)"
+                              >
+                                <Smartphone className="w-4 h-4" />
+                              </button>
+
+                              {/* Quick Telegram Message Button */}
+                              <a
+                                href={getTelegramLink(lead.phone, telegramCustomMsg)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 bg-sky-50 hover:bg-sky-500 text-sky-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs flex items-center justify-center"
+                                title="ارسال پیام مستقیم در تلگرام"
+                              >
+                                <Send className="w-4 h-4" />
+                              </a>
+
+                              {/* Quick Eitaa Message Button */}
+                              <a
+                                href={getEitaaLink(lead.phone)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white rounded-xl transition-all cursor-pointer shadow-xs flex items-center justify-center"
+                                title="ارسال پیام در پیام‌رسان ایتا"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </a>
 
                               <button
                                 type="button"
@@ -2646,7 +2738,20 @@ export default function LeadsManager() {
             </div>
 
             {/* Modal Tabs */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-2xl">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1 bg-slate-100 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setActiveExportTab("vcf_contacts")}
+                className={`py-2.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeExportTab === "vcf_contacts"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>مخاطبین گوشی (VCF)</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveExportTab("excel_export")}
@@ -2657,7 +2762,7 @@ export default function LeadsManager() {
                 }`}
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>اکسل ملی‌پیامک (numbers.xls)</span>
+                <span>اکسل ملی‌پیامک (XLS)</span>
               </button>
 
               <button
@@ -2696,7 +2801,7 @@ export default function LeadsManager() {
                 }`}
               >
                 <Lightbulb className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-                <span>راهنمای جذب ارزان</span>
+                <span>راهنما</span>
               </button>
             </div>
 
@@ -3272,6 +3377,140 @@ export default function LeadsManager() {
               </div>
             )}
 
+            {/* TAB 0: VCF CONTACTS EXPORT FOR MOBILE PHONES */}
+            {activeExportTab === "vcf_contacts" && (
+              <div className="space-y-5 animate-fade-in">
+                {/* Intro Card */}
+                <div className="bg-emerald-50 border-2 border-emerald-200 p-4 md:p-5 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <Smartphone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-emerald-950">
+                        خروجی دفترچه مخاطبین گوشی (فرمت VCF / vCard 3.0)
+                      </h4>
+                      <p className="text-xs text-emerald-800 font-medium mt-0.5">
+                        فایل استاندارد مخاطبین را دانلود کنید و روی گوشی اندروید یا آیفون خود باز کنید تا همه تامین‌کنندگان به همراه نام با پیشوند دلخواه در مخاطبین گوشی ذخیره شوند.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Configuration: Prefix & Scope Count */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-2">
+                    <label className="text-xs font-black text-slate-900 flex items-center gap-2">
+                      <Edit2 className="w-3.5 h-3.5 text-purple-600" />
+                      <span>پیشوند نام مخاطب در گوشی:</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={vcfPrefix}
+                      onChange={(e) => setVcfPrefix(e.target.value)}
+                      placeholder="تامین‌کننده - "
+                      className="w-full bg-white border border-slate-300 focus:border-emerald-500 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none transition-all shadow-xs"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      مثال: با پیشوند «{vcfPrefix || "تامین‌کننده - "}»، مخاطب به صورت «{vcfPrefix || "تامین‌کننده - "}{targetLeadsForExport[0]?.name || "تولیدی پارس"}» ذخیره خواهد شد.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-2 flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-black text-slate-900 flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>تعداد مخاطبین آماده ذخیره:</span>
+                      </span>
+                      <p className="text-2xl font-black text-emerald-700 mt-1 font-mono">
+                        {targetLeadsForExport.length.toLocaleString("fa-IR")}{" "}
+                        <span className="text-xs font-normal text-slate-600">تامین‌کننده</span>
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      شماره‌های معتبر: {exportData.filter((i) => i.isMobile).length.toLocaleString("fa-IR")} همراه
+                    </p>
+                  </div>
+                </div>
+
+                {/* Main Download Button */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!targetLeadsForExport.length) {
+                        toast.error("تامین‌کننده‌ای برای خروجی انتخاب نشده است.");
+                        return;
+                      }
+                      const contactsToExport = targetLeadsForExport.map((l) => ({
+                        name: l.name,
+                        managerName: l.managerName,
+                        phone: l.phone,
+                        additionalPhones: l.additionalPhones,
+                        category: l.category,
+                        address: l.address
+                      }));
+                      const ok = downloadVcfContacts(
+                        contactsToExport,
+                        `Zopit_Suppliers_${targetLeadsForExport.length}_Contacts.vcf`,
+                        vcfPrefix
+                      );
+                      if (ok) {
+                        toast.success(
+                          `فایل مخاطبین شامل ${targetLeadsForExport.length} تامین‌کننده دانلود شد! برای اضافه شدن به گوشی، کافی است فایل را در گوشی خود لمس کنید.`
+                        );
+                      }
+                    }}
+                    className="w-full py-3.5 px-5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-2xl text-sm font-black flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>دانلود فایل مخاطبین گوشی ({targetLeadsForExport.length.toLocaleString("fa-IR")} تامین‌کننده)</span>
+                  </button>
+                </div>
+
+                {/* Preview of Top Contacts */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>پیش‌نمایش ذخیره در دفترچه تلفن گوشی شما (نمونه ۶ مخاطب اول):</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400">کارت ویزیت استاندارد VCF</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {targetLeadsForExport.slice(0, 6).map((lead, idx) => (
+                      <div key={idx} className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black text-slate-900 truncate">
+                            {vcfPrefix}{lead.name || lead.managerName || "تامین‌کننده"}
+                          </p>
+                          <p className="text-[11px] font-mono text-emerald-700 dir-ltr text-right mt-0.5">
+                            {normalizePhone(lead.phone) || lead.phone}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3-Step Guide */}
+                <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-2.5">
+                  <h5 className="text-xs font-black text-slate-900 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>راهنمای ۳ مرحله‌ای وارد کردن به گوشی (اندروید و آیفون):</span>
+                  </h5>
+                  <ol className="text-xs text-slate-600 space-y-1.5 list-decimal list-inside pr-1 leading-relaxed">
+                    <li>فایل دانلود شده (.vcf) را به گوشی خود انتقال دهید (یا همین صفحه را در مرورگر موبایل باز کرده و دانلود کنید).</li>
+                    <li>روی فایل دانلود شده ضربه بزنید تا برنامه <strong>مخاطبین (Contacts)</strong> آن را باز کند.</li>
+                    <li>گزینه <strong>«ذخیره همه / Import»</strong> را بزنید. همه مخاطبین با پیشوند «{vcfPrefix}» به سرعت ذخیره می‌شوند و در تلگرام و ایتا هم شناسایی می‌شوند.</li>
+                  </ol>
+                </div>
+              </div>
+            )}
+
             {/* TAB 2: EXCEL EXPORT (Single Column MeliPayamak format) */}
             {activeExportTab === "excel_export" && (
               <div className="space-y-4 animate-fade-in">
@@ -3607,40 +3846,142 @@ export default function LeadsManager() {
             {/* TAB 3: TELEGRAM & SOCIAL INTEGRATION */}
             {activeExportTab === "telegram" && (
               <div className="space-y-4 animate-fade-in">
-                <div className="bg-sky-50/60 border-2 border-sky-200 p-4 rounded-2xl space-y-3">
-                  <div className="flex items-center gap-2.5 font-black text-xs text-sky-900">
-                    <Share2 className="w-4 h-4 text-sky-600" />
-                    <span>اشتراک‌گذاری دعوت‌نامه و اطلاع‌رسانی در تلگرام و ایتا</span>
+                <div className="bg-sky-50/60 border-2 border-sky-200 p-4 md:p-5 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 font-black text-xs text-sky-900">
+                      <Share2 className="w-4 h-4 text-sky-600" />
+                      <span>ارسال پیام مستقیم و دعوت در تلگرام و ایتا</span>
+                    </div>
+                    <span className="text-[11px] bg-sky-100 text-sky-800 font-bold px-2.5 py-1 rounded-full">
+                      {targetLeadsForExport.length.toLocaleString("fa-IR")} تامین‌کننده هدف
+                    </span>
                   </div>
+
                   <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    می‌توانید پیام دعوت تامین‌کنندگان را به طور مستقیم در کانال‌ها، گروه‌های صنفی بازار یا چت خصوصی تامین‌کنندگان به اشتراک بگذارید.
+                    متن دلخواه پیام خود را بنویسید؛ سپس با کلیک بر روی دکمه چت هر تامین‌کننده، صفحه گفتگوی مستقیم در تلگرام یا ایتا به همراه متن از پیش آماده باز خواهد شد (بدون نیاز به ربات یا ریسک مسدودی).
                   </p>
+
+                  {/* Message Template Editor */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-800 flex items-center justify-between">
+                      <span>متن پیام پیش‌فرض برای ارسال در تلگرام و ایتا:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(telegramCustomMsg);
+                          toast.success("متن پیام با موفقیت در کلیپ‌بورد کپی شد.");
+                        }}
+                        className="text-sky-700 hover:text-sky-900 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>کپی متن پیام</span>
+                      </button>
+                    </label>
+                    <textarea
+                      value={telegramCustomMsg}
+                      onChange={(e) => setTelegramCustomMsg(e.target.value)}
+                      rows={3}
+                      className="w-full bg-white border border-sky-300 focus:border-sky-500 rounded-xl p-3 text-xs text-slate-800 leading-relaxed outline-none shadow-xs font-sans resize-none"
+                      placeholder="متن پیام دعوت خود را اینجا بنویسید..."
+                    />
+                  </div>
 
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <a
-                      href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + "/supplier-onboarding")}&text=${encodeURIComponent(
-                        "سلام و احترام، از شما به عنوان تامین‌کننده برتر جهت ثبت‌نام و عرضه کالاهای خود در پلتفرم دعوت به عمل می‌آید."
-                      )}`}
+                      href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + "/supplier-onboarding")}&text=${encodeURIComponent(telegramCustomMsg)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-xs transition-colors"
                     >
                       <Share2 className="w-3.5 h-3.5" />
-                      <span>اشتراک‌گذاری در تلگرام</span>
+                      <span>اشتراک‌گذاری در کانال یا گروه تلگرام</span>
                     </a>
+                  </div>
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const inviteText = `مدیریت محترم؛\nاز شما جهت عرضه عمده و مستقیم محصولاتتان در پلتفرم زوپیت دعوت به عمل می‌آید.\nاتصال به فروشگاه‌های آنلاین سراسر کشور و تسویه تضمین‌شده.\nثبت‌نام مستقیم: ${window.location.origin}/supplier-onboarding`;
-                        navigator.clipboard.writeText(inviteText);
-                        toast.success("متن پیام دعوت تلگرام و ایتا با موفقیت کپی شد.");
-                      }}
-                      className="bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>کپی متن پیام پیام‌رسان‌ها</span>
-                    </button>
+                {/* Scannable Lead List with One-Click Chat Buttons */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-black text-slate-900 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-sky-600" />
+                      <span>ارسال تکی پیام به تامین‌کنندگان (روی دکمه کلیک کنید تا چت باز شود):</span>
+                    </h5>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      نمایش ۲۰ مورد اول
+                    </span>
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                    {targetLeadsForExport.slice(0, 25).map((lead, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-50 hover:bg-slate-100 border border-slate-200 p-2.5 rounded-xl flex items-center justify-between gap-3 transition-colors"
+                      >
+                        <div className="min-w-0 flex items-center gap-2.5">
+                          <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-[11px] font-bold flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {lead.name || lead.managerName || "تامین‌کننده"}
+                            </p>
+                            <p className="text-[11px] font-mono text-slate-500 dir-ltr text-right">
+                              {normalizePhone(lead.phone) || lead.phone}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Direct Telegram Chat */}
+                          <a
+                            href={getTelegramLink(lead.phone, telegramCustomMsg)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-xs transition-colors"
+                            title="باز کردن گفتگوی مستقیم در تلگرام با متن آماده"
+                          >
+                            <Send className="w-3 h-3" />
+                            <span>تلگرام</span>
+                          </a>
+
+                          {/* Direct Eitaa Chat */}
+                          <a
+                            href={getEitaaLink(lead.phone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-xs transition-colors"
+                            title="باز کردن صفحه گفتگو در پیام‌رسان ایتا"
+                          >
+                            <MessageCircle className="w-3 h-3" />
+                            <span>ایتا</span>
+                          </a>
+
+                          {/* Single VCF */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              downloadVcfContacts(
+                                [{
+                                  name: lead.name,
+                                  managerName: lead.managerName,
+                                  phone: lead.phone,
+                                  additionalPhones: lead.additionalPhones,
+                                  category: lead.category,
+                                  address: lead.address
+                                }],
+                                `Contact_${normalizePhone(lead.phone)}.vcf`,
+                                vcfPrefix
+                              );
+                              toast.success(`مخاطب «${vcfPrefix}${lead.name}» دانلود شد.`);
+                            }}
+                            className="p-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg transition-colors cursor-pointer"
+                            title="دانلود کارت مخاطب گوشی (VCF)"
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

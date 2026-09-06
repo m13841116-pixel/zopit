@@ -22,7 +22,16 @@ import {
   DollarSign,
   TrendingUp,
   Plus,
+  Smartphone,
+  Send,
+  MessageCircle
 } from "lucide-react";
+import {
+  downloadVcfContacts,
+  getTelegramLink,
+  getEitaaLink,
+  normalizePhone
+} from "../../utils/contactExport";
 
 interface AllUsersListProps {
   initialRoleFilter?: string;
@@ -298,8 +307,37 @@ export default function AllUsersList({
         {/* Role Filter Tabs & Add Button */}
         <div className="flex flex-wrap items-center gap-3">
           <button
+            onClick={() => {
+              const suppliers = users.filter((u) => u.role === "SUPPLIER" || roleFilter === "SUPPLIER");
+              const targetList = suppliers.length > 0 ? suppliers : users.filter((u) => u.mobile);
+              if (targetList.length === 0) {
+                if (showNotification) showNotification("تامین‌کننده‌ای با شماره همراه یافت نشد.", "error");
+                return;
+              }
+              const contacts = targetList.map((u) => ({
+                name: u.brandName || u.storeName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username,
+                managerName: `${u.firstName || ""} ${u.lastName || ""}`.trim(),
+                phone: u.mobile,
+                address: u.address
+              }));
+              downloadVcfContacts(contacts, `Suppliers_${contacts.length}_Contacts.vcf`, "تامین‌کننده - ");
+              if (showNotification) {
+                showNotification(
+                  `فایل مخاطبین (${contacts.length} تامین‌کننده با پیشوند «تامین‌کننده - ») با موفقیت دانلود شد. برای اضافه شدن به گوشی، فایل را در موبایل باز کنید.`,
+                  "success"
+                );
+              }
+            }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+            title="دانلود تمام تامین‌کنندگان در قالب مخاطب گوشی (VCF) با پیشوند تامین‌کننده"
+          >
+            <Smartphone className="w-4 h-4" />
+            <span>خروجی مخاطبین گوشی تامین‌کنندگان (VCF)</span>
+          </button>
+
+          <button
             onClick={() => setShowAddUserModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all"
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-md shadow-purple-600/20 transition-all"
           >
             <Plus className="w-4 h-4" /> افزودن کاربر جدید
           </button>
@@ -478,9 +516,60 @@ export default function AllUsersList({
                       </>
                     )}
 
-                    {/* Actions Column (3 Icons) */}
+                    {/* Actions Column */}
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-1.5">
+                        {/* Quick Contact & Messaging buttons if mobile exists */}
+                        {u.mobile && (
+                          <>
+                            {/* Single VCF */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const contactName = u.brandName || u.storeName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username;
+                                downloadVcfContacts(
+                                  [{
+                                    name: contactName,
+                                    phone: u.mobile,
+                                    address: u.address
+                                  }],
+                                  `Contact_${normalizePhone(u.mobile)}.vcf`,
+                                  u.role === "SUPPLIER" ? "تامین‌کننده - " : ""
+                                );
+                                if (showNotification) {
+                                  showNotification(`کارت مخاطب «${contactName}» برای ذخیره در گوشی آماده شد.`, "success");
+                                }
+                              }}
+                              className="p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded-xl transition-all cursor-pointer"
+                              title="ذخیره در مخاطبین گوشی (VCF)"
+                            >
+                              <Smartphone className="w-4 h-4" />
+                            </button>
+
+                            {/* Telegram Chat */}
+                            <a
+                              href={getTelegramLink(u.mobile, "سلام و احترام، از پلتفرم زوپیت در ارتباط هستم.")}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 bg-sky-50 hover:bg-sky-500 text-sky-600 hover:text-white rounded-xl transition-all flex items-center justify-center"
+                              title="ارسال پیام مستقیم در تلگرام"
+                            >
+                              <Send className="w-4 h-4" />
+                            </a>
+
+                            {/* Eitaa Chat */}
+                            <a
+                              href={getEitaaLink(u.mobile)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 bg-amber-50 hover:bg-amber-600 text-amber-600 hover:text-white rounded-xl transition-all flex items-center justify-center"
+                              title="ارسال پیام در ایتا"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </a>
+                          </>
+                        )}
+
                         {/* 1. Login as User / Impersonate */}
                         <button
                           onClick={() => handleImpersonate(u)}
