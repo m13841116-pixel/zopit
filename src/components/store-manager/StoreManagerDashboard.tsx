@@ -740,24 +740,24 @@ export default function StoreManagerDashboard({
 
             <button
               onClick={() => setShowAutomationVideoModal(true)}
-              className="p-2 sm:px-3 sm:py-1.5 bg-gradient-to-r from-rose-500/10 via-purple-500/10 to-indigo-500/10 hover:from-rose-500/20 hover:to-indigo-500/20 text-rose-600 dark:text-rose-400 rounded-xl transition-all duration-200 border border-rose-500/30 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs group"
+              className="p-2 sm:px-3 sm:py-1.5 bg-rose-50 hover:bg-rose-100/80 text-rose-700 rounded-xl transition-colors border border-rose-200 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs group"
               title="مشاهده ویدیوی ۱ دقیقه‌ای آموزش سریع فروشگاه"
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
               </span>
-              <Play className="w-3.5 h-3.5 fill-current text-rose-500 group-hover:scale-110 transition-transform" />
-              <span className="text-[11px] font-black hidden sm:inline-block">آموزش سریع ۶۰ ثانیه‌ای</span>
+              <Play className="w-3.5 h-3.5 fill-current text-rose-600 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold hidden sm:inline-block">آموزش سریع ۶۰ ثانیه‌ای</span>
             </button>
 
             <button
               onClick={() => setShowEducationModal(true)}
-              className="p-2 bg-surface hover:bg-emerald-500/10 text-muted hover:text-emerald-600 rounded-xl transition-all duration-200 border border-subtle hover:border-emerald-200 cursor-pointer flex items-center justify-center gap-1.5"
+              className="p-2 sm:px-3 sm:py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl transition-colors border border-slate-200 cursor-pointer flex items-center justify-center gap-1.5"
               title="مرکز آموزش و ویدیوهای راهنما"
             >
-              <GraduationCap className="w-5 h-5 text-emerald-500" />
-              <span className="text-[11px] font-bold text-emerald-600 hidden md:inline-block">آموزش</span>
+              <GraduationCap className="w-4 h-4 text-slate-600" />
+              <span className="text-xs font-semibold hidden md:inline-block">آموزش</span>
             </button>
 
             <NotificationBell
