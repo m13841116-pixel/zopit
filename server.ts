@@ -7,6 +7,7 @@ try {
 } catch (e) {}
 import multer from 'multer';
 import AdmZip from 'adm-zip';
+import crypto from 'crypto';
 
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err);
@@ -1826,19 +1827,20 @@ function getValidProductImageUrlServer(p: any): string {
 
 
 if (!process.env.JWT_SECRET) {
-  console.warn('⚠️ WARNING: JWT_SECRET environment variable is missing. Using fallback for development.');
-  process.env.JWT_SECRET = 'dev_secret_key_123!@#';
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: JWT_SECRET environment variable is required in production mode!');
+  }
+  console.warn('⚠️ WARNING: JWT_SECRET environment variable is missing. Generating an ephemeral random secret for development session.');
+  process.env.JWT_SECRET = crypto.randomBytes(32).toString('hex');
 }
-
 
 if (!process.env.ENCRYPTION_KEY) {
-  console.warn('⚠️ WARNING: ENCRYPTION_KEY environment variable is missing. Using fallback for development.');
-  process.env.ENCRYPTION_KEY = '12345678901234567890123456789012';
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: ENCRYPTION_KEY environment variable is required in production mode!');
+  }
+  console.warn('⚠️ WARNING: ENCRYPTION_KEY environment variable is missing. Generating an ephemeral random key for development session.');
+  process.env.ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex').slice(0, 32);
 }
-
-
-
-
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -2940,7 +2942,10 @@ app.get('/api/auth/me', authenticateToken, async (req: any, res: any) => {
     if (!user) {
       return res.status(401).json({ error: 'Account Not Found (حساب کاربری یافت نشد.)' });
     }
-    const { password: _, ...userWithoutPassword } = user;
+    if (user.status === 'BLOCKED') {
+      return res.status(403).json({ error: 'حساب کاربری شما مسدود شده است.' });
+    }
+    const { password: _, apiKey: _k, ...userWithoutPassword } = user;
     return res.json({ user: userWithoutPassword });
   } catch (error) {
     return res.status(500).json({ error: 'خطا در تایید اعتبار.' });
@@ -2957,34 +2962,36 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const cleanUsername = String(username).trim();
-    const isSuperAdminCandidate = cleanUsername === 'admin' || cleanUsername === 'superadmin' || cleanUsername === '09120000000';
 
     let user: any = null;
     try {
-      user = await prisma.user.findUnique({ where: { username: cleanUsername } });
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: cleanUsername },
+            { mobile: cleanUsername }
+          ]
+        }
+      });
     } catch (queryErr: any) {
       if (queryErr?.code === 'P2022' || String(queryErr?.message || '').includes('does not exist')) {
         console.warn('[Login Auto-Heal] P2022 column missing error in login query, healing database schema now...');
         await ensureDatabaseSchemaColumns(getActivePrisma() || prisma, true);
-        user = await prisma.user.findUnique({ where: { username: cleanUsername } });
+        user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { username: cleanUsername },
+              { mobile: cleanUsername }
+            ]
+          }
+        });
       } else {
         throw queryErr;
       }
     }
 
-    if (!user && isSuperAdminCandidate) {
-      try {
-        user = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
-      } catch (saErr: any) {
-        if (saErr?.code === 'P2022' || String(saErr?.message || '').includes('does not exist')) {
-          await ensureDatabaseSchemaColumns(getActivePrisma() || prisma, true);
-          user = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
-        }
-      }
-    }
-
-    // Special auto-recovery for Super Admin login only in development environment
-    if (process.env.NODE_ENV !== 'production' && !user && isSuperAdminCandidate && process.env.SUPER_ADMIN_PASSWORD && password === process.env.SUPER_ADMIN_PASSWORD) {
+    // Special auto-recovery for Super Admin login ONLY in development environment
+    if (process.env.NODE_ENV !== 'production' && !user && (cleanUsername === 'admin' || cleanUsername === '09120000000') && process.env.SUPER_ADMIN_PASSWORD && password === process.env.SUPER_ADMIN_PASSWORD) {
       try {
         const hashedPassword = await bcrypt.hash(password, 10);
         user = await prisma.user.create({
@@ -3018,19 +3025,19 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'نام کاربری یا کلمه عبور نادرست است.' });
     }
 
-    // Check Supplier status if Supplier
-    if (user.role === 'SUPPLIER' && user.status === 'BLOCKED') {
+    // Check user blocked status across all roles
+    if (user.status === 'BLOCKED') {
       return res.status(403).json({ error: 'حساب کاربری شما مسدود شده است. لطفا با پشتیبانی تماس بگیرید.' });
     }
 
-    // Issue JWT
+    // Issue cryptographically signed JWT
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: user.role, status: user.status },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: _, apiKey: _k, ...userWithoutPassword } = user;
     return res.json({
       message: 'ورود با موفقیت انجام شد.',
       token,
@@ -3044,7 +3051,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // --- OTP / Mobile-based Authentication (MelliPayamak & SMS) ---
-const activeOtps = new Map<string, { code: string; expires: number }>();
+const activeOtps = new Map<string, { code: string; expires: number; attempts: number }>();
 
 function sanitizeMobileDigits(input: string): string {
   if (!input) return '';
@@ -3091,18 +3098,30 @@ app.post('/api/auth/send-otp', async (req, res) => {
       return res.status(404).json({ error: 'حساب کاربری با این شماره موبایل یا نام کاربری یافت نشد.' });
     }
 
-    // Generate 5-digit OTP
-    const code = Math.floor(10000 + Math.random() * 90000).toString();
-    activeOtps.set(cleanMobile, { code, expires: Date.now() + 180000 }); // 3 min expiry
-    activeOtps.set(withZero, { code, expires: Date.now() + 180000 });
-    activeOtps.set(withoutZero, { code, expires: Date.now() + 180000 });
-    activeOtps.set(user.username, { code, expires: Date.now() + 180000 });
+    if (user.status === 'BLOCKED') {
+      return res.status(403).json({ error: 'حساب کاربری شما مسدود شده است. لطفاً با پشتیبانی تماس بگیرید.' });
+    }
+
+    // Rate limit: enforce 60 seconds interval between OTP generation per user
+    const existingActiveOtp = activeOtps.get(cleanMobile);
+    if (existingActiveOtp && (existingActiveOtp.expires - Date.now() > 120000)) {
+      const waitSec = Math.ceil((existingActiveOtp.expires - 120000 - Date.now()) / 1000);
+      return res.status(429).json({ error: `لطفاً ${waitSec > 0 ? waitSec : 60} ثانیه دیگر مجدداً تلاش نمایید.` });
+    }
+
+    // Generate cryptographically secure 5-digit OTP
+    const code = crypto.randomInt(10000, 100000).toString();
+    const otpData = { code, expires: Date.now() + 180000, attempts: 0 }; // 3 min expiry, max 3 attempts
+    activeOtps.set(cleanMobile, otpData);
+    activeOtps.set(withZero, otpData);
+    activeOtps.set(withoutZero, otpData);
+    activeOtps.set(user.username, otpData);
     if (user.mobile) {
       const dbMobileClean = sanitizeMobileDigits(user.mobile);
       const dbMobileNorm = dbMobileClean.startsWith('0') ? dbMobileClean.slice(1) : dbMobileClean;
-      activeOtps.set(dbMobileClean, { code, expires: Date.now() + 180000 });
-      activeOtps.set('0' + dbMobileNorm, { code, expires: Date.now() + 180000 });
-      activeOtps.set(dbMobileNorm, { code, expires: Date.now() + 180000 });
+      activeOtps.set(dbMobileClean, otpData);
+      activeOtps.set('0' + dbMobileNorm, otpData);
+      activeOtps.set(dbMobileNorm, otpData);
     }
 
     // Send SMS via MelliPayamak
@@ -3110,6 +3129,12 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const result = await sendOtpSms(targetPhone, code);
 
     if (result && (result as any).simulated) {
+      if (process.env.NODE_ENV === 'production') {
+        return res.json({
+          success: true,
+          message: 'کد تایید با موفقیت از طریق پیامک ارسال گردید.'
+        });
+      }
       return res.json({
         success: true,
         simulated: true,
@@ -3150,11 +3175,17 @@ app.post('/api/auth/login-otp', async (req, res) => {
       return res.status(400).json({ error: 'کد تایید منقضی شده است. لطفا مجددا کد دریافت کنید.' });
     }
 
-    if (stored.code !== cleanCode && cleanCode !== '12345') { // Bypass for easy testing
-      return res.status(400).json({ error: 'کد تایید معتبر نیست.' });
+    // Strict validation without backdoor + attempt tracking (max 3)
+    if (stored.code !== cleanCode) {
+      stored.attempts = (stored.attempts || 0) + 1;
+      if (stored.attempts >= 3) {
+        activeOtps.delete(cleanMobile);
+        return res.status(400).json({ error: 'بیش از ۳ بار کد نادرست وارد شد. کد منقضی گردید. لطفاً مجدداً درخواست کد دهید.' });
+      }
+      return res.status(400).json({ error: `کد تایید نادرست است. (${3 - stored.attempts} تلاش باقی‌مانده)` });
     }
 
-    // Delete OTP after successful verification
+    // Invalidate OTP immediately after successful verification
     activeOtps.delete(cleanMobile);
 
     const normalizedMobile = cleanMobile.startsWith('0') ? cleanMobile.slice(1) : cleanMobile;
@@ -3177,7 +3208,7 @@ app.post('/api/auth/login-otp', async (req, res) => {
       return res.status(404).json({ error: 'حساب کاربری یافت نشد.' });
     }
 
-    if (user.role === 'SUPPLIER' && user.status === 'BLOCKED') {
+    if (user.status === 'BLOCKED') {
       return res.status(403).json({ error: 'حساب کاربری شما مسدود شده است. لطفا با پشتیبانی تماس بگیرید.' });
     }
 
@@ -3189,14 +3220,14 @@ app.post('/api/auth/login-otp', async (req, res) => {
       }
     } catch (e) {}
 
-    // Issue JWT
+    // Issue cryptographically signed JWT
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: user.role, status: user.status },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: _, apiKey: _k, ...userWithoutPassword } = user;
     return res.json({
       message: 'ورود با موفقیت انجام شد.',
       token,
@@ -3320,57 +3351,33 @@ app.post('/api/admin/sms/test', authenticateToken, requireAdmin, async (req: any
 // --- Auth Middleware ---
 function authenticateToken(req: any, res: any, next: any) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : (authHeader && authHeader.split(' ')[1]);
   
   if (!token) {
-    // In dev / preview environment, fallback to demo supplier if no token provided
-    req.user = { userId: 5, id: 5, username: 'demo_supplier', role: 'SUPPLIER', status: 'ACTIVE' };
-    return next();
+    return res.status(401).json({ error: 'توکن احراز هویت الزامی است.' });
   }
 
-  // 1. Try standard verification
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (!err && user) {
-      req.user = { ...user, userId: user.userId || user.id, id: user.id || user.userId };
-      return next();
+    if (err || !user) {
+      return res.status(401).json({ error: 'توکن نامعتبر یا منقضی شده است.' });
     }
 
-    // 2. Try common dev secrets in case server restarted with different key
-    try {
-      const devDecoded = jwt.verify(token, 'dev_secret_key_123!@#') as any;
-      if (devDecoded) {
-        req.user = { ...devDecoded, userId: devDecoded.userId || devDecoded.id, id: devDecoded.id || devDecoded.userId };
-        return next();
-      }
-    } catch {}
+    if (user.status === 'BLOCKED') {
+      return res.status(403).json({ error: 'حساب کاربری شما مسدود شده است.' });
+    }
 
-    // 3. Fallback to decoding token payload
-    try {
-      const decoded: any = jwt.decode(token);
-      if (decoded && (decoded.userId || decoded.id || decoded.role || decoded.username)) {
-        req.user = {
-          ...decoded,
-          userId: decoded.userId || decoded.id || 5,
-          id: decoded.id || decoded.userId || 5,
-          role: decoded.role || 'SUPPLIER'
-        };
-        return next();
-      }
-    } catch {}
-
-    // 4. Default fallback for development preview
-    req.user = { userId: 5, id: 5, username: 'demo_supplier', role: 'SUPPLIER', status: 'ACTIVE' };
+    req.user = {
+      ...user,
+      userId: user.userId || user.id,
+      id: user.id || user.userId
+    };
     return next();
   });
 };
 
 function requireSupplier(req: any, res: any, next: any) {
-  if (req.user?.role !== 'SUPPLIER' && req.user?.role !== 'SUPERADMIN' && req.user?.role !== 'ADMIN') {
-    if (req.user) {
-      req.user.role = 'SUPPLIER';
-      return next();
-    }
-    return res.status(403).json({ error: 'فقط تامینکنندگان دسترسی دارند' });
+  if (req.user?.role !== 'SUPPLIER' && req.user?.role !== 'SUPER_ADMIN' && req.user?.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'دسترسی فقط برای تامین‌کنندگان مجاز است' });
   }
   next();
 };
@@ -4142,14 +4149,22 @@ app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSup
 app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 5);
+    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    if (!supplierId) {
+      return res.status(401).json({ error: 'اطلاعات کاربری نامعتبر است.' });
+    }
     const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl } = req.body;
     
     // Ensure product exists
     const existing = await prisma.product.findFirst({
-      where: { id: parseInt(id) }
+      where: { id: parseInt(id, 10) }
     });
     if (!existing) return res.status(404).json({ error: 'محصول یافت نشد' });
+
+    // Enforce ownership: suppliers can only update their own products
+    if (req.user?.role === 'SUPPLIER' && existing.supplierId !== supplierId) {
+      return res.status(403).json({ error: 'شما دسترسی ویرایش این محصول را ندارید.' });
+    }
 
     let actualCategoryId = safeParseInt(categoryId);
     if (actualCategoryId > 0) {
@@ -4238,21 +4253,49 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
   }
 });
 
-// Get orders containing this supplier's products
+// Get orders containing this supplier's products with pagination
 app.get('/api/supplier/orders', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const orderItems = await prisma.orderItem.findMany({
-      where: { supplierId: req.user.userId },
-      include: {
-        order: {
-          include: {
-            store: true
-          }
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+    const skip = (page - 1) * limit;
+
+    const whereClause = { supplierId: req.user.userId };
+
+    const [totalCount, orderItems] = await Promise.all([
+      prisma.orderItem.count({ where: whereClause }),
+      prisma.orderItem.findMany({
+        where: whereClause,
+        include: {
+          order: {
+            include: {
+              store: true
+            }
+          },
+          product: true,
+          variant: true
         },
-        product: true,
-        variant: true
-      }
-    });
+        orderBy: { id: 'desc' },
+        skip,
+        take: limit
+      })
+    ]);
+
+    res.setHeader('X-Total-Count', totalCount.toString());
+    res.setHeader('X-Page', page.toString());
+    res.setHeader('X-Limit', limit.toString());
+    res.setHeader('X-Total-Pages', Math.ceil(totalCount / limit).toString());
+
+    if (req.query.format === 'paginated') {
+      return res.json({
+        data: orderItems,
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit)
+      });
+    }
+
     res.json(orderItems);
   } catch (err: any) {
     res.status(500).json({ error: 'خطا در دریافت سفارشات' });
@@ -4266,6 +4309,9 @@ app.post('/api/supplier/orders/ship-batch', authenticateToken, requireSupplier, 
     const { itemIds } = req.body;
     if (!Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ error: 'لیست سفارشات نامعتبر است' });
+    }
+    if (itemIds.length > 50) {
+      return res.status(400).json({ error: 'حداکثر ۵۰ سفارش را می‌توان در یک مرحله به صورت دسته‌ای ارسال کرد.' });
     }
     
     let updatedItems: any[] = [];
@@ -4907,15 +4953,15 @@ function requireSuperAdmin(req: any, res: any, next: any) {
   next();
 }
 function requireAdmin(req: any, res: any, next: any) {
-  if (req.user?.role !== 'SUPER_ADMIN') {
-    return res.status(403).json({ error: 'دسترسی فقط برای مدیر کل مجاز است' });
+  if (req.user?.role !== 'ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'دسترسی فقط برای مدیران مجاز است' });
   }
   next();
 };
 
 // --- Store Manager API Routes ---
 function requireStoreManager(req: any, res: any, next: any) {
-  if (req.user?.role !== 'STORE_MANAGER') {
+  if (req.user?.role !== 'STORE_MANAGER' && req.user?.role !== 'SUPER_ADMIN') {
     return res.status(403).json({ error: 'دسترسی فقط برای مدیر فروشگاه مجاز است' });
   }
   next();
@@ -5137,8 +5183,8 @@ app.get('/api/store-manager/marketplace-products', authenticateToken, requireSto
     const now = new Date();
     
     // Pagination params
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
     // Filters
@@ -5150,32 +5196,43 @@ app.get('/api/store-manager/marketplace-products', authenticateToken, requireSto
 
     if (search) {
       where.OR = [
-        { name: { contains: search } },
-        { shortDescription: { contains: search } }
+        { name: { contains: search, mode: 'insensitive' } },
+        { shortDescription: { contains: search, mode: 'insensitive' } }
       ];
     }
     if (category) {
       where.category = { name: category };
     }
 
-    const products = await prisma.product.findMany({
-      where,
-      include: {
-        category: true,
-        images: true,
-        variants: true,
-        supplier: true,
-        exploreContent: true
-      },
-      orderBy: [
-        { isPinned: 'desc' },
-        { id: 'desc' }
-      ],
-      skip,
-      take: limit
-    });
-
-    const total = await prisma.product.count({ where });
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: {
+          category: true,
+          images: true,
+          variants: true,
+          supplier: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              brandName: true,
+              province: true,
+              city: true
+            }
+          },
+          exploreContent: true
+        },
+        orderBy: [
+          { isPinned: 'desc' },
+          { id: 'desc' }
+        ],
+        skip,
+        take: limit
+      }),
+      prisma.product.count({ where })
+    ]);
 
     // Format products and include ONLY allowed supplier details (name, username, province, city)
     const sanitizedProducts = products.map((product: any) => {
@@ -5687,7 +5744,18 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
       return res.status(400).json({ error: 'کد محصول یا لیست اقلام الزامی است.' });
     }
 
-    // Resolve products and details
+    // Resolve products and details via Batch queries to eliminate N+1 overhead
+    const productIds = Array.from(new Set(rawItems.map(i => i.productId).filter(Boolean)));
+    const variantIds = Array.from(new Set(rawItems.map(i => i.variantId).filter((v): v is number => Boolean(v))));
+
+    const [products, variants] = await Promise.all([
+      prisma.product.findMany({ where: { id: { in: productIds } } }),
+      variantIds.length > 0 ? prisma.productVariant.findMany({ where: { id: { in: variantIds } } }) : Promise.resolve([])
+    ]);
+
+    const productMap = new Map<number, any>(products.map((p: any) => [p.id, p]));
+    const variantMap = new Map<number, any>(variants.map((v: any) => [v.id, v]));
+
     const resolvedItems: Array<{
       product: any;
       variantId: number | null;
@@ -5700,9 +5768,7 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
 
     for (const itemReq of rawItems) {
       if (!itemReq.productId) continue;
-      const product = await prisma.product.findUnique({
-        where: { id: itemReq.productId }
-      });
+      const product: any = productMap.get(itemReq.productId);
       if (!product) {
         return res.status(404).json({ error: `محصول با کد ${itemReq.productId} یافت نشد.` });
       }
@@ -5712,9 +5778,7 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
       let finalVariantId: number | null = null;
 
       if (itemReq.variantId) {
-        const variant = await prisma.productVariant.findUnique({
-          where: { id: itemReq.variantId }
-        });
+        const variant: any = variantMap.get(itemReq.variantId);
         if (variant && variant.productId === product.id) {
           finalVariantId = variant.id;
           supplierPrice = variant.supplierBasePrice || product.supplierBasePrice || 0;
@@ -5839,6 +5903,9 @@ app.get('/api/store-manager/orders', authenticateToken, requireStoreManager, asy
   try {
     const storeId = req.user.userId;
     const { status } = req.query; // unpaid or paid
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+    const skip = (page - 1) * limit;
 
     let whereClause: any = { storeId };
     if (status === 'unpaid') {
@@ -5858,19 +5925,39 @@ app.get('/api/store-manager/orders', authenticateToken, requireStoreManager, asy
       ];
     }
 
-    const orders = await prisma.order.findMany({
-      where: whereClause,
-      include: {
-        invoice: true,
-        items: { include: { product: { include: { supplier: true } }, variant: true } }
-      },
-      orderBy: { id: 'desc' }
-    });
+    const [totalCount, orders] = await Promise.all([
+      prisma.order.count({ where: whereClause }),
+      prisma.order.findMany({
+        where: whereClause,
+        include: {
+          invoice: true,
+          items: { include: { product: { include: { supplier: true } }, variant: true } }
+        },
+        orderBy: { id: 'desc' },
+        skip,
+        take: limit
+      })
+    ]);
 
     const mappedOrders = orders.map((o: any) => ({
       ...o,
       storeInvoice: o.invoice
     }));
+
+    res.setHeader('X-Total-Count', totalCount.toString());
+    res.setHeader('X-Page', page.toString());
+    res.setHeader('X-Limit', limit.toString());
+    res.setHeader('X-Total-Pages', Math.ceil(totalCount / limit).toString());
+
+    if (req.query.format === 'paginated') {
+      return res.json({
+        data: mappedOrders,
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit)
+      });
+    }
 
     res.json(mappedOrders);
   } catch (err: any) {
@@ -5968,7 +6055,6 @@ app.post('/api/store-manager/notifications/settings', authenticateToken, require
 // ==========================================
 // STORE MANAGER WOOCOMMERCE & API KEY SETTINGS
 // ==========================================
-import crypto from 'crypto';
 
 // 1. Get Store Manager API Settings (API Key & Profit Margin)
 app.get('/api/store-manager/settings', authenticateToken, requireStoreManager, async (req: any, res: any) => {
@@ -6277,15 +6363,20 @@ app.post('/api/v1/store/orders', authenticateStoreApiKey, async (req: any, res: 
     let totalBaseAmount = 0;
     const itemsToCreate: any[] = [];
 
+    // Batch fetch all requested products and variants
+    const productIds = Array.from(new Set(rawItems.map(i => Number(i.product_id)).filter(Boolean)));
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      include: { variants: true }
+    });
+    const productMap = new Map<number, any>(products.map((p: any) => [p.id, p]));
+
     for (const rawItem of rawItems) {
       const pId = Number(rawItem.product_id);
       const vId = rawItem.variant_id ? Number(rawItem.variant_id) : null;
       const qty = Math.max(1, Number(rawItem.quantity || 1));
 
-      const product = await prisma.product.findUnique({
-        where: { id: pId },
-        include: { variants: true }
-      });
+      const product: any = productMap.get(pId);
 
       if (!product) {
         return res.status(404).json({ success: false, error: `محصولی با شناسه ${pId} در بانک اطلاعاتی زوپیت یافت نشد.` });
@@ -6566,72 +6657,75 @@ app.put('/api/store-manager/orders/:id/shipping', authenticateToken, requireStor
 
 // Helper to deduct product & variant inventory immediately when order is paid by store manager
 async function deductOrderInventory(tx: any, orders: any[]) {
-  try {
-    for (const o of orders) {
-      const orderItems = await tx.orderItem.findMany({
-        where: { orderId: o.id },
-        include: { product: true }
-      });
+  for (const o of orders) {
+    const orderItems = await tx.orderItem.findMany({
+      where: { orderId: o.id },
+      include: { product: true }
+    });
 
-      for (const item of orderItems) {
-        const qty = item.quantity || 1;
-        if (item.variantId) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { decrement: qty } }
-          }).catch((err: any) => console.warn(`Error decrementing variant stock ${item.variantId}:`, err.message));
+    // Sort deterministically to prevent database deadlocks under concurrent multi-item transactions
+    orderItems.sort((a: any, b: any) => ((a.variantId || 0) - (b.variantId || 0)) || ((a.productId || 0) - (b.productId || 0)));
+
+    for (const item of orderItems) {
+      const qty = item.quantity || 1;
+      if (item.variantId) {
+        // Atomic conditional update on ProductVariant at database level
+        const affected: number = await tx.$executeRaw`
+          UPDATE "ProductVariant"
+          SET stock = stock - ${qty}
+          WHERE id = ${item.variantId} AND stock >= ${qty}
+        `;
+        if (affected === 0) {
+          throw new Error(`موجودی تنوع کالا با شناسه ${item.variantId} برای کسر ${qty} عدد کافی نمی‌باشد.`);
         }
-        if (item.productId) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { inventory: { decrement: qty } }
-          }).catch((err: any) => console.warn(`Error decrementing product inventory ${item.productId}:`, err.message));
+      }
+      if (item.productId) {
+        // Atomic conditional update on Product at database level
+        const affected: number = await tx.$executeRaw`
+          UPDATE "Product"
+          SET inventory = inventory - ${qty}
+          WHERE id = ${item.productId} AND inventory >= ${qty}
+        `;
+        if (affected === 0) {
+          throw new Error(`موجودی محصول با شناسه ${item.productId} برای کسر ${qty} عدد کافی نمی‌باشد.`);
         }
       }
     }
-  } catch (err: any) {
-    console.error('Error in deductOrderInventory:', err.message);
   }
 }
 
 // Helper to restore inventory when an order item is cancelled or rejected
 async function restoreOrderItemInventory(tx: any, item: any) {
-  try {
-    if (!item) return;
-    const qty = item.quantity || 1;
-    if (item.variantId) {
-      await tx.productVariant.update({
-        where: { id: item.variantId },
-        data: { stock: { increment: qty } }
-      }).catch((err: any) => console.warn(`Error incrementing variant stock ${item.variantId}:`, err.message));
-    }
-    if (item.productId) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { inventory: { increment: qty } }
-      }).catch((err: any) => console.warn(`Error incrementing product inventory ${item.productId}:`, err.message));
-    }
-  } catch (err: any) {
-    console.error('Error restoring order item inventory:', err.message);
+  if (!item) return;
+  const qty = item.quantity || 1;
+  if (item.variantId) {
+    await tx.$executeRaw`
+      UPDATE "ProductVariant"
+      SET stock = stock + ${qty}
+      WHERE id = ${item.variantId}
+    `;
+  }
+  if (item.productId) {
+    await tx.$executeRaw`
+      UPDATE "Product"
+      SET inventory = inventory + ${qty}
+      WHERE id = ${item.productId}
+    `;
   }
 }
 
 // Helper to restore inventory when an entire order is cancelled or rejected
 async function restoreOrderInventory(tx: any, orderOrOrders: any) {
-  try {
-    const ordersList = Array.isArray(orderOrOrders) ? orderOrOrders : [orderOrOrders];
-    for (const o of ordersList) {
-      const orderId = typeof o === 'number' ? o : o?.id;
-      if (!orderId) continue;
-      const items = await tx.orderItem.findMany({
-        where: { orderId }
-      });
-      for (const item of items) {
-        await restoreOrderItemInventory(tx, item);
-      }
+  const ordersList = Array.isArray(orderOrOrders) ? orderOrOrders : [orderOrOrders];
+  for (const o of ordersList) {
+    const orderId = typeof o === 'number' ? o : o?.id;
+    if (!orderId) continue;
+    const items = await tx.orderItem.findMany({
+      where: { orderId }
+    });
+    for (const item of items) {
+      await restoreOrderItemInventory(tx, item);
     }
-  } catch (err: any) {
-    console.error('Error restoring order inventory:', err.message);
   }
 }
 
@@ -6988,7 +7082,7 @@ app.post('/api/store-manager/settle-orders', authenticateToken, requireStoreMana
         return res.json({ payLink: zibalResult.payLink, invoiceId: invoice.id });
       } catch (paymentErr: any) {
         console.warn('Server-side Zibal payment creation failed, providing client-side payment fallback:', paymentErr.message);
-        const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || 'zibal';
         const baseUrl = getCanonicalAppUrl(req);
         return res.json({
           success: true,
@@ -7093,7 +7187,7 @@ app.post('/api/store-manager/invoices/:id/pay', authenticateToken, requireStoreM
       return res.json({ payLink, invoiceId: invoice.id });
     } catch (paymentErr: any) {
       console.warn('Error creating Zibal payment for invoice, using client fallback:', paymentErr.message);
-      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || 'zibal';
       return res.json({
         success: true,
         clientPaymentRequired: true,
@@ -7112,15 +7206,42 @@ app.post('/api/store-manager/invoices/:id/pay', authenticateToken, requireStoreM
 
 app.get('/api/admin/manual-invoices', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
-    const invoices = await prisma.storeInvoice.findMany({
-      where: {
-        paymentMethod: 'MANUAL'
-      },
-      include: {
-        storeManager: true
-      },
-      orderBy: { id: 'desc' }
-    });
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+    const skip = (page - 1) * limit;
+
+    const whereClause = {
+      paymentMethod: 'MANUAL'
+    };
+
+    const [totalCount, invoices] = await Promise.all([
+      prisma.storeInvoice.count({ where: whereClause }),
+      prisma.storeInvoice.findMany({
+        where: whereClause,
+        include: {
+          storeManager: true
+        },
+        orderBy: { id: 'desc' },
+        skip,
+        take: limit
+      })
+    ]);
+
+    res.setHeader('X-Total-Count', totalCount.toString());
+    res.setHeader('X-Page', page.toString());
+    res.setHeader('X-Limit', limit.toString());
+    res.setHeader('X-Total-Pages', Math.ceil(totalCount / limit).toString());
+
+    if (req.query.format === 'paginated') {
+      return res.json({
+        data: invoices,
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit)
+      });
+    }
+
     res.json(invoices);
   } catch (err: any) {
     console.error('Get manual invoices error:', err);
@@ -7132,6 +7253,16 @@ app.get('/api/admin/manual-invoices', authenticateToken, requireAdmin, async (re
 app.post('/api/admin/system/update', authenticateToken, requireAdmin, multerFn({ dest: rootUploadsDir }).any(), async (req: any, res: any) => {
   try {
     const uploadedFile = (req.files && req.files.length > 0) ? req.files[0] : req.file;
+
+    if (process.env.NODE_ENV === 'production' || process.env.ALLOW_RUNTIME_CODE_UPDATES !== 'true') {
+      if (uploadedFile?.path) {
+        try { fs.unlinkSync(uploadedFile.path); } catch (e) {}
+      }
+      return res.status(403).json({
+        error: 'عملیات بروزرسانی زنده کد در محیط پروداکشن به دلایل امنیتی غیرفعال است. لطفاً از طریق فرآیند استقرار (CI/CD یا Git) اقدام نمایید.'
+      });
+    }
+
     if (!uploadedFile) {
       return res.status(400).json({ error: 'فایلی ارسال نشده است' });
     }
@@ -7271,15 +7402,19 @@ app.post('/api/admin/manual-invoices/:id/approve', authenticateToken, requireAdm
     }
 
     await prisma.$transaction(async (tx) => {
-      // Update invoice status
-      await tx.storeInvoice.update({
-        where: { id: invoiceId },
+      // Atomic compare-and-swap update on StoreInvoice status to prevent concurrent double-processing
+      const affected = await tx.storeInvoice.updateMany({
+        where: { id: invoiceId, status: { not: 'PAID' } },
         data: {
           status: 'PAID',
           receiptStatus: 'APPROVED',
           paidAt: new Date()
         }
       });
+
+      if (affected.count === 0) {
+        return; // Already approved idempotently by a concurrent request
+      }
 
       // Update all orders linked to this invoice to PAID
       await tx.order.updateMany({
@@ -7307,6 +7442,9 @@ app.post('/api/admin/manual-invoices/:id/approve', authenticateToken, requireAdm
 
       // Automatically deduct product/variant inventory for these paid orders
       await deductOrderInventory(tx, orders);
+
+      // Automatically credit supplier wallets for these paid orders
+      await creditSuppliersForOrders(tx, orders);
     });
 
     res.json({ message: 'فیش واریزی با موفقیت تایید و سفارشات تسویه شدند.' });
@@ -7442,7 +7580,7 @@ app.post('/api/wallet/deposit', authenticateToken, async (req: any, res: any) =>
     } catch (paymentErr: any) {
       console.warn('[Payment Failed] Took ' + (Date.now() - (req.paymentStartTime || 0)) + 'ms. Error:', paymentErr.message);
       console.warn('Server Zibal error for wallet deposit, providing client fallback:', paymentErr.message);
-      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || 'zibal';
       return res.json({
         success: true,
         clientPaymentRequired: true,
@@ -7501,24 +7639,65 @@ app.get('/api/public/wallet/deposit/callback', async (req: any, res: any) => {
       const refId = verification.refId || trackId.toString();
 
       await prisma.$transaction(async (tx) => {
+        let targetAmount = amount;
+        let targetUserId = userId;
+
+        // Verify and bind to StoreInvoice if provided
+        const invoiceId = req.query.invoiceId;
+        if (invoiceId && !isNaN(parseInt(invoiceId, 10))) {
+          const invoice = await tx.storeInvoice.findUnique({
+            where: { id: parseInt(invoiceId, 10) }
+          });
+          if (!invoice) {
+            throw new Error('فاکتور افزایش موجودی یافت نشد.');
+          }
+          if (invoice.storeManagerId !== userId) {
+            throw new Error('شناسه کاربر با فاکتور افزایش موجودی تطابق ندارد.');
+          }
+          // Idempotency check 1: invoice already marked as PAID
+          if (invoice.status === 'PAID') {
+            return; // Already processed and credited, safe idempotent exit
+          }
+          targetAmount = invoice.totalAmount;
+          targetUserId = invoice.storeManagerId;
+        }
+
         // Ensure wallet exists
         let wallet = await tx.wallet.findUnique({
-          where: { supplierId: userId }
+          where: { supplierId: targetUserId }
         });
         
         if (!wallet) {
           wallet = await tx.wallet.create({
-            data: { supplierId: userId, balance: 0 }
+            data: { supplierId: targetUserId, balance: 0 }
           });
         }
 
-        // Create wallet history entry
+        // Idempotency check 2: verify if this transaction / refId has already been credited in ledger
+        const existingEntry = await tx.ledgerEntry.findFirst({
+          where: {
+            walletId: wallet.id,
+            status: 'COMPLETED',
+            OR: [
+              { referenceId: String(refId) },
+              { referenceId: String(trackId) },
+              { description: { contains: String(refId) } }
+            ]
+          }
+        });
+
+        if (existingEntry) {
+          return; // Already processed and credited, safe idempotent exit
+        }
+
+        // Create wallet ledger entry with explicit referenceId
         await tx.ledgerEntry.create({
           data: {
             walletId: wallet.id,
-            amount,
+            amount: targetAmount,
             type: 'DEPOSIT',
             status: 'COMPLETED',
+            referenceId: String(refId),
             description: `افزایش موجودی آنلاین (کد رهگیری: ${refId})`
           }
         });
@@ -7528,20 +7707,19 @@ app.get('/api/public/wallet/deposit/callback', async (req: any, res: any) => {
           where: { id: wallet.id },
           data: {
             balance: {
-              increment: amount
+              increment: targetAmount
             }
           }
         });
         
-        // Update StoreInvoice if provided
-        const invoiceId = req.query.invoiceId;
+        // Update StoreInvoice to PAID
         if (invoiceId && !isNaN(parseInt(invoiceId, 10))) {
           await tx.storeInvoice.update({
             where: { id: parseInt(invoiceId, 10) },
             data: {
               status: 'PAID',
               paidAt: new Date(),
-              trackId: refId
+              trackId: String(refId)
             }
           });
         }
@@ -7679,8 +7857,9 @@ app.get('/api/public/store-invoice/callback', async (req: any, res: any) => {
     if (verification && verification.success) {
       const refId = verification.refId || resolvedTrackId.toString();
       await prisma.$transaction(async (tx) => {
-        await tx.storeInvoice.update({
-          where: { id: invoiceId },
+        // Atomic compare-and-swap update on StoreInvoice status to guarantee idempotency under concurrent callbacks
+        const affected = await tx.storeInvoice.updateMany({
+          where: { id: invoiceId, status: { not: 'PAID' } },
           data: {
             status: 'PAID',
             paidAt: new Date(),
@@ -7689,7 +7868,18 @@ app.get('/api/public/store-invoice/callback', async (req: any, res: any) => {
           }
         });
 
-        for (const order of invoice.orders) {
+        if (affected.count === 0) {
+          return; // Already processed idempotently by another concurrent callback
+        }
+
+        const currentInvoice = await tx.storeInvoice.findUnique({
+          where: { id: invoiceId },
+          include: { orders: true }
+        });
+
+        if (!currentInvoice) return;
+
+        for (const order of currentInvoice.orders) {
           if (order.status !== 'PAID') {
             await tx.order.update({
               where: { id: order.id },
@@ -7710,7 +7900,10 @@ app.get('/api/public/store-invoice/callback', async (req: any, res: any) => {
         }
 
         // Automatically deduct product/variant inventory upon payment completion
-        await deductOrderInventory(tx, invoice.orders);
+        await deductOrderInventory(tx, currentInvoice.orders);
+
+        // Automatically credit supplier wallets for these paid orders
+        await creditSuppliersForOrders(tx, currentInvoice.orders);
       });
       return res.redirect(`${baseUrl}/?payment_status=success&invoiceId=${invoiceId}&trackId=${resolvedTrackId}&refId=${refId}`);
     } else {
@@ -7742,6 +7935,15 @@ app.get('/api/public/store-invoice/pay-simulate', async (req: any, res: any) => 
     }
 
     await prisma.$transaction(async (tx) => {
+      const currentInvoice = await tx.storeInvoice.findUnique({
+        where: { id: invoiceId },
+        include: { orders: true }
+      });
+
+      if (!currentInvoice || currentInvoice.status === 'PAID') {
+        return; // Already paid idempotently
+      }
+
       // Update invoice to PAID
       await tx.storeInvoice.update({
         where: { id: invoiceId },
@@ -7777,6 +7979,9 @@ app.get('/api/public/store-invoice/pay-simulate', async (req: any, res: any) => 
 
       // Automatically deduct product/variant inventory for these paid orders
       await deductOrderInventory(tx, orders);
+
+      // Automatically credit supplier wallets for these paid orders
+      await creditSuppliersForOrders(tx, orders);
     });
 
     // Redirect to frontend with success parameters
@@ -7986,13 +8191,23 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
     const isAutoApprove = settingsMap['pro_auto_approve'] !== 'false';
     const initialStatus = isAutoApprove ? 'APPROVED' : 'PENDING';
 
-    // Incredible Offer Logic: Pro Max license & package (14.8M) is 100% FREE.
-    // Cloud Hosting (15GB SSD NVMe, 5 Core CPU, 5GB RAM) - 299,000 Tomans (Discounted from 900,000 Tomans)
-    let defaultPrice = parseInt(settingsMap['promax_account_price'] || '299000', 10);
+    // Pricing calculation based on planType:
+    // Startup: 259,000 Tomans base price. Enamad is official fee of 50,000 Tomans (added only if selected).
+    // Pro & VIP: Enamad is 100% free / covered by Zopit.
+    let defaultPrice = 259000;
+    if (planType === 'VIP') {
+      defaultPrice = 1490000;
+    } else if (planType === 'PRO') {
+      defaultPrice = 599000;
+    } else if (planType === 'STARTUP') {
+      defaultPrice = 259000;
+    } else {
+      defaultPrice = parseInt(settingsMap['promax_account_price'] || '299000', 10);
+    }
     
     let basePrice = defaultPrice;
-    let enamadCost = hasEnamad ? 50000 : 0;
-    let totalPayable = basePrice + enamadCost; // No domain fee
+    let enamadCost = (planType === 'STARTUP' && hasEnamad) ? 50000 : 0;
+    let totalPayable = basePrice + enamadCost; // Startup enamad is 50,000 if selected
     
     // Promo Code / Discount Code logic
     if (promoCodeInput && promoCodeInput.trim()) {
@@ -8109,7 +8324,7 @@ app.post('/api/store-manager/pro/register', authenticateToken, requireStoreManag
       } catch (paymentErr: any) {
         console.warn('[Payment Failed] Took ' + (Date.now() - (req.paymentStartTime || 0)) + 'ms. Error:', paymentErr.message);
       console.warn('Server Zibal error for pro register, providing client fallback:', paymentErr.message);
-        const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+        const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || 'zibal';
         return res.json({
           success: true,
           clientPaymentRequired: true,
@@ -8165,7 +8380,7 @@ app.post('/api/store-manager/pro/renew-host', authenticateToken, requireStoreMan
     } catch (paymentErr: any) {
       console.warn('[Payment Failed] Took ' + (Date.now() - (req.paymentStartTime || 0)) + 'ms. Error:', paymentErr.message);
       console.warn('Server Zibal error for renew-host, providing client fallback:', paymentErr.message);
-      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || 'zibal';
       return res.json({
         success: true,
         clientPaymentRequired: true,
@@ -8214,7 +8429,7 @@ app.post('/api/store-manager/pro/pay-torob', authenticateToken, requireStoreMana
     } catch (paymentErr: any) {
       console.warn('[Payment Failed] Took ' + (Date.now() - (req.paymentStartTime || 0)) + 'ms. Error:', paymentErr.message);
       console.warn('Server Zibal error for pay-torob, providing client fallback:', paymentErr.message);
-      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || 'zibal';
       return res.json({
         success: true,
         clientPaymentRequired: true,
@@ -8663,21 +8878,21 @@ app.put('/api/admin/payouts/:id', authenticateToken, requireAdmin, async (req: a
       return res.status(400).json({ error: 'Invalid status' });
     }
     
-    const payoutRequest = await prisma.payoutRequest.findUnique({ where: { id: payoutId } });
-    if (!payoutRequest) {
-      return res.status(404).json({ error: 'Payout request not found' });
-    }
-    
-    // Check if it's already in final state
-    if (payoutRequest.status === 'SUCCESS' || payoutRequest.status === 'FAILED') {
-      return res.status(400).json({ error: 'Payout is already in a final state' });
-    }
-
     await prisma.$transaction(async (tx) => {
+      const payoutRequest = await tx.payoutRequest.findUnique({ where: { id: payoutId } });
+      if (!payoutRequest) {
+        throw new Error('Payout request not found');
+      }
+      
+      // Check if it's already in final state
+      if (payoutRequest.status === 'SUCCESS' || payoutRequest.status === 'FAILED') {
+        throw new Error('Payout is already in a final state');
+      }
+
       // Update payout status
       await tx.payoutRequest.update({
         where: { id: payoutId },
-        data: { status }
+        data: { status, financiallyLocked: status === 'SUCCESS' }
       });
 
       // Update associated ledger entry
@@ -8701,7 +8916,7 @@ app.put('/api/admin/payouts/:id', authenticateToken, requireAdmin, async (req: a
 
     res.json({ success: true, message: `Payout status updated to ${status}` });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -8820,6 +9035,11 @@ app.post('/api/admin/settlements/:id/approve', authenticateToken, requireAdmin, 
 
     if (payoutResult.success) {
       await prisma.$transaction(async (tx) => {
+        const currentPR = await tx.payoutRequest.findUnique({ where: { id: payoutId } });
+        if (!currentPR || (currentPR.status !== 'PENDING' && currentPR.status !== 'PROCESSING')) {
+          throw new Error('درخواست قبلاً نهایی شده است یا تغییر وضعیت داده است.');
+        }
+
         await tx.payoutRequest.update({
           where: { id: payoutId },
           data: { 
@@ -8844,21 +9064,22 @@ app.post('/api/admin/settlements/:id/approve', authenticateToken, requireAdmin, 
       return res.json({ success: true, message: 'درخواست تسویه تایید شد و در وضعیت در حال پردازش قرار گرفت. (انتقال خودکار ناموفق بود)' });
     }
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 app.post('/api/admin/settlements/:id/reject', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
     const payoutId = req.params.id;
-    const payoutRequest = await prisma.payoutRequest.findUnique({ where: { id: payoutId } });
-    if (!payoutRequest) {
-      return res.status(404).json({ error: 'درخواست تسویه یافت نشد' });
-    }
-    if (payoutRequest.status === 'SUCCESS' || payoutRequest.status === 'FAILED') {
-      return res.status(400).json({ error: 'درخواست قبلاً نهایی شده است' });
-    }
 
     await prisma.$transaction(async (tx) => {
+      const currentPR = await tx.payoutRequest.findUnique({ where: { id: payoutId } });
+      if (!currentPR) {
+        throw new Error('درخواست تسویه یافت نشد');
+      }
+      if (currentPR.status === 'SUCCESS' || currentPR.status === 'FAILED') {
+        throw new Error('درخواست قبلاً نهایی شده است');
+      }
+
       // Set status to FAILED/REJECTED
       await tx.payoutRequest.update({
         where: { id: payoutId },
@@ -8873,10 +9094,10 @@ app.post('/api/admin/settlements/:id/reject', authenticateToken, requireAdmin, a
 
       // Return the amount to the wallet balance
       await tx.wallet.update({
-        where: { id: payoutRequest.walletId },
+        where: { id: currentPR.walletId },
         data: {
           balance: {
-            increment: payoutRequest.amount
+            increment: currentPR.amount
           }
         }
       });
@@ -8884,7 +9105,7 @@ app.post('/api/admin/settlements/:id/reject', authenticateToken, requireAdmin, a
 
     res.json({ success: true, message: 'درخواست تسویه رد شد و مبلغ به کیف پول بازگردانده شد.' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -8893,15 +9114,15 @@ app.post('/api/admin/settlements/:id/pay', authenticateToken, requireAdmin, asyn
     const payoutId = req.params.id;
     const { receiptUrl, transactionRef, paymentDate, paymentNotes } = req.body;
 
-    const payoutRequest = await prisma.payoutRequest.findUnique({ where: { id: payoutId } });
-    if (!payoutRequest) {
-      return res.status(404).json({ error: 'درخواست تسویه یافت نشد' });
-    }
-    if (payoutRequest.status === 'SUCCESS' || payoutRequest.status === 'FAILED') {
-      return res.status(400).json({ error: 'درخواست قبلاً نهایی شده است' });
-    }
-
     await prisma.$transaction(async (tx) => {
+      const currentPR = await tx.payoutRequest.findUnique({ where: { id: payoutId } });
+      if (!currentPR) {
+        throw new Error('درخواست تسویه یافت نشد');
+      }
+      if (currentPR.status === 'SUCCESS' || currentPR.status === 'FAILED') {
+        throw new Error('درخواست قبلاً نهایی شده است');
+      }
+
       // Set status to SUCCESS
       await tx.payoutRequest.update({
         where: { id: payoutId },
@@ -8924,7 +9145,7 @@ app.post('/api/admin/settlements/:id/pay', authenticateToken, requireAdmin, asyn
 
     res.json({ success: true, message: 'پرداخت با موفقیت نهایی و ثبت شد.' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -9218,21 +9439,38 @@ app.get('/api/admin/analytics/performance', authenticateToken, requireAdmin, asy
   }
 });
 
+// In-memory cache for admin overview stats (TTL: 30 seconds)
+let cachedAdminStats: { data: any; expiresAt: number } | null = null;
+
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
-    const suppliersCount = await prisma.user.count({ where: { role: 'SUPPLIER' } });
-    const storesCount = await prisma.user.count({ where: { role: 'STORE_MANAGER' } });
-    const productsCount = await prisma.product.count();
-    const ordersCount = await prisma.order.count();
-    const totalRevenue = await prisma.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: 'PAID' } });
+    const now = Date.now();
+    if (cachedAdminStats && cachedAdminStats.expiresAt > now) {
+      return res.json(cachedAdminStats.data);
+    }
 
-    res.json({
+    const [suppliersCount, storesCount, productsCount, ordersCount, totalRevenue] = await Promise.all([
+      prisma.user.count({ where: { role: 'SUPPLIER' } }),
+      prisma.user.count({ where: { role: 'STORE_MANAGER' } }),
+      prisma.product.count(),
+      prisma.order.count(),
+      prisma.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: 'PAID' } })
+    ]);
+
+    const result = {
       suppliers: suppliersCount,
       stores: storesCount,
       activeProducts: productsCount,
       orders: ordersCount,
       totalRevenue: totalRevenue._sum.totalAmount || 0
-    });
+    };
+
+    cachedAdminStats = {
+      data: result,
+      expiresAt: now + 30 * 1000 // 30s TTL
+    };
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'خطا در دریافت آمار' });
   }
@@ -9261,7 +9499,7 @@ app.get('/api/admin/export-all-data', authenticateToken, requireAdmin, async (re
     const backupData = {
       exportedAt: new Date().toISOString(),
       version: "1.0",
-      users: users.map(({ password, ...u }: any) => u), // Exclude password hashes for security
+      users: users.map(({ password, apiKey, ...u }: any) => u), // Exclude password hashes and API keys for security
       products,
       categories,
       productImages,
@@ -10706,23 +10944,80 @@ app.post('/api/admin/dev/restart', authenticateToken, requireAdmin, async (req: 
 });
 
 
-app.post('/api/upload', authenticateToken, multerFn({ dest: rootUploadsDir }).single('file'), async (req: any, res: any) => {
+// Helper function to validate uploaded file signature (Magic Bytes)
+function validateUploadSignature(filePath: string, ext: string): boolean {
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    const buffer = Buffer.alloc(16);
+    fs.readSync(fd, buffer, 0, 16, 0);
+    fs.closeSync(fd);
+
+    const lowerExt = ext.toLowerCase();
+    if (lowerExt === '.jpg' || lowerExt === '.jpeg') {
+      // JPEG magic bytes: FF D8 FF
+      return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    }
+    if (lowerExt === '.png') {
+      // PNG magic bytes: 89 50 4E 47
+      return buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
+    }
+    if (lowerExt === '.webp') {
+      // WEBP magic bytes: RIFF....WEBP
+      return buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP';
+    }
+    if (lowerExt === '.pdf') {
+      // PDF magic bytes: %PDF
+      return buffer.toString('ascii', 0, 4) === '%PDF';
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+const safeUploadMulter = multerFn({
+  dest: rootUploadsDir,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB maximum file size
+});
+
+app.post('/api/upload', authenticateToken, safeUploadMulter.single('file'), async (req: any, res: any) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded.' });
+      return res.status(400).json({ error: 'هیچ فایلی برای آپلود انتخاب نشده است.' });
+    }
+
+    const rawExt = path.extname(req.file.originalname || '').toLowerCase();
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf']);
+
+    if (!allowedExtensions.has(rawExt)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      return res.status(400).json({
+        error: 'فرمت فایل غیرمجاز است. تنها فایل‌های تصویری (JPG, PNG, WEBP) و اسناد PDF مجاز می‌باشند.'
+      });
+    }
+
+    // Verify magic bytes
+    const isMagicValid = validateUploadSignature(req.file.path, rawExt);
+    if (!isMagicValid) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      return res.status(400).json({
+        error: 'محتوای فایل معتبر نیست یا با پسوند آن همخوانی ندارد.'
+      });
     }
     
-    // Move and rename the file with original extension
-    const ext = path.extname(req.file.originalname) || '';
-    const newFilename = `${req.file.filename}${ext}`;
-    const newPath = path.join(rootUploadsDir, newFilename);
+    // Generate secure randomized filename to eliminate Path Traversal
+    const safeFilename = `${Date.now()}_${crypto.randomBytes(8).toString('hex')}${rawExt}`;
+    const newPath = path.join(rootUploadsDir, safeFilename);
     fs.renameSync(req.file.path, newPath);
     
-    const fileUrl = `/uploads/${newFilename}`;
+    const fileUrl = `/uploads/${safeFilename}`;
     res.json({ url: fileUrl });
   } catch (err: any) {
     console.error('File upload error:', err);
-    res.status(500).json({ error: 'خطا در آپلود فایل' });
+    if (req.file?.path) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
+    res.status(500).json({ error: 'خطا در آپلود فایل: ' + (err?.message || 'خطای سرور') });
   }
 });
 
@@ -10731,10 +11026,19 @@ if (!fs.existsSync(devUploadDir)) {
   try { fs.mkdirSync(devUploadDir, { recursive: true }); } catch (e) {}
 }
 
-const upload = multerFn({ dest: devUploadDir });
+const upload = multerFn({ dest: devUploadDir, limits: { fileSize: 50 * 1024 * 1024 } });
 
 app.post('/api/admin/dev/update', authenticateToken, requireAdmin, upload.single('updateZip'), async (req: any, res: any) => {
   try {
+    if (process.env.NODE_ENV === 'production' || process.env.ALLOW_RUNTIME_CODE_UPDATES !== 'true') {
+      if (req.file?.path) {
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+      }
+      return res.status(403).json({
+        error: 'عملیات بروزرسانی زنده کد در محیط پروداکشن به دلایل امنیتی غیرفعال است. لطفاً از طریق فرآیند استقرار (CI/CD یا Git) اقدام نمایید.'
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'هیچ فایلی ارسال نشده است' });
     }
@@ -11698,25 +12002,37 @@ app.get('/api/public/checkout/callback', async (req, res) => {
       const refId = verification.refId || resolvedTrackId.toString();
       const nextStatus = 'PROCESSING';
       
-      const updatedOrder = await prisma.order.update({
-        where: { id: parsedOrderId },
-        data: {
-          status: nextStatus,
-          trackingCode: refId,
-          statusHistory: {
-            create: {
-              fromStatus: order.status,
-              toStatus: nextStatus,
-              actorRole: 'SYSTEM',
-              actorName: 'درگاه پرداخت زیبال',
-              note: `پرداخت سفارش با موفقیت تایید شد. کد رهگیری: ${refId}`
+      await prisma.$transaction(async (tx) => {
+        const currentOrder = await tx.order.findUnique({
+          where: { id: parsedOrderId }
+        });
+        if (!currentOrder || currentOrder.status === 'PAID' || currentOrder.status === 'PROCESSING' || currentOrder.status === 'COMPLETED') {
+          return; // Already processed, safe idempotent exit
+        }
+
+        const updatedOrder = await tx.order.update({
+          where: { id: parsedOrderId },
+          data: {
+            status: nextStatus,
+            trackingCode: refId,
+            statusHistory: {
+              create: {
+                fromStatus: currentOrder.status,
+                toStatus: nextStatus,
+                actorRole: 'SYSTEM',
+                actorName: 'درگاه پرداخت زیبال',
+                note: `پرداخت سفارش با موفقیت تایید شد. کد رهگیری: ${refId}`
+              }
             }
           }
-        }
-      });
+        });
 
-      // Deduct inventory for paid order
-      await deductOrderInventory(prisma, [updatedOrder]);
+        // Deduct inventory for paid order
+        await deductOrderInventory(tx, [updatedOrder]);
+
+        // Credit supplier revenue
+        await creditSuppliersForOrders(tx, [updatedOrder]);
+      });
 
       return res.redirect(`${baseUrl}/?payment_status=success&trackId=${resolvedTrackId}&orderId=${orderId}&refNumber=${refId}`);
     } else {
@@ -11981,25 +12297,37 @@ const handlePaymentCallback = async (req: any, res: any) => {
     if (verification && verification.success) {
       const refId = verification.refId || String(trackId);
       if (orderToUpdate) {
-        await prisma.order.update({
-          where: { id: orderToUpdate.id },
-          data: {
-            status: 'PAID',
-            trackingCode: refId,
-            statusHistory: {
-              create: {
-                fromStatus: orderToUpdate.status,
-                toStatus: 'PAID',
-                actorRole: 'SYSTEM',
-                actorName: 'درگاه پرداخت زیبال',
-                note: `پرداخت با موفقیت تایید شد. کد رهگیری: ${refId}`
+        await prisma.$transaction(async (tx) => {
+          const currentOrder = await tx.order.findUnique({
+            where: { id: orderToUpdate.id }
+          });
+          if (!currentOrder || currentOrder.status === 'PAID' || currentOrder.status === 'SUCCESS' || currentOrder.status === 'COMPLETED') {
+            return; // Idempotently exit
+          }
+
+          const updatedOrder = await tx.order.update({
+            where: { id: orderToUpdate.id },
+            data: {
+              status: 'PAID',
+              trackingCode: refId,
+              statusHistory: {
+                create: {
+                  fromStatus: currentOrder.status,
+                  toStatus: 'PAID',
+                  actorRole: 'SYSTEM',
+                  actorName: 'درگاه پرداخت زیبال',
+                  note: `پرداخت با موفقیت تایید شد. کد رهگیری: ${refId}`
+                }
               }
             }
-          }
-        }).catch(() => null);
+          });
 
-        // Deduct inventory for paid order
-        await deductOrderInventory(prisma, [orderToUpdate]);
+          // Deduct inventory for paid order
+          await deductOrderInventory(tx, [updatedOrder]);
+
+          // Credit supplier revenue
+          await creditSuppliersForOrders(tx, [updatedOrder]);
+        });
       }
 
       return res.redirect(
@@ -13239,14 +13567,14 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       if (!merchantToTest || merchantToTest === 'zibal_merchant_key') {
         try {
           const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
-          merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+          merchantToTest = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || 'zibal';
         } catch (dbErr) {
-          merchantToTest = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+          merchantToTest = process.env.ZIBAL_MERCHANT_ID || 'zibal';
         }
       }
 
       if (!merchantToTest) {
-        merchantToTest = '6a0213e61b27742a09938588';
+        merchantToTest = 'zibal';
       }
       
       const baseUrl = getCanonicalAppUrl(req);
@@ -13308,14 +13636,14 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       if (!merchantToUse || merchantToUse === 'zibal_merchant_key') {
         try {
           const savedSetting = await prisma.systemConfig.findUnique({ where: { key: 'PAYMENT_GATEWAY_MERCHANT_CODE' } });
-          merchantToUse = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+          merchantToUse = savedSetting?.value || process.env.ZIBAL_MERCHANT_ID || 'zibal';
         } catch (dbErr) {
-          merchantToUse = process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+          merchantToUse = process.env.ZIBAL_MERCHANT_ID || 'zibal';
         }
       }
 
       if (!merchantToUse) {
-        merchantToUse = '6a0213e61b27742a09938588';
+        merchantToUse = 'zibal';
       }
 
       const baseUrl = getCanonicalAppUrl(req);

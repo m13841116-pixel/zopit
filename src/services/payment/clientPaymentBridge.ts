@@ -22,8 +22,8 @@ export interface UniversalPaymentResult {
   error?: string;
 }
 
-const DEFAULT_PROXY_SECRET = "ZopitSec_9f84b13a7c6e25d0e81f72ac39014b";
-const DEFAULT_ZIBAL_MERCHANT = "6a0213e61b27742a09938588";
+const DEFAULT_PROXY_SECRET = (import.meta as any).env?.VITE_PROXY_SECRET || "";
+const DEFAULT_ZIBAL_MERCHANT = (import.meta as any).env?.VITE_ZIBAL_MERCHANT_ID || "zibal";
 
 const PRIMARY_PROXY_URL = "https://bankkalaha.ir/zibal-proxy.php";
 const BACKUP_PROXY_URL = "https://www.bankkalaha.ir/zibal-proxy.php";

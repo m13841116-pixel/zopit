@@ -208,21 +208,21 @@ export class WalletService {
       throw new Error('Payout amount must be greater than zero.');
     }
 
-    // Safety check: Ensure no payout is requested if there are already PENDING or PROCESSING payouts
-    // (Prevents double-payouts by restricting concurrent payout requests)
-    const activePayouts = await prisma.payoutRequest.findFirst({
-      where: {
-        walletId,
-        status: { in: [PayoutStatus.PENDING, PayoutStatus.PROCESSING] }
+    const payoutRequest = await prisma.$transaction(async (tx: any) => {
+      // 1. Safety check inside transaction: Ensure no payout is requested if there are already PENDING or PROCESSING payouts
+      // (Prevents double-payouts and race conditions on concurrent requests)
+      const activePayout = await tx.payoutRequest.findFirst({
+        where: {
+          walletId,
+          status: { in: [PayoutStatus.PENDING, PayoutStatus.PROCESSING] }
+        }
+      });
+
+      if (activePayout) {
+        throw new Error('An active payout request already exists. Please wait for it to complete.');
       }
-    });
 
-    if (activePayouts) {
-      throw new Error('An active payout request already exists. Please wait for it to complete.');
-    }
-
-    const payoutRequest = await prisma.$transaction(async  (tx: any) => {
-      // 1. Fetch wallet
+      // 2. Fetch wallet
       const wallet = await tx.wallet.findUnique({
         where: { id: walletId },
       });
@@ -231,12 +231,12 @@ export class WalletService {
         throw new Error('Wallet not found.');
       }
 
-      // 2. Ensure sufficient funds
+      // 3. Ensure sufficient funds
       if (wallet.balance.lt(payoutAmount)) {
         throw new Error(`Insufficient funds for payout. Available balance: ${wallet.balance.toString()}`);
       }
 
-      // 3. Decrement balance to lock the funds immediately
+      // 4. Decrement balance to lock the funds immediately
       const updatedWallet = await tx.wallet.update({
         where: { id: walletId },
         data: {
@@ -250,7 +250,7 @@ export class WalletService {
         throw new Error('Insufficient funds. Transaction reverted.');
       }
 
-      // 4. Create a PayoutRequest in PROCESSING state (we are about to request it)
+      // 5. Create a PayoutRequest in PROCESSING state
       const pr = await tx.payoutRequest.create({
         data: {
           walletId,
@@ -261,7 +261,7 @@ export class WalletService {
         },
       });
 
-      // 5. Create a PENDING LedgerEntry to represent the locked funds
+      // 6. Create a PENDING LedgerEntry to represent the locked funds
       await tx.ledgerEntry.create({
         data: {
           walletId,

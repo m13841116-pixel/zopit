@@ -39,8 +39,10 @@ import {
   ArrowLeft,
   UserCheck,
   ChevronLeft,
-  ChevronRight
-, Volume2 } from "lucide-react";
+  ChevronRight,
+  Volume2,
+  Timer
+} from "lucide-react";
 import { toast } from "../GlobalToast";
 import { ProAccountMediaShowcase } from "./ProAccountMediaShowcase";
 import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
@@ -76,35 +78,28 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     termsContent: ""
   });
 
-  // 24-Hour countdown timer state with auto-renewal and localStorage persistence
-  const [countdown, setCountdown] = useState({ hours: 23, minutes: 59, seconds: 59 });
+  // Midnight countdown timer state with auto-renewal every midnight (12 شب به ۱۲ شب)
+  const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    const storageKey = "zopit_promax_offer_expiry";
-    let expiry = localStorage.getItem(storageKey);
-    const now = Date.now();
-    if (!expiry || parseInt(expiry, 10) <= now) {
-      const newExpiry = now + 24 * 60 * 60 * 1000;
-      localStorage.setItem(storageKey, newExpiry.toString());
-      expiry = newExpiry.toString();
-    }
-
-    const timer = setInterval(() => {
-      const currentNow = Date.now();
-      let targetTime = parseInt(localStorage.getItem(storageKey) || "0", 10);
-      let diff = targetTime - currentNow;
+    const updateCountdown = () => {
+      const now = new Date();
+      const target = new Date();
+      target.setHours(23, 59, 59, 999);
+      let diff = target.getTime() - now.getTime();
       if (diff <= 0) {
-        // Auto-renew timer for next 24 hours so offer remains live and active
-        const renewed = currentNow + 24 * 60 * 60 * 1000;
-        localStorage.setItem(storageKey, renewed.toString());
-        diff = renewed - currentNow;
+        // Automatically renews for the next midnight
+        target.setDate(target.getDate() + 1);
+        diff = target.getTime() - now.getTime();
       }
-      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-      const minutes = Math.floor((diff / (1000 * 60)) % 60);
-      const seconds = Math.floor((diff / 1000) % 60);
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
       setCountdown({ hours, minutes, seconds });
-    }, 1000);
+    };
 
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -165,7 +160,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
       // Calculate applied discount amount
       const planCost = selectedPlan === 'VIP' ? (billingCycle === 'ANNUAL' ? 9900000 : 1490000) : selectedPlan === 'PRO' ? (billingCycle === 'ANNUAL' ? 1490000 : 599000) : 259000;
-      const adminServicesCost = hasEnamad ? 50000 : 0;
+      const adminServicesCost = (selectedPlan === 'STARTUP' && hasEnamad) ? 50000 : 0;
       const totalCost = planCost + adminServicesCost;
       
       let discountAmount = 0;
@@ -505,7 +500,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     const signatureImage = signatureDataUrl || (canvas ? canvas.toDataURL("image/png") : "");
 
     const planCost = selectedPlan === 'VIP' ? (billingCycle === 'ANNUAL' ? 9900000 : 1490000) : selectedPlan === 'PRO' ? (billingCycle === 'ANNUAL' ? 1490000 : 599000) : 259000;
-    const adminServicesCost = hasEnamad ? 50000 : 0;
+    const adminServicesCost = (selectedPlan === 'STARTUP' && hasEnamad) ? 50000 : 0;
     const subtotal = planCost + adminServicesCost;
     const calculatedAmount = Math.max(0, subtotal - appliedDiscount);
 
@@ -1353,6 +1348,35 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                 </div>
               </div>
 
+              {/* Midnight countdown reminder */}
+              <div className="bg-gradient-to-r from-amber-500/10 via-indigo-500/5 to-amber-500/10 border border-amber-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0">
+                    <Timer className="w-5 h-5 text-amber-700" />
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm font-extrabold text-amber-950 flex items-center gap-2 flex-wrap">
+                      <span>تخفیف و تعرفه ویژه راه‌اندازی (معتبر تا ۲۴:۰۰ امشب)</span>
+                      <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                        تمدید خودکار هر شب ساعت ۱۲ شب
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      {selectedPlan === "STARTUP"
+                        ? "پلن استارتاپ بر اساس کف قیمت مصوب سرور ابری محاسبه شده و ثبت‌نام تا پایان امروز معتبر است."
+                        : "تعرفه‌های تخفیف سالانه و ماهانه تا پایان امروز فعال بوده و هر شب ساعت ۱۲ تمدید می‌شوند."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-white border border-amber-200 px-3.5 py-1.5 rounded-xl shadow-2xs shrink-0" dir="ltr">
+                  <span className="text-[11px] font-bold text-slate-400 font-sans">اعتبار تا ۱۲ شب:</span>
+                  <span className="font-mono font-black text-sm sm:text-base text-amber-600">
+                    {String(countdown.hours).padStart(2, '0')}:{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')}
+                  </span>
+                </div>
+              </div>
+
               {/* APPLICANT INFO & SERVICES FORM */}
               <div className="space-y-8">
                 {/* SECTION 1: STORE MANAGER PROFILE */}
@@ -1408,40 +1432,63 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
 
                 {/* SECTION 2: ADMIN SERVICES */}
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-slate-900 font-bold text-sm border-b border-slate-100 pb-2.5">
-                    <Shield className="w-4 h-4 text-indigo-600" />
-                    <span>۲. خدمات اداری و زیرساختی (رایگان با پلن پرومکس)</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                      <Shield className="w-4 h-4 text-indigo-600" />
+                      <span>۲. خدمات اداری، حقوقی و درگاه پرداخت</span>
+                    </div>
+                    {selectedPlan === "STARTUP" ? (
+                      <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                        پلن استارتاپ: ۵۰,۰۰۰ تومان تعرفه دولتی ای‌نماد
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        رایگان با پلن‌های پرو و VIP (تقبل ۱۰۰٪ توسط زوپیت)
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <label className="flex items-start gap-3 cursor-pointer bg-slate-50/70 hover:bg-slate-50 p-4 rounded-2xl border border-slate-200 transition-colors">
+                    <label className={`flex items-start gap-3 cursor-pointer p-4 rounded-2xl border transition-all ${
+                      hasEnamad ? "bg-indigo-50/40 border-indigo-200" : "bg-slate-50/70 hover:bg-slate-50 border-slate-200"
+                    }`}>
                       <input
                         type="checkbox"
                         checked={hasEnamad}
                         onChange={(e) => setHasEnamad(e.target.checked)}
-                        className="mt-1 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-white border-slate-300"
+                        className="mt-1 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-white border-slate-300 cursor-pointer"
                       />
-                      <div>
+                      <div className="flex-1">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs font-bold text-slate-800">اخذ ای‌نماد و درگاه پرداخت</span>
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            رایگان
-                          </span>
+                          <span className="text-xs font-bold text-slate-800">اخذ نماد اعتماد الکترونیکی (ای‌نماد)</span>
+                          {selectedPlan === "STARTUP" ? (
+                            <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300">
+                              + ۵۰,۰۰۰ تومان
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              رایگان
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
-                          دریافت نماد اعتماد الکترونیک و درگاه بانکی مستقیم با نام خود شما.
+                          {selectedPlan === "STARTUP"
+                            ? "به دلیل محاسبه پلن استارتاپ با کف قیمت، هزینه مصوب سامانه دولتی اینماد (۵۰ هزار تومان) دریافت شده و تمامی مراحل اداری و تاییدیه توسط زوپیت پیگیری و انجام می‌شود."
+                            : "اخذ رسمی ای‌نماد و کلیه پیگیری‌های اداری به نام شما، با تقبل ۱۰۰٪ هزینه‌ها توسط زوپیت."}
                         </p>
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer bg-slate-50/70 hover:bg-slate-50 p-4 rounded-2xl border border-slate-200 transition-colors">
+                    <label className={`flex items-start gap-3 cursor-pointer p-4 rounded-2xl border transition-all ${
+                      hasTaxProfile ? "bg-indigo-50/40 border-indigo-200" : "bg-slate-50/70 hover:bg-slate-50 border-slate-200"
+                    }`}>
                       <input
                         type="checkbox"
                         checked={hasTaxProfile}
                         onChange={(e) => setHasTaxProfile(e.target.checked)}
-                        className="mt-1 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-white border-slate-300"
+                        className="mt-1 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-white border-slate-300 cursor-pointer"
                       />
-                      <div>
+                      <div className="flex-1">
                         <div className="flex justify-between items-center mb-1">
                           <span className="text-xs font-bold text-slate-800">تشکیل پرونده مالیاتی</span>
                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -1449,7 +1496,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
-                          ثبت‌نام و تشکیل پرونده در سازمان امور مالیاتی کشور.
+                          ثبت‌نام و تشکیل پرونده مالیاتی معتبر در سازمان امور مالیاتی کشور بدون نیاز به مراجعه حضوری.
                         </p>
                       </div>
                     </label>
@@ -1527,6 +1574,38 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                       </span>
                     </div>
 
+                    {/* Itemized Enamad cost row */}
+                    {hasEnamad && (
+                      <div className="flex justify-between items-center text-sm py-1 border-t border-slate-200/60 pt-2">
+                        <span className="text-slate-600 flex items-center gap-1.5">
+                          <Shield className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>تعرفه صدور ای‌نماد (سامانه دولتی اینماد):</span>
+                        </span>
+                        {selectedPlan === 'STARTUP' ? (
+                          <span className="text-amber-900 font-bold bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md text-xs">
+                            + ۵۰,۰۰۰ تومان
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-xs">
+                            رایگان (تقبل ۱۰۰٪ توسط زوپیت)
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tax profile row */}
+                    {hasTaxProfile && (
+                      <div className="flex justify-between items-center text-sm py-1 border-t border-slate-200/60 pt-2">
+                        <span className="text-slate-600 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>تشکیل پرونده در سازمان امور مالیاتی:</span>
+                        </span>
+                        <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-xs">
+                          رایگان
+                        </span>
+                      </div>
+                    )}
+
                     {/* Promo code */}
                     <div className="pt-4 border-t border-slate-200/80">
                       <label className="text-xs font-semibold text-slate-600 block mb-2">
@@ -1577,7 +1656,16 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     <div className="flex justify-between items-center text-base pt-4 border-t border-slate-200/80">
                       <span className="text-slate-800 font-extrabold">مبلغ قابل پرداخت:</span>
                       <span className="text-indigo-600 font-extrabold text-xl">
-                        {Math.max(0, (selectedPlan === 'VIP' ? (billingCycle === 'ANNUAL' ? 9900000 : 1490000) : selectedPlan === 'PRO' ? (billingCycle === 'ANNUAL' ? 1490000 : 599000) : 259000) + (hasEnamad ? 50000 : 0) - appliedDiscount).toLocaleString()} تومان
+                        {Math.max(
+                          0, 
+                          (selectedPlan === 'VIP' 
+                            ? (billingCycle === 'ANNUAL' ? 9900000 : 1490000) 
+                            : selectedPlan === 'PRO' 
+                              ? (billingCycle === 'ANNUAL' ? 1490000 : 599000) 
+                              : 259000) 
+                          + ((selectedPlan === 'STARTUP' && hasEnamad) ? 50000 : 0) 
+                          - appliedDiscount
+                        ).toLocaleString()} تومان
                       </span>
                     </div>
                   </div>

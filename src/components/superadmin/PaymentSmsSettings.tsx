@@ -87,7 +87,7 @@ export default function PaymentSmsSettings() {
   const [smsTestResult, setSmsTestResult] = useState<any>(null);
 
   const handleTestGateway = async () => {
-    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode || '6a0213e61b27742a09938588');
+    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode);
     if (!liveMerchant) {
       toast("لطفاً ابتدا کد مرچنت / ترمینال درگاه را وارد فرمایید", "error");
       return;
@@ -186,7 +186,7 @@ export default function PaymentSmsSettings() {
   };
 
   const handleCreateTestInvoice = async () => {
-    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode || '6a0213e61b27742a09938588');
+    const liveMerchant = gatewayType === 'SEP' ? sepTerminalId : (zibalMerchantCode || merchantCode);
     if (!liveMerchant) {
       toast("لطفاً ابتدا کد مرچنت را وارد فرمایید", "error");
       return;
@@ -361,14 +361,14 @@ export default function PaymentSmsSettings() {
           if (data.PAYMENT_GATEWAY_MERCHANT_CODE && data.PAYMENT_GATEWAY_MERCHANT_CODE !== 'zibal' && data.PAYMENT_GATEWAY_MERCHANT_CODE !== 'zibal_merchant_key') {
             setMerchantCode(String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim());
           } else {
-            setMerchantCode('6a0213e61b27742a09938588');
+            setMerchantCode('');
           }
           if (data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE && data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE !== 'zibal' && data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE !== 'zibal_merchant_key') {
             setZibalMerchantCode(String(data.PAYMENT_GATEWAY_ZIBAL_MERCHANT_CODE).trim());
           } else if (data.PAYMENT_GATEWAY_MERCHANT_CODE && data.PAYMENT_GATEWAY_MERCHANT_CODE !== 'zibal' && data.PAYMENT_GATEWAY_MERCHANT_CODE !== 'zibal_merchant_key') {
             setZibalMerchantCode(String(data.PAYMENT_GATEWAY_MERCHANT_CODE).trim());
           } else {
-            setZibalMerchantCode('6a0213e61b27742a09938588');
+            setZibalMerchantCode('');
           }
           if (data.PAYMENT_GATEWAY_SEP_TERMINAL_ID) {
             setSepTerminalId(String(data.PAYMENT_GATEWAY_SEP_TERMINAL_ID).trim());

@@ -18,11 +18,43 @@ import {
   Globe,
   LifeBuoy,
   ChevronDown,
-  Info
+  Info,
+  Timer,
+  Clock,
+  Flame
 } from "lucide-react";
 
 export type PlanId = "STARTUP" | "PRO" | "VIP";
 export type BillingCycle = "MONTHLY" | "ANNUAL";
+
+// Custom hook to calculate remaining time until 24:00 (12 midnight) and auto-renew every midnight
+export function useMidnightCountdown() {
+  const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      const target = new Date();
+      target.setHours(23, 59, 59, 999);
+      let diff = target.getTime() - now.getTime();
+      if (diff <= 0) {
+        // Automatically renew for the next day's midnight (24:00)
+        target.setDate(target.getDate() + 1);
+        diff = target.getTime() - now.getTime();
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setCountdown({ hours, minutes, seconds });
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return countdown;
+}
 
 interface PricingPlansTableProps {
   selectedPlan: PlanId;
@@ -38,6 +70,7 @@ export function PricingPlansTable({
   onProceedToForm 
 }: PricingPlansTableProps) {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(externalBillingCycle || "ANNUAL");
+  const countdown = useMidnightCountdown();
 
   useEffect(() => {
     if (externalBillingCycle && externalBillingCycle !== billingCycle) {
@@ -112,6 +145,54 @@ export function PricingPlansTable({
         </div>
       </div>
 
+      {/* ======================= MIDNIGHT RESETTING COUNTDOWN BANNER ======================= */}
+      <div className="max-w-4xl mx-auto bg-gradient-to-r from-amber-500/10 via-indigo-500/5 to-amber-500/10 border border-amber-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="space-y-1.5 text-center md:text-right">
+            <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <span className="text-xs sm:text-sm font-extrabold text-amber-950 flex items-center gap-1.5">
+                <Timer className="w-4 h-4 text-amber-600" />
+                فرصت ویژه ثبت‌نام با تعرفه کف قیمت استارتاپ (۲۵۹,۰۰۰ تومان)
+              </span>
+              <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
+                تمدید خودکار هر شب ساعت ۱۲ شب
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
+              این تعرفه صرفاً با پوشش حداقل هزینه‌های هاست ابری و با کف قیمت مصوب ارائه شده است. مهلت استفاده تا پایان امروز (ساعت ۲۴:۰۰) معتبر بوده و در پایان هر شب به صورت خودکار تمدید می‌گردد.
+            </p>
+          </div>
+
+          {/* Live Countdown Display */}
+          <div className="flex items-center gap-2 bg-white border border-amber-200 px-4 py-2.5 rounded-xl shadow-xs shrink-0" dir="ltr">
+            <div className="text-center min-w-[2.4rem]">
+              <div className="text-base sm:text-lg font-black font-mono text-slate-900 leading-tight">
+                {String(countdown.hours).padStart(2, '0')}
+              </div>
+              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">ساعت</div>
+            </div>
+            <span className="text-amber-500 font-bold text-sm">:</span>
+            <div className="text-center min-w-[2.4rem]">
+              <div className="text-base sm:text-lg font-black font-mono text-slate-900 leading-tight">
+                {String(countdown.minutes).padStart(2, '0')}
+              </div>
+              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">دقیقه</div>
+            </div>
+            <span className="text-amber-500 font-bold text-sm">:</span>
+            <div className="text-center min-w-[2.4rem]">
+              <div className="text-base sm:text-lg font-black font-mono text-amber-600 leading-tight">
+                {String(countdown.seconds).padStart(2, '0')}
+              </div>
+              <div className="text-[9px] font-bold text-amber-600 uppercase tracking-wider">ثانیه</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ======================= PRICING CARDS ======================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
         
@@ -139,27 +220,54 @@ export function PricingPlansTable({
               </div>
               <h3 className="text-2xl font-extrabold text-slate-900">استارتاپ</h3>
               <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                ویژه راه‌اندازی سریع فروشگاه برای افراد نوپا با تمام امکانات اولیه و ضروری آنلاین.
+                ویژه راه‌اندازی سریع فروشگاه برای افراد نوپا با حداقل هزینه تمام‌شده و امکانات پایه.
               </p>
             </div>
 
-            {/* Price Box */}
-            <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+            {/* Price Box with Countdown */}
+            <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">۲۵۹,۰۰۰</span>
                 <span className="text-xs font-medium text-slate-500">تومان / ماهانه</span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
-                دوره‌ی تمدید: فقط ماهانه (پرداخت منعطف)
+                دوره‌ی تمدید: فقط ماهانه (کف قیمت زیرساخت)
               </p>
+              <div className="flex items-center justify-between text-[10px] text-amber-900 bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg">
+                <span className="flex items-center gap-1 font-bold">
+                  <Timer className="w-3 h-3 text-amber-600" />
+                  <span>مهلت قیمت امروز:</span>
+                </span>
+                <span className="font-mono font-extrabold" dir="ltr">
+                  {String(countdown.hours).padStart(2, '0')}:{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')}
+                </span>
+              </div>
             </div>
 
             {/* Features List */}
             <div className="space-y-3 pt-1">
-              <p className="text-xs font-bold text-slate-700">امکانات اصلی پلن:</p>
-              <FeatureItem active>۱۰ گیگابایت هاست ابری پرسرعت</FeatureItem>
+              <p className="text-xs font-bold text-slate-700">امکانات اصلی پلن استارتاپ:</p>
+              <FeatureItem active>۱۰ گیگابایت هاست ابری پرسرعت NVMe</FeatureItem>
               <FeatureItem active>۳.۵ هسته پردازنده CPU و ۳ گیگابایت RAM</FeatureItem>
-              <FeatureItem active>اخذ رسمی درگاه، ای‌نماد و پرونده مالیاتی</FeatureItem>
+              <FeatureItem active>درگاه مستقیم بانکی پرداخت (رایگان به نام شما)</FeatureItem>
+              <FeatureItem active>تشکیل پرونده مالیاتی آنلاین (رایگان)</FeatureItem>
+              
+              {/* Enamad specific notice box */}
+              <div className="p-3 rounded-2xl bg-amber-50/90 border border-amber-200/90 text-amber-950 text-xs space-y-1 shadow-2xs">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-1.5 text-slate-800">
+                    <Shield className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    اخذ نماد اعتماد الکترونیکی (ای‌نماد)
+                  </span>
+                  <span className="text-[10px] bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md font-extrabold">
+                    + ۵۰,۰۰۰ تومان
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-normal">
+                  با توجه به محاسبه استارتاپ با <strong>کف قیمت</strong>، در صورت انتخاب ای‌نماد ۵۰ هزار تومان تعرفه مصوب سامانه دولتی اینماد دریافت شده و کلیه مراحل اداری توسط زوپیت پیگیری می‌شود.
+                </p>
+              </div>
+
               <FeatureItem active>فروشگاه‌ساز استاندارد وودمارت</FeatureItem>
               <FeatureItem active>پشتیبانی تیکتی استاندارد</FeatureItem>
               <FeatureItem active={false}>سیستم بکاپ‌گیری خودکار دوره‌ای</FeatureItem>
@@ -453,9 +561,26 @@ export function PricingPlansTable({
                 />
                 <TableRow
                   title="دریافت نماد اعتماد الکترونیکی (ای‌نماد)"
-                  v1={<StatusBadge status={true} text="انجام کلیه مراحل اداری" />}
-                  v2={<StatusBadge status={true} text="انجام کلیه مراحل اداری" />}
-                  v3={<StatusBadge status={true} text="انجام کلیه مراحل اداری" />}
+                  v1={
+                    <div className="space-y-1">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                        ۵۰,۰۰۰ تومان (تعرفه دولتی)
+                      </span>
+                      <span className="block text-[11px] text-slate-500 font-medium">مازاد بر کف قیمت استارتاپ</span>
+                    </div>
+                  }
+                  v2={
+                    <div className="space-y-0.5">
+                      <StatusBadge status={true} text="رایگان (تقبل ۱۰۰٪ توسط زوپیت)" />
+                      <span className="block text-[11px] text-emerald-700 font-medium">بدون هیچ هزینه مازاد</span>
+                    </div>
+                  }
+                  v3={
+                    <div className="space-y-0.5">
+                      <StatusBadge status={true} text="رایگان (تقبل ۱۰۰٪ توسط زوپیت)" />
+                      <span className="block text-[11px] text-emerald-700 font-medium">بدون هیچ هزینه مازاد</span>
+                    </div>
+                  }
                   isFeaturedColumn
                 />
                 <TableRow

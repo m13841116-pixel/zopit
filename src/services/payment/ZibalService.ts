@@ -48,10 +48,10 @@ export class ZibalService implements PaymentGateway {
 
   constructor(merchantId?: string) {
     const isProduction = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
-    const merchant = merchantId || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
-    this.zibalMerchant = merchant.trim();
-    if (!this.zibalMerchant) {
-      this.zibalMerchant = '6a0213e61b27742a09938588';
+    const merchant = merchantId || process.env.ZIBAL_MERCHANT_ID || (isProduction ? '' : 'zibal');
+    this.zibalMerchant = merchant ? merchant.trim() : '';
+    if (!this.zibalMerchant && !isProduction) {
+      this.zibalMerchant = 'zibal';
     }
   }
 
@@ -169,7 +169,7 @@ export class ZibalService implements PaymentGateway {
         }
       }
 
-      const resolvedMerchant = this.zibalMerchant || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      const resolvedMerchant = this.zibalMerchant || process.env.ZIBAL_MERCHANT_ID || 'zibal';
       const requestPayload: Record<string, any> = {
         merchant: resolvedMerchant,
         amount: numAmount,
@@ -208,7 +208,7 @@ export class ZibalService implements PaymentGateway {
         return { success: true, trackId: authority, refId: `REF_${authority}` };
       }
 
-      const resolvedMerchant = this.zibalMerchant || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      const resolvedMerchant = this.zibalMerchant || process.env.ZIBAL_MERCHANT_ID || 'zibal';
       const verifyPayload: Record<string, any> = {
         trackId: authority,
         merchant: resolvedMerchant

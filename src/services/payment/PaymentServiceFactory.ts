@@ -70,7 +70,7 @@ export class PaymentServiceFactory {
         merchantId = process.env.ZIBAL_MERCHANT_ID;
       }
       if (!merchantId || merchantId.trim() === '' || merchantId === 'zibal_merchant_key') {
-        merchantId = '6a0213e61b27742a09938588';
+        merchantId = process.env.NODE_ENV === 'production' ? '' : 'zibal';
       }
 
       cachedMerchantId = merchantId;
@@ -90,7 +90,7 @@ export class PaymentServiceFactory {
     } catch (err: any) {
       console.error('[PaymentServiceFactory Error]', err.message);
       
-      const fallbackMerchant = forcedMerchantId || process.env.ZIBAL_MERCHANT_ID || '6a0213e61b27742a09938588';
+      const fallbackMerchant = forcedMerchantId || process.env.ZIBAL_MERCHANT_ID || (process.env.NODE_ENV === 'production' ? '' : 'zibal');
       
       await PaymentLogger.logPaymentEvent({
         requestId: PaymentLogger.generateRequestId(),
