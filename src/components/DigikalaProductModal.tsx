@@ -174,9 +174,19 @@ export function DigikalaProductModal({
     } catch {}
   };
 
-  // Estimated suggested retail price (30% margin)
-  const suggestedRetailPrice = Math.round(currentPrice * 1.3);
-  const potentialProfit = suggestedRetailPrice - currentPrice;
+  // Interactive Profit Simulator State
+  const [simulatorMarkupPercent, setSimulatorMarkupPercent] = useState(25);
+  const [customRetailInput, setCustomRetailInput] = useState<string>("");
+
+  const simulatedRetailPrice = useMemo(() => {
+    if (customRetailInput && !isNaN(Number(customRetailInput)) && Number(customRetailInput) > 0) {
+      return Number(customRetailInput);
+    }
+    return Math.round(currentPrice * (1 + simulatorMarkupPercent / 100));
+  }, [currentPrice, simulatorMarkupPercent, customRetailInput]);
+
+  const simulatedProfit = Math.max(0, simulatedRetailPrice - currentPrice);
+  const simulatedMarginPercent = currentPrice > 0 ? Math.round((simulatedProfit / currentPrice) * 100) : 0;
 
   return (
     <div
@@ -495,10 +505,10 @@ export function DigikalaProductModal({
                   </div>
                 </div>
 
-                {/* Wholesale Price Box */}
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                {/* Wholesale Price & Live Profit Simulator Box */}
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">قیمت خرید عمده:</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">قیمت خرید عمده فروشگاه:</span>
                     {product.discount > 0 && (
                       <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md">
                         {product.discount}٪ تخفیف
@@ -513,15 +523,45 @@ export function DigikalaProductModal({
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">تومان</span>
                   </div>
 
-                  {/* Profit Estimation Helper */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] flex items-center justify-between text-slate-600 dark:text-slate-400">
-                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
-                      <TrendingUp className="w-3.5 h-3.5" />
-                      تخمین سود فروش:
-                    </span>
-                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      +{potentialProfit.toLocaleString()} ت
-                    </span>
+                  {/* Interactive Margin & Profit Simulator */}
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400 font-bold">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                        محاسبه‌گر سود فروشگاه:
+                      </span>
+                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                        +{simulatedProfit.toLocaleString()} ت ({simulatedMarginPercent}٪)
+                      </span>
+                    </div>
+
+                    {/* Quick Markup Presets */}
+                    <div className="flex items-center gap-1.5">
+                      {[15, 20, 25, 30, 40].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => {
+                            setSimulatorMarkupPercent(pct);
+                            setCustomRetailInput("");
+                          }}
+                          className={`flex-1 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                            simulatorMarkupPercent === pct && !customRetailInput
+                              ? "bg-emerald-600 text-white shadow-sm"
+                              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                          }`}
+                        >
+                          {pct}٪
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-[11px]">
+                      <span className="text-slate-500">قیمت پیشنهادی فروش در سایت:</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+                        {simulatedRetailPrice.toLocaleString()} تومان
+                      </span>
+                    </div>
                   </div>
                 </div>
 

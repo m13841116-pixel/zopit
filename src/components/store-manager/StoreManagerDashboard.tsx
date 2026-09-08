@@ -1,4 +1,7 @@
 import StoreMarketplace from "./StoreMarketplace";
+import StoreRecommendationsHub from "./StoreRecommendationsHub";
+import SmartActionCenter from "./SmartActionCenter";
+import { StoreGrowthProfitCenter } from "./StoreGrowthProfitCenter";
 import StoreConnection from "./StoreConnection";
 import { StoreManagerProfile } from "./StoreManagerProfile";
 import MyCatalog from "./MyCatalog";
@@ -19,6 +22,7 @@ import {
   Crown,
   Award,
   Store,
+  Building2,
   ShoppingCart,
   ShoppingBag,
   Package,
@@ -131,6 +135,7 @@ const getIconComponent = (iconName: any) => {
 };
 import UserDashboardWidgets from "../UserDashboardWidgets";
 import LatestAnnouncementsWidget from "../LatestAnnouncementsWidget";
+import { StoreSupplierMatches } from "../store/StoreSupplierMatches";
 import { useSyncTabWithUrl } from "../../utils/routeSync";
 import { getPersianStatus } from "../../utils/statusUtils";
 
@@ -159,6 +164,8 @@ export default function StoreManagerDashboard({
   
   const validStoreTabs = [
     "overview",
+    "growth",
+    "supplier_matches",
     "pro_account",
     "pro",
     "orders",
@@ -531,6 +538,16 @@ export default function StoreManagerDashboard({
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
+      id: "growth",
+      label: "مرکز رشد و سودآوری",
+      icon: <TrendingUp className="w-5 h-5 text-indigo-400" />,
+    },
+    {
+      id: "supplier_matches",
+      label: "تأمین‌کنندگان مناسب 🤝",
+      icon: <Building2 className="w-5 h-5 text-emerald-500" />,
+    },
+    {
       id: "pro_account",
       label: "اکانت پرو (ویژه)",
       icon: <Crown className="w-5 h-5 text-emerald-500 animate-pulse" />,
@@ -849,78 +866,11 @@ export default function StoreManagerDashboard({
                       <span>{user?.storeLink ? "ویرایش لینک وب‌سایت" : "تنظیم لینک وب‌سایت فروشگاه"}</span>
                     </AppLink>
                   </div>
-                  {/* 3 Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-gradient-to-br from-card to-background p-7 rounded-3xl shadow-sm border border-subtle flex flex-col justify-between min-h-[140px] hover:shadow-lg hover:border-primary-default/20 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden cursor-pointer">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary-default/5 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                      <div className="flex justify-between items-start relative z-10">
-                        <div>
-                          <p className="text-muted font-bold text-sm block">
-                            تعداد کل سفارشات
-                          </p>
-                          <h3 className="text-3xl font-black text-primary mt-2 group-hover:text-primary-hover transition-colors">
-                            {stats.totalOrders || 0}
-                            <span className="text-xs text-muted font-normal mr-1">
-                              عدد
-                            </span>
-                          </h3>
-                        </div>
-                        <div className="w-12 h-12 rounded-2xl bg-primary-default/10 text-primary-default flex items-center justify-center border border-primary-default/10 transition-all duration-300 group-hover:scale-115 group-hover:bg-primary-default group-hover:text-white group-hover:shadow-md">
-                          <ShoppingCart className="w-5 h-5" />
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted pt-4 border-t border-slate-50 flex items-center gap-1.5 mt-4 relative z-10">
-                        <Clock className="w-3.5 h-3.5 text-primary-default" />
-                        به‌روزرسانی شده در چند لحظه پیش
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-card to-background p-7 rounded-3xl shadow-sm border border-subtle flex flex-col justify-between min-h-[140px] hover:shadow-lg hover:border-success/20 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden cursor-pointer">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-success/5 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                      <div className="flex justify-between items-start relative z-10">
-                        <div>
-                          <p className="text-muted font-bold text-sm block">
-                            پرداختی به پلتفرم
-                          </p>
-                          <h3 className="text-3xl font-black text-primary mt-2 group-hover:text-success transition-colors">
-                            {(stats.totalPaid || 0).toLocaleString()}
-                            <span className="text-xs text-muted font-normal mr-1">
-                              تومان
-                            </span>
-                          </h3>
-                        </div>
-                        <div className="w-12 h-12 rounded-2xl bg-success/10 text-success flex items-center justify-center border border-emerald-100/10 transition-all duration-300 group-hover:scale-115 group-hover:bg-success group-hover:text-white group-hover:shadow-md">
-                          <Wallet className="w-5 h-5" />
-                        </div>
-                      </div>
-                      <div className="text-xs text-success pt-4 border-t border-slate-50 flex items-center gap-1.5 mt-4 relative z-10">
-                        <CheckCircle className="w-3.5 h-3.5" /> تراکنش‌های موفق
-                        و تایید شده
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-card to-background p-7 rounded-3xl shadow-sm border border-subtle flex flex-col justify-between min-h-[140px] hover:shadow-lg hover:border-warning/20 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden cursor-pointer">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-warning/5 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                      <div className="flex justify-between items-start relative z-10">
-                        <div>
-                          <p className="text-muted font-bold text-sm block">
-                            سود خالص (تخمینی)
-                          </p>
-                          <h3 className="text-3xl font-black text-primary mt-2 group-hover:text-warning transition-colors">
-                            {(stats.netProfit || 0).toLocaleString()}
-                            <span className="text-xs text-muted font-normal mr-1">
-                              تومان
-                            </span>
-                          </h3>
-                        </div>
-                        <div className="w-12 h-12 rounded-2xl bg-warning/10 text-warning flex items-center justify-center border border-amber-100/10 transition-all duration-300 group-hover:scale-115 group-hover:bg-warning group-hover:text-white group-hover:shadow-md">
-                          <TrendingUp className="w-5 h-5" />
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted pt-4 border-t border-slate-50 flex items-center gap-1.5 mt-4 relative z-10">
-                        <TrendingUp className="w-3.5 h-3.5 text-success" />
-                        میانگین حاشیه سود روی کالاهای انتخابی
-                      </div>
-                    </div>
-                  </div>
+                  {/* Store Growth & Profit Control Center (Prompt 10) */}
+                  <StoreGrowthProfitCenter
+                    user={user}
+                    onNavigateTab={(tabId) => setActiveTab(tabId)}
+                  />
                   {/* Two Unequal Columns: Recent Activity & Shortcuts */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Recent activity list */}
@@ -995,6 +945,12 @@ export default function StoreManagerDashboard({
                       )}
                     </div>
                     
+                  {/* Smart Action Center (Prompt 12) */}
+                  <SmartActionCenter onNavigateTab={(tab) => setActiveTab(tab)} />
+
+                  {/* Smart Product Discovery & Recommendations (Prompt 09) */}
+                  <StoreRecommendationsHub compact={true} onProductAdded={() => fetchData()} />
+
                   {/* Better Sellers Section (لیست فروشندگان برتر و بالاتر از میانگین) */}
                   <div className="bg-gradient-to-br from-card to-background p-5 sm:p-7 rounded-3xl border border-subtle shadow-sm">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-subtle">
@@ -1143,6 +1099,22 @@ export default function StoreManagerDashboard({
                       <UserDashboardWidgets role="STORE_MANAGER" />
                     </div>
                   </div>
+                </div>
+              )}
+              {activeTab === "supplier_matches" && (
+                <div className="animate-fade-in">
+                  <StoreSupplierMatches
+                    onNavigateTab={(tabId) => setActiveTab(tabId)}
+                    showNotification={showNotification}
+                  />
+                </div>
+              )}
+              {activeTab === "growth" && (
+                <div className="animate-fade-in">
+                  <StoreGrowthProfitCenter
+                    user={user}
+                    onNavigateTab={(tabId) => setActiveTab(tabId)}
+                  />
                 </div>
               )}
               {activeTab === "orders" &&

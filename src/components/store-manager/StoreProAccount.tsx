@@ -66,6 +66,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [showCpanelPass, setShowCpanelPass] = useState(false);
   const [showWpPass, setShowWpPass] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
   const [proResources, setProResources] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({
     autoApprove: true,
@@ -265,9 +266,11 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     setLoading(true);
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch("/api/store-manager/pro/status", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [res, subRes] = await Promise.all([
+        fetch("/api/store-manager/pro/status", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/store-manager/subscription/status", { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
       if (res.ok) {
         const data = await res.json();
         setProAccount(data.proAccount);
@@ -280,6 +283,11 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
         if (data.activePromotions) {
           setActivePromotions(data.activePromotions);
         }
+      }
+
+      if (subRes.ok) {
+        const subData = await subRes.json();
+        setSubscriptionStatus(subData);
       }
 
       // Fetch all active public promotions from public API

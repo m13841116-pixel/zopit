@@ -338,7 +338,7 @@ export function PricingPlansTable({
             <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-2">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-                  {billingCycle === "ANNUAL" ? "۱,۴۹۰,۰۰۰" : "۵۹۹,۰۰۰"}
+                  {billingCycle === "ANNUAL" ? "۲۴,۹۰۰,۰۰۰" : "۲,۴۹۰,۰۰۰"}
                 </span>
                 <span className="text-xs font-medium text-slate-600">
                   تومان / {billingCycle === "ANNUAL" ? "سالانه" : "ماهانه"}
@@ -347,11 +347,11 @@ export function PricingPlansTable({
               {billingCycle === "ANNUAL" ? (
                 <div className="text-[11px] font-bold text-indigo-700 bg-indigo-100/70 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
                   <BadgePercent className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>شامل ۸۰٪ تخفیف خرید سالانه (صرفه‌جویی چشمگیر)</span>
+                  <span>شامل ۲ ماه تخفیف سالانه (معادل ۲۴,۹۰۰,۰۰۰ تومان)</span>
                 </div>
               ) : (
                 <div className="text-[11px] text-slate-500 font-medium">
-                  پرداخت منعطف ماهانه با امکان تمدید یا ارتقا
+                  پرداخت ماهانه ۲,۴۹۰,۰۰۰ تومان با امکان تمدید یا ارتقا
                 </div>
               )}
             </div>

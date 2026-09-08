@@ -76,37 +76,66 @@ model User {
   messages               TicketMessage[]
   wallet                 Wallet?
   proAccount             ProAccount?
+  subscriptionEvents     SubscriptionEvent[]
 }
 
 model ProAccount {
-  id                Int      @id @default(autoincrement())
-  userId            Int      @unique
-  planType          String?  @default("PRO")
-  status            String   @default("PENDING")
-  acceptedTerms     Boolean  @default(true)
-  signatureImage    String?
-  nationalCode      String?
-  fullName          String?
-  mobile            String?
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @unique
+  planType            String?  @default("PRO_ANNUAL")
+  status              String   @default("PENDING")
+  acceptedTerms       Boolean  @default(true)
+  signatureImage      String?
+  nationalCode        String?
+  fullName            String?
+  mobile              String?
 
-  domainName        String?
-  cpanelUrl         String?
-  cpanelUsername    String?
-  cpanelPassword    String?
-  wpAdminUrl        String?
-  wpUsername        String?
-  wpPassword        String?
-  hasEnamad         Boolean  @default(false)
-  hasGateway        Boolean  @default(false)
-  hasTaxProfile     Boolean  @default(false)
-  hostExpiresAt     DateTime?
-  torobConnected    Boolean  @default(false)
-  payLink           String?
+  domainName          String?
+  cpanelUrl           String?
+  cpanelUsername      String?
+  cpanelPassword      String?
+  wpAdminUrl          String?
+  wpUsername          String?
+  wpPassword          String?
+  hasEnamad           Boolean  @default(false)
+  hasGateway          Boolean  @default(false)
+  hasTaxProfile       Boolean  @default(false)
+  hostExpiresAt       DateTime?
+  torobConnected      Boolean  @default(false)
+  payLink             String?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  startDate           DateTime?
+  expiresAt           DateTime?
+  lastRenewedAt       DateTime?
+  renewalCount        Int      @default(0)
+  freeMonthCredits    Int      @default(0)
+  lastRewardAppliedAt DateTime?
 
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SubscriptionEvent {
+  id             String    @id @default(uuid())
+  userId         Int
+  proAccountId   Int?
+  eventType      String    // SUBSCRIPTION_CREATED, SUBSCRIPTION_ACTIVATED, SUBSCRIPTION_RENEWED, SUBSCRIPTION_EXPIRED, SUBSCRIPTION_CANCELLED, PAYMENT_FAILED
+  planType       String    // PRO_MONTHLY, PRO_ANNUAL
+  amount         Float     @default(0)
+  durationMonths Int       @default(1)
+  startDate      DateTime?
+  endDate        DateTime?
+  paymentRef     String?
+  metadata       String?
+  createdAt      DateTime  @default(now())
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
 }
 
 model Product {

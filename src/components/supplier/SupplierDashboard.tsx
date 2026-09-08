@@ -77,6 +77,9 @@ import { ZopitLogo } from "../ZopitLogo";
 import { SupplierReferralProgram } from "./SupplierReferralProgram";
 import { SupplierBulkImport } from "./SupplierBulkImport";
 import { SupplierConciergeImport } from "./SupplierConciergeImport";
+import { SupplierGrowthCenter } from "./SupplierGrowthCenter";
+import { SupplierStoreMatches } from "./SupplierStoreMatches";
+import { SupplierProductOpportunities } from "./SupplierProductOpportunities";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -195,6 +198,9 @@ export function SupplierDashboard({
   // Valid supplier tabs for routing fallback
   const validSupplierTabs = [
     "overview",
+    "growth-center",
+    "store-matches",
+    "product-opportunities",
     "products",
     "add-product",
     "bulk-import",
@@ -787,6 +793,21 @@ export function SupplierDashboard({
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
+      id: "growth-center",
+      label: "مرکز رشد و عملکرد 🚀",
+      icon: <TrendingUp className="w-5 h-5 text-emerald-500" />,
+    },
+    {
+      id: "store-matches",
+      label: "فروشگاه‌های مناسب 🎯",
+      icon: <Users className="w-5 h-5 text-indigo-500" />,
+    },
+    {
+      id: "product-opportunities",
+      label: "فرصت‌های محصول 💡",
+      icon: <Sparkles className="w-5 h-5 text-amber-500" />,
+    },
+    {
       id: "products",
       label: "محصولات من",
       icon: <Package className="w-5 h-5" />,
@@ -1033,9 +1054,33 @@ export function SupplierDashboard({
           ) : (
             <>
               
+              {/* STORE MATCHES TAB */}
+              {activeTab === "store-matches" && (
+                <SupplierStoreMatches
+                  onNavigateTab={(tab) => setActiveTab(tab)}
+                  showNotification={showNotification}
+                />
+              )}
+
+              {/* GROWTH CENTER TAB */}
+              {activeTab === "growth-center" && (
+                <SupplierGrowthCenter
+                  user={user}
+                  onNavigateTab={(tab) => setActiveTab(tab)}
+                  showNotification={showNotification}
+                />
+              )}
+
               {/* OVERVIEW TAB */}
               {activeTab === "overview" && (
                 <div className="space-y-8 animate-fade-in">
+                  
+                  {/* Embedded Supplier Growth Center Component */}
+                  <SupplierGrowthCenter
+                    user={user}
+                    onNavigateTab={(tab) => setActiveTab(tab)}
+                    showNotification={showNotification}
+                  />
                   
                   {/* Supplier Order / Request Announcement Alert */}
                   {orders.length > 0 && (
@@ -1575,6 +1620,18 @@ export function SupplierDashboard({
                     onGoToSettings={() => setActiveTab("profile")}
                   />
                 </div>
+              )}
+              {/* GROWTH CENTER TAB */}
+              {activeTab === "growth-center" && (
+                <SupplierGrowthCenter user={user} onNavigateTab={(tab) => setActiveTab(tab)} showNotification={showNotification} />
+              )}
+              {/* STORE MATCHES TAB */}
+              {activeTab === "store-matches" && (
+                <SupplierStoreMatches />
+              )}
+              {/* PRODUCT OPPORTUNITIES TAB */}
+              {activeTab === "product-opportunities" && (
+                <SupplierProductOpportunities />
               )}
               {/* PRODUCTS TAB */}
               {activeTab === "products" &&

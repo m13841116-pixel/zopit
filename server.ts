@@ -46,6 +46,13 @@ import {
   sendMelliPayamakPattern 
 } from './src/services/sms/SmsService.js';
 import { WalletService } from './src/services/WalletService.js';
+import { StoreRecommendationService } from './src/services/StoreRecommendationService.js';
+import { StoreGrowthService } from './src/services/StoreGrowthService.js';
+import { StoreActionPriorityService } from './src/services/StoreActionPriorityService.js';
+import { SupplierGrowthService } from './src/services/SupplierGrowthService.js';
+import { MarketplaceMatchingService } from './src/services/MarketplaceMatchingService.js';
+import { ProductOpportunityService } from './src/services/ProductOpportunityService.js';
+import { SubscriptionService } from './src/services/SubscriptionService.js';
 import { OAuth2Client } from 'google-auth-library';
 import express from 'express';
 import { PrismaClient as StaticPrismaClient } from '@prisma/client';
@@ -106,14 +113,14 @@ function safeParseFloat(val: any, fallback = 0): number {
   if (val === undefined || val === null || val === '') return fallback;
   const engStr = toEngDigits(val.toString());
   const parsed = parseFloat(engStr);
-  return isNaN(parsed) ? fallback : parsed;
+  return isNaN(parsed) || !isFinite(parsed) ? fallback : parsed;
 }
 
 function safeParseInt(val: any, fallback = 0): number {
   if (val === undefined || val === null || val === '') return fallback;
   const engStr = toEngDigits(val.toString());
   const parsed = parseInt(engStr, 10);
-  return isNaN(parsed) ? fallback : parsed;
+  return isNaN(parsed) || !isFinite(parsed) ? fallback : parsed;
 }
 
 import rateLimit from 'express-rate-limit';
@@ -1407,7 +1414,7 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastName" TEXT;`,
 
       // ProAccount table columns (ALTER TABLE ADD COLUMN IF NOT EXISTS)
-      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "planType" TEXT DEFAULT 'PRO';`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "planType" TEXT DEFAULT 'PRO_ANNUAL';`,
       `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'PENDING';`,
       `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "acceptedTerms" BOOLEAN DEFAULT true;`,
       `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "signatureImage" TEXT;`,
@@ -1427,8 +1434,30 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "hostExpiresAt" TIMESTAMP;`,
       `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "torobConnected" BOOLEAN DEFAULT false;`,
       `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "payLink" TEXT;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "startDate" TIMESTAMP;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "lastRenewedAt" TIMESTAMP;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "renewalCount" INTEGER DEFAULT 0;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "freeMonthCredits" INTEGER DEFAULT 0;`,
+      `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "lastRewardAppliedAt" TIMESTAMP;`,
       `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
       `ALTER TABLE "ProAccount" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+
+      // SubscriptionEvent table
+      `CREATE TABLE IF NOT EXISTS "SubscriptionEvent" (
+        "id" TEXT PRIMARY KEY,
+        "userId" INTEGER NOT NULL,
+        "proAccountId" INTEGER,
+        "eventType" TEXT NOT NULL,
+        "planType" TEXT NOT NULL,
+        "amount" DOUBLE PRECISION DEFAULT 0,
+        "durationMonths" INTEGER DEFAULT 1,
+        "startDate" TIMESTAMP,
+        "endDate" TIMESTAMP,
+        "paymentRef" TEXT,
+        "metadata" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
 
       // Order table columns
       `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "storeId" INTEGER;`,
@@ -3647,6 +3676,11 @@ app.post('/api/supplier/products', authenticateToken, requireSupplier, async (re
       }
     }
 
+    const basePrice = safeParseFloat(supplierBasePrice, 0);
+    if (status !== 'DRAFT' && basePrice <= 0) {
+      return res.status(400).json({ error: 'قیمت پایه تامین‌کننده باید عددی معتبر و بزرگتر از صفر باشد.' });
+    }
+
     const totalInventory = (variants && variants.length > 0)
       ? variants.reduce((sum: number, v: any) => sum + safeParseInt(v.stock), 0)
       : safeParseInt(stock);
@@ -3659,7 +3693,7 @@ app.post('/api/supplier/products', authenticateToken, requireSupplier, async (re
         shortDescription: shortDescription || longDescription || '',
         longDescription: longDescription || shortDescription || '',
         technicalSpecs: typeof technicalSpecs === 'object' ? JSON.stringify(technicalSpecs) : (technicalSpecs || '[]'),
-        supplierBasePrice: safeParseFloat(supplierBasePrice),
+        supplierBasePrice: basePrice,
         discount: safeParseFloat(discount, 0),
         sku: sku || '',
         brand: brand || '',
@@ -3890,14 +3924,57 @@ app.post('/api/supplier/products/bulk', authenticateToken, requireSupplier, asyn
 
           const thresholdPct = await getExtremePriceChangeThresholdPercent();
           const oldBasePrice = safeParseFloat(existingProduct.supplierBasePrice, 0);
+          let isExtremePriceChange = false;
+          let priceCheck = { isExtreme: false, diffPercent: 0 };
           if (oldBasePrice > 0) {
-            const priceCheck = isPriceChangeExtreme(oldBasePrice, wholesalePrice, thresholdPct);
-            if (priceCheck.isExtreme) isMajorChange = true;
+            priceCheck = isPriceChangeExtreme(oldBasePrice, wholesalePrice, thresholdPct);
+            if (priceCheck.isExtreme) {
+              isExtremePriceChange = true;
+              isMajorChange = true;
+            }
           }
 
           // If major fields changed or price drastically altered, revert PUBLISHED to PENDING_APPROVAL
-          if (isMajorChange && existingProduct.status === 'PUBLISHED') {
+          if ((isMajorChange || isExtremePriceChange) && existingProduct.status === 'PUBLISHED') {
             newStatus = 'PENDING_APPROVAL';
+
+            await recordProductGovernanceAudit({
+              productId: existingProduct.id,
+              actorId: supplierId,
+              actorRole: 'SUPPLIER',
+              action: isExtremePriceChange ? 'PRODUCT_EXTREME_PRICE_CHANGE_BULK_IMPORT' : 'PRODUCT_MAJOR_CHANGE_BULK_IMPORT',
+              metadata: {
+                source: 'CSV_IMPORT',
+                oldBasePrice,
+                newBasePrice: wholesalePrice,
+                diffPercent: priceCheck.diffPercent,
+                thresholdPercent: thresholdPct
+              }
+            });
+
+            await sendProductGovernanceNotification(
+              supplierId,
+              'تعلیق کالا در اکسل به دلیل جهش قیمت',
+              `کالای «${name || existingProduct.name}» در بروزرسانی اکسل به دلیل تغییر قیمت فراتر از آستانه مجاز (${priceCheck.diffPercent}٪) جهت بازبینی مجدد به صف بررسی مدیریت منتقل شد.`,
+              'WARNING'
+            );
+          } else if (!isExtremePriceChange && oldBasePrice > 0 && oldBasePrice !== wholesalePrice) {
+            // Ordinary price change: record audit trail
+            await recordProductGovernanceAudit({
+              productId: existingProduct.id,
+              actorId: supplierId,
+              actorRole: 'SUPPLIER',
+              action: 'PRODUCT_PRICE_CHANGED_SUPPLIER_ORDINARY',
+              metadata: {
+                source: 'CSV_IMPORT',
+                oldBasePrice,
+                newBasePrice: wholesalePrice,
+                oldFinalPrice: existingProduct.finalPrice,
+                diffPercent: priceCheck.diffPercent,
+                thresholdPercent: thresholdPct,
+                isExtreme: false
+              }
+            });
           }
 
           // Dynamic authoritative margin recalculation
@@ -4885,6 +4962,23 @@ app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSup
                   thresholdPercent: thresholdPct
                 }
               });
+            } else if (oldPrice > 0 && oldPrice !== wholesalePrice) {
+              // Ordinary price change: record audit trail
+              await recordProductGovernanceAudit({
+                productId: existingProduct.id,
+                actorId: supplierId,
+                actorRole: 'SUPPLIER',
+                action: 'PRODUCT_PRICE_CHANGED_SUPPLIER_ORDINARY',
+                metadata: {
+                  source: 'WOOCOMMERCE',
+                  oldBasePrice: oldPrice,
+                  newBasePrice: wholesalePrice,
+                  oldFinalPrice: existingProduct.finalPrice,
+                  diffPercent: priceCheck.diffPercent,
+                  thresholdPercent: thresholdPct,
+                  isExtreme: false
+                }
+              });
             }
 
             let newFinalPrice = existingProduct.finalPrice;
@@ -5156,6 +5250,9 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
     if (existing.categoryId !== actualCategoryId) isMajorChange = true;
     
     const newBasePrice = safeParseFloat(supplierBasePrice);
+    if (!newBasePrice || newBasePrice <= 0) {
+      return res.status(400).json({ error: 'قیمت پایه تامین‌کننده باید عددی معتبر و بزرگتر از صفر باشد.' });
+    }
     const oldBasePrice = safeParseFloat(existing.supplierBasePrice);
     
     const thresholdPct = await getExtremePriceChangeThresholdPercent();
@@ -5190,6 +5287,24 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
         `کالای «${name || existing.name}» به دلیل ${isExtremePriceChange ? `تغییر قیمت فراتر از آستانه مجاز (${priceCheck.diffPercent}٪)` : 'تغییرات ساختاری'} جهت بازبینی به صف بررسی مدیریت منتقل شد.`,
         'WARNING'
       );
+    } else if (!isExtremePriceChange && oldBasePrice > 0 && oldBasePrice !== newBasePrice) {
+      // Ordinary price change: record audit trail
+      await recordProductGovernanceAudit({
+        productId: existing.id,
+        actorId: supplierId,
+        actorRole: 'SUPPLIER',
+        action: 'PRODUCT_PRICE_CHANGED_SUPPLIER_ORDINARY',
+        metadata: {
+          source: 'MANUAL',
+          oldBasePrice,
+          newBasePrice,
+          oldFinalPrice: existing.finalPrice,
+          newFinalPrice: existing.marginValue != null ? calculateAuthoritativeFinalPrice(newBasePrice, existing.marginType || 'PERCENTAGE', existing.marginValue) : newBasePrice,
+          diffPercent: priceCheck.diffPercent,
+          thresholdPercent: thresholdPct,
+          isExtreme: false
+        }
+      });
     }
 
     if (newStatus === 'PUBLISHED') {
@@ -5262,6 +5377,43 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
     console.error('Error editing supplier product message:', err?.message || String(err));
     console.error('Error editing supplier product stack:', err?.stack || '');
     res.status(500).json({ error: 'خطا در ویرایش محصول', details: err?.message || String(err) });
+  }
+});
+
+// Dedicated Quick Price Update Endpoint for Suppliers (Authoritative Dynamic Pricing)
+app.patch('/api/supplier/products/:id/price', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const productId = safeParseInt(req.params.id, 0);
+    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    const { supplierBasePrice } = req.body;
+
+    if (!productId) return res.status(400).json({ error: 'شناسه محصول نامعتبر است.' });
+
+    const result = await updateSupplierProductPriceCore({
+      productId,
+      newBasePrice: supplierBasePrice,
+      actorId: supplierId,
+      actorRole: 'SUPPLIER',
+      source: 'MANUAL'
+    });
+
+    if (!result.success) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    res.json({
+      message: result.isExtreme
+        ? `قیمت با موفقیت ذخیره شد. با توجه به جهش قیمت (${result.diffPercent}٪)، محصول جهت تایید نهایی به مدیریت ارجاع گردید.`
+        : 'قیمت پایه تامین‌کننده و قیمت نهایی فروشگاه با موفقیت به‌روزرسانی شدند.',
+      product: result.product,
+      supplierBasePrice: result.newBasePrice,
+      finalPrice: result.newFinalPrice,
+      isExtreme: result.isExtreme,
+      diffPercent: result.diffPercent
+    });
+  } catch (err: any) {
+    console.error('Error in /api/supplier/products/:id/price:', err);
+    res.status(500).json({ error: 'خطای سرور در تغییر قیمت محصول' });
   }
 });
 
@@ -6813,22 +6965,150 @@ app.patch('/api/store-manager/profile', authenticateToken, requireStoreManager, 
 
 app.get('/api/store-manager/stats', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
-    const storeId = req.user.userId;
+    const storeId = req.user.userId || req.user.id;
+    const growthService = new StoreGrowthService(prisma);
+    const growthData = await growthService.getStoreGrowthDashboard(storeId);
 
-    const totalOrders = await prisma.order.count({ where: { storeId } });
-    const paidInvoices = await prisma.storeInvoice.findMany({ where: { storeManagerId: storeId, status: 'PAID' } });
-    const totalPaid = paidInvoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
+    const totalOrders = growthData.profitOverview.monthOrdersCount;
+    const totalPaid = growthData.profitOverview.monthSales;
+    const netProfit = growthData.profitOverview.monthProfit;
 
-    // Get recently added items (mock)
     const recentActivity = await prisma.order.findMany({
       where: { storeId },
       orderBy: { id: 'desc' },
       take: 5
     });
 
-    res.json({ totalOrders, totalPaid, netProfit: totalPaid * 1.5, recentActivity });
-  } catch (err) {
+    res.json({
+      totalOrders,
+      totalPaid,
+      netProfit,
+      recentActivity,
+      growth: growthData
+    });
+  } catch (err: any) {
+    console.error('Error in /api/store-manager/stats:', err);
     res.status(500).json({ error: 'خطا در دریافت آمار' });
+  }
+});
+
+// Store Growth & Profit Center Endpoints
+app.get(['/api/store-manager/growth', '/api/store/growth'], authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const growthService = new StoreGrowthService(prisma);
+    const data = await growthService.getStoreGrowthDashboard(storeId);
+    res.json(data);
+  } catch (err: any) {
+    console.error('Error in /api/store-manager/growth:', err);
+    res.status(500).json({ error: 'خطا در دریافت اطلاعات رشد و سودآوری فروشگاه', details: err.message });
+  }
+});
+
+app.get(['/api/store-manager/profit-summary', '/api/store/profit-summary'], authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const growthService = new StoreGrowthService(prisma);
+    const dashboard = await growthService.getStoreGrowthDashboard(storeId);
+    res.json(dashboard.profitOverview);
+  } catch (err: any) {
+    console.error('Error in /api/store-manager/profit-summary:', err);
+    res.status(500).json({ error: 'خطا در دریافت خلاصه سودآوری', details: err.message });
+  }
+});
+
+app.get(['/api/store-manager/target', '/api/store/target'], authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const growthService = new StoreGrowthService(prisma);
+    const dashboard = await growthService.getStoreGrowthDashboard(storeId);
+    res.json(dashboard.targetProgress);
+  } catch (err: any) {
+    console.error('Error in /api/store-manager/target:', err);
+    res.status(500).json({ error: 'خطا در دریافت اطلاعات تارگت رشد', details: err.message });
+  }
+});
+
+app.put('/api/store-manager/target', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const { monthlyTarget } = req.body;
+    const targetNum = monthlyTarget !== null && monthlyTarget !== undefined ? Number(monthlyTarget) : null;
+    
+    await prisma.storeSettings.upsert({
+      where: { storeManagerId: storeId },
+      update: { monthlyTarget: targetNum },
+      create: { storeManagerId: storeId, monthlyTarget: targetNum }
+    });
+
+    const growthService = new StoreGrowthService(prisma);
+    const dashboard = await growthService.getStoreGrowthDashboard(storeId);
+    res.json({ message: 'تارگت رشد با موفقیت تنظیم شد', targetProgress: dashboard.targetProgress });
+  } catch (err: any) {
+    console.error('Error in PUT /api/store-manager/target:', err);
+    res.status(500).json({ error: 'خطا در ذخیره تارگت رشد', details: err.message });
+  }
+});
+
+// Admin Growth Target Configuration
+app.get('/api/admin/growth/stores-overview', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const growthService = new StoreGrowthService(prisma);
+    const storeManagers = await prisma.user.findMany({
+      where: { role: 'STORE_MANAGER' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        storeName: true,
+        storeSlug: true,
+        createdAt: true
+      }
+    });
+
+    const storesOverview = await Promise.all(
+      storeManagers.map(async (store) => {
+        try {
+          const dashboard = await growthService.getStoreGrowthDashboard(store.id);
+          return {
+            id: store.id,
+            name: store.storeName || `${store.firstName || ''} ${store.lastName || ''}`.trim() || 'فروشگاه زوپیت',
+            phone: store.phone,
+            createdAt: store.createdAt,
+            profitOverview: dashboard.profitOverview,
+            targetProgress: dashboard.targetProgress,
+            storeHealth: dashboard.storeHealth
+          };
+        } catch (e) {
+          return null;
+        }
+      })
+    );
+
+    const validStores = storesOverview.filter(Boolean);
+    validStores.sort((a: any, b: any) => (b.profitOverview.monthSales || 0) - (a.profitOverview.monthSales || 0));
+
+    res.json({
+      stores: validStores,
+      totalStores: validStores.length,
+      nearOrReachedTargetCount: validStores.filter((s: any) => s.targetProgress.progressPercentage >= 80).length,
+      targetReachedCount: validStores.filter((s: any) => s.targetProgress.progressPercentage >= 100).length
+    });
+  } catch (err: any) {
+    console.error('Error in /api/admin/growth/stores-overview:', err);
+    res.status(500).json({ error: 'خطا در دریافت گزارش رشد فروشگاه‌ها', details: err.message });
+  }
+});
+
+app.put('/api/admin/growth/settings', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const growthService = new StoreGrowthService(prisma);
+    const updated = await growthService.updateGrowthSettings(req.body);
+    res.json({ message: 'تنظیمات تارگت رشد با موفقیت بروزرسانی شد', settings: updated });
+  } catch (err: any) {
+    console.error('Error in PUT /api/admin/growth/settings:', err);
+    res.status(500).json({ error: 'خطا در ذخیره تنظیمات تارگت رشد', details: err.message });
   }
 });
 
@@ -6893,24 +7173,22 @@ app.get('/api/store-manager/marketplace-products', authenticateToken, requireSto
     // Format products and include ONLY allowed supplier details (name, username, province, city)
     const sanitizedProducts = products.map((product: any) => {
       let fPrice = product.finalPrice;
-      if (!fPrice) {
-        fPrice = product.supplierBasePrice;
-        if (product.marginType === 'PERCENTAGE' && product.marginValue) {
-          fPrice = product.supplierBasePrice * (1 + product.marginValue / 100);
-        } else if (product.marginType === 'FIXED' && product.marginValue) {
-          fPrice = product.supplierBasePrice + product.marginValue;
-        }
+      if (!fPrice && product.supplierBasePrice) {
+        fPrice = calculateAuthoritativeFinalPrice(
+          product.supplierBasePrice,
+          product.marginType || 'PERCENTAGE',
+          product.marginValue ?? 0
+        );
       }
 
       const mappedVariants = product.variants?.map((v: any) => {
         let vfPrice = v.finalPrice;
-        if (!vfPrice) {
-          vfPrice = v.supplierBasePrice;
-          if (product.marginType === 'PERCENTAGE' && product.marginValue) {
-            vfPrice = v.supplierBasePrice * (1 + product.marginValue / 100);
-          } else if (product.marginType === 'FIXED' && product.marginValue) {
-            vfPrice = v.supplierBasePrice + product.marginValue;
-          }
+        if (!vfPrice && v.supplierBasePrice) {
+          vfPrice = calculateAuthoritativeFinalPrice(
+            v.supplierBasePrice,
+            product.marginType || 'PERCENTAGE',
+            product.marginValue ?? 0
+          );
         }
         const { supplierBasePrice, ...safeV } = v;
         return { ...safeV, finalPrice: vfPrice };
@@ -6976,17 +7254,115 @@ app.get('/api/store-manager/marketplace-products', authenticateToken, requireSto
   }
 });
 
+// Store Manager - Product Discovery & Recommendations Engine (Prompt 09)
+const handleRecommendationsRequest = async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const { type, categoryId, page, limit, excludeImported } = req.query;
+
+    const recService = new StoreRecommendationService(prisma);
+    const results = await recService.getRecommendations(storeId, {
+      type: type as any,
+      categoryId: categoryId ? parseInt(categoryId) : undefined,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 12,
+      excludeImported: excludeImported === 'true' || excludeImported === '1'
+    });
+
+    res.json(results);
+  } catch (err: any) {
+    console.error('Error in store recommendations:', err);
+    res.status(500).json({ error: 'خطا در دریافت پیشنهادات هوشمند کالا', details: err?.message });
+  }
+};
+
+app.get('/api/store-manager/recommendations', authenticateToken, requireStoreManager, handleRecommendationsRequest);
+app.get('/api/store/recommendations', authenticateToken, requireStoreManager, handleRecommendationsRequest);
+
+// Store Manager - Recommendation Interaction Analytics (Prompt 09)
+const handleRecommendationEvent = async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const { eventType, productId, recommendationType, score, metadata } = req.body;
+
+    if (!eventType || !productId) {
+      return res.status(400).json({ error: 'eventType and productId are required' });
+    }
+
+    const recService = new StoreRecommendationService(prisma);
+    const result = await recService.recordEvent(storeId, {
+      eventType,
+      productId: parseInt(productId),
+      recommendationType,
+      score,
+      metadata
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error logging recommendation event:', err);
+    res.status(500).json({ error: 'خطا در ثبت رویداد پیشنهادات' });
+  }
+};
+
+app.post('/api/store-manager/recommendations/events', authenticateToken, requireStoreManager, handleRecommendationEvent);
+app.post('/api/store/recommendations/events', authenticateToken, requireStoreManager, handleRecommendationEvent);
+
+// Admin - Recommendation Analytics Stats (Prompt 09)
+app.get('/api/admin/recommendations/stats', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const recService = new StoreRecommendationService(prisma);
+    const stats = await recService.getAdminStats();
+    res.json(stats);
+  } catch (err: any) {
+    console.error('Error fetching admin recommendation stats:', err);
+    res.status(500).json({ error: 'خطا در دریافت آمار پیشنهادات' });
+  }
+});
+
 // Add to My Catalog (زوپیتی من)
 app.post('/api/store-manager/my-catalog', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
     const storeId = req.user.userId || req.user.id;
-    const { productId } = req.body;
+    const { productId: rawProductId, source } = req.body;
 
-    if (!productId) {
-      return res.status(400).json({ error: 'Product ID is required.' });
+    if (!rawProductId) {
+      return res.status(400).json({ error: 'شناسه محصول الزامی است.' });
+    }
+    const productId = parseInt(rawProductId);
+
+    // Verify authoritative product eligibility
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: { supplier: true }
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'محصول مورد نظر یافت نشد.' });
     }
 
-    // Check limit
+    if (product.status !== 'ACTIVE' && product.status !== 'PUBLISHED') {
+      return res.status(400).json({ error: 'این محصول در حال حاضر در دسترس یا فعال برای افزودن به فروشگاه نیست.' });
+    }
+
+    if (product.supplier && ((product.supplier as any).status === 'SUSPENDED' || (product.supplier as any).status === 'BLOCKED')) {
+      return res.status(400).json({ error: 'تامین‌کننده این محصول در دسترس نمی‌باشد.' });
+    }
+
+    // Check if already selected (Idempotent handling)
+    const existing = await prisma.storeProductSelection.findFirst({
+      where: { storeId, productId }
+    });
+
+    if (existing) {
+      return res.status(200).json({
+        message: 'این محصول قبلاً به کاتالوگ فروشگاه شما اضافه شده است.',
+        alreadyImported: true,
+        selection: existing
+      });
+    }
+
+    // Check quota limit
     const totalSelections = await prisma.storeProductSelection.count({
       where: { storeId }
     });
@@ -7012,26 +7388,248 @@ app.post('/api/store-manager/my-catalog', authenticateToken, requireStoreManager
       }
     }
 
-    // Check if already selected
-    const existing = await prisma.storeProductSelection.findFirst({
-      where: { storeId, productId }
-    });
-
-    if (existing) {
-      return res.status(400).json({ error: 'این محصول قبلاً به زوپیتی شما اضافه شده است.' });
-    }
-
     const selection = await prisma.storeProductSelection.create({
       data: {
         storeId,
         productId,
-        status: 'PENDING_SYNC'
+        status: 'ACTIVE'
       }
     });
 
-    res.json({ message: 'محصول با موفقیت به زوپیتی شما اضافه شد.', selection });
+    // Record governance & import audit trail
+    recordProductGovernanceAudit({
+      productId: product.id,
+      actorId: storeId,
+      actorRole: 'STORE_MANAGER',
+      action: 'PRODUCT_IMPORT',
+      metadata: {
+        productName: product.name,
+        finalPrice: product.finalPrice || product.supplierBasePrice,
+        source: source || 'MARKETPLACE'
+      }
+    }).catch(() => {});
+
+    res.status(201).json({
+      message: 'محصول با موفقیت به کاتالوگ فروشگاه شما اضافه شد.',
+      alreadyImported: false,
+      selection
+    });
   } catch (err) {
-    res.status(500).json({ error: 'خطا در افزودن محصول به زوپیت' });
+    console.error('Error importing product to store catalog:', err);
+    res.status(500).json({ error: 'خطا در افزودن محصول به کاتالوگ' });
+  }
+});
+
+// Bulk Add to My Catalog
+app.post('/api/store-manager/my-catalog/bulk', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const { productIds, source } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({ error: 'لیست شناسه‌های محصول الزامی است.' });
+    }
+
+    if (productIds.length > 50) {
+      return res.status(400).json({ error: 'حداکثر ۵۰ محصول را می‌توانید همزمان وارد کنید.' });
+    }
+
+    const uniqueIds = Array.from(new Set(productIds.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id) && id > 0)));
+
+    // Fetch candidate products
+    const products = await prisma.product.findMany({
+      where: {
+        id: { in: uniqueIds }
+      },
+      include: { supplier: true }
+    });
+
+    const productMap = new Map<number, any>();
+    products.forEach((p: any) => productMap.set(p.id, p));
+
+    // Fetch existing selections for this store
+    const existingSelections = await prisma.storeProductSelection.findMany({
+      where: {
+        storeId,
+        productId: { in: uniqueIds }
+      }
+    });
+    const existingSet = new Set<number>(existingSelections.map((s: any) => s.productId));
+
+    // Check quota constraints
+    const totalSelections = await prisma.storeProductSelection.count({ where: { storeId } });
+    const setting = await prisma.systemSettings.findUnique({ where: { key: 'DAILY_PRODUCT_LIMIT' } });
+    const dailyLimit = setting ? parseInt(setting.value) : 3;
+
+    let availableQuota = 999;
+    if (totalSelections >= 20) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const selectionsToday = await prisma.storeProductSelection.count({
+        where: {
+          storeId,
+          selected_at: { gte: today, lt: tomorrow }
+        }
+      });
+      availableQuota = Math.max(0, dailyLimit - selectionsToday);
+    }
+
+    const results: Array<{ productId: number; status: 'SUCCESS' | 'ALREADY_EXISTS' | 'SKIPPED'; reason?: string }> = [];
+    const importedIds: number[] = [];
+
+    for (const pid of uniqueIds) {
+      if (existingSet.has(pid)) {
+        results.push({ productId: pid, status: 'ALREADY_EXISTS', reason: 'پیش‌تر در کاتالوگ موجود است' });
+        continue;
+      }
+
+      const prod = productMap.get(pid);
+      if (!prod) {
+        results.push({ productId: pid, status: 'SKIPPED', reason: 'محصول یافت نشد' });
+        continue;
+      }
+
+      if (prod.status !== 'ACTIVE' && prod.status !== 'PUBLISHED') {
+        results.push({ productId: pid, status: 'SKIPPED', reason: 'محصول غیرفعال است' });
+        continue;
+      }
+
+      if (prod.supplier && ((prod.supplier as any).status === 'SUSPENDED' || (prod.supplier as any).status === 'BLOCKED')) {
+        results.push({ productId: pid, status: 'SKIPPED', reason: 'تامین‌کننده غیرفعال است' });
+        continue;
+      }
+
+      if (availableQuota <= 0) {
+        results.push({ productId: pid, status: 'SKIPPED', reason: 'سهمیه روزانه به پایان رسیده است' });
+        continue;
+      }
+
+      try {
+        await prisma.storeProductSelection.create({
+          data: {
+            storeId,
+            productId: pid,
+            status: 'ACTIVE'
+          }
+        });
+        importedIds.push(pid);
+        availableQuota--;
+        results.push({ productId: pid, status: 'SUCCESS' });
+      } catch (insertErr) {
+        results.push({ productId: pid, status: 'SKIPPED', reason: 'خطا در ثبت پایگاه داده' });
+      }
+    }
+
+    const importedCount = results.filter(r => r.status === 'SUCCESS').length;
+    const alreadyImportedCount = results.filter(r => r.status === 'ALREADY_EXISTS').length;
+    const skippedCount = results.filter(r => r.status === 'SKIPPED').length;
+
+    // Log bulk audit
+    if (importedCount > 0) {
+      recordProductGovernanceAudit({
+        productId: importedIds[0],
+        actorId: storeId,
+        actorRole: 'STORE_MANAGER',
+        action: 'BULK_PRODUCT_IMPORT',
+        metadata: {
+          totalRequested: uniqueIds.length,
+          importedCount,
+          alreadyImportedCount,
+          skippedCount,
+          importedIds,
+          source: source || 'MARKETPLACE_BULK'
+        }
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      totalRequested: uniqueIds.length,
+      importedCount,
+      alreadyImportedCount,
+      skippedCount,
+      results,
+      importedIds,
+      message: `${importedCount} محصول با موفقیت به کاتالوگ فروشگاه اضافه شد.`
+    });
+  } catch (err: any) {
+    console.error('Error in bulk product import:', err);
+    res.status(500).json({ error: 'خطا در ورود دسته‌جمعی محصولات' });
+  }
+});
+
+// Toggle Storefront Activation Status
+app.post('/api/store-manager/products/:productId/status', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const productId = parseInt(req.params.productId);
+    const { status, isActive } = req.body;
+
+    const selection = await prisma.storeProductSelection.findFirst({
+      where: { storeId, productId }
+    });
+
+    if (!selection) {
+      return res.status(404).json({ error: 'این محصول در کاتالوگ شما یافت نشد.' });
+    }
+
+    let targetStatus = status;
+    if (isActive !== undefined) {
+      targetStatus = isActive ? 'ACTIVE' : 'INACTIVE';
+    }
+    if (!targetStatus) {
+      targetStatus = selection.status === 'ACTIVE' || selection.status === 'SYNCED' ? 'INACTIVE' : 'ACTIVE';
+    }
+
+    await prisma.storeProductSelection.updateMany({
+      where: { storeId, productId },
+      data: { status: targetStatus }
+    });
+
+    recordProductGovernanceAudit({
+      productId,
+      actorId: storeId,
+      actorRole: 'STORE_MANAGER',
+      action: 'PRODUCT_ACTIVATION',
+      metadata: {
+        previousStatus: selection.status,
+        newStatus: targetStatus
+      }
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      status: targetStatus,
+      message: targetStatus === 'ACTIVE' || targetStatus === 'SYNCED' ? 'محصول در فروشگاه فعال شد.' : 'فروش محصول در فروشگاه متوقف شد.'
+    });
+  } catch (err: any) {
+    console.error('Error updating storefront status:', err);
+    res.status(500).json({ error: 'خطا در تغییر وضعیت نمایش محصول' });
+  }
+});
+
+// Product View Analytics Endpoint
+app.post('/api/store-manager/products/:productId/view', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const storeId = req.user.userId || req.user.id;
+    const productId = parseInt(req.params.productId);
+
+    recordProductGovernanceAudit({
+      productId,
+      actorId: storeId,
+      actorRole: 'STORE_MANAGER',
+      action: 'PRODUCT_VIEW',
+      metadata: {
+        source: req.body.source || 'MARKETPLACE'
+      }
+    }).catch(() => {});
+
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false });
   }
 });
 
@@ -7252,7 +7850,8 @@ app.post('/api/store-manager/products/:productId/price', authenticateToken, requ
     const { customPrice, customProfit } = req.body;
 
     const selection = await prisma.storeProductSelection.findFirst({
-      where: { storeId, productId }
+      where: { storeId, productId },
+      include: { product: true }
     });
 
     if (!selection) {
@@ -7261,6 +7860,18 @@ app.post('/api/store-manager/products/:productId/price', authenticateToken, requ
 
     const priceNum = customPrice !== null && customPrice !== undefined && customPrice !== '' ? Number(customPrice) : null;
     const profitNum = customProfit !== null && customProfit !== undefined && customProfit !== '' ? Number(customProfit) : null;
+
+    // Validate against wholesale base price
+    const prod = selection.product;
+    const wholesalePrice = prod?.finalPrice || (prod?.supplierBasePrice ? calculateAuthoritativeFinalPrice(prod.supplierBasePrice, prod.marginType || 'PERCENTAGE', prod.marginValue ?? 0) : 0);
+
+    if (priceNum !== null && priceNum < wholesalePrice) {
+      return res.status(400).json({ error: `قیمت فروش دلخواه نمی‌تواند کمتر از قیمت خرید عمده (${wholesalePrice.toLocaleString()} تومان) باشد.` });
+    }
+
+    if (profitNum !== null && profitNum < 0) {
+      return res.status(400).json({ error: 'سود فروشگاه نمی‌تواند مبلغ منفی باشد.' });
+    }
 
     try {
       await prisma.storeProductSelection.updateMany({
@@ -7288,6 +7899,19 @@ app.post('/api/store-manager/products/:productId/price', authenticateToken, requ
         productId
       );
     }
+
+    // Record audit trail
+    recordProductGovernanceAudit({
+      productId,
+      actorId: storeId,
+      actorRole: 'STORE_MANAGER',
+      action: 'RETAIL_PRICE_SET',
+      metadata: {
+        customPrice: priceNum,
+        customProfit: profitNum,
+        wholesalePrice
+      }
+    }).catch(() => {});
 
     res.json({ message: 'قیمت فروش با موفقیت بروزرسانی شد.' });
   } catch (err: any) {
@@ -7932,7 +8556,7 @@ app.get('/api/v1/store/products', authenticateStoreApiKey, async (req: any, res:
     });
 
     const formattedProducts = products.map(p => {
-      const basePrice = p.supplierBasePrice || 0;
+      const basePrice = p.finalPrice || (p.supplierBasePrice ? calculateAuthoritativeFinalPrice(p.supplierBasePrice, p.marginType || 'PERCENTAGE', p.marginValue ?? 0) : 0);
       const sel = selectionMap.get(p.id);
 
       let sellingPrice = basePrice;
@@ -9696,6 +10320,128 @@ app.post('/api/store-manager/settings', authenticateToken, requireStoreManager, 
   }
 });
 
+// ==================== SUBSCRIPTION & PLAN ENGINE ROUTES ==================== //
+
+// Get subscription plan configurations
+app.get('/api/store-manager/subscription/configs', async (req: any, res: any) => {
+  try {
+    const configs = await SubscriptionService.getPlanConfigs();
+    res.json(configs);
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در دریافت تنظیمات پلن‌های اشتراک' });
+  }
+});
+
+// Get store manager authoritative subscription status
+app.get('/api/store-manager/subscription/status', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const status = await SubscriptionService.getStoreSubscriptionStatus(req.user.userId);
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در دریافت وضعیت اشتراک فروشگاه' });
+  }
+});
+
+// Initiate subscription payment (Monthly or Annual)
+app.post('/api/store-manager/subscription/subscribe', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { planType } = req.body;
+
+    if (planType !== 'PRO_MONTHLY' && planType !== 'PRO_ANNUAL') {
+      return res.status(400).json({ error: 'نوع پلن انتخاب شده معتبر نمی‌باشد.' });
+    }
+
+    const configs = await SubscriptionService.getPlanConfigs();
+    const planConfig = planType === 'PRO_MONTHLY' ? configs.PRO_MONTHLY : configs.PRO_ANNUAL;
+    const amountToman = planConfig.priceToman;
+
+    const baseUrl = getCanonicalAppUrl(req);
+
+    const invoice = await prisma.storeInvoice.create({
+      data: {
+        storeManagerId: userId,
+        totalAmount: amountToman,
+        status: 'PENDING',
+        receiptNotes: `خرید ${planConfig.displayName}`
+      }
+    });
+
+    const callbackUrl = `${baseUrl}/api/public/pro/callback?userId=${userId}&type=SUBSCRIPTION_PAYMENT&planType=${planType}&amount=${amountToman}&invoiceId=${invoice.id}`;
+
+    req.paymentStartTime = Date.now();
+    try {
+      const paymentGateway = await PaymentServiceFactory.getService();
+      const zibalResult = await paymentGateway.createPayment(
+        amountToman * 10,
+        `خرید ${planConfig.displayName} کاربر #${userId}`,
+        callbackUrl
+      );
+      return res.json({
+        payLink: zibalResult.payLink,
+        amount: amountToman,
+        invoiceId: invoice.id
+      });
+    } catch (paymentErr: any) {
+      console.warn('Server Zibal error for subscription subscribe, providing client fallback:', paymentErr.message);
+      const resolvedMerchant = process.env.ZIBAL_MERCHANT_ID || 'zibal';
+      return res.json({
+        success: true,
+        clientPaymentRequired: true,
+        amountInRials: amountToman * 10,
+        merchant: resolvedMerchant,
+        callbackUrl,
+        description: `خرید ${planConfig.displayName} کاربر #${userId}`,
+        amount: amountToman,
+        invoiceId: invoice.id
+      });
+    }
+  } catch (err: any) {
+    console.error('Error in /api/store-manager/subscription/subscribe:', err);
+    res.status(500).json({ error: 'خطا در ایجاد درگاه پرداخت اشتراک: ' + err.message });
+  }
+});
+
+// Admin subscription management
+app.get('/api/admin/subscriptions', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const page = parseInt(req.query.page as string || '1', 10);
+    const limit = parseInt(req.query.limit as string || '20', 10);
+    const search = req.query.search as string;
+    const status = req.query.status as string;
+
+    const result = await SubscriptionService.adminGetSubscriptions({ page, limit, search, status });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در دریافت لیست اشتراک‌ها' });
+  }
+});
+
+app.post('/api/admin/subscriptions/plan-config', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { monthlyPrice, annualPrice } = req.body;
+    await SubscriptionService.adminUpdatePlanPrices(req.user.userId, parseInt(monthlyPrice, 10), parseInt(annualPrice, 10));
+    res.json({ message: 'قیمت‌های جدید اشتراک با موفقیت ثبت شدند.' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'خطا در به‌روزرسانی قیمت‌های اشتراک' });
+  }
+});
+
+app.post('/api/admin/subscriptions/manual-action', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { targetUserId, action, extensionDays } = req.body;
+    const updated = await SubscriptionService.adminManualAction(
+      req.user.userId,
+      parseInt(targetUserId, 10),
+      action,
+      extensionDays ? parseInt(extensionDays, 10) : 30
+    );
+    res.json({ message: 'عملیات با موفقیت انجام شد.', subscription: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'خطا در اجرای عملیات اشتراک' });
+  }
+});
+
 // ==================== PRO ACCOUNT ROUTES ==================== //
 
 // 1. Get Pro Account status & settings for Store Manager
@@ -10180,20 +10926,34 @@ app.get('/api/public/pro/callback', async (req: any, res: any) => {
       `);
     }
 
-    if (type === 'HOST_RENEWAL') {
-      const nextMonth = new Date();
-      nextMonth.setDate(nextMonth.getDate() + 30);
-      await prisma.proAccount.update({
-        where: { userId: parsedUserId },
-        data: { hostExpiresAt: nextMonth, status: 'APPROVED' }
-      }).catch(() => {});
+    if (type === 'SUBSCRIPTION_PAYMENT') {
+      const targetPlan = (req.query.planType as string) === 'PRO_MONTHLY' ? 'PRO_MONTHLY' : 'PRO_ANNUAL';
+      const parsedInvoiceId = req.query.invoiceId ? parseInt(req.query.invoiceId as string, 10) : undefined;
+      await SubscriptionService.activateOrRenewSubscription({
+        userId: parsedUserId,
+        planType: targetPlan,
+        paymentRef: verification.refId || resolvedTrackId.toString(),
+        invoiceId: parsedInvoiceId,
+        amountPaidToman: expectedAmountRials / 10
+      });
+    } else if (type === 'HOST_RENEWAL') {
+      const parsedInvoiceId = req.query.invoiceId ? parseInt(req.query.invoiceId as string, 10) : undefined;
+      await SubscriptionService.activateOrRenewSubscription({
+        userId: parsedUserId,
+        planType: 'PRO_MONTHLY',
+        paymentRef: verification.refId || resolvedTrackId.toString(),
+        invoiceId: parsedInvoiceId,
+        amountPaidToman: expectedAmountRials / 10
+      });
     } else if (type === 'PRO_REGISTER') {
-      const autoApproveSetting = await prisma.systemSettings.findUnique({ where: { key: 'pro_auto_approve' } });
-      const isAutoApprove = !autoApproveSetting || autoApproveSetting.value !== 'false';
-      await prisma.proAccount.update({
-        where: { userId: parsedUserId },
-        data: { status: isAutoApprove ? 'APPROVED' : 'PENDING', payLink: null }
-      }).catch(() => {});
+      const parsedInvoiceId = req.query.invoiceId ? parseInt(req.query.invoiceId as string, 10) : undefined;
+      await SubscriptionService.activateOrRenewSubscription({
+        userId: parsedUserId,
+        planType: 'PRO_ANNUAL',
+        paymentRef: verification.refId || resolvedTrackId.toString(),
+        invoiceId: parsedInvoiceId,
+        amountPaidToman: expectedAmountRials / 10
+      });
     } else if (type === 'TOROB_SETUP') {
       await prisma.proAccount.update({
         where: { userId: parsedUserId },
@@ -11578,6 +12338,155 @@ export async function setProductMarginCore(params: {
   });
 
   return { success: true, product: updated };
+}
+
+// 10. Central Dynamic Supplier Price Update Function (Authoritative Dynamic Pricing)
+export async function updateSupplierProductPriceCore(params: {
+  productId: number;
+  newBasePrice: number | string;
+  actorId?: number;
+  actorRole?: string;
+  source?: string;
+}): Promise<{
+  success: boolean;
+  product?: any;
+  error?: string;
+  status?: number;
+  isExtreme?: boolean;
+  diffPercent?: number;
+  oldBasePrice?: number;
+  newBasePrice?: number;
+  oldFinalPrice?: number;
+  newFinalPrice?: number;
+}> {
+  const { productId, newBasePrice: rawPrice, actorId, actorRole = 'SUPPLIER', source = 'MANUAL' } = params;
+
+  const parsedBasePrice = safeParseFloat(rawPrice, 0);
+  if (!parsedBasePrice || parsedBasePrice <= 0) {
+    return { success: false, error: 'قیمت پایه تامین‌کننده باید عددی معتبر و بزرگتر از صفر باشد.', status: 400 };
+  }
+
+  const existing = await prisma.product.findUnique({
+    where: { id: productId },
+    include: { variants: true }
+  });
+  if (!existing) {
+    return { success: false, error: 'محصول مورد نظر یافت نشد.', status: 404 };
+  }
+
+  // If actor is a supplier, ensure ownership
+  if (actorRole === 'SUPPLIER' && actorId && existing.supplierId !== actorId) {
+    return { success: false, error: 'شما دسترسی ویرایش این محصول را ندارید.', status: 403 };
+  }
+
+  const oldBasePrice = safeParseFloat(existing.supplierBasePrice, 0);
+  const oldFinalPrice = safeParseFloat(existing.finalPrice, oldBasePrice);
+  const thresholdPct = await getExtremePriceChangeThresholdPercent();
+  const priceCheck = isPriceChangeExtreme(oldBasePrice, parsedBasePrice, thresholdPct);
+
+  let newStatus = existing.status;
+  let isExtreme = false;
+
+  // Extreme price change detection on PUBLISHED product
+  if (oldBasePrice > 0 && priceCheck.isExtreme && existing.status === 'PUBLISHED') {
+    newStatus = 'PENDING_APPROVAL';
+    isExtreme = true;
+
+    await recordProductGovernanceAudit({
+      productId: existing.id,
+      actorId: actorId || existing.supplierId,
+      actorRole,
+      action: 'PRODUCT_EXTREME_PRICE_CHANGE_SUPPLIER_EDIT',
+      metadata: {
+        source,
+        oldBasePrice,
+        newBasePrice: parsedBasePrice,
+        oldFinalPrice,
+        diffPercent: priceCheck.diffPercent,
+        thresholdPercent: thresholdPct,
+        isExtreme: true
+      }
+    });
+
+    await sendProductGovernanceNotification(
+      existing.supplierId,
+      'تعلیق محصول جهت بازبینی جهش قیمت',
+      `کالای «${existing.name}» به دلیل تغییر قیمت فراتر از آستانه مجاز (${priceCheck.diffPercent}٪) جهت بازبینی مجدد به صف بررسی مدیریت منتقل شد.`,
+      'WARNING'
+    );
+
+    await prisma.announcement.create({
+      data: {
+        title: `هشدار جهش قیمت محصول #${existing.id}`,
+        content: `محصول شماره ${existing.id} (${existing.name}) با جهش قیمت ${priceCheck.diffPercent}٪ (از ${oldBasePrice.toLocaleString('fa-IR')} به ${parsedBasePrice.toLocaleString('fa-IR')} تومان) تا تایید مجدد مدیریت تعلیق شد.`,
+        target: 'ALL',
+        priority: 'HIGH',
+        isSticky: true,
+      }
+    }).catch(console.error);
+  } else if (oldBasePrice !== parsedBasePrice) {
+    // Ordinary price change: record audit trail
+    await recordProductGovernanceAudit({
+      productId: existing.id,
+      actorId: actorId || existing.supplierId,
+      actorRole,
+      action: 'PRODUCT_PRICE_CHANGED_SUPPLIER_ORDINARY',
+      metadata: {
+        source,
+        oldBasePrice,
+        newBasePrice: parsedBasePrice,
+        oldFinalPrice,
+        diffPercent: priceCheck.diffPercent,
+        thresholdPercent: thresholdPct,
+        isExtreme: false
+      }
+    });
+  }
+
+  // Authoritatively recalculate finalPrice preserving existing Admin margin
+  let newFinalPrice = existing.finalPrice;
+  if (existing.marginValue != null) {
+    newFinalPrice = calculateAuthoritativeFinalPrice(
+      parsedBasePrice,
+      existing.marginType || 'PERCENTAGE',
+      existing.marginValue
+    );
+  } else {
+    newFinalPrice = parsedBasePrice;
+  }
+
+  // Atomically update product in DB
+  const updatedProduct = await prisma.product.update({
+    where: { id: productId },
+    data: {
+      supplierBasePrice: parsedBasePrice,
+      finalPrice: newFinalPrice,
+      status: newStatus
+    }
+  });
+
+  // Update variants base price
+  try {
+    if (existing.variants && existing.variants.length > 0) {
+      await prisma.productVariant.updateMany({
+        where: { productId },
+        data: {
+          supplierBasePrice: parsedBasePrice
+        }
+      });
+    }
+  } catch (vErr) {}
+
+  return {
+    success: true,
+    product: updatedProduct,
+    isExtreme,
+    diffPercent: priceCheck.diffPercent,
+    oldBasePrice,
+    newBasePrice: parsedBasePrice,
+    oldFinalPrice,
+    newFinalPrice
+  };
 }
 
 // ============================================================================
@@ -13692,15 +14601,12 @@ app.get('/api/public/products', async (req, res) => {
 
     const formattedProducts = products.map((p: any) => {
       let finalPrice = p.finalPrice;
-      if (!finalPrice) {
-        finalPrice = p.supplierBasePrice;
-        if (p.marginType === 'PERCENTAGE' && p.marginValue) {
-          finalPrice = p.supplierBasePrice * (1 + p.marginValue / 100);
-        } else if (p.marginType === 'FIXED' && p.marginValue) {
-          finalPrice = p.supplierBasePrice + p.marginValue;
-        } else {
-          finalPrice = p.supplierBasePrice * 1.15; // default 15% margin if none is set
-        }
+      if (!finalPrice && p.supplierBasePrice) {
+        finalPrice = calculateAuthoritativeFinalPrice(
+          p.supplierBasePrice,
+          p.marginType || 'PERCENTAGE',
+          p.marginValue ?? 0
+        );
       }
       const imgUrl = p.exploreContent?.customImageUrl || getValidProductImageUrlServer(p);
       const imagesArr = (p.images && p.images.length > 0) ? p.images : [{ url: imgUrl }];
@@ -15997,6 +16903,322 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
       res.json(map);
     } catch (err) {
       res.json(defaultCode);
+    }
+  });
+
+  // Prompt 12: Smart Action Center APIs
+  app.get('/api/store-manager/smart-actions', authenticateToken, async (req: any, res: any) => {
+    try {
+      const storeId = req.user.userId || req.user.id;
+      const limit = parseInt(req.query.limit || '5', 10);
+      const actions = await StoreActionPriorityService.getSmartActions(prisma, storeId, limit);
+      return res.json({ success: true, actions, count: actions.length });
+    } catch (err: any) {
+      console.error('[SmartActions] Error fetching actions:', err);
+      return res.status(500).json({ error: 'خطا در محاسبه پیشنهادهای رشد فروشگاه', success: false });
+    }
+  });
+
+  app.post('/api/store-manager/smart-actions/impression', authenticateToken, async (req: any, res: any) => {
+    try {
+      const storeId = req.user.userId || req.user.id;
+      const { actionIds } = req.body || {};
+      if (Array.isArray(actionIds) && actionIds.length > 0) {
+        await StoreActionPriorityService.trackActionImpression(prisma, storeId, actionIds);
+      }
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to log impression', success: false });
+    }
+  });
+
+  app.post('/api/store-manager/smart-actions/:actionId/click', authenticateToken, async (req: any, res: any) => {
+    try {
+      const storeId = req.user.userId || req.user.id;
+      const { actionId } = req.params;
+      await StoreActionPriorityService.trackActionClick(prisma, storeId, actionId);
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to log click', success: false });
+    }
+  });
+
+  app.post('/api/store-manager/smart-actions/:actionId/dismiss', authenticateToken, async (req: any, res: any) => {
+    try {
+      const storeId = req.user.userId || req.user.id;
+      const { actionId } = req.params;
+      await StoreActionPriorityService.dismissAction(prisma, storeId, actionId);
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to dismiss action', success: false });
+    }
+  });
+
+  app.post('/api/store-manager/smart-actions/:actionId/complete', authenticateToken, async (req: any, res: any) => {
+    try {
+      const storeId = req.user.userId || req.user.id;
+      const { actionId } = req.params;
+      await StoreActionPriorityService.completeAction(prisma, storeId, actionId);
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to complete action', success: false });
+    }
+  });
+
+  app.get('/api/admin/action-center/analytics', requireAdmin, async (req: any, res: any) => {
+    try {
+      const analytics = await StoreActionPriorityService.getAdminActionAnalytics(prisma);
+      return res.json({ success: true, analytics });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch action center analytics', success: false });
+    }
+  });
+
+  // Supplier Growth & Performance Center Routes (Prompt 13)
+  app.get('/api/supplier/growth', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      if (!supplierId) {
+        return res.status(401).json({ error: 'شناسه کاربری احراز هویت نشده است', success: false });
+      }
+      const growthData = await SupplierGrowthService.getSupplierGrowthDashboard(prisma, Number(supplierId));
+      return res.json({ success: true, ...growthData });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/growth:', err);
+      return res.status(500).json({ error: err.message || 'خطای داخلی در دریافت اطلاعات رشد تامین‌کننده', success: false });
+    }
+  });
+
+  app.get('/api/supplier/performance/sales', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      if (!supplierId) {
+        return res.status(401).json({ error: 'شناسه کاربری احراز هویت نشده است', success: false });
+      }
+      const period = (req.query.period as string) || '7days';
+      const salesData = await SupplierGrowthService.getSupplierSalesPerformance(prisma, Number(supplierId), period);
+      return res.json({ success: true, ...salesData });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/performance/sales:', err);
+      return res.status(500).json({ error: err.message || 'خطای سرور در دریافت گزارش فروش', success: false });
+    }
+  });
+
+  app.get('/api/supplier/products/performance', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      if (!supplierId) {
+        return res.status(401).json({ error: 'شناسه کاربری احراز هویت نشده است', success: false });
+      }
+      const productPerfData = await SupplierGrowthService.getSupplierProductsPerformance(prisma, Number(supplierId));
+      return res.json({ success: true, ...productPerfData });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/products/performance:', err);
+      return res.status(500).json({ error: err.message || 'خطای سرور در دریافت عملکرد محصولات', success: false });
+    }
+  });
+
+  // SUPPLIER ↔ STORE MATCHING ENGINE ROUTES (Prompt 14)
+  const matchingService = new MarketplaceMatchingService(prisma);
+
+  // 1. Supplier -> Stores Matches
+  app.get('/api/supplier/matches', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      if (!supplierId) {
+        return res.status(401).json({ error: 'شناسه کاربری احراز هویت نشده است', success: false });
+      }
+
+      const categoryId = req.query.categoryId ? Number(req.query.categoryId) : undefined;
+      const minScore = req.query.minScore ? Number(req.query.minScore) : 25;
+      const page = req.query.page ? Number(req.query.page) : 1;
+      const limit = req.query.limit ? Number(req.query.limit) : 10;
+      const sort = (req.query.sort as any) || 'score_desc';
+
+      const result = await matchingService.getMatchingStoresForSupplier(Number(supplierId), {
+        categoryId,
+        minScore,
+        page,
+        limit,
+        sort
+      });
+
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/matches:', err);
+      return res.status(500).json({ error: err.message || 'خطای سرور در دریافت فروشگاه‌های پیشنهادی', success: false });
+    }
+  });
+
+  // 2. Supplier Product -> Stores Matches
+  app.get('/api/supplier/products/:id/matches', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      const productId = Number(req.params.id);
+
+      if (!supplierId || isNaN(productId)) {
+        return res.status(400).json({ error: 'شناسه محصول یا کاربر نامعتبر است', success: false });
+      }
+
+      // Verify product ownership
+      const product = await prisma.product.findFirst({
+        where: { id: productId, supplierId: Number(supplierId) }
+      });
+
+      if (!product) {
+        return res.status(404).json({ error: 'محصول یافت نشد یا متعلق به شما نیست', success: false });
+      }
+
+      const minScore = req.query.minScore ? Number(req.query.minScore) : 25;
+      const page = req.query.page ? Number(req.query.page) : 1;
+      const limit = req.query.limit ? Number(req.query.limit) : 10;
+      const sort = (req.query.sort as any) || 'score_desc';
+
+      const result = await matchingService.getMatchingStoresForSupplier(Number(supplierId), {
+        productId,
+        minScore,
+        page,
+        limit,
+        sort
+      });
+
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/products/:id/matches:', err);
+      return res.status(500).json({ error: err.message || 'خطای سرور در تطبیق محصول با فروشگاه‌ها', success: false });
+    }
+  });
+
+  // 3. Store Manager -> Suppliers Matches
+  app.get('/api/store-manager/supplier-matches', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+    try {
+      const storeId = req.user?.userId || req.user?.id;
+      if (!storeId) {
+        return res.status(401).json({ error: 'شناسه فروشگاه احراز هویت نشده است', success: false });
+      }
+
+      const categoryId = req.query.categoryId ? Number(req.query.categoryId) : undefined;
+      const minScore = req.query.minScore ? Number(req.query.minScore) : 25;
+      const page = req.query.page ? Number(req.query.page) : 1;
+      const limit = req.query.limit ? Number(req.query.limit) : 10;
+      const sort = (req.query.sort as any) || 'score_desc';
+
+      const result = await matchingService.getMatchingSuppliersForStore(Number(storeId), {
+        categoryId,
+        minScore,
+        page,
+        limit,
+        sort
+      });
+
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('Error in /api/store-manager/supplier-matches:', err);
+      return res.status(500).json({ error: err.message || 'خطای سرور در دریافت تأمین‌کنندگان پیشنهادی', success: false });
+    }
+  });
+
+  // 4. Tracking Match Events
+  app.post('/api/matching/track', authenticateToken, async (req: any, res: any) => {
+    try {
+      const userId = req.user?.userId || req.user?.id;
+      const { eventType, targetType, targetId, metadata } = req.body;
+
+      if (!userId || !eventType || !targetType || !targetId) {
+        return res.status(400).json({ error: 'پارامترهای ثبت رویداد تطبیق ناقص است', success: false });
+      }
+
+      await matchingService.trackMatchInteraction(Number(userId), eventType, {
+        targetType,
+        targetId: Number(targetId),
+        metadata
+      });
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('Error in /api/matching/track:', err);
+      return res.status(500).json({ error: 'خطا در ثبت تعامل تطبیق', success: false });
+    }
+  });
+
+  // SUPPLIER DEMAND & PRODUCT OPPORTUNITY ENGINE ROUTES (Prompt 15)
+  const productOpportunityService = new ProductOpportunityService(prisma);
+
+  // 1. Supplier Product Opportunities List & Summary
+  app.get('/api/supplier/product-opportunities', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      if (!supplierId) {
+        return res.status(401).json({ error: 'شناسه کاربری احراز هویت نشده است', success: false });
+      }
+
+      const categoryId = req.query.categoryId ? Number(req.query.categoryId) : undefined;
+      const opportunityType = req.query.opportunityType as any;
+      const minScore = req.query.minScore ? Number(req.query.minScore) : 0;
+      const page = req.query.page ? Number(req.query.page) : 1;
+      const limit = req.query.limit ? Number(req.query.limit) : 10;
+      const sort = (req.query.sort as any) || 'score_desc';
+
+      const result = await productOpportunityService.getSupplierProductOpportunities(Number(supplierId), {
+        categoryId,
+        opportunityType,
+        minScore,
+        page,
+        limit,
+        sort
+      });
+
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/product-opportunities:', err);
+      return res.status(500).json({ error: err.message || 'خطای سرور در محاسبه فرصت‌های فروش محصولات', success: false });
+    }
+  });
+
+  // 2. Single Product Opportunity Detail
+  app.get('/api/supplier/products/:id/opportunity', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      const productId = Number(req.params.id);
+
+      if (!supplierId || isNaN(productId)) {
+        return res.status(400).json({ error: 'شناسه محصول یا کاربر نامعتبر است', success: false });
+      }
+
+      const result = await productOpportunityService.analyzeProductOpportunity(productId, Number(supplierId));
+      return res.json({ success: true, opportunity: result });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/products/:id/opportunity:', err);
+      return res.status(500).json({ error: err.message || 'خطا در ارزیابی فرصت محصول', success: false });
+    }
+  });
+
+  // 3. Track Opportunity Interactions
+  app.post('/api/supplier/product-opportunities/track', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const userId = req.user?.userId || req.user?.id;
+      const { eventType, productId, metadata } = req.body;
+
+      if (!userId || !eventType || !productId) {
+        return res.status(400).json({ error: 'اطلاعات ثبت رویداد فرصت ناقص است', success: false });
+      }
+
+      await productOpportunityService.trackOpportunityInteraction(Number(userId), eventType, Number(productId), metadata);
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/product-opportunities/track:', err);
+      return res.status(500).json({ error: 'خطا در ثبت تعامل فرصت محصول', success: false });
+    }
+  });
+
+  // 4. Admin Network-wide Product Opportunities Overview
+  app.get('/api/admin/product-opportunities', authenticateToken, requireSuperAdmin, async (req: any, res: any) => {
+    try {
+      const overview = await productOpportunityService.getAdminProductOpportunitiesOverview();
+      return res.json({ success: true, overview });
+    } catch (err: any) {
+      console.error('Error in /api/admin/product-opportunities:', err);
+      return res.status(500).json({ error: 'خطا در دریافت گزارش ارزیابی فرصت‌های شبکه', success: false });
     }
   });
 

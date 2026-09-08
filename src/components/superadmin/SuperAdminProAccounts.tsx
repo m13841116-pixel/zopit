@@ -82,6 +82,8 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
 
   // Global Pro Settings states
   const [autoApprove, setAutoApprove] = useState(true);
+  const [proMonthlyPrice, setProMonthlyPrice] = useState("2490000");
+  const [proAnnualPrice, setProAnnualPrice] = useState("24900000");
   const [proAccountPrice, setProAccountPrice] = useState("189000");
   const [promaxAccountPrice, setPromaxAccountPrice] = useState("299000");
   const [hostRenewalPrice, setHostRenewalPrice] = useState("500000");
@@ -359,6 +361,19 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
     setSavingSettings(true);
     try {
       const token = localStorage.getItem("token") || "";
+
+      await fetch("/api/admin/subscriptions/plan-config", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          monthlyPrice: proMonthlyPrice,
+          annualPrice: proAnnualPrice
+        })
+      }).catch(() => {});
+
       const res = await fetch("/api/superadmin/pro/settings", {
         method: "POST",
         headers: {
