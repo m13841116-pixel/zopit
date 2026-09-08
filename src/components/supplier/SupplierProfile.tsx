@@ -18,6 +18,10 @@ export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
     bankName: user?.bankName || "",
     accountHolderName: user?.accountHolderName || "",
     address: user?.address || "",
+    originAddress: user?.originAddress || "",
+    website: user?.website || "",
+    telephone: user?.telephone || "",
+    postalCode: user?.postalCode || "",
     autoApproveOrders: user?.autoApproveOrders ?? true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -220,6 +224,69 @@ export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
                 placeholder="آدرس دقیق انبار یا دفتر خود را جهت هماهنگی ارسال‌ها وارد کنید..."
               />
             </div>
+            
+            <div className="md:col-span-2 space-y-4">
+              <label className="block text-sm font-semibold text-secondary mb-1.5">
+                آدرس مبدأ (Origin Address) - الزامی
+              </label>
+              <textarea
+                value={formData.originAddress}
+                onChange={(e) =>
+                  setFormData({ ...formData, originAddress: e.target.value })
+                }
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none h-20 resize-none"
+                placeholder="آدرس دقیق مبدا ارسال کالا..."
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-secondary mb-1.5">
+                تلفن ثابت (Telephone)
+              </label>
+              <input
+                type="text"
+                value={formData.telephone}
+                onChange={(e) =>
+                  setFormData({ ...formData, telephone: e.target.value })
+                }
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none"
+                placeholder="021XXXXXXXX"
+                dir="ltr"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-secondary mb-1.5">
+                کد پستی (Postal Code)
+              </label>
+              <input
+                type="text"
+                value={formData.postalCode}
+                onChange={(e) =>
+                  setFormData({ ...formData, postalCode: e.target.value })
+                }
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none"
+                placeholder="1234567890"
+                dir="ltr"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-secondary mb-1.5">
+                وب‌سایت (Website)
+              </label>
+              <input
+                type="text"
+                value={formData.website}
+                onChange={(e) =>
+                  setFormData({ ...formData, website: e.target.value })
+                }
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none"
+                placeholder="https://example.com"
+                dir="ltr"
+              />
+            </div>
+
             <div className="border-t border-subtle pt-4 mt-4">
               
               <h3 className="font-bold text-primary text-base mb-3">

@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+const fs = require('fs');
+
+const code = `import React, { useState, useEffect, useMemo } from "react";
 import { 
   CreditCard, 
   MapPin, 
@@ -20,7 +22,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
   // Determine completion statuses
   const [isDismissed, setIsDismissed] = useState<boolean>(() => {
     if (!user?.id) return false;
-    return localStorage.getItem(`dismissed_onboarding_${user.id}`) === "true";
+    return localStorage.getItem(\`dismissed_onboarding_\${user.id}\`) === "true";
   });
 
   const [categories, setCategories] = useState<any[]>([]);
@@ -47,7 +49,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
   );
 
   const hasBankInfo = Boolean(
-    (user?.shaba && user.shaba.replace(/\D/g, '').length >= 24) &&
+    (user?.shaba && user.shaba.replace(/\\D/g, '').length >= 24) &&
     user?.accountHolderName &&
     user?.bankName
   );
@@ -84,7 +86,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
   const [bankData, setBankData] = useState({
     shaba: user?.shaba ? (user.shaba.startsWith("IR") ? user.shaba.substring(2) : user.shaba) : "",
     cardNumber: user?.cardNumber || "",
-    accountHolderName: user?.accountHolderName || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : ""),
+    accountHolderName: user?.accountHolderName || (user?.firstName && user?.lastName ? \`\${user.firstName} \${user.lastName}\` : ""),
     bankName: user?.bankName || ""
   });
 
@@ -102,7 +104,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
   const handleDismiss = () => {
     setIsDismissed(true);
     if (user?.id) {
-      localStorage.setItem(`dismissed_onboarding_${user.id}`, "true");
+      localStorage.setItem(\`dismissed_onboarding_\${user.id}\`, "true");
     }
   };
 
@@ -145,7 +147,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: \`Bearer \${token}\`
         },
         body: JSON.stringify({
           firstName: businessData.firstName.trim(),
@@ -191,7 +193,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: \`Bearer \${token}\`
         },
         body: JSON.stringify({
           province: addressData.province.trim(),
@@ -236,7 +238,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: \`Bearer \${token}\`
         },
         body: JSON.stringify({
           shaba: bankData.shaba,
@@ -326,7 +328,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
             <div className="w-full sm:w-40 bg-slate-100 dark:bg-slate-800 rounded-full h-3 p-0.5 overflow-hidden border border-slate-200 dark:border-slate-700">
-              <div className="bg-gradient-to-r from-amber-500 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-700 shadow-sm" style={{ width: `${completionPercentage}%` }}></div>
+              <div className="bg-gradient-to-r from-amber-500 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-700 shadow-sm" style={{ width: \`\${completionPercentage}%\` }}></div>
             </div>
             <button type="button" onClick={handleDismiss} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0">
               <X className="w-4 h-4" />
@@ -338,10 +340,10 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
         <div className="mt-5 space-y-4">
           
           {/* LEVEL 1: Business Information */}
-          <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${hasBusinessInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "business" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}`}>
+          <div className={\`rounded-2xl border transition-all duration-200 overflow-hidden \${hasBusinessInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "business" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}\`}>
             <button type="button" onClick={() => setActiveStep(activeStep === "business" ? null : "business")} className="w-full p-4 flex items-center justify-between gap-3 text-right cursor-pointer">
               <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${hasBusinessInfo ? "bg-emerald-500 text-white" : "bg-amber-500/15 text-amber-600 border border-amber-500/30"}`}>
+                <div className={\`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs \${hasBusinessInfo ? "bg-emerald-500 text-white" : "bg-amber-500/15 text-amber-600 border border-amber-500/30"}\`}>
                   {hasBusinessInfo ? <CheckCircle2 className="w-5 h-5" /> : "۱"}
                 </div>
                 <div>
@@ -384,7 +386,7 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
                               type="button"
                               key={cat.id}
                               onClick={() => toggleCategory(cat.id)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${isSelected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-600 border-slate-300 hover:border-indigo-400'}`}
+                              className={\`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors \${isSelected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-600 border-slate-300 hover:border-indigo-400'}\`}
                             >
                               {cat.name}
                             </button>
@@ -410,10 +412,10 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
           </div>
 
           {/* LEVEL 2: Address & Logistics */}
-          <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${hasAddressInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "address" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}`}>
+          <div className={\`rounded-2xl border transition-all duration-200 overflow-hidden \${hasAddressInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "address" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}\`}>
             <button type="button" onClick={() => setActiveStep(activeStep === "address" ? null : "address")} className="w-full p-4 flex items-center justify-between gap-3 text-right cursor-pointer">
               <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${hasAddressInfo ? "bg-emerald-500 text-white" : "bg-amber-500/15 text-amber-600 border border-amber-500/30"}`}>
+                <div className={\`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs \${hasAddressInfo ? "bg-emerald-500 text-white" : "bg-amber-500/15 text-amber-600 border border-amber-500/30"}\`}>
                   {hasAddressInfo ? <CheckCircle2 className="w-5 h-5" /> : "۲"}
                 </div>
                 <div>
@@ -470,10 +472,10 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
           </div>
 
           {/* LEVEL 3: Bank */}
-          <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${hasBankInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "bank" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}`}>
+          <div className={\`rounded-2xl border transition-all duration-200 overflow-hidden \${hasBankInfo ? "border-emerald-500/30 bg-emerald-500/[0.02]" : activeStep === "bank" ? "border-indigo-500 bg-indigo-500/[0.02] shadow-md ring-2 ring-indigo-500/10" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"}\`}>
             <button type="button" onClick={() => setActiveStep(activeStep === "bank" ? null : "bank")} className="w-full p-4 flex items-center justify-between gap-3 text-right cursor-pointer">
               <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${hasBankInfo ? "bg-emerald-500 text-white" : "bg-amber-500/15 text-amber-600 border border-amber-500/30"}`}>
+                <div className={\`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs \${hasBankInfo ? "bg-emerald-500 text-white" : "bg-amber-500/15 text-amber-600 border border-amber-500/30"}\`}>
                   {hasBankInfo ? <CheckCircle2 className="w-5 h-5" /> : "۳"}
                 </div>
                 <div>
@@ -538,3 +540,6 @@ export const SupplierOnboardingWidget = ({ user, showNotification, onUpdateUser 
     </div>
   );
 };
+`
+fs.writeFileSync('src/components/supplier/SupplierOnboardingWidget.tsx', code);
+console.log('generated');

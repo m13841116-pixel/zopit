@@ -997,6 +997,7 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
         "city" TEXT,
         "postalCode" TEXT,
         "telephone" TEXT,
+        "originAddress" TEXT,
         "website" TEXT,
         "accountHolderName" TEXT,
         "shaba" TEXT,
@@ -1066,6 +1067,8 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
         "sku" TEXT,
         "brand" TEXT,
         "status" TEXT DEFAULT 'DRAFT',
+        "featuredStatus" TEXT DEFAULT 'NONE',
+        "featuredUntil" TIMESTAMP(3),
         "marginType" TEXT,
         "marginValue" DOUBLE PRECISION,
         "finalPrice" DOUBLE PRECISION,
@@ -1337,7 +1340,8 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
         "storeManagerId" INTEGER UNIQUE NOT NULL,
         "platformType" TEXT,
         "apiKey" TEXT,
-        "webhookUrl" TEXT
+        "webhookUrl" TEXT,
+        "monthlyTarget" DOUBLE PRECISION
       );`,
 
       `CREATE TABLE IF NOT EXISTS "Lead" (
@@ -1369,6 +1373,7 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "city" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "postalCode" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "telephone" TEXT;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "originAddress" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "website" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "accountHolderName" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "shaba" TEXT;`,
@@ -1388,6 +1393,7 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "warningLevel" TEXT DEFAULT 'NONE';`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralCode" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "activityType" TEXT;`,
+      `ALTER TABLE "StoreSettings" ADD COLUMN IF NOT EXISTS "monthlyTarget" DOUBLE PRECISION;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "brandName" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "nationalCode" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "address" TEXT;`,
@@ -1464,6 +1470,8 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "finalPrice" DOUBLE PRECISION;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "publishStartDate" TIMESTAMP;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "publishEndDate" TIMESTAMP;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "featuredStatus" TEXT DEFAULT 'NONE';`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "featuredUntil" TIMESTAMP;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "minOrderQuantity" INTEGER DEFAULT 1;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN DEFAULT false;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "inventory" INTEGER DEFAULT 0;`,
@@ -1519,7 +1527,55 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
 
       // StoreProductSelection custom pricing columns
       `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customPrice" DOUBLE PRECISION;`,
-      `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customProfit" DOUBLE PRECISION;`
+      `ALTER TABLE "StoreProductSelection" ADD COLUMN IF NOT EXISTS "customProfit" DOUBLE PRECISION;`,
+
+      // ProductImportHistory table
+      `CREATE TABLE IF NOT EXISTS "ProductImportHistory" (
+        "id" SERIAL PRIMARY KEY,
+        "supplierId" INTEGER NOT NULL,
+        "fileName" TEXT,
+        "fileType" TEXT DEFAULT 'xlsx',
+        "totalRows" INTEGER DEFAULT 0,
+        "importedCount" INTEGER DEFAULT 0,
+        "updatedCount" INTEGER DEFAULT 0,
+        "skippedCount" INTEGER DEFAULT 0,
+        "errorCount" INTEGER DEFAULT 0,
+        "status" TEXT DEFAULT 'COMPLETED',
+        "errorReport" TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      // StoreConnection table
+      `CREATE TABLE IF NOT EXISTS "StoreConnection" (
+        "id" SERIAL PRIMARY KEY,
+        "storeId" INTEGER UNIQUE NOT NULL,
+        "platform" TEXT DEFAULT 'WOOCOMMERCE',
+        "storeUrl" TEXT NOT NULL,
+        "consumerKey" TEXT NOT NULL,
+        "consumerSecret" TEXT NOT NULL,
+        "webhookSecret" TEXT,
+        "status" TEXT DEFAULT 'DISCONNECTED',
+        "lastSync" TIMESTAMP,
+        "lastSuccessfulSync" TIMESTAMP,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      // Product external sync and governance columns
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "externalSource" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "externalId" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "lastSyncedAt" TIMESTAMP;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "reviewNotes" TEXT;`,
+      `ALTER TABLE "ProductImportHistory" ADD COLUMN IF NOT EXISTS "source" TEXT DEFAULT 'FILE';`,
+      `ALTER TABLE "Ticket" ADD COLUMN IF NOT EXISTS "approxProductCount" INTEGER;`,
+      `ALTER TABLE "Ticket" ADD COLUMN IF NOT EXISTS "categories" TEXT;`,
+      `ALTER TABLE "Ticket" ADD COLUMN IF NOT EXISTS "catalogUrl" TEXT;`,
+      `ALTER TABLE "Ticket" ADD COLUMN IF NOT EXISTS "websiteUrl" TEXT;`,
+      `ALTER TABLE "Ticket" ADD COLUMN IF NOT EXISTS "internalNotes" TEXT;`,
+      `ALTER TABLE "Ticket" ADD COLUMN IF NOT EXISTS "completionStats" TEXT;`,
+      `ALTER TABLE "Ticket" ADD COLUMN IF NOT EXISTS "attachments" TEXT;`,
+      `ALTER TABLE "TicketMessage" ADD COLUMN IF NOT EXISTS "isInternal" BOOLEAN DEFAULT false;`
     ];
 
     for (const sql of postgresStatements) {
@@ -3531,7 +3587,7 @@ app.get('/api/supplier/products', authenticateToken, requireSupplier, async (req
 // Add a new product
 app.post('/api/supplier/products', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl } = req.body;
+    const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl, status } = req.body;
     
     let supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
     if (!supplierId || supplierId <= 0) {
@@ -3607,7 +3663,12 @@ app.post('/api/supplier/products', authenticateToken, requireSupplier, async (re
         discount: safeParseFloat(discount, 0),
         sku: sku || '',
         brand: brand || '',
-        status: 'PENDING_APPROVAL', // Require admin approval and profit margin setting before entering marketplace
+        status: (status === 'DRAFT' ? 'DRAFT' : 'PENDING_APPROVAL'),
+        marginType: null,
+        marginValue: null,
+        finalPrice: null,
+        rejectionReason: null,
+        externalSource: 'MANUAL',
         inventory: totalInventory,
         exploreContent: videoUrl ? {
           create: {
@@ -3643,10 +3704,26 @@ app.post('/api/supplier/products', authenticateToken, requireSupplier, async (re
   }
 });
 
+// Helper to normalize Persian/Arabic strings for fuzzy category matching and text comparison
+function normalizeBulkPersianText(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/[ي]/g, 'ی')
+    .replace(/[ك]/g, 'ک')
+    .replace(/[۰]/g, '0').replace(/[۱]/g, '1').replace(/[۲]/g, '2').replace(/[۳]/g, '3').replace(/[۴]/g, '4')
+    .replace(/[۵]/g, '5').replace(/[۶]/g, '6').replace(/[۷]/g, '7').replace(/[۸]/g, '8').replace(/[۹]/g, '9')
+    .replace(/[٠]/g, '0').replace(/[١]/g, '1').replace(/[٢]/g, '2').replace(/[٣]/g, '3').replace(/[٤]/g, '4')
+    .replace(/[٥]/g, '5').replace(/[٦]/g, '6').replace(/[٧]/g, '7').replace(/[٨]/g, '8').replace(/[٩]/g, '9')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 // Bulk import products for suppliers (Excel/CSV payload)
 app.post('/api/supplier/products/bulk', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { products } = req.body;
+    const { products, duplicateAction = 'update', targetStatus = 'PENDING_APPROVAL', fileName = 'products_bulk.xlsx' } = req.body;
     if (!Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ error: 'لیست محصولات جهت ثبت دسته‌جمعی ارسال نشده است.' });
     }
@@ -3658,59 +3735,236 @@ app.post('/api/supplier/products/bulk', authenticateToken, requireSupplier, asyn
         supplierId = firstSupplier.id;
       }
     }
+    if (!supplierId || supplierId <= 0) {
+      return res.status(403).json({ error: 'دسترسی غیرمجاز: اطلاعات تامین‌کننده معتبر نیست.' });
+    }
 
     const createdProducts: any[] = [];
-    const errors: { row: number; name: string; error: string }[] = [];
+    const updatedProducts: any[] = [];
+    let skippedCount = 0;
+    const errors: { row: number; column: string; name: string; error: string; suggestion: string }[] = [];
+
+    // Fetch centralized price change threshold
+    const thresholdPercent = await getExtremePriceChangeThresholdPercent();
 
     // Pre-cache existing categories
     const existingCategories = await prisma.category.findMany();
     const categoryMap = new Map<string, number>();
     for (const cat of existingCategories) {
-      categoryMap.set(cat.name.trim().toLowerCase(), cat.id);
+      const norm = normalizeBulkPersianText(cat.name);
+      categoryMap.set(norm, cat.id);
+      categoryMap.set(norm.replace(/\s+/g, ''), cat.id);
     }
 
     for (let i = 0; i < products.length; i++) {
       const rowNum = i + 1;
       const item = products[i];
 
-      // Sanitize & Validate
+      // 1. Sanitize & Validate Product Name
       const name = item.name ? String(item.name).trim() : '';
       if (!name) {
-        errors.push({ row: rowNum, name: 'نامشخص', error: 'نام محصول اجباری است.' });
+        errors.push({
+          row: rowNum,
+          column: 'نام محصول',
+          name: 'نامشخص',
+          error: 'نام محصول الزامی است و خالی می‌باشد.',
+          suggestion: 'نام معتبر و توصیفی برای کالا وارد فرمایید.'
+        });
         continue;
       }
 
-      const categoryName = item.category ? String(item.category).trim() : 'عمومی';
+      // 2. Validate Wholesale Price (> 0)
       const wholesalePrice = safeParseFloat(item.wholesalePrice || item.price || item.supplierBasePrice, 0);
       if (wholesalePrice <= 0) {
-        errors.push({ row: rowNum, name, error: 'قیمت عمده نامعتبر یا خالی است.' });
+        errors.push({
+          row: rowNum,
+          column: 'قیمت پایه تامین‌کننده',
+          name,
+          error: 'قیمت پایه تامین‌کننده باید مقداری مثبت و بزرگ‌تر از صفر باشد.',
+          suggestion: 'قیمت عمده خرید را بر حسب تومان به عدد صحیح وارد فرمایید.'
+        });
         continue;
       }
 
-      const stock = safeParseInt(item.stock || item.inventory, 0);
+      // 3. Validate Stock (>= 0)
+      const stock = safeParseInt(item.stock !== undefined ? item.stock : item.inventory, 0);
       if (stock < 0) {
-        errors.push({ row: rowNum, name, error: 'موجودی انبار نمی‌تواند منفی باشد.' });
+        errors.push({
+          row: rowNum,
+          column: 'موجودی انبار',
+          name,
+          error: 'موجودی انبار نمی‌تواند عددی منفی باشد.',
+          suggestion: 'تعداد موجودی کالا را برابر با صفر یا بیشتر وارد کنید.'
+        });
         continue;
+      }
+
+      // 4. Validate & Match Category (Strict validation against Zopit categories - Do NOT auto-create)
+      const categoryName = item.category ? String(item.category).trim() : '';
+      if (!categoryName) {
+        errors.push({
+          row: rowNum,
+          column: 'دسته‌بندی',
+          name,
+          error: 'دسته‌بندی محصول مشخص نشده است.',
+          suggestion: 'یکی از دسته‌بندی‌های مجاز زوپیت را وارد کنید.'
+        });
+        continue;
+      }
+
+      const normCat = normalizeBulkPersianText(categoryName);
+      let categoryId = categoryMap.get(normCat) || categoryMap.get(normCat.replace(/\s+/g, ''));
+      if (!categoryId) {
+        // Try substring matching
+        const matched = existingCategories.find(c => {
+          const normExisting = normalizeBulkPersianText(c.name);
+          return normExisting.includes(normCat) || normCat.includes(normExisting);
+        });
+        if (matched) {
+          categoryId = matched.id;
+        }
+      }
+
+      if (!categoryId) {
+        errors.push({
+          row: rowNum,
+          column: 'دسته‌بندی',
+          name,
+          error: `دسته‌بندی «${categoryName}» در فهرست دسته‌بندی‌های سامانه زوپیت یافت نشد.`,
+          suggestion: `لطفاً از دسته‌بندی‌های مجاز مانند (${existingCategories.slice(0, 4).map(c => c.name).join('، ')} و...) استفاده کنید.`
+        });
+        continue;
+      }
+
+      // 5. SKU & Duplicate Handling
+      let sku = item.sku ? String(item.sku).trim() : '';
+      if (!sku) {
+        sku = `ZP-${supplierId}-${Date.now().toString(36).toUpperCase()}-${i + 1}`;
+      }
+
+      // Check if product with this SKU already exists for this supplier
+      let existingProduct: any = null;
+      try {
+        existingProduct = await prisma.product.findFirst({
+          where: {
+            supplierId,
+            sku
+          }
+        });
+      } catch (findErr) {
+        // ignore
       }
 
       const phoneModel = item.phoneModel ? String(item.phoneModel).trim() : '';
       const color = item.color ? String(item.color).trim() : '';
-      const sku = item.sku ? String(item.sku).trim() : `SKU-${Date.now()}-${i}`;
+      const brand = item.brand ? String(item.brand).trim() : '';
+      const shortDescription = item.shortDescription ? String(item.shortDescription).trim() : '';
+      const longDescription = item.longDescription ? String(item.longDescription).trim() : '';
+      const mainImage = item.mainImage || item.imageUrl || item.image || '';
+      const additionalImages = item.images || item.additionalImages || [];
 
-      // Resolve or create Category
-      let categoryId = categoryMap.get(categoryName.toLowerCase());
-      if (!categoryId) {
-        try {
-          const newCat = await prisma.category.create({
-            data: { name: categoryName, isActive: true, sortOrder: 0 }
-          });
-          categoryId = newCat.id;
-          categoryMap.set(categoryName.toLowerCase(), categoryId);
-        } catch {
-          const fallbackCat = existingCategories[0] || (await prisma.category.findFirst());
-          categoryId = fallbackCat ? fallbackCat.id : 1;
+      // If duplicate exists
+      if (existingProduct) {
+        if (duplicateAction === 'skip') {
+          skippedCount++;
+          continue;
+        }
+
+        if (duplicateAction === 'update') {
+          // Verify ownership: strictly check that the product belongs to this supplier
+          if (existingProduct.supplierId !== supplierId) {
+            errors.push({
+              row: rowNum,
+              column: 'کد محصول (SKU)',
+              name,
+              error: 'کد محصول متعلق به تامین‌کننده دیگری است و دسترسی به ویرایش آن وجود ندارد.',
+              suggestion: 'از یک کد محصول (SKU) یکتا برای فروشگاه خود استفاده نمایید.'
+            });
+            continue;
+          }
+
+          let newStatus = existingProduct.status;
+          let isMajorChange = false;
+          if (existingProduct.name !== name) isMajorChange = true;
+          if (existingProduct.categoryId !== categoryId) isMajorChange = true;
+
+          const thresholdPct = await getExtremePriceChangeThresholdPercent();
+          const oldBasePrice = safeParseFloat(existingProduct.supplierBasePrice, 0);
+          if (oldBasePrice > 0) {
+            const priceCheck = isPriceChangeExtreme(oldBasePrice, wholesalePrice, thresholdPct);
+            if (priceCheck.isExtreme) isMajorChange = true;
+          }
+
+          // If major fields changed or price drastically altered, revert PUBLISHED to PENDING_APPROVAL
+          if (isMajorChange && existingProduct.status === 'PUBLISHED') {
+            newStatus = 'PENDING_APPROVAL';
+          }
+
+          // Dynamic authoritative margin recalculation
+          let newFinalPrice = existingProduct.finalPrice;
+          if (newStatus === 'PUBLISHED' && existingProduct.marginValue != null) {
+            newFinalPrice = calculateAuthoritativeFinalPrice(
+              wholesalePrice,
+              existingProduct.marginType || 'PERCENTAGE',
+              existingProduct.marginValue
+            );
+          }
+
+          try {
+            const updated = await prisma.product.update({
+              where: { id: existingProduct.id },
+              data: {
+                supplierBasePrice: wholesalePrice,
+                inventory: stock,
+                status: newStatus,
+                finalPrice: newFinalPrice,
+                name: name || existingProduct.name,
+                brand: brand || existingProduct.brand,
+                shortDescription: shortDescription || existingProduct.shortDescription,
+                longDescription: longDescription || existingProduct.longDescription,
+                categoryId
+              }
+            });
+
+            // Update main variant
+            try {
+              const defaultVariant = await prisma.productVariant.findFirst({
+                where: { productId: existingProduct.id }
+              });
+              if (defaultVariant) {
+                await prisma.productVariant.update({
+                  where: { id: defaultVariant.id },
+                  data: {
+                    supplierBasePrice: wholesalePrice,
+                    stock: stock
+                  }
+                });
+              }
+            } catch (vErr) {}
+
+            updatedProducts.push(updated);
+            continue;
+          } catch (updateErr: any) {
+            errors.push({
+              row: rowNum,
+              column: 'بروزرسانی',
+              name,
+              error: updateErr?.message || 'خطا در به‌روزرسانی محصول موجود',
+              suggestion: 'اطلاعات محصول را بررسی نمایید.'
+            });
+            continue;
+          }
+        }
+
+        if (duplicateAction === 'create_new') {
+          // Suffix SKU to make it unique
+          sku = `${sku}-${Math.floor(1000 + Math.random() * 9000)}`;
         }
       }
+
+      // 6. Create New Product
+      // Safety: Imported products must ALWAYS be DRAFT or PENDING_APPROVAL, NEVER PUBLISHED!
+      const finalProductStatus = targetStatus === 'DRAFT' ? 'DRAFT' : 'PENDING_APPROVAL';
 
       const variantAttributes: Record<string, string> = {};
       if (color) variantAttributes['رنگ'] = color;
@@ -3720,25 +3974,46 @@ app.post('/api/supplier/products/bulk', authenticateToken, requireSupplier, asyn
       if (phoneModel) techSpecs.push({ key: 'مدل سازگار', value: phoneModel });
       if (color) techSpecs.push({ key: 'رنگ‌بندی', value: color });
 
+      // Parse image URLs
+      const imageList: { url: string }[] = [];
+      if (mainImage && typeof mainImage === 'string' && (mainImage.startsWith('http') || mainImage.startsWith('/uploads'))) {
+        imageList.push({ url: mainImage.trim() });
+      }
+      if (Array.isArray(additionalImages)) {
+        for (const img of additionalImages) {
+          if (typeof img === 'string' && (img.startsWith('http') || img.startsWith('/uploads'))) {
+            imageList.push({ url: img.trim() });
+          }
+        }
+      } else if (typeof additionalImages === 'string' && additionalImages.trim()) {
+        const parts = additionalImages.split(/[,;\n]/).map(p => p.trim()).filter(Boolean);
+        for (const p of parts) {
+          if (p.startsWith('http') || p.startsWith('/uploads')) {
+            imageList.push({ url: p });
+          }
+        }
+      }
+      if (imageList.length === 0) {
+        imageList.push({ url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80' });
+      }
+
       try {
         const product = await prisma.product.create({
           data: {
             supplierId,
             categoryId,
             name,
-            shortDescription: phoneModel ? `مناسب برای ${phoneModel}` : '',
-            longDescription: `محصول ${name} با بالاترین کیفیت و قیمت عمده دست‌اول.`,
+            shortDescription: shortDescription || (phoneModel ? `مناسب برای ${phoneModel}` : ''),
+            longDescription: longDescription || `محصول ${name} با بالاترین کیفیت و قیمت عمده دست‌اول.`,
             technicalSpecs: JSON.stringify(techSpecs),
             supplierBasePrice: wholesalePrice,
             discount: 0,
             sku,
-            brand: phoneModel ? phoneModel.split(' ')[0] : 'برند اصلی',
-            status: 'PENDING_APPROVAL',
+            brand: brand || (phoneModel ? phoneModel.split(' ')[0] : 'برند اصلی'),
+            status: finalProductStatus,
             inventory: stock,
             images: {
-              create: [
-                { url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80' }
-              ]
+              create: imageList
             },
             variants: {
               create: [
@@ -3747,7 +4022,7 @@ app.post('/api/supplier/products/bulk', authenticateToken, requireSupplier, asyn
                   supplierBasePrice: wholesalePrice,
                   stock,
                   sku,
-                  imageUrl: null
+                  imageUrl: imageList[0]?.url || null
                 }
               ]
             }
@@ -3755,42 +4030,413 @@ app.post('/api/supplier/products/bulk', authenticateToken, requireSupplier, asyn
         });
         createdProducts.push(product);
       } catch (insertErr: any) {
-        errors.push({ row: rowNum, name, error: insertErr?.message || 'خطا در ثبت محصول در پایگاه داده' });
+        errors.push({
+          row: rowNum,
+          column: 'ایجاد محصول',
+          name,
+          error: insertErr?.message || 'خطا در ثبت محصول در پایگاه داده',
+          suggestion: 'از تکراری نبودن فیلدها و صحت مقادیر اطمینان حاصل فرمایید.'
+        });
+      }
+    }
+
+    // 7. Save Import History Log
+    try {
+      const historyRecord = {
+        supplierId,
+        fileName: String(fileName || 'products_import.xlsx').slice(0, 100),
+        fileType: String(fileName || '').toLowerCase().endsWith('.csv') ? 'csv' : 'xlsx',
+        totalRows: products.length,
+        importedCount: createdProducts.length,
+        updatedCount: updatedProducts.length,
+        skippedCount,
+        errorCount: errors.length,
+        status: errors.length > 0 && createdProducts.length === 0 && updatedProducts.length === 0 ? 'FAILED' : 'COMPLETED',
+        errorReport: JSON.stringify(errors.slice(0, 100)),
+        createdAt: new Date()
+      };
+
+      if (isRealRemoteDb && !isPrismaMock) {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "ProductImportHistory" ("supplierId", "fileName", "fileType", "totalRows", "importedCount", "updatedCount", "skippedCount", "errorCount", "status", "errorReport", "createdAt")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+          historyRecord.supplierId,
+          historyRecord.fileName,
+          historyRecord.fileType,
+          historyRecord.totalRows,
+          historyRecord.importedCount,
+          historyRecord.updatedCount,
+          historyRecord.skippedCount,
+          historyRecord.errorCount,
+          historyRecord.status,
+          historyRecord.errorReport
+        );
+      } else {
+        const memHistory = (memoryStore as any).getCollection('productimporthistory');
+        memHistory.unshift({ id: Date.now(), ...historyRecord });
+      }
+    } catch (histErr) {
+      console.warn('[ImportHistory] Logging notice:', histErr);
+    }
+
+    res.json({
+      success: true,
+      total: products.length,
+      count: createdProducts.length,
+      createdCount: createdProducts.length,
+      updatedCount: updatedProducts.length,
+      skippedCount,
+      errorsCount: errors.length,
+      errors,
+      message: `پردازش با موفقیت انجام شد: ${createdProducts.length} محصول جدید، ${updatedProducts.length} به‌روزرسانی شده، ${skippedCount} تکراری رد شده، و ${errors.length} ردیف دارای خطا.`
+    });
+  } catch (err: any) {
+    console.error('Bulk product import error:', err);
+    res.status(500).json({ error: 'خطا در پردازش فایل ورود دسته‌جمعی محصولات', details: err?.message || String(err) });
+  }
+});
+
+// Get Supplier Import History
+app.get('/api/supplier/products/import-history', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    let supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    if (!supplierId || supplierId <= 0) {
+      const firstSupplier = await prisma.user.findFirst({ where: { role: 'SUPPLIER' } });
+      if (firstSupplier) {
+        supplierId = firstSupplier.id;
+      }
+    }
+
+    let history: any[] = [];
+    if (isRealRemoteDb && !isPrismaMock) {
+      try {
+        history = await prisma.$queryRawUnsafe(
+          `SELECT * FROM "ProductImportHistory" WHERE "supplierId" = $1 ORDER BY "id" DESC LIMIT 50`,
+          supplierId
+        );
+      } catch (qErr) {
+        console.warn('[ImportHistory] Query error, checking memory store fallback');
+      }
+    }
+    if (!history || history.length === 0) {
+      const memHistory = (memoryStore as any).getCollection('productimporthistory');
+      history = memHistory.filter((h: any) => h.supplierId === supplierId).slice(0, 50);
+    }
+
+    res.json({
+      success: true,
+      history: history || []
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در بارگذاری تاریخچه ورود کالاها' });
+  }
+});
+
+// --- Supplier WooCommerce REST API Integration Helpers & Routes ---
+function validateSafeWooCommerceUrl(inputUrl: string): { safe: boolean; error?: string; cleanUrl?: string } {
+  if (!inputUrl || typeof inputUrl !== 'string') {
+    return { safe: false, error: 'آدرس فروشگاه ووکامرس الزامی است.' };
+  }
+  let trimmed = inputUrl.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    trimmed = 'https://' + trimmed;
+  }
+  trimmed = trimmed.replace(/\/+$/, '');
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { safe: false, error: 'فرمت آدرس فروشگاه ووکامرس نامعتبر است.' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { safe: false, error: 'پروتکل مجاز فقط HTTP و HTTPS می‌باشد.' };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname === '0.0.0.0' ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.lan') ||
+    hostname.endsWith('.test')
+  ) {
+    return { safe: false, error: 'استفاده از آدرس‌های شبکه داخلی و لوکال به دلایل امنیتی مسدود است.' };
+  }
+
+  // Check IPv4 private and link-local ranges
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const match = hostname.match(ipv4Regex);
+  if (match) {
+    const b1 = parseInt(match[1], 10);
+    const b2 = parseInt(match[2], 10);
+    if (
+      b1 === 10 ||
+      b1 === 127 ||
+      (b1 === 169 && b2 === 254) ||
+      (b1 === 172 && b2 >= 16 && b2 <= 31) ||
+      (b1 === 192 && b2 === 168) ||
+      b1 === 0
+    ) {
+      return { safe: false, error: 'آدرس آی‌پی وارد شده در محدوده شبکه‌های خصوصی یا متادیتا است.' };
+    }
+  }
+
+  return { safe: true, cleanUrl: parsed.origin + (parsed.pathname === '/' ? '' : parsed.pathname) };
+}
+
+function encryptCredential(text: string): string {
+  if (!text) return '';
+  const algorithm = 'aes-256-cbc';
+  const defaultKey = 'my-secret-key-that-is-32-bytes-!';
+  const encKey = process.env.ENCRYPTION_KEY ? Buffer.from(process.env.ENCRYPTION_KEY.padEnd(32, ' ').slice(0, 32)) : Buffer.from(defaultKey);
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(algorithm, encKey, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return `${iv.toString('hex')}:${encrypted}`;
+}
+
+function decryptCredential(text: string): string {
+  if (!text) return '';
+  try {
+    const algorithm = 'aes-256-cbc';
+    const defaultKey = 'my-secret-key-that-is-32-bytes-!';
+    const encKey = process.env.ENCRYPTION_KEY ? Buffer.from(process.env.ENCRYPTION_KEY.padEnd(32, ' ').slice(0, 32)) : Buffer.from(defaultKey);
+    const textParts = text.split(':');
+    if (textParts.length < 2) return text;
+    const iv = Buffer.from(textParts.shift()!, 'hex');
+    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    const decipher = crypto.createDecipheriv(algorithm, encKey, iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch (err) {
+    return '';
+  }
+}
+
+function isSafeImageUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal')
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// 0. Get current saved WooCommerce connection status for supplier
+app.get('/api/supplier/woocommerce/connection', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    if (!supplierId) {
+      return res.status(401).json({ error: 'کاربر احراز هویت نشده است.' });
+    }
+
+    let connection: any = null;
+    try {
+      connection = await prisma.storeConnection.findUnique({
+        where: { storeId: supplierId }
+      });
+    } catch (dbErr) {
+      const memConnections = (memoryStore as any)?.getCollection?.('storeconnection') || [];
+      connection = memConnections.find((c: any) => c.storeId === supplierId);
+    }
+
+    if (!connection || connection.status === 'DISCONNECTED') {
+      return res.json({
+        connected: false,
+        storeUrl: '',
+        consumerKeyMasked: '',
+        status: 'DISCONNECTED',
+        lastSync: null,
+        lastSuccessfulSync: null
+      });
+    }
+
+    const decryptedKey = decryptCredential(connection.consumerKey || '');
+    const maskedKey = decryptedKey.length > 8
+      ? `${decryptedKey.substring(0, 5)}...${decryptedKey.slice(-4)}`
+      : (decryptedKey ? 'ck_****' : '');
+
+    res.json({
+      connected: connection.status === 'CONNECTED',
+      storeUrl: connection.storeUrl || '',
+      consumerKeyMasked: maskedKey,
+      status: connection.status || 'CONNECTED',
+      lastSync: connection.lastSync,
+      lastSuccessfulSync: connection.lastSuccessfulSync
+    });
+  } catch (err: any) {
+    console.error('Error fetching WooCommerce connection:', err);
+    res.status(500).json({ error: 'خطا در دریافت وضعیت اتصال ووکامرس' });
+  }
+});
+
+// 0.1 Save WooCommerce connection for supplier
+app.post('/api/supplier/woocommerce/save-connection', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    if (!supplierId) {
+      return res.status(401).json({ error: 'کاربر احراز هویت نشده است.' });
+    }
+
+    const { storeUrl, consumerKey, consumerSecret } = req.body;
+    if (!storeUrl || !consumerKey || !consumerSecret) {
+      return res.status(400).json({ error: 'آدرس فروشگاه، Consumer Key و Consumer Secret الزامی هستند.' });
+    }
+
+    const urlCheck = validateSafeWooCommerceUrl(storeUrl);
+    if (!urlCheck.safe || !urlCheck.cleanUrl) {
+      return res.status(400).json({ error: urlCheck.error || 'آدرس فروشگاه نامعتبر است.' });
+    }
+
+    const encryptedKey = encryptCredential(consumerKey.trim());
+    const encryptedSecret = encryptCredential(consumerSecret.trim());
+
+    try {
+      await prisma.storeConnection.upsert({
+        where: { storeId: supplierId },
+        update: {
+          storeUrl: urlCheck.cleanUrl,
+          consumerKey: encryptedKey,
+          consumerSecret: encryptedSecret,
+          status: 'CONNECTED',
+          platform: 'WOOCOMMERCE',
+          updatedAt: new Date()
+        },
+        create: {
+          storeId: supplierId,
+          storeUrl: urlCheck.cleanUrl,
+          consumerKey: encryptedKey,
+          consumerSecret: encryptedSecret,
+          status: 'CONNECTED',
+          platform: 'WOOCOMMERCE',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    } catch (dbErr) {
+      const memConnections = (memoryStore as any)?.getCollection?.('storeconnection');
+      if (memConnections) {
+        const existingIdx = memConnections.findIndex((c: any) => c.storeId === supplierId);
+        const data = {
+          id: existingIdx >= 0 ? memConnections[existingIdx].id : Date.now(),
+          storeId: supplierId,
+          storeUrl: urlCheck.cleanUrl,
+          consumerKey: encryptedKey,
+          consumerSecret: encryptedSecret,
+          status: 'CONNECTED',
+          platform: 'WOOCOMMERCE',
+          updatedAt: new Date()
+        };
+        if (existingIdx >= 0) memConnections[existingIdx] = data;
+        else memConnections.push(data);
       }
     }
 
     res.json({
       success: true,
-      count: createdProducts.length,
-      errorsCount: errors.length,
-      errors,
-      message: `تعداد ${createdProducts.length} محصول با موفقیت به سیستم اضافه شد.`
+      message: 'اطلاعات اتصال به ووکامرس با موفقیت به صورت امن ذخیره شد.'
     });
   } catch (err: any) {
-    console.error('Bulk product import error:', err);
-    res.status(500).json({ error: 'خطا در پردازش فایل ورود دسته‌جمعی محصولات' });
+    console.error('Error saving WooCommerce connection:', err);
+    res.status(500).json({ error: 'خطا در ذخیره اطلاعات اتصال به ووکامرس' });
   }
 });
 
-// --- Supplier WooCommerce REST API Integration Routes ---
+// 0.2 Disconnect WooCommerce store
+app.post('/api/supplier/woocommerce/disconnect', authenticateToken, requireSupplier, async (req: any, res) => {
+  try {
+    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    if (!supplierId) {
+      return res.status(401).json({ error: 'کاربر احراز هویت نشده است.' });
+    }
+
+    try {
+      await prisma.storeConnection.updateMany({
+        where: { storeId: supplierId },
+        data: {
+          status: 'DISCONNECTED',
+          consumerKey: '',
+          consumerSecret: '',
+          updatedAt: new Date()
+        }
+      });
+    } catch (dbErr) {
+      const memConnections = (memoryStore as any)?.getCollection?.('storeconnection');
+      if (memConnections) {
+        const item = memConnections.find((c: any) => c.storeId === supplierId);
+        if (item) {
+          item.status = 'DISCONNECTED';
+          item.consumerKey = '';
+          item.consumerSecret = '';
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'اتصال به فروشگاه ووکامرس با موفقیت قطع شد.'
+    });
+  } catch (err: any) {
+    console.error('Error disconnecting WooCommerce store:', err);
+    res.status(500).json({ error: 'خطا در قطع اتصال ووکامرس' });
+  }
+});
+
 // 1. Test connection to supplier's WooCommerce store
 app.post('/api/supplier/woocommerce/test-connection', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    let { storeUrl, consumerKey, consumerSecret } = req.body;
-    if (!storeUrl || !consumerKey || !consumerSecret) {
-      return res.status(400).json({ error: 'آدرس سایت و کلیدهای دسترسی (Consumer Key و Consumer Secret) اجباری هستند.' });
+    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    let { storeUrl, consumerKey, consumerSecret, useSaved } = req.body;
+
+    if (useSaved || (!storeUrl && !consumerKey)) {
+      let savedConn: any = null;
+      try {
+        savedConn = await prisma.storeConnection.findUnique({ where: { storeId: supplierId } });
+      } catch {
+        const memConnections = (memoryStore as any)?.getCollection?.('storeconnection') || [];
+        savedConn = memConnections.find((c: any) => c.storeId === supplierId);
+      }
+
+      if (savedConn && savedConn.status !== 'DISCONNECTED') {
+        storeUrl = savedConn.storeUrl;
+        consumerKey = decryptCredential(savedConn.consumerKey);
+        consumerSecret = decryptCredential(savedConn.consumerSecret);
+      }
     }
 
-    storeUrl = storeUrl.trim();
-    if (!storeUrl.startsWith('http://') && !storeUrl.startsWith('https://')) {
-      storeUrl = 'https://' + storeUrl;
+    if (!storeUrl || !consumerKey || !consumerSecret) {
+      return res.status(400).json({ error: 'آدرس سایت و کلیدهای دسترسی (Consumer Key و Consumer Secret) الزامی هستند.' });
     }
-    storeUrl = storeUrl.replace(/\/+$/, '');
+
+    const urlCheck = validateSafeWooCommerceUrl(storeUrl);
+    if (!urlCheck.safe || !urlCheck.cleanUrl) {
+      return res.status(400).json({ error: urlCheck.error || 'آدرس فروشگاه نامعتبر است.' });
+    }
+    const cleanStoreUrl = urlCheck.cleanUrl;
 
     const auth = Buffer.from(`${consumerKey.trim()}:${consumerSecret.trim()}`).toString('base64');
     
     // Test with products endpoint (per_page=1)
-    const testUrl = new URL('/wp-json/wc/v3/products?per_page=1', storeUrl);
+    const testUrl = new URL('/wp-json/wc/v3/products?per_page=1', cleanStoreUrl);
     const response = await fetch(testUrl.toString(), {
       signal: AbortSignal.timeout(12000),
       headers: {
@@ -3813,10 +4459,10 @@ app.post('/api/supplier/woocommerce/test-connection', authenticateToken, require
     const totalProducts = response.headers.get('x-wp-total') || '10+';
     const totalPages = response.headers.get('x-wp-totalpages') || '1';
 
-    // Optional store name fetch from /wp-json
+    // Fetch store name from /wp-json
     let storeName = 'فروشگاه ووکامرسی';
     try {
-      const infoUrl = new URL('/wp-json', storeUrl);
+      const infoUrl = new URL('/wp-json', cleanStoreUrl);
       const infoRes = await fetch(infoUrl.toString(), { signal: AbortSignal.timeout(5000) });
       if (infoRes.ok) {
         const infoData = await infoRes.json() as any;
@@ -3829,7 +4475,7 @@ app.post('/api/supplier/woocommerce/test-connection', authenticateToken, require
       storeName,
       totalProducts: parseInt(totalProducts) || 0,
       totalPages: parseInt(totalPages) || 1,
-      message: `اتصال با موفقیت برقرار شد! تعداد ${totalProducts} محصول در سایت شناسایی گردید.`
+      message: `اتصال با موفقیت برقرار شد! تعداد ${totalProducts} محصول در فروشگاه شناسایی گردید.`
     });
   } catch (err: any) {
     console.error('WooCommerce test connection error:', err);
@@ -3840,25 +4486,43 @@ app.post('/api/supplier/woocommerce/test-connection', authenticateToken, require
   }
 });
 
-// 2. Fetch products from WooCommerce with details, variations, and images
+// 2. Fetch products from WooCommerce with normalization, category mapping & duplicate detection
 app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    let { storeUrl, consumerKey, consumerSecret, page = 1, perPage = 50, currencyUnit = 'toman' } = req.body;
+    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    let { storeUrl, consumerKey, consumerSecret, useSaved, page = 1, perPage = 50, currencyUnit = 'toman' } = req.body;
+
+    if (useSaved || (!storeUrl && !consumerKey)) {
+      let savedConn: any = null;
+      try {
+        savedConn = await prisma.storeConnection.findUnique({ where: { storeId: supplierId } });
+      } catch {
+        const memConnections = (memoryStore as any)?.getCollection?.('storeconnection') || [];
+        savedConn = memConnections.find((c: any) => c.storeId === supplierId);
+      }
+
+      if (savedConn && savedConn.status !== 'DISCONNECTED') {
+        storeUrl = savedConn.storeUrl;
+        consumerKey = decryptCredential(savedConn.consumerKey);
+        consumerSecret = decryptCredential(savedConn.consumerSecret);
+      }
+    }
+
     if (!storeUrl || !consumerKey || !consumerSecret) {
       return res.status(400).json({ error: 'اطلاعات اتصال به ووکامرس ارسال نشده است.' });
     }
 
-    storeUrl = storeUrl.trim();
-    if (!storeUrl.startsWith('http://') && !storeUrl.startsWith('https://')) {
-      storeUrl = 'https://' + storeUrl;
+    const urlCheck = validateSafeWooCommerceUrl(storeUrl);
+    if (!urlCheck.safe || !urlCheck.cleanUrl) {
+      return res.status(400).json({ error: urlCheck.error || 'آدرس فروشگاه نامعتبر است.' });
     }
-    storeUrl = storeUrl.replace(/\/+$/, '');
+    const cleanStoreUrl = urlCheck.cleanUrl;
 
     const auth = Buffer.from(`${consumerKey.trim()}:${consumerSecret.trim()}`).toString('base64');
     const safePage = Math.max(1, safeParseInt(page, 1));
     const safePerPage = Math.min(100, Math.max(10, safeParseInt(perPage, 50)));
 
-    const fetchUrl = new URL(`/wp-json/wc/v3/products?per_page=${safePerPage}&page=${safePage}&status=publish`, storeUrl);
+    const fetchUrl = new URL(`/wp-json/wc/v3/products?per_page=${safePerPage}&page=${safePage}&status=publish`, cleanStoreUrl);
     
     const response = await fetch(fetchUrl.toString(), {
       signal: AbortSignal.timeout(20000),
@@ -3887,43 +4551,107 @@ app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireS
       return html.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
     };
 
-    // Helper for currency divisor (if user store is Rial, divide by 10 to get Toman)
+    // Helper for currency divisor (if store is Rial, divide by 10 to get Toman)
     const currencyDivisor = currencyUnit === 'rial' ? 10 : 1;
 
-    // Process raw products
+    // Pre-fetch Zopit Categories for safe category mapping
+    let zopitCategories: any[] = [];
+    try {
+      zopitCategories = await prisma.category.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true }
+      });
+    } catch (cErr) {
+      zopitCategories = (memoryStore as any)?.getCollection?.('category') || [];
+    }
+
+    const categoryMap = new Map<string, { id: number; name: string }>();
+    for (const cat of zopitCategories) {
+      const catName = cat.name || cat.title || '';
+      if (catName) {
+        categoryMap.set(normalizeBulkPersianText(catName), { id: cat.id, name: catName });
+      }
+    }
+
+    // Pre-fetch supplier's existing products to detect duplicates safely
+    let existingSupplierProducts: any[] = [];
+    try {
+      existingSupplierProducts = await prisma.product.findMany({
+        where: { supplierId },
+        select: { id: true, name: true, sku: true, externalId: true, externalSource: true, status: true, supplierBasePrice: true, inventory: true }
+      });
+    } catch {
+      const memProducts = (memoryStore as any)?.getCollection?.('product') || [];
+      existingSupplierProducts = memProducts.filter((p: any) => p.supplierId === supplierId);
+    }
+
+    const existingWcIdMap = new Map<string, any>();
+    const existingSkuMap = new Map<string, any>();
+    for (const ep of existingSupplierProducts) {
+      if (ep.externalSource === 'WOOCOMMERCE' && ep.externalId) {
+        existingWcIdMap.set(String(ep.externalId), ep);
+      }
+      if (ep.sku) {
+        existingSkuMap.set(String(ep.sku).trim().toLowerCase(), ep);
+      }
+    }
+
+    // Process & Normalize Raw Products
     const processedProducts: any[] = [];
 
     for (const raw of rawProducts) {
-      // Parse main prices
+      // 1. Prices
       const regPriceRaw = safeParseFloat(raw.regular_price || raw.price, 0);
       const salePriceRaw = safeParseFloat(raw.sale_price, 0);
       const originalPrice = Math.round(regPriceRaw / currencyDivisor);
       const originalSalePrice = salePriceRaw > 0 ? Math.round(salePriceRaw / currencyDivisor) : 0;
 
-      // Default suggested supply wholesale price: 20% discount below original consumer price (or sale price)
+      // Suggested wholesale price: 20% discount below original consumer price (or sale price)
       const baseForDiscount = originalSalePrice > 0 ? originalSalePrice : originalPrice;
       let suggestedWholesalePrice = baseForDiscount > 0 ? Math.round((baseForDiscount * 0.8) / 1000) * 1000 : 0;
       if (suggestedWholesalePrice <= 0 && originalPrice > 0) {
         suggestedWholesalePrice = Math.round((originalPrice * 0.8) / 1000) * 1000;
       }
 
-      // Stock
+      // 2. Stock
       let stockQuantity = 0;
       if (raw.manage_stock && raw.stock_quantity !== null && raw.stock_quantity !== undefined) {
         stockQuantity = Math.max(0, safeParseInt(raw.stock_quantity, 0));
       } else if (raw.in_stock || raw.stock_status === 'instock') {
-        stockQuantity = 50; // Default healthy stock for in-stock non-managed items
+        stockQuantity = 50;
       }
 
-      // Images
-      const imagesList = Array.isArray(raw.images) ? raw.images.map((img: any) => img.src).filter(Boolean) : [];
+      // 3. Images with SSRF validation
+      const imagesList: string[] = [];
+      if (Array.isArray(raw.images)) {
+        for (const img of raw.images) {
+          if (img && typeof img.src === 'string' && isSafeImageUrl(img.src)) {
+            imagesList.push(img.src);
+          }
+        }
+      }
       const mainImage = imagesList[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 
-      // Categories
-      const categories = Array.isArray(raw.categories) ? raw.categories.map((c: any) => c.name) : [];
-      const primaryCategory = categories[0] || 'عمومی';
+      // 4. Categories & Auto-Mapping
+      const rawCategories = Array.isArray(raw.categories) ? raw.categories.map((c: any) => c.name) : [];
+      const primaryCategory = rawCategories[0] || 'عمومی';
 
-      // Technical Specs from attributes
+      let mappedCategoryId: number | null = null;
+      let mappedCategoryName = '';
+      let categoryStatus: 'RESOLVED' | 'UNRESOLVED' = 'UNRESOLVED';
+
+      for (const catName of rawCategories) {
+        const normalized = normalizeBulkPersianText(catName);
+        if (categoryMap.has(normalized)) {
+          const match = categoryMap.get(normalized)!;
+          mappedCategoryId = match.id;
+          mappedCategoryName = match.name;
+          categoryStatus = 'RESOLVED';
+          break;
+        }
+      }
+
+      // 5. Technical Specs
       const technicalSpecs: { key: string; value: string }[] = [];
       if (Array.isArray(raw.attributes)) {
         for (const attr of raw.attributes) {
@@ -3936,14 +4664,12 @@ app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireS
         }
       }
 
-      // Handle Variations if product is variable
+      // 6. Variations
       const variations: any[] = [];
       if (raw.type === 'variable' && Array.isArray(raw.variations) && raw.variations.length > 0) {
-        // If variations list has IDs, we can map basic attribute combinations
         if (Array.isArray(raw.attributes)) {
           const varAttributes = raw.attributes.filter((a: any) => a.variation === true || a.options?.length > 1);
           if (varAttributes.length > 0) {
-            // Create default variation matrix
             const attr = varAttributes[0];
             for (const opt of attr.options || []) {
               variations.push({
@@ -3962,6 +4688,30 @@ app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireS
         }
       }
 
+      // 7. Duplicate Check
+      const rawSku = raw.sku ? String(raw.sku).trim() : '';
+      const existingByWcId = existingWcIdMap.get(String(raw.id));
+      const existingBySku = rawSku ? existingSkuMap.get(rawSku.toLowerCase()) : null;
+      const existingMatch = existingByWcId || existingBySku;
+
+      let importStatus: 'READY' | 'UPDATE_EXISTING' | 'CATEGORY_UNRESOLVED' | 'INVALID' = 'READY';
+      let isDuplicate = false;
+      let existingProductId: number | null = null;
+      let existingProductName = '';
+
+      if (existingMatch) {
+        isDuplicate = true;
+        existingProductId = existingMatch.id;
+        existingProductName = existingMatch.name;
+        importStatus = 'UPDATE_EXISTING';
+      } else if (categoryStatus === 'UNRESOLVED') {
+        importStatus = 'CATEGORY_UNRESOLVED';
+      }
+
+      if (!raw.name || suggestedWholesalePrice <= 0) {
+        importStatus = 'INVALID';
+      }
+
       processedProducts.push({
         wcId: raw.id,
         name: raw.name || 'بدون عنوان',
@@ -3969,7 +4719,10 @@ app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireS
         type: raw.type || 'simple',
         sku: raw.sku || `WC-${raw.id}`,
         primaryCategory,
-        categories,
+        categories: rawCategories,
+        mappedCategoryId,
+        mappedCategoryName,
+        categoryStatus,
         mainImage,
         images: imagesList,
         originalPrice,
@@ -3981,7 +4734,11 @@ app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireS
         technicalSpecs,
         variations,
         hasVariations: variations.length > 0,
-        isSelected: true // Default selected for convenience
+        isDuplicate,
+        existingProductId,
+        existingProductName,
+        importStatus,
+        isSelected: importStatus !== 'INVALID'
       });
     }
 
@@ -3991,7 +4748,8 @@ app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireS
       totalPages,
       currentPage: safePage,
       perPage: safePerPage,
-      products: processedProducts
+      products: processedProducts,
+      zopitCategories: zopitCategories.map(c => ({ id: c.id, name: c.name || c.title }))
     });
   } catch (err: any) {
     console.error('WooCommerce fetch products error:', err);
@@ -4005,69 +4763,183 @@ app.post('/api/supplier/woocommerce/fetch-products', authenticateToken, requireS
 // 3. Batch Import WooCommerce Products into Zopit Catalog
 app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { products, defaultMarginPercent = 20 } = req.body;
+    const supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
+    if (!supplierId || supplierId <= 0) {
+      return res.status(401).json({ error: 'شناسه تامین‌کننده نامعتبر است.' });
+    }
+
+    const { products, duplicateAction = 'update', targetStatus = 'PENDING_APPROVAL', storeUrl } = req.body;
     if (!Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ error: 'هیچ محصولی جهت انتقال به کاتالوگ انتخاب نشده است.' });
     }
 
-    let supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
-    if (!supplierId || supplierId <= 0) {
-      const firstSupplier = await prisma.user.findFirst({ where: { role: 'SUPPLIER' } });
-      if (firstSupplier) {
-        supplierId = firstSupplier.id;
+    // Strictly enforce status constraint: external imports MUST NOT be PUBLISHED!
+    const safeTargetStatus = targetStatus === 'DRAFT' ? 'DRAFT' : 'PENDING_APPROVAL';
+
+    // Pre-cache existing Zopit categories
+    const existingCategories = await prisma.category.findMany({ where: { isActive: true } });
+    const categoryMap = new Map<number, any>();
+    const categoryNameMap = new Map<string, number>();
+    for (const cat of existingCategories) {
+      categoryMap.set(cat.id, cat);
+      const cName = (cat.name || cat.title || '').trim();
+      if (cName) {
+        categoryNameMap.set(normalizeBulkPersianText(cName), cat.id);
       }
     }
 
-    const createdProducts: any[] = [];
+    let importedCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
     const errors: { name: string; error: string }[] = [];
-
-    // Pre-cache existing categories
-    const existingCategories = await prisma.category.findMany();
-    const categoryMap = new Map<string, number>();
-    for (const cat of existingCategories) {
-      categoryMap.set(cat.name.trim().toLowerCase(), cat.id);
-    }
+    const createdProducts: any[] = [];
 
     for (const item of products) {
       try {
         const name = item.name ? String(item.name).trim() : 'محصول وارداتی';
-        const categoryName = item.primaryCategory || (Array.isArray(item.categories) && item.categories[0]) || 'عمومی';
-        
         const wholesalePrice = safeParseFloat(item.wholesalePrice || item.supplierBasePrice, 0);
         if (wholesalePrice <= 0) {
           errors.push({ name, error: 'قیمت تامین عمده باید بزرگتر از صفر باشد.' });
           continue;
         }
 
-        const stock = safeParseInt(item.stock, 10);
-        const originalPrice = safeParseFloat(item.originalPrice, wholesalePrice * 1.25);
+        const stock = Math.max(0, safeParseInt(item.stock, 0));
         const sku = item.sku ? String(item.sku).trim() : `WC-${item.wcId || Date.now()}`;
 
-        // Resolve or create Category
-        let categoryId = categoryMap.get(categoryName.trim().toLowerCase());
-        if (!categoryId) {
-          try {
-            const newCat = await prisma.category.create({
-              data: { name: categoryName.trim(), isActive: true, sortOrder: 0 }
+        // 1. Resolve Category (MUST be an existing Zopit category)
+        let categoryId = safeParseInt(item.mappedCategoryId || item.categoryId, 0);
+        if (!categoryId || !categoryMap.has(categoryId)) {
+          const rawCatName = item.primaryCategory || (Array.isArray(item.categories) && item.categories[0]) || '';
+          const matchId = categoryNameMap.get(normalizeBulkPersianText(rawCatName));
+          if (matchId) {
+            categoryId = matchId;
+          } else {
+            errors.push({
+              name,
+              error: `دسته‌بندی "${rawCatName || 'نامشخص'}" در زوپیت تعریف نشده است. تطبیق دسته‌بندی الزامی است.`
             });
-            categoryId = newCat.id;
-            categoryMap.set(categoryName.trim().toLowerCase(), categoryId);
-          } catch {
-            const fallbackCat = existingCategories[0] || (await prisma.category.findFirst());
-            categoryId = fallbackCat ? fallbackCat.id : 1;
+            continue;
           }
         }
 
-        const imagesList = Array.isArray(item.images) && item.images.length > 0
-          ? item.images
-          : (item.mainImage ? [item.mainImage] : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80']);
+        // 2. Check Duplicate strictly for THIS supplier
+        let existingProduct: any = null;
+        try {
+          if (item.existingProductId) {
+            existingProduct = await prisma.product.findUnique({
+              where: { id: safeParseInt(item.existingProductId, 0) },
+              include: { variants: true }
+            });
+          } else if (item.wcId) {
+            existingProduct = await prisma.product.findFirst({
+              where: {
+                supplierId,
+                externalSource: 'WOOCOMMERCE',
+                externalId: String(item.wcId)
+              },
+              include: { variants: true }
+            });
+          }
+          if (!existingProduct && sku) {
+            existingProduct = await prisma.product.findFirst({
+              where: { supplierId, sku },
+              include: { variants: true }
+            });
+          }
+        } catch {
+          const memProducts = (memoryStore as any)?.getCollection?.('product') || [];
+          existingProduct = memProducts.find((p: any) => p.supplierId === supplierId && (p.externalId === String(item.wcId) || p.sku === sku));
+        }
 
-        // Format technical specs
+        // 3. Handle Duplicate Logic
+        if (existingProduct) {
+          // Security check: NEVER update another supplier's product
+          if (existingProduct.supplierId !== supplierId) {
+            errors.push({ name, error: 'این کالا متعلق به تامین‌کننده دیگری است و قابل بازنویسی نمی‌باشد.' });
+            continue;
+          }
+
+          if (duplicateAction === 'skip') {
+            skippedCount++;
+            continue;
+          }
+
+          if (duplicateAction === 'update') {
+            // Check if price changed by more than threshold on a PUBLISHED product -> revert to PENDING_APPROVAL
+            let newStatus = existingProduct.status;
+            const thresholdPct = await getExtremePriceChangeThresholdPercent();
+            const oldPrice = safeParseFloat(existingProduct.supplierBasePrice, wholesalePrice);
+            const priceCheck = isPriceChangeExtreme(oldPrice, wholesalePrice, thresholdPct);
+            if (existingProduct.status === 'PUBLISHED' && priceCheck.isExtreme) {
+              newStatus = 'PENDING_APPROVAL';
+              await recordProductGovernanceAudit({
+                productId: existingProduct.id,
+                actorId: supplierId,
+                actorRole: 'SUPPLIER',
+                action: 'PRODUCT_EXTREME_PRICE_CHANGE_SYNC',
+                metadata: {
+                  source: 'WOOCOMMERCE',
+                  oldPrice,
+                  newPrice: wholesalePrice,
+                  diffPercent: priceCheck.diffPercent,
+                  thresholdPercent: thresholdPct
+                }
+              });
+            }
+
+            let newFinalPrice = existingProduct.finalPrice;
+            if (newStatus === 'PUBLISHED' && existingProduct.marginValue != null) {
+              newFinalPrice = calculateAuthoritativeFinalPrice(
+                wholesalePrice,
+                existingProduct.marginType || 'PERCENTAGE',
+                existingProduct.marginValue
+              );
+            }
+
+            const updatedData: any = {
+              supplierBasePrice: wholesalePrice,
+              finalPrice: newFinalPrice,
+              inventory: stock,
+              shortDescription: item.shortDescription || existingProduct.shortDescription,
+              longDescription: item.longDescription || existingProduct.longDescription,
+              status: newStatus,
+              externalSource: 'WOOCOMMERCE',
+              externalId: String(item.wcId),
+              lastSyncedAt: new Date()
+            };
+
+            await prisma.product.update({
+              where: { id: existingProduct.id },
+              data: updatedData
+            });
+
+            // Update main variant if exists
+            try {
+              if (existingProduct.variants && existingProduct.variants.length > 0) {
+                await prisma.productVariant.updateMany({
+                  where: { productId: existingProduct.id },
+                  data: {
+                    supplierBasePrice: wholesalePrice,
+                    stock: Math.max(1, Math.floor(stock / existingProduct.variants.length))
+                  }
+                });
+              }
+            } catch {}
+
+            updatedCount++;
+            continue;
+          }
+        }
+
+        // 4. Create New Product
+        const imagesList = Array.isArray(item.images) && item.images.length > 0
+          ? item.images.filter((u: string) => isSafeImageUrl(u))
+          : (item.mainImage && isSafeImageUrl(item.mainImage) ? [item.mainImage] : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80']);
+
         const techSpecsStr = Array.isArray(item.technicalSpecs) && item.technicalSpecs.length > 0
           ? JSON.stringify(item.technicalSpecs)
           : '[]';
 
-        // Prepare variations
         let variantsData: any[] = [];
         if (Array.isArray(item.variations) && item.variations.length > 0) {
           variantsData = item.variations.map((v: any) => ({
@@ -4075,7 +4947,7 @@ app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSup
             supplierBasePrice: safeParseFloat(v.wholesalePrice || wholesalePrice),
             stock: safeParseInt(v.stock, stock),
             sku: v.sku || `${sku}-${Math.random().toString(36).substring(7)}`,
-            imageUrl: v.imageUrl || null
+            imageUrl: v.imageUrl && isSafeImageUrl(v.imageUrl) ? v.imageUrl : null
           }));
         } else {
           variantsData = [{
@@ -4092,7 +4964,7 @@ app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSup
         const newProduct = await prisma.product.create({
           data: {
             supplierId,
-            categoryId: categoryId || 1,
+            categoryId,
             name,
             shortDescription: item.shortDescription || '',
             longDescription: item.longDescription || item.shortDescription || `محصول با کیفیت ${name} با بهترین قیمت تامین مستقیم.`,
@@ -4101,8 +4973,11 @@ app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSup
             discount: 0,
             sku,
             brand: item.brand || 'اصلی',
-            status: 'PENDING_APPROVAL', // Set to PENDING_APPROVAL for admin marketplace validation
+            status: safeTargetStatus,
             inventory: totalInventory,
+            externalSource: 'WOOCOMMERCE',
+            externalId: String(item.wcId),
+            lastSyncedAt: new Date(),
             images: {
               create: imagesList.map((url: string) => ({ url }))
             },
@@ -4113,19 +4988,79 @@ app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSup
         });
 
         createdProducts.push(newProduct);
+        importedCount++;
       } catch (err: any) {
-        errors.push({ name: item.name || 'نامشخص', error: err?.message || 'خطا در ثبت پایگاه داده' });
+        errors.push({ name: item.name || 'نامشخص', error: err?.message || 'خطا در ثبت کالا' });
       }
     }
 
-    // Save notification for supplier and admin
+    // 5. Record in ProductImportHistory
+    let hostName = 'ووکامرس';
     try {
-      if (createdProducts.length > 0) {
+      if (storeUrl) {
+        const pUrl = new URL(storeUrl.startsWith('http') ? storeUrl : `https://${storeUrl}`);
+        hostName = pUrl.hostname;
+      }
+    } catch {}
+
+    try {
+      await prisma.productImportHistory.create({
+        data: {
+          supplierId,
+          fileName: `WooCommerce (${hostName})`,
+          fileType: 'woocommerce_api',
+          source: 'WOOCOMMERCE',
+          totalRows: products.length,
+          importedCount,
+          updatedCount,
+          skippedCount,
+          errorCount: errors.length,
+          status: errors.length === 0 ? 'COMPLETED' : (importedCount + updatedCount > 0 ? 'PARTIAL' : 'FAILED'),
+          errorReport: errors.length > 0 ? JSON.stringify(errors) : null,
+          createdAt: new Date()
+        }
+      });
+    } catch (hErr) {
+      const memHistory = (memoryStore as any)?.getCollection?.('productimporthistory');
+      if (memHistory) {
+        memHistory.push({
+          id: Date.now(),
+          supplierId,
+          fileName: `WooCommerce (${hostName})`,
+          fileType: 'woocommerce_api',
+          source: 'WOOCOMMERCE',
+          totalRows: products.length,
+          importedCount,
+          updatedCount,
+          skippedCount,
+          errorCount: errors.length,
+          status: errors.length === 0 ? 'COMPLETED' : (importedCount + updatedCount > 0 ? 'PARTIAL' : 'FAILED'),
+          errorReport: errors.length > 0 ? JSON.stringify(errors) : null,
+          createdAt: new Date()
+        });
+      }
+    }
+
+    // 6. Update StoreConnection lastSync
+    try {
+      await prisma.storeConnection.updateMany({
+        where: { storeId: supplierId },
+        data: {
+          status: 'CONNECTED',
+          lastSync: new Date(),
+          ...(importedCount + updatedCount > 0 ? { lastSuccessfulSync: new Date() } : {})
+        }
+      });
+    } catch {}
+
+    // 7. Send In-App Notification
+    try {
+      if (importedCount + updatedCount > 0) {
         await prisma.notification.create({
           data: {
             userId: supplierId,
-            title: 'انتقال موفق کالاها از ووکامرس 🎉',
-            message: `تعداد ${createdProducts.length} محصول با موفقیت از فروشگاه ووکامرسی شما به کاتالوگ زوپیت منتقل گردید.`,
+            title: 'اتمام انتقال کالاها از ووکامرس 🛍️',
+            message: `تعداد ${importedCount} محصول جدید ثبت و ${updatedCount} محصول به‌روزرسانی شد. محصولات با وضعیت ${safeTargetStatus === 'PENDING_APPROVAL' ? 'در انتظار تایید ادمین' : 'پیش‌نویس'} در دسترس هستند.`,
             type: 'PRODUCT_STATUS'
           }
         });
@@ -4134,10 +5069,13 @@ app.post('/api/supplier/woocommerce/import-batch', authenticateToken, requireSup
 
     res.json({
       success: true,
-      count: createdProducts.length,
+      count: importedCount,
+      updatedCount,
+      skippedCount,
       errorsCount: errors.length,
       errors,
-      message: `تعداد ${createdProducts.length} محصول با موفقیت از ووکامرس دریافت و در کاتالوگ زوپیت ثبت گردید.`
+      targetStatus: safeTargetStatus,
+      message: `عملیات انتقال با موفقیت پایان یافت: ${importedCount} کالای جدید افزوده شد، ${updatedCount} کالا به‌روزرسانی شد و ${skippedCount} کالا نادیده گرفته شد.`
     });
   } catch (err: any) {
     console.error('WooCommerce import batch error:', err);
@@ -4153,7 +5091,7 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
     if (!supplierId) {
       return res.status(401).json({ error: 'اطلاعات کاربری نامعتبر است.' });
     }
-    const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl } = req.body;
+    const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl, status } = req.body;
     
     // Ensure product exists
     const existing = await prisma.product.findFirst({
@@ -4188,6 +5126,82 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
       ? variants.reduce((sum: number, v: any) => sum + safeParseInt(v.stock), 0)
       : safeParseInt(stock);
 
+    let newStatus = existing.status;
+    let clearRejectionReason = false;
+
+    if (status === 'DRAFT') {
+      newStatus = 'DRAFT';
+    } else if (status === 'PENDING_APPROVAL' || existing.status === 'NEEDS_REVISION' || existing.status === 'REJECTED' || existing.status === 'DRAFT') {
+      newStatus = 'PENDING_APPROVAL';
+      clearRejectionReason = true;
+    }
+
+    let newFinalPrice = existing.finalPrice;
+    
+    // Check if critical non-price fields have changed
+    let isMajorChange = false;
+    if (existing.name !== name) isMajorChange = true;
+    const oldShort = existing.shortDescription || '';
+    const newShort = shortDescription || longDescription || '';
+    if (oldShort !== newShort) isMajorChange = true;
+    
+    const oldLong = existing.longDescription || '';
+    const newLong = longDescription || shortDescription || '';
+    if (oldLong !== newLong) isMajorChange = true;
+    
+    const oldBrand = existing.brand || '';
+    const newBrand = brand || '';
+    if (oldBrand !== newBrand) isMajorChange = true;
+    
+    if (existing.categoryId !== actualCategoryId) isMajorChange = true;
+    
+    const newBasePrice = safeParseFloat(supplierBasePrice);
+    const oldBasePrice = safeParseFloat(existing.supplierBasePrice);
+    
+    const thresholdPct = await getExtremePriceChangeThresholdPercent();
+    const priceCheck = isPriceChangeExtreme(oldBasePrice, newBasePrice, thresholdPct);
+    let isExtremePriceChange = false;
+    if (oldBasePrice > 0 && priceCheck.isExtreme) {
+      isExtremePriceChange = true;
+    }
+
+    // If major fields changed or price jumped dramatically on a published product, revert to PENDING_APPROVAL
+    if ((isMajorChange || isExtremePriceChange) && existing.status === 'PUBLISHED') {
+      newStatus = 'PENDING_APPROVAL';
+      clearRejectionReason = true;
+
+      await recordProductGovernanceAudit({
+        productId: existing.id,
+        actorId: supplierId,
+        actorRole: 'SUPPLIER',
+        action: isExtremePriceChange ? 'PRODUCT_EXTREME_PRICE_CHANGE_SUPPLIER_EDIT' : 'PRODUCT_MAJOR_CHANGE_SUPPLIER_EDIT',
+        metadata: {
+          oldBasePrice,
+          newBasePrice,
+          diffPercent: priceCheck.diffPercent,
+          thresholdPercent: thresholdPct,
+          isMajorChange
+        }
+      });
+
+      await sendProductGovernanceNotification(
+        supplierId,
+        'ارسال مجدد کالا جهت بررسی مدیریت',
+        `کالای «${name || existing.name}» به دلیل ${isExtremePriceChange ? `تغییر قیمت فراتر از آستانه مجاز (${priceCheck.diffPercent}٪)` : 'تغییرات ساختاری'} جهت بازبینی به صف بررسی مدیریت منتقل شد.`,
+        'WARNING'
+      );
+    }
+
+    if (newStatus === 'PUBLISHED') {
+      if (existing.marginValue != null) {
+        newFinalPrice = calculateAuthoritativeFinalPrice(
+          newBasePrice,
+          existing.marginType || 'PERCENTAGE',
+          existing.marginValue
+        );
+      }
+    }
+
     const product = await prisma.product.update({
       where: { id: parseInt(id) },
       data: {
@@ -4196,21 +5210,18 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
         shortDescription: shortDescription || longDescription,
         longDescription: longDescription || shortDescription,
         technicalSpecs: typeof technicalSpecs === 'object' ? JSON.stringify(technicalSpecs) : technicalSpecs,
-        supplierBasePrice: safeParseFloat(supplierBasePrice),
+        supplierBasePrice: newBasePrice,
+        finalPrice: newFinalPrice,
         discount: safeParseFloat(discount, 0),
         sku,
         brand,
-        status: 'PENDING_APPROVAL', // Product waits for admin approval upon edit
+        status: newStatus,
+        rejectionReason: clearRejectionReason ? null : existing.rejectionReason,
         inventory: totalInventory,
         exploreContent: {
           upsert: {
-            create: {
-              customVideoUrl: videoUrl || null,
-              isPublished: false
-            },
-            update: {
-              customVideoUrl: videoUrl || null
-            }
+            create: { customVideoUrl: videoUrl || null, isPublished: false },
+            update: { customVideoUrl: videoUrl || null }
           }
         },
         images: {
@@ -4225,7 +5236,7 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
             imageUrl: normalizeImageUrl(v.imageUrl) || null
           })) : [{
             attributes: JSON.stringify({}),
-            supplierBasePrice: safeParseFloat(supplierBasePrice),
+            supplierBasePrice: newBasePrice,
             stock: safeParseInt(stock),
             sku: sku || '',
             imageUrl: null
@@ -4234,18 +5245,19 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
       }
     });
 
-    // Prompt 7.1: Send system announcement to SuperAdmin and Store Managers
-    await prisma.announcement.create({
-      data: {
-        title: `تعلیق محصول شماره ${id} جهت بررسی و تایید مجدد`,
-        content: `محصول شماره ${id} (${name}) توسط تامین‌کننده ویرایش شد. مشخصات/قیمت جدید به ثبت رسید و جهت حفظ صحت داده‌ها، کالا تا زمان تایید نهایی توسط مدیریت ارشد غیرفعال گردید.`,
-        target: 'ALL',
-        priority: 'HIGH',
-        isSticky: true,
-      }
-    }).catch(console.error);
+    if (isMajorChange || isExtremePriceChange) {
+      await prisma.announcement.create({
+        data: {
+          title: `تعلیق محصول شماره ${id} جهت بررسی مجدد`,
+          content: `محصول شماره ${id} (${name}) به دلیل تغییرات اساسی یا افزایش شدید قیمت، تا تایید نهایی توسط مدیریت ارشد تعلیق گردید.`,
+          target: 'ALL',
+          priority: 'HIGH',
+          isSticky: true,
+        }
+      }).catch(console.error);
+    }
 
-    res.json({ message: 'محصول با موفقیت ویرایش و تا زمان تایید مجدد مدیریت ارشد تعلیق گردید', product });
+    res.json({ message: newStatus === 'PUBLISHED' ? 'محصول با موفقیت ویرایش شد (وضعیت انتشار حفظ شد)' : 'محصول با موفقیت ویرایش و تا زمان تایید مجدد مدیریت ارشد تعلیق گردید', product });
   } catch (err: any) {
     console.error('Error editing supplier product message:', err?.message || String(err));
     console.error('Error editing supplier product stack:', err?.stack || '');
@@ -4863,10 +5875,10 @@ app.get('/api/supplier/wallet', authenticateToken, requireSupplier, async (req: 
 // Update supplier profile
 app.put('/api/supplier/profile', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders } = req.body;
+    const { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders, originAddress, website, activityType } = req.body;
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders }
+      data: { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders, originAddress, website, activityType }
     });
     res.json({ message: 'پروفایل با موفقیت بروزرسانی شد', user });
   } catch (err) {
@@ -4876,10 +5888,10 @@ app.put('/api/supplier/profile', authenticateToken, requireSupplier, async (req:
 
 app.patch('/api/supplier/profile', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders } = req.body;
+    const { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders, originAddress, website, activityType } = req.body;
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders }
+      data: { firstName, lastName, brandName, shaba, cardNumber, mobile, bankName, accountHolderName, address, province, city, postalCode, telephone, autoApproveOrders, originAddress, website, activityType }
     });
     res.json({ message: 'پروفایل با موفقیت بروزرسانی شد', user });
   } catch (err) {
@@ -4958,6 +5970,650 @@ function requireAdmin(req: any, res: any, next: any) {
   }
   next();
 };
+
+// ============================================================================
+// CONCIERGE PRODUCT IMPORT ("محصولاتم را شما وارد کنید")
+// ============================================================================
+
+// 1. Supplier: Create concierge product import request
+app.post('/api/supplier/concierge-requests', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const supplierId = req.user.userId;
+    if (!supplierId) {
+      return res.status(403).json({ error: 'دسترسی غیرمجاز: هویت تامین‌کننده مشخص نیست.' });
+    }
+
+    const {
+      title,
+      approxProductCount,
+      categories,
+      catalogUrl,
+      websiteUrl,
+      notes,
+      attachments
+    } = req.body;
+
+    const count = safeParseInt(approxProductCount, 0);
+    const categoryStr = Array.isArray(categories) ? categories.join(', ') : (categories ? String(categories).trim() : '');
+    const safeTitle = title && String(title).trim() ? String(title).trim() : `درخواست ورود کاتالوگ (${count > 0 ? count + ' محصول' : 'محصولات جدید'})`;
+    const cleanCatalogUrl = catalogUrl && String(catalogUrl).trim().startsWith('http') ? String(catalogUrl).trim() : null;
+    const cleanWebsiteUrl = websiteUrl && String(websiteUrl).trim().startsWith('http') ? String(websiteUrl).trim() : null;
+
+    let safeAttachments: any[] = [];
+    if (Array.isArray(attachments)) {
+      safeAttachments = attachments.filter(a => a && (typeof a === 'string' ? (a.startsWith('/uploads') || a.startsWith('http')) : (a.url && (a.url.startsWith('/uploads') || a.url.startsWith('http')))));
+    } else if (attachments && typeof attachments === 'string') {
+      safeAttachments = [{ url: attachments }];
+    }
+
+    const initialMessage = [
+      notes && String(notes).trim() ? String(notes).trim() : 'درخواست بررسی و ورود اولیه کاتالوگ توسط کارشناس زوپیت ثبت شد.',
+      count > 0 ? `\n• تعداد تقریبی کالاها: ${count} قلم` : '',
+      categoryStr ? `\n• حوزه‌های مرتبط: ${categoryStr}` : '',
+      cleanCatalogUrl ? `\n• لینک کاتالوگ: ${cleanCatalogUrl}` : '',
+      cleanWebsiteUrl ? `\n• لینک وب‌سایت / کانال: ${cleanWebsiteUrl}` : '',
+      safeAttachments.length > 0 ? `\n• فایل‌های ضمیمه‌شده: ${safeAttachments.length} فایل` : ''
+    ].filter(Boolean).join('');
+
+    const ticket = await prisma.ticket.create({
+      data: {
+        userId: supplierId,
+        subject: safeTitle,
+        department: 'CONCIERGE_IMPORT',
+        priority: 'NORMAL',
+        status: 'SUBMITTED',
+        approxProductCount: count > 0 ? count : null,
+        categories: categoryStr || null,
+        catalogUrl: cleanCatalogUrl,
+        websiteUrl: cleanWebsiteUrl,
+        attachments: JSON.stringify(safeAttachments),
+        messages: {
+          create: [
+            {
+              userId: supplierId,
+              message: initialMessage,
+              attachmentUrl: safeAttachments[0]?.url || (typeof safeAttachments[0] === 'string' ? safeAttachments[0] : null),
+              isInternal: false
+            }
+          ]
+        }
+      },
+      include: {
+        messages: true
+      }
+    });
+
+    // In-app Notification for Supplier
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: supplierId,
+          title: 'درخواست ورود محصولات ثبت شد 📝',
+          message: `درخواست "${safeTitle}" با شماره پیگیری #${ticket.id} دریافت شد. تیم زوپیت به زودی کاتالوگ شما را بررسی خواهد کرد.`,
+          type: 'CONCIERGE_IMPORT'
+        }
+      });
+    } catch (nErr) {}
+
+    // Activity Log
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: supplierId,
+          action: 'CONCIERGE_IMPORT_REQUEST_CREATED',
+          details: `ثبت درخواست ورود کاتالوگ #${ticket.id} با ${count} کالا`
+        }
+      });
+    } catch (aErr) {}
+
+    res.status(201).json({
+      success: true,
+      ticket,
+      message: 'درخواست شما با موفقیت ثبت شد و در صف بررسی کارشناسان زوپیت قرار گرفت.'
+    });
+  } catch (err: any) {
+    console.error('Error creating concierge request:', err);
+    res.status(500).json({ error: 'خطا در ثبت درخواست ورود محصولات', details: err?.message });
+  }
+});
+
+// 2. Supplier: Get all concierge requests of current supplier
+app.get('/api/supplier/concierge-requests', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const supplierId = req.user.userId;
+    const requests = await prisma.ticket.findMany({
+      where: {
+        userId: supplierId,
+        department: 'CONCIERGE_IMPORT'
+      },
+      include: {
+        messages: {
+          where: { isInternal: { not: true } },
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: { select: { firstName: true, lastName: true, role: true } }
+          }
+        }
+      },
+      orderBy: { id: 'desc' }
+    });
+
+    const parsed = requests.map((r: any) => {
+      let attachmentsList = [];
+      try {
+        if (r.attachments) attachmentsList = JSON.parse(r.attachments);
+      } catch (e) {}
+      let completionData = null;
+      try {
+        if (r.completionStats) completionData = JSON.parse(r.completionStats);
+      } catch (e) {}
+
+      return {
+        ...r,
+        attachmentsList,
+        completionData,
+        // Internal notes strictly hidden from supplier
+        internalNotes: undefined
+      };
+    });
+
+    res.json(parsed);
+  } catch (err: any) {
+    console.error('Error fetching supplier concierge requests:', err);
+    res.status(500).json({ error: 'خطا در دریافت درخواست‌های ورود محصول' });
+  }
+});
+
+// 3. Supplier: Get single concierge request
+app.get('/api/supplier/concierge-requests/:id', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const supplierId = req.user.userId;
+    const request = await prisma.ticket.findFirst({
+      where: {
+        id: safeParseInt(id),
+        userId: supplierId,
+        department: 'CONCIERGE_IMPORT'
+      },
+      include: {
+        messages: {
+          where: { isInternal: { not: true } },
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: { select: { firstName: true, lastName: true, role: true } }
+          }
+        }
+      }
+    });
+
+    if (!request) {
+      return res.status(404).json({ error: 'درخواست مورد نظر یافت نشد یا دسترسی به آن مجاز نمی‌باشد.' });
+    }
+
+    let attachmentsList = [];
+    try {
+      if (request.attachments) attachmentsList = JSON.parse(request.attachments);
+    } catch (e) {}
+    let completionData = null;
+    try {
+      if (request.completionStats) completionData = JSON.parse(request.completionStats);
+    } catch (e) {}
+
+    res.json({
+      ...request,
+      attachmentsList,
+      completionData,
+      internalNotes: undefined
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در دریافت اطلاعات درخواست' });
+  }
+});
+
+// 4. Supplier: Send reply message in request thread
+app.post('/api/supplier/concierge-requests/:id/messages', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const supplierId = req.user.userId;
+    const { message, attachmentUrl } = req.body;
+
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({ error: 'متن پیام الزامی است.' });
+    }
+
+    const ticket = await prisma.ticket.findFirst({
+      where: {
+        id: safeParseInt(id),
+        userId: supplierId,
+        department: 'CONCIERGE_IMPORT'
+      }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'درخواست یافت نشد.' });
+    }
+
+    const newMsg = await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        userId: supplierId,
+        message: String(message).trim(),
+        attachmentUrl: attachmentUrl || null,
+        isInternal: false
+      }
+    });
+
+    // If ticket was waiting for info, move it back to IN_REVIEW
+    const newStatus = ticket.status === 'NEEDS_INFO' ? 'IN_REVIEW' : ticket.status;
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        status: newStatus,
+        updatedAt: new Date()
+      }
+    });
+
+    res.status(201).json(newMsg);
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در ثبت پیام' });
+  }
+});
+
+// 5. Admin: Get all concierge requests
+app.get('/api/admin/concierge-requests', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const requests = await prisma.ticket.findMany({
+      where: {
+        OR: [
+          { department: 'CONCIERGE_IMPORT' },
+          { department: { contains: 'ثبت رایگان' } },
+          { subject: { contains: 'ثبت رایگان' } }
+        ]
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            brandName: true,
+            storeName: true,
+            mobile: true,
+            email: true,
+            username: true,
+            role: true
+          }
+        },
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: { select: { firstName: true, lastName: true, role: true } }
+          }
+        }
+      },
+      orderBy: { id: 'desc' }
+    });
+
+    const parsed = requests.map((r: any) => {
+      let attachmentsList = [];
+      try {
+        if (r.attachments) attachmentsList = JSON.parse(r.attachments);
+      } catch (e) {}
+      let completionData = null;
+      try {
+        if (r.completionStats) completionData = JSON.parse(r.completionStats);
+      } catch (e) {}
+
+      return {
+        ...r,
+        attachmentsList,
+        completionData
+      };
+    });
+
+    res.json(parsed);
+  } catch (err: any) {
+    console.error('Error fetching admin concierge requests:', err);
+    res.status(500).json({ error: 'خطا در دریافت لیست درخواست‌های ورود کاتالوگ' });
+  }
+});
+
+// 6. Admin: Get single concierge request
+app.get('/api/admin/concierge-requests/:id', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const request = await prisma.ticket.findUnique({
+      where: { id: safeParseInt(id) },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            brandName: true,
+            storeName: true,
+            mobile: true,
+            email: true,
+            username: true,
+            role: true
+          }
+        },
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: { select: { firstName: true, lastName: true, role: true } }
+          }
+        }
+      }
+    });
+
+    if (!request) {
+      return res.status(404).json({ error: 'درخواست یافت نشد.' });
+    }
+
+    let attachmentsList = [];
+    try {
+      if (request.attachments) attachmentsList = JSON.parse(request.attachments);
+    } catch (e) {}
+    let completionData = null;
+    try {
+      if (request.completionStats) completionData = JSON.parse(request.completionStats);
+    } catch (e) {}
+
+    res.json({
+      ...request,
+      attachmentsList,
+      completionData
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در دریافت اطلاعات پرونده' });
+  }
+});
+
+// 7. Admin: Update request status and internal notes
+app.patch('/api/admin/concierge-requests/:id/status', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const { status, internalNotes, completionStats } = req.body;
+
+    const validStatuses = ['SUBMITTED', 'IN_REVIEW', 'PROCESSING', 'NEEDS_INFO', 'COMPLETED', 'CANCELLED'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'وضعیت ارسال شده نامعتبر است.' });
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: safeParseInt(id) },
+      include: { user: true }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'درخواست یافت نشد.' });
+    }
+
+    const updateData: any = {
+      updatedAt: new Date()
+    };
+
+    if (status) {
+      updateData.status = status;
+    }
+    if (internalNotes !== undefined) {
+      updateData.internalNotes = internalNotes ? String(internalNotes).trim() : null;
+    }
+    if (completionStats !== undefined) {
+      updateData.completionStats = typeof completionStats === 'object' ? JSON.stringify(completionStats) : String(completionStats);
+    }
+
+    const updated = await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: updateData
+    });
+
+    // Notify supplier based on status transition
+    if (status && status !== ticket.status) {
+      try {
+        let notifTitle = '';
+        let notifMsg = '';
+
+        if (status === 'IN_REVIEW') {
+          notifTitle = 'درخواست ورود کاتالوگ در حال بررسی 🔍';
+          notifMsg = `درخواست شما (${ticket.subject}) در صف بررسی کارشناسان زوپیت قرار گرفت.`;
+        } else if (status === 'PROCESSING') {
+          notifTitle = 'آغاز ثبت محصولات کاتالوگ ⚙️';
+          notifMsg = `کارشناس زوپیت فرآیند ثبت و آماده‌سازی محصولات کاتالوگ شما (${ticket.subject}) را آغاز کرد.`;
+        } else if (status === 'NEEDS_INFO') {
+          notifTitle = 'نیاز به اطلاعات تکمیلی ⚠️';
+          notifMsg = `برای پیشبرد ثبت محصولات در درخواست #${ticket.id}، به اطلاعات بیشتری نیاز است. لطفاً بخش درخواست‌های ورود محصول را بررسی فرمایید.`;
+        } else if (status === 'COMPLETED') {
+          const stats = typeof completionStats === 'object' ? completionStats : {};
+          const created = stats.createdCount || ticket.approxProductCount || 'چندین';
+          notifTitle = 'ثبت محصولات کاتالوگ تکمیل شد 🎉';
+          notifMsg = `فرآیند ورود کاتالوگ شما به پایان رسید (${created} محصول ثبت شد). محصولات با وضعیت پیش‌نویس/در انتظار تایید در پنل شما قرار گرفتند.`;
+        } else if (status === 'CANCELLED') {
+          notifTitle = 'درخواست ورود محصولات لغو شد ❌';
+          notifMsg = `درخواست ورود کاتالوگ #${ticket.id} لغو گردید.`;
+        }
+
+        if (notifTitle) {
+          await prisma.notification.create({
+            data: {
+              userId: ticket.userId,
+              title: notifTitle,
+              message: notifMsg,
+              type: 'CONCIERGE_IMPORT'
+            }
+          });
+        }
+      } catch (nErr) {}
+    }
+
+    // Activity Log
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.userId,
+          action: 'CONCIERGE_REQUEST_STATUS_UPDATED',
+          details: `تغییر وضعیت درخواست #${ticket.id} به ${status || ticket.status}`
+        }
+      });
+    } catch (aErr) {}
+
+    res.json({
+      success: true,
+      ticket: updated,
+      message: 'وضعیت درخواست با موفقیت به‌روزرسانی شد.'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در به‌روزرسانی وضعیت درخواست' });
+  }
+});
+
+// 8. Admin: Send message / internal note on concierge request
+app.post('/api/admin/concierge-requests/:id/messages', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const { message, attachmentUrl, isInternal } = req.body;
+
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({ error: 'متن پیام یا یادداشت الزامی است.' });
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: safeParseInt(id) }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'درخواست یافت نشد.' });
+    }
+
+    const newMsg = await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        userId: req.user.userId,
+        message: String(message).trim(),
+        attachmentUrl: attachmentUrl || null,
+        isInternal: !!isInternal
+      },
+      include: {
+        user: { select: { firstName: true, lastName: true, role: true } }
+      }
+    });
+
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { updatedAt: new Date() }
+    });
+
+    // Only notify supplier if the message is NOT internal
+    if (!isInternal) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: ticket.userId,
+            title: 'پیام جدید از کارشناس زوپیت 💬',
+            message: `کارشناس زوپیت در پرونده درخواست #${ticket.id} پیامی برای شما ارسال کرد: "${String(message).slice(0, 80)}..."`,
+            type: 'CONCIERGE_IMPORT'
+          }
+        });
+      } catch (nErr) {}
+    }
+
+    res.status(201).json(newMsg);
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در ثبت پیام' });
+  }
+});
+
+// 9. Admin: Create a product directly under the supplier of a concierge request
+app.post('/api/admin/concierge-requests/:id/products', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: safeParseInt(id) },
+      include: { user: true }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'درخواست یافت نشد.' });
+    }
+
+    const targetSupplierId = ticket.userId;
+    const supplierUser = await prisma.user.findUnique({
+      where: { id: targetSupplierId }
+    });
+
+    if (!supplierUser || supplierUser.role !== 'SUPPLIER') {
+      return res.status(400).json({ error: 'کاربر ارسال‌کننده این درخواست، در نقش تامین‌کننده فعال نمی‌باشد.' });
+    }
+
+    const {
+      name,
+      categoryId,
+      supplierBasePrice,
+      stock,
+      sku,
+      brand,
+      mainImage,
+      images,
+      shortDescription,
+      longDescription,
+      targetStatus
+    } = req.body;
+
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'نام محصول الزامی است.' });
+    }
+
+    const basePrice = safeParseFloat(supplierBasePrice, 0);
+    if (basePrice <= 0) {
+      return res.status(400).json({ error: 'قیمت پایه تامین‌کننده باید بزرگ‌تر از صفر باشد.' });
+    }
+
+    // Category
+    let actualCategoryId = safeParseInt(categoryId, 0);
+    if (!actualCategoryId) {
+      const firstCat = await prisma.category.findFirst();
+      actualCategoryId = firstCat ? firstCat.id : 1;
+    }
+
+    // Safety: Concierge products MUST NEVER be PUBLISHED!
+    // Must be DRAFT or PENDING_APPROVAL. Margin will be set during admin approval.
+    const safeProductStatus = targetStatus === 'DRAFT' ? 'DRAFT' : 'PENDING_APPROVAL';
+
+    // SKU
+    let productSku = sku && String(sku).trim() ? String(sku).trim() : `CONC-${Date.now().toString().slice(-6)}`;
+
+    // Images
+    const imageList: { url: string }[] = [];
+    if (mainImage && (mainImage.startsWith('http') || mainImage.startsWith('/uploads'))) {
+      imageList.push({ url: mainImage });
+    }
+    if (Array.isArray(images)) {
+      for (const img of images) {
+        const u = typeof img === 'string' ? img : img?.url;
+        if (u && (u.startsWith('http') || u.startsWith('/uploads')) && !imageList.some(i => i.url === u)) {
+          imageList.push({ url: u });
+        }
+      }
+    }
+    if (imageList.length === 0) {
+      imageList.push({ url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80' });
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        supplierId: targetSupplierId,
+        categoryId: actualCategoryId,
+        name: String(name).trim(),
+        shortDescription: shortDescription || `محصول ثبت شده از طریق کاتالوگ پرونده #${ticket.id}`,
+        longDescription: longDescription || `توضیحات تکمیلی محصول ${name} - ثبت شده توسط کارشناس پشتیبانی زوپیت`,
+        supplierBasePrice: basePrice,
+        finalPrice: null, // Critical: Zopit margin remains controlled by admin approval!
+        marginType: null,
+        marginValue: null,
+        sku: productSku,
+        brand: brand || supplierUser.brandName || 'اصلی',
+        inventory: safeParseInt(stock, 10),
+        status: safeProductStatus,
+        images: {
+          create: imageList
+        },
+        variants: {
+          create: [
+            {
+              attributes: JSON.stringify({}),
+              supplierBasePrice: basePrice,
+              stock: safeParseInt(stock, 10),
+              sku: productSku,
+              imageUrl: imageList[0]?.url || null
+            }
+          ]
+        }
+      }
+    });
+
+    // Notify supplier
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: targetSupplierId,
+          title: 'ثبت محصول جدید در پنل شما 📦',
+          message: `محصول "${product.name}" با موفقیت برای شما ثبت شد و در وضعیت ${safeProductStatus === 'PENDING_APPROVAL' ? 'در انتظار تایید' : 'پیش‌نویس'} قرار گرفت.`,
+          type: 'PRODUCT_STATUS'
+        }
+      });
+    } catch (nErr) {}
+
+    res.status(201).json({
+      success: true,
+      product,
+      message: `محصول "${product.name}" با وضعیت ${safeProductStatus} برای تامین‌کننده ایجاد شد.`
+    });
+  } catch (err: any) {
+    console.error('Error creating product from concierge request:', err);
+    res.status(500).json({ error: 'خطا در ایجاد محصول', details: err?.message });
+  }
+});
 
 // --- Store Manager API Routes ---
 function requireStoreManager(req: any, res: any, next: any) {
@@ -9557,72 +11213,632 @@ app.get('/api/admin/products', authenticateToken, requireAdmin, async (req: any,
 });
 
 
+// ============================================================================
+// PRODUCT APPROVAL & ZOPIT MARGIN GOVERNANCE SERVICE (Phase 3 Prompt 07)
+// ============================================================================
+
+// 1. Extreme Price Change Threshold (Centralized & Configurable)
+export async function getExtremePriceChangeThresholdPercent(): Promise<number> {
+  try {
+    const setting = await prisma.systemSettings.findUnique({
+      where: { key: 'EXTREME_PRICE_CHANGE_THRESHOLD_PERCENT' }
+    });
+    if (setting && setting.value) {
+      const parsed = parseFloat(setting.value);
+      if (!isNaN(parsed) && parsed > 0 && parsed <= 500) {
+        return parsed;
+      }
+    }
+  } catch (err) {}
+  return 30; // Unified authoritative default threshold (30%)
+}
+
+// 2. Authoritative Final Store-Facing Price Calculation (Server-Side)
+export function calculateAuthoritativeFinalPrice(
+  supplierBasePrice: number,
+  marginType: string,
+  marginValue: number
+): number {
+  const base = Math.max(0, safeParseFloat(supplierBasePrice, 0));
+  const val = Math.max(0, safeParseFloat(marginValue, 0));
+  const type = String(marginType || 'PERCENTAGE').toUpperCase();
+
+  if (type === 'PERCENTAGE') {
+    // E.g., base = 115000, margin = 10% -> 126500 (rounded to integer currency)
+    return Math.round(base * (1 + val / 100));
+  } else if (type === 'FIXED') {
+    // E.g., base = 115000, margin = 15000 -> 130000
+    return Math.round(base + val);
+  }
+  return base;
+}
+
+// 3. Governance Audit Logging (reusing AuditTrail model)
+export async function recordProductGovernanceAudit(data: {
+  productId: number;
+  actorId?: number | null;
+  actorRole?: string;
+  action: string;
+  metadata?: Record<string, any>;
+}) {
+  try {
+    const metaStr = data.metadata ? JSON.stringify({
+      ...data.metadata,
+      actorRole: data.actorRole,
+      timestamp: new Date().toISOString()
+    }) : JSON.stringify({ actorRole: data.actorRole, timestamp: new Date().toISOString() });
+
+    await prisma.auditTrail.create({
+      data: {
+        actorId: data.actorId || undefined,
+        action: data.action,
+        resource: `PRODUCT:${data.productId}`,
+        metadata: metaStr
+      }
+    });
+  } catch (err) {
+    console.error('Failed to log product governance audit trail:', err);
+  }
+}
+
+// 4. Supplier In-App Notification Dispatcher (reusing Notification model)
+export async function sendProductGovernanceNotification(
+  supplierId: number,
+  title: string,
+  message: string,
+  type: string = 'INFO'
+) {
+  try {
+    if (!supplierId || supplierId <= 0) return;
+    await prisma.notification.create({
+      data: {
+        userId: supplierId,
+        title,
+        message,
+        type,
+        isRead: false
+      }
+    });
+  } catch (err) {
+    console.error('Failed to send product governance notification:', err);
+  }
+}
+
+// 5. Extreme Price Change Evaluator
+export function isPriceChangeExtreme(
+  oldPrice: number,
+  newPrice: number,
+  thresholdPercent: number
+): { isExtreme: boolean; diffPercent: number } {
+  const oldP = safeParseFloat(oldPrice, 0);
+  const newP = safeParseFloat(newPrice, 0);
+  if (oldP <= 0 || newP <= 0) {
+    return { isExtreme: false, diffPercent: 0 };
+  }
+  const diffPercent = (Math.abs(newP - oldP) / oldP) * 100;
+  return {
+    isExtreme: diffPercent > thresholdPercent,
+    diffPercent: Math.round(diffPercent * 10) / 10
+  };
+}
+
+// 6. Central Atomic Approve & Publish Function
+export async function approveAndPublishProductCore(params: {
+  productId: number;
+  adminUser: { id: number; role: string; username?: string };
+  marginType?: string;
+  marginValue?: number | string;
+  publishStartDate?: string | Date | null;
+  publishEndDate?: string | Date | null;
+  isPinned?: boolean;
+}): Promise<{ success: boolean; product?: any; error?: string; status?: number }> {
+  const { productId, adminUser, marginType, marginValue, publishStartDate, publishEndDate, isPinned } = params;
+
+  if (adminUser.role !== 'ADMIN' && adminUser.role !== 'SUPER_ADMIN') {
+    return { success: false, error: 'تنها مدیران سامانه مجاز به تعیین سود و انتشار محصول هستند.', status: 403 };
+  }
+
+  const existing = await prisma.product.findUnique({
+    where: { id: productId },
+    include: { supplier: true }
+  });
+  if (!existing) {
+    return { success: false, error: 'محصول مورد نظر یافت نشد.', status: 404 };
+  }
+
+  const effectiveMarginType = String(marginType || existing.marginType || 'PERCENTAGE').toUpperCase();
+  if (effectiveMarginType !== 'PERCENTAGE' && effectiveMarginType !== 'FIXED') {
+    return { success: false, error: 'نوع مارجین باید درصدی (PERCENTAGE) یا مبلغ ثابت (FIXED) باشد.', status: 400 };
+  }
+
+  let effectiveMarginVal = -1;
+  if (marginValue !== undefined && marginValue !== null && String(marginValue).trim() !== '') {
+    effectiveMarginVal = safeParseFloat(marginValue, -1);
+  } else if (existing.marginValue !== null && existing.marginValue !== undefined) {
+    effectiveMarginVal = safeParseFloat(existing.marginValue, -1);
+  }
+
+  if (effectiveMarginVal < 0) {
+    return { success: false, error: 'تعیین مقدار معتبر مارجین سود زوپیت (بزرگتر یا مساوی صفر) برای تایید و انتشار کالا الزامی است.', status: 400 };
+  }
+
+  const basePrice = safeParseFloat(existing.supplierBasePrice, 0);
+  if (basePrice <= 0) {
+    return { success: false, error: 'قیمت پایه تامین‌کننده برای این محصول نامعتبر یا صفر است.', status: 400 };
+  }
+
+  // Authoritative server-side price calculation
+  const calculatedFinalPrice = calculateAuthoritativeFinalPrice(
+    basePrice,
+    effectiveMarginType,
+    effectiveMarginVal
+  );
+
+  // Check pin limit
+  if (isPinned) {
+    const pinnedCount = await prisma.product.count({ where: { isPinned: true, status: 'PUBLISHED' } });
+    if (pinnedCount >= 10 && !existing.isPinned) {
+      return { success: false, error: 'حداکثر ۱۰ کالا می‌توانند به صورت همزمان پین شوند.', status: 400 };
+    }
+  }
+
+  let productSku = existing.sku;
+  if (!productSku || productSku.trim() === '') {
+    productSku = 'BK-' + Math.floor(100000 + Math.random() * 900000);
+  }
+
+  // Atomic publication & margin update
+  const updatedProduct = await prisma.product.update({
+    where: { id: productId },
+    data: {
+      status: 'PUBLISHED',
+      marginType: effectiveMarginType,
+      marginValue: effectiveMarginVal,
+      finalPrice: calculatedFinalPrice,
+      rejectionReason: null,
+      publishStartDate: publishStartDate ? new Date(publishStartDate) : existing.publishStartDate,
+      publishEndDate: publishEndDate ? new Date(publishEndDate) : existing.publishEndDate,
+      isPinned: isPinned !== undefined ? !!isPinned : existing.isPinned,
+      sku: productSku
+    }
+  });
+
+  // Audit trail
+  await recordProductGovernanceAudit({
+    productId,
+    actorId: adminUser.id,
+    actorRole: adminUser.role,
+    action: 'PRODUCT_APPROVED_AND_PUBLISHED',
+    metadata: {
+      previousStatus: existing.status,
+      newStatus: 'PUBLISHED',
+      supplierBasePrice: basePrice,
+      marginType: effectiveMarginType,
+      marginValue: effectiveMarginVal,
+      finalPrice: calculatedFinalPrice,
+      source: existing.externalSource || 'MANUAL'
+    }
+  });
+
+  // Supplier notification
+  const marginDisplay = effectiveMarginType === 'PERCENTAGE' ? `${effectiveMarginVal}٪` : `${effectiveMarginVal.toLocaleString('fa-IR')} ریال`;
+  await sendProductGovernanceNotification(
+    existing.supplierId,
+    'تایید و انتشار کالا در فروشگاه زوپیت',
+    `محصول شما با عنوان «${existing.name}» تایید گردید و با مارجین مصوب ${marginDisplay} و قیمت فروشگاه ${calculatedFinalPrice.toLocaleString('fa-IR')} ریال در کاتالوگ عمومی زوپیت منتشر شد.`,
+    'SUCCESS'
+  );
+
+  return { success: true, product: updatedProduct };
+}
+
+// 7. Central Reject Function
+export async function rejectProductCore(params: {
+  productId: number;
+  adminUser: { id: number; role: string };
+  reason: string;
+}): Promise<{ success: boolean; product?: any; error?: string; status?: number }> {
+  const { productId, adminUser, reason } = params;
+  if (adminUser.role !== 'ADMIN' && adminUser.role !== 'SUPER_ADMIN') {
+    return { success: false, error: 'دسترسی فقط برای مدیران مجاز است.', status: 403 };
+  }
+  const cleanReason = (reason || '').trim();
+  if (!cleanReason) {
+    return { success: false, error: 'ذکر علت رد کالا الزامی است.', status: 400 };
+  }
+  const existing = await prisma.product.findUnique({ where: { id: productId } });
+  if (!existing) {
+    return { success: false, error: 'محصول یافت نشد.', status: 404 };
+  }
+
+  const updated = await prisma.product.update({
+    where: { id: productId },
+    data: {
+      status: 'REJECTED',
+      rejectionReason: cleanReason
+    }
+  });
+
+  await recordProductGovernanceAudit({
+    productId,
+    actorId: adminUser.id,
+    actorRole: adminUser.role,
+    action: 'PRODUCT_REJECTED',
+    metadata: {
+      previousStatus: existing.status,
+      newStatus: 'REJECTED',
+      reason: cleanReason
+    }
+  });
+
+  await sendProductGovernanceNotification(
+    existing.supplierId,
+    'عدم تایید کالا در زوپیت',
+    `کالای «${existing.name}» توسط تیم بررسی زوپیت رد شد. علت رد: ${cleanReason}`,
+    'ERROR'
+  );
+
+  return { success: true, product: updated };
+}
+
+// 8. Central Request Revision Function
+export async function requestRevisionProductCore(params: {
+  productId: number;
+  adminUser: { id: number; role: string };
+  reason: string;
+}): Promise<{ success: boolean; product?: any; error?: string; status?: number }> {
+  const { productId, adminUser, reason } = params;
+  if (adminUser.role !== 'ADMIN' && adminUser.role !== 'SUPER_ADMIN') {
+    return { success: false, error: 'دسترسی فقط برای مدیران مجاز است.', status: 403 };
+  }
+  const cleanReason = (reason || '').trim();
+  if (!cleanReason) {
+    return { success: false, error: 'توضیحات موارد نیازمند اصلاح الزامی است.', status: 400 };
+  }
+  const existing = await prisma.product.findUnique({ where: { id: productId } });
+  if (!existing) {
+    return { success: false, error: 'محصول یافت نشد.', status: 404 };
+  }
+
+  const updated = await prisma.product.update({
+    where: { id: productId },
+    data: {
+      status: 'NEEDS_REVISION',
+      rejectionReason: cleanReason
+    }
+  });
+
+  await recordProductGovernanceAudit({
+    productId,
+    actorId: adminUser.id,
+    actorRole: adminUser.role,
+    action: 'PRODUCT_NEEDS_REVISION',
+    metadata: {
+      previousStatus: existing.status,
+      newStatus: 'NEEDS_REVISION',
+      reason: cleanReason
+    }
+  });
+
+  await sendProductGovernanceNotification(
+    existing.supplierId,
+    'درخواست اصلاح و بازبینی کالا',
+    `کالای «${existing.name}» نیازمند اصلاح است. توضیحات کارشناس: ${cleanReason}. لطفاً پس از ویرایش، مجدداً ارسال نمایید.`,
+    'WARNING'
+  );
+
+  return { success: true, product: updated };
+}
+
+// 9. Central Set Margin Function (Without Publishing Immediately)
+export async function setProductMarginCore(params: {
+  productId: number;
+  adminUser: { id: number; role: string };
+  marginType: string;
+  marginValue: number | string;
+}): Promise<{ success: boolean; product?: any; error?: string; status?: number }> {
+  const { productId, adminUser, marginType, marginValue } = params;
+  if (adminUser.role !== 'ADMIN' && adminUser.role !== 'SUPER_ADMIN') {
+    return { success: false, error: 'دسترسی فقط برای مدیران مجاز است.', status: 403 };
+  }
+  const mType = String(marginType || 'PERCENTAGE').toUpperCase();
+  if (mType !== 'PERCENTAGE' && mType !== 'FIXED') {
+    return { success: false, error: 'نوع مارجین باید PERCENTAGE یا FIXED باشد.', status: 400 };
+  }
+  const mVal = safeParseFloat(marginValue, -1);
+  if (mVal < 0) {
+    return { success: false, error: 'مقدار مارجین نامعتبر است.', status: 400 };
+  }
+  const existing = await prisma.product.findUnique({ where: { id: productId } });
+  if (!existing) {
+    return { success: false, error: 'محصول یافت نشد.', status: 404 };
+  }
+
+  const finalPrice = calculateAuthoritativeFinalPrice(existing.supplierBasePrice, mType, mVal);
+
+  const updated = await prisma.product.update({
+    where: { id: productId },
+    data: {
+      marginType: mType,
+      marginValue: mVal,
+      finalPrice
+    }
+  });
+
+  await recordProductGovernanceAudit({
+    productId,
+    actorId: adminUser.id,
+    actorRole: adminUser.role,
+    action: 'PRODUCT_MARGIN_SET',
+    metadata: {
+      marginType: mType,
+      marginValue: mVal,
+      finalPrice
+    }
+  });
+
+  return { success: true, product: updated };
+}
+
+// ============================================================================
+// ADMIN PRODUCT GOVERNANCE ENDPOINTS
+// ============================================================================
+
+// A. Publish with Margin (Authoritative)
 app.patch('/api/admin/products/:id/publish', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
-    const { id } = req.params;
-    const { finalPrice, marginType, marginValue, publishStartDate, publishEndDate, isPinned } = req.body;
-    
-    // Check if pinning limit reached
-    if (isPinned) {
-      const pinnedCount = await prisma.product.count({ where: { isPinned: true, status: 'PUBLISHED' } });
-      if (pinnedCount >= 10) {
-        // Maybe we just unpin the oldest? Or return error.
-        // Let's return error.
-        return res.status(400).json({ error: 'Maximum 10 pinned products allowed.' });
-      }
+    const productId = safeParseInt(req.params.id, 0);
+    if (!productId) return res.status(400).json({ error: 'شناسه محصول نامعتبر است.' });
+
+    const adminUser = {
+      id: safeParseInt(req.user?.userId || req.user?.id, 0),
+      role: req.user?.role || 'ADMIN',
+      username: req.user?.username || 'admin'
+    };
+
+    const result = await approveAndPublishProductCore({
+      productId,
+      adminUser,
+      marginType: req.body.marginType,
+      marginValue: req.body.marginValue,
+      publishStartDate: req.body.publishStartDate,
+      publishEndDate: req.body.publishEndDate,
+      isPinned: req.body.isPinned
+    });
+
+    if (!result.success) {
+      return res.status(result.status || 400).json({ error: result.error });
     }
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { id: parseInt(id) }
-    });
-    
-    let productSku = existingProduct?.sku;
-    if (!productSku) {
-      productSku = 'BK-' + Math.floor(100000 + Math.random() * 900000);
-    }
-
-    const product = await prisma.product.update({
-      where: { id: parseInt(id) },
-      data: {
-        finalPrice: finalPrice ? parseFloat(finalPrice) : null,
-        marginType,
-        marginValue: marginValue ? parseFloat(marginValue) : null,
-        publishStartDate: publishStartDate ? new Date(publishStartDate) : null,
-        publishEndDate: publishEndDate ? new Date(publishEndDate) : null,
-        isPinned: !!isPinned,
-        status: 'PUBLISHED',
-        sku: productSku
-      }
-    });
-    res.json({ message: 'Product published', product });
-  } catch (err) {
-    res.status(500).json({ error: 'Error publishing product' });
+    res.json({ message: 'محصول با موفقیت تایید و منتشر شد.', product: result.product });
+  } catch (err: any) {
+    console.error('Error in /api/admin/products/:id/publish:', err);
+    res.status(500).json({ error: 'خطای سرور در انتشار محصول' });
   }
 });
 
-app.patch('/api/admin/products/:id/status', authenticateToken, requireAdmin, async (req: any, res: any) => {
+// B. Explicit Approve Route
+app.post('/api/admin/products/:id/approve', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
-    
-    let updateData: any = { status };
-    
-    if (status === 'PUBLISHED' || status === 'ACTIVE') {
-      const existingProduct = await prisma.product.findUnique({
-        where: { id: parseInt(id) }
-      });
-      if (!existingProduct?.sku) {
-        updateData.sku = 'BK-' + Math.floor(100000 + Math.random() * 900000);
-      }
+    const productId = safeParseInt(req.params.id, 0);
+    const adminUser = {
+      id: safeParseInt(req.user?.userId || req.user?.id, 0),
+      role: req.user?.role || 'ADMIN',
+      username: req.user?.username || 'admin'
+    };
+
+    const result = await approveAndPublishProductCore({
+      productId,
+      adminUser,
+      marginType: req.body.marginType,
+      marginValue: req.body.marginValue,
+      publishStartDate: req.body.publishStartDate,
+      publishEndDate: req.body.publishEndDate,
+      isPinned: req.body.isPinned
+    });
+
+    if (!result.success) {
+      return res.status(result.status || 400).json({ error: result.error });
     }
 
-    const product = await prisma.product.update({
-      where: { id: parseInt(id) },
-      data: updateData
+    res.json({ message: 'محصول با موفقیت تایید شد.', product: result.product });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در تایید محصول' });
+  }
+});
+
+// C. Explicit Reject Route
+app.post('/api/admin/products/:id/reject', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const productId = safeParseInt(req.params.id, 0);
+    const adminUser = {
+      id: safeParseInt(req.user?.userId || req.user?.id, 0),
+      role: req.user?.role || 'ADMIN'
+    };
+    const { reason } = req.body;
+
+    const result = await rejectProductCore({ productId, adminUser, reason });
+    if (!result.success) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    res.json({ message: 'محصول رد شد.', product: result.product });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در رد محصول' });
+  }
+});
+
+// D. Explicit Request Revision Route
+app.post('/api/admin/products/:id/request-revision', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const productId = safeParseInt(req.params.id, 0);
+    const adminUser = {
+      id: safeParseInt(req.user?.userId || req.user?.id, 0),
+      role: req.user?.role || 'ADMIN'
+    };
+    const { reason } = req.body;
+
+    const result = await requestRevisionProductCore({ productId, adminUser, reason });
+    if (!result.success) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    res.json({ message: 'درخواست اصلاح با موفقیت ثبت شد.', product: result.product });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در ثبت درخواست اصلاح' });
+  }
+});
+
+// E. Explicit Set Margin Route
+app.post('/api/admin/products/:id/margin', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const productId = safeParseInt(req.params.id, 0);
+    const adminUser = {
+      id: safeParseInt(req.user?.userId || req.user?.id, 0),
+      role: req.user?.role || 'ADMIN'
+    };
+    const { marginType, marginValue } = req.body;
+
+    const result = await setProductMarginCore({ productId, adminUser, marginType, marginValue });
+    if (!result.success) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    res.json({ message: 'مارجین کالا با موفقیت ذخیره شد.', product: result.product });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در تعیین مارجین' });
+  }
+});
+
+// F. Admin Change Status (Unified Routing)
+app.patch('/api/admin/products/:id/status', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const productId = safeParseInt(req.params.id, 0);
+    const { status, reason, marginType, marginValue } = req.body;
+    const adminUser = {
+      id: safeParseInt(req.user?.userId || req.user?.id, 0),
+      role: req.user?.role || 'ADMIN',
+      username: req.user?.username || 'admin'
+    };
+
+    if (status === 'PUBLISHED' || status === 'ACTIVE') {
+      const result = await approveAndPublishProductCore({
+        productId,
+        adminUser,
+        marginType,
+        marginValue
+      });
+      if (!result.success) {
+        return res.status(result.status || 400).json({ error: result.error });
+      }
+      return res.json({ message: 'محصول تایید و منتشر شد.', product: result.product });
+    }
+
+    if (status === 'REJECTED') {
+      const result = await rejectProductCore({
+        productId,
+        adminUser,
+        reason: reason || 'رد شده توسط مدیریت زوپیت'
+      });
+      if (!result.success) {
+        return res.status(result.status || 400).json({ error: result.error });
+      }
+      return res.json({ message: 'وضعیت محصول به رد شده تغییر یافت.', product: result.product });
+    }
+
+    if (status === 'NEEDS_REVISION') {
+      const result = await requestRevisionProductCore({
+        productId,
+        adminUser,
+        reason: reason || 'نیازمند اصلاح اطلاعات محصول'
+      });
+      if (!result.success) {
+        return res.status(result.status || 400).json({ error: result.error });
+      }
+      return res.json({ message: 'وضعیت محصول به نیازمند اصلاح تغییر یافت.', product: result.product });
+    }
+
+    // Otherwise standard update (e.g. DRAFT, PENDING_APPROVAL, OUT_OF_STOCK)
+    const existing = await prisma.product.findUnique({ where: { id: productId } });
+    if (!existing) return res.status(404).json({ error: 'محصول یافت نشد.' });
+
+    const updated = await prisma.product.update({
+      where: { id: productId },
+      data: { status }
     });
-    res.json({ message: 'Status updated', product });
+
+    await recordProductGovernanceAudit({
+      productId,
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      action: 'PRODUCT_STATUS_CHANGED',
+      metadata: { previousStatus: existing.status, newStatus: status }
+    });
+
+    res.json({ message: 'وضعیت محصول بروزرسانی شد.', product: updated });
+  } catch (err: any) {
+    console.error('Error updating status:', err);
+    res.status(500).json({ error: 'خطا در تغییر وضعیت محصول' });
+  }
+});
+
+// G. Approval Queue & Statistics
+app.get('/api/admin/products/approval-stats', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const [total, pending, needsRevision, rejected, published] = await Promise.all([
+      prisma.product.count(),
+      prisma.product.count({ where: { status: 'PENDING_APPROVAL' } }),
+      prisma.product.count({ where: { status: 'NEEDS_REVISION' } }),
+      prisma.product.count({ where: { status: 'REJECTED' } }),
+      prisma.product.count({ where: { status: 'PUBLISHED' } })
+    ]);
+
+    const thresholdPercent = await getExtremePriceChangeThresholdPercent();
+
+    res.json({
+      total,
+      pending,
+      needsRevision,
+      rejected,
+      published,
+      thresholdPercent
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Error updating status' });
+    res.status(500).json({ error: 'خطا در دریافت آمار بررسی محصولات' });
+  }
+});
+
+// H. Configurable Price Change Threshold
+app.get('/api/admin/system/pricing-threshold', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const thresholdPercent = await getExtremePriceChangeThresholdPercent();
+    res.json({ thresholdPercent });
+  } catch (err) {
+    res.status(500).json({ error: 'خطا در دریافت آستانه تغییر قیمت' });
+  }
+});
+
+app.post('/api/admin/system/pricing-threshold', authenticateToken, requireAdmin, async (req: any, res: any) => {
+  try {
+    const rawVal = req.body.thresholdPercent;
+    const num = parseFloat(rawVal);
+    if (isNaN(num) || num <= 0 || num > 500) {
+      return res.status(400).json({ error: 'درصد آستانه باید عددی بین ۱ تا ۵۰۰ باشد.' });
+    }
+
+    await prisma.systemSettings.upsert({
+      where: { key: 'EXTREME_PRICE_CHANGE_THRESHOLD_PERCENT' },
+      update: { value: String(Math.round(num)) },
+      create: {
+        key: 'EXTREME_PRICE_CHANGE_THRESHOLD_PERCENT',
+        value: String(Math.round(num)),
+        description: 'آستانه هشدار تغییر قیمت غیرعادی (درصد)'
+      }
+    });
+
+    res.json({ message: 'آستانه تغییر قیمت با موفقیت بروزرسانی شد.', thresholdPercent: Math.round(num) });
+  } catch (err) {
+    res.status(500).json({ error: 'خطا در ذخیره آستانه تغییر قیمت' });
   }
 });
 
@@ -10029,6 +12245,11 @@ app.get('/api/admin/all-users', authenticateToken, requireAdmin, async (req: any
         shaba: true,
         cardNumber: true,
         storeName: true,
+        originAddress: true,
+        postalCode: true,
+        telephone: true,
+        website: true,
+        activityType: true,
         storeUrl: true,
         storeLink: true,
         platformType: true,
@@ -10151,7 +12372,7 @@ app.get('/api/admin/suppliers', authenticateToken, requireAdmin, async (req: any
   try {
     const suppliers = await prisma.user.findMany({
       where: { role: 'SUPPLIER' },
-      select: { id: true, firstName: true, lastName: true, brandName: true, status: true, mobile: true, }
+      select: { id: true, firstName: true, lastName: true, brandName: true, status: true, mobile: true, activityType: true, originAddress: true, province: true, city: true, shaba: true }
     });
     res.json(suppliers);
   } catch (err) {
@@ -10969,6 +13190,22 @@ function validateUploadSignature(filePath: string, ext: string): boolean {
       // PDF magic bytes: %PDF
       return buffer.toString('ascii', 0, 4) === '%PDF';
     }
+    if (lowerExt === '.xlsx' || lowerExt === '.zip') {
+      // PK Zip archive magic bytes: 50 4B 03 04 or 50 4B 05 06
+      return buffer[0] === 0x50 && buffer[1] === 0x4b && (buffer[2] === 0x03 || buffer[2] === 0x05);
+    }
+    if (lowerExt === '.xls') {
+      // OLE2 Compound Document magic bytes: D0 CF 11 E0
+      return buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0;
+    }
+    if (lowerExt === '.csv' || lowerExt === '.txt') {
+      // Plain text: reject dangerous binary executables (MZ, ELF) or script tags
+      const isMZ = buffer[0] === 0x4d && buffer[1] === 0x5a;
+      const isELF = buffer[0] === 0x7f && buffer[1] === 0x45 && buffer[2] === 0x4c && buffer[3] === 0x46;
+      const str = buffer.toString('ascii', 0, 10).toLowerCase();
+      const isScript = str.startsWith('<?php') || str.startsWith('<script') || str.startsWith('#!');
+      return !isMZ && !isELF && !isScript;
+    }
     return false;
   } catch (err) {
     return false;
@@ -10987,12 +13224,12 @@ app.post('/api/upload', authenticateToken, safeUploadMulter.single('file'), asyn
     }
 
     const rawExt = path.extname(req.file.originalname || '').toLowerCase();
-    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf']);
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.xlsx', '.xls', '.csv', '.txt', '.zip']);
 
     if (!allowedExtensions.has(rawExt)) {
       try { fs.unlinkSync(req.file.path); } catch (e) {}
       return res.status(400).json({
-        error: 'فرمت فایل غیرمجاز است. تنها فایل‌های تصویری (JPG, PNG, WEBP) و اسناد PDF مجاز می‌باشند.'
+        error: 'فرمت فایل غیرمجاز است. تنها فایل‌های اکسل (XLSX, XLS)، متن و CSV، اسناد PDF، تصاویر و فایل‌های ZIP مجاز می‌باشند.'
       });
     }
 
@@ -11011,7 +13248,11 @@ app.post('/api/upload', authenticateToken, safeUploadMulter.single('file'), asyn
     fs.renameSync(req.file.path, newPath);
     
     const fileUrl = `/uploads/${safeFilename}`;
-    res.json({ url: fileUrl });
+    res.json({
+      url: fileUrl,
+      filename: req.file.originalname || safeFilename,
+      size: req.file.size
+    });
   } catch (err: any) {
     console.error('File upload error:', err);
     if (req.file?.path) {

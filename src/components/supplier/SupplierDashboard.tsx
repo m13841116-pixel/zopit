@@ -66,13 +66,17 @@ import {
   Menu,
   Play,
   Gift,
-  ArrowLeft
+  ArrowLeft,
+  FileSpreadsheet,
+  FileCheck
 } from "lucide-react";
 import { EducationModal } from "../EducationModal";
 import { SupplierOnboardingWidget } from "./SupplierOnboardingWidget";
 import { AutomationVideoModal } from "../AutomationVideoModal";
 import { ZopitLogo } from "../ZopitLogo";
 import { SupplierReferralProgram } from "./SupplierReferralProgram";
+import { SupplierBulkImport } from "./SupplierBulkImport";
+import { SupplierConciergeImport } from "./SupplierConciergeImport";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -119,7 +123,8 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Grid,
   Info,
   Layers,
-  Store
+  Store,
+  FileSpreadsheet
 };
 
 const getIconComponent = (iconName: any) => {
@@ -164,7 +169,7 @@ export function SupplierDashboard({
   showNotification,
   onUpdateUser,
 }: any) {
-  const [activeTab, setActiveTab] = useState(() => {
+  const [activeTab, setActiveTabRaw] = useState(() => {
     if (typeof window !== 'undefined') {
       const initialTab = sessionStorage.getItem("supplier_initial_tab");
       if (initialTab) {
@@ -192,7 +197,9 @@ export function SupplierDashboard({
     "overview",
     "products",
     "add-product",
+    "bulk-import",
     "woocommerce-import",
+    "concierge-import",
     "orders",
     "wallet",
     "performance",
@@ -202,7 +209,40 @@ export function SupplierDashboard({
   ];
 
   // Sync tab with URL
-  useSyncTabWithUrl("/supplier", activeTab, setActiveTab, "overview", validSupplierTabs);
+  
+  const hasBusinessInfo = Boolean(
+    (user?.firstName && user?.lastName) &&
+    user?.brandName &&
+    user?.activityType &&
+    user?.activityType.length > 2
+  );
+
+  const hasAddressInfo = Boolean(
+    user?.province &&
+    user?.city &&
+    user?.originAddress && user.originAddress.trim().length >= 10 &&
+    user?.postalCode && user.postalCode.trim().length >= 10
+  );
+
+  const hasBankInfo = Boolean(
+    (user?.shaba && user.shaba.replace(/\D/g, '').length >= 24) &&
+    user?.accountHolderName &&
+    user?.bankName
+  );
+
+  const isFullyCompleted = hasBusinessInfo && hasAddressInfo && hasBankInfo;
+
+  const setActiveTab = (tab: any) => {
+    if (!isFullyCompleted && (tab === "add-product" || tab === "woocommerce-import")) {
+      showNotification("لطفاً ابتدا فرآیند تکمیل حساب (اطلاعات هویتی، آدرس مبدا، اطلاعات بانکی) را تکمیل کنید.", "error");
+      setActiveTabRaw("overview");
+      return;
+    }
+    setActiveTabRaw(tab);
+  };
+
+  useSyncTabWithUrl("/supplier", activeTab, setActiveTabRaw, "overview", validSupplierTabs);
+
 
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [showAutomationVideoModal, setShowAutomationVideoModal] = useState(false);
@@ -757,9 +797,19 @@ export function SupplierDashboard({
       icon: <PlusCircle className="w-5 h-5" />,
     },
     {
+      id: "bulk-import",
+      label: "ورود اکسل / CSV",
+      icon: <FileSpreadsheet className="w-5 h-5 text-emerald-500" />,
+    },
+    {
       id: "woocommerce-import",
       label: "دریافت از ووکامرس (API)",
       icon: <Globe className="w-5 h-5 text-indigo-500" />,
+    },
+    {
+      id: "concierge-import",
+      label: "محصولاتم را شما وارد کنید",
+      icon: <FileCheck className="w-5 h-5 text-amber-500" />,
     },
     {
       id: "orders",
@@ -1548,10 +1598,22 @@ export function SupplierDashboard({
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setActiveTab("woocommerce-import")}
-                          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+                          onClick={() => setActiveTab("concierge-import")}
+                          className="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
                         >
-                          <Globe className="w-4 h-4" /> دریافت خودکار از ووکامرس
+                          <FileCheck className="w-4 h-4" /> محصولاتم را شما وارد کنید
+                        </button>
+                        <button
+                          onClick={() => setActiveTab("bulk-import")}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+                        >
+                          <FileSpreadsheet className="w-4 h-4" /> ورود اکسل / CSV
+                        </button>
+                        <button
+                          onClick={() => setActiveTab("woocommerce-import")}
+                          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+                        >
+                          <Globe className="w-4 h-4" /> دریافت از ووکامرس
                         </button>
                         <button
                           onClick={() => setActiveTab("add-product")}
@@ -2973,8 +3035,30 @@ export function SupplierDashboard({
                       setActiveTicketDepartment("🎁 ثبت رایگان محصولات توسط زوپیت (ارسال لیست قیمت / کاتالوگ)");
                       setActiveTab("tickets");
                     }}
+                    onNavigateToConciergeImport={() => setActiveTab("concierge-import")}
+                    onNavigateToBulkImport={() => setActiveTab("bulk-import")}
                   />
                 ))}
+              {/* CONCIERGE IMPORT TAB */}
+              {activeTab === "concierge-import" && (
+                <SupplierConciergeImport
+                  user={user}
+                  onBack={() => setActiveTab("products")}
+                  onNavigateToAddProduct={() => setActiveTab("add-product")}
+                  onNavigateToProducts={() => setActiveTab("products")}
+                />
+              )}
+              {/* BULK IMPORT TAB */}
+              {activeTab === "bulk-import" && (
+                <SupplierBulkImport
+                  onSuccess={() => {
+                    fetchData();
+                    setActiveTab("products");
+                  }}
+                  onCancel={() => setActiveTab("products")}
+                  showNotification={showNotification}
+                />
+              )}
               {/* WOOCOMMERCE IMPORT TAB */}
               {activeTab === "woocommerce-import" && (
                 <SupplierWooCommerceImport

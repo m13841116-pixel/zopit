@@ -45,9 +45,10 @@ import LeadsManager from "./LeadsManager";
 import SuperAdminNewFeatures from "./SuperAdminNewFeatures";
 import SuperAdminProAccounts from "./SuperAdminProAccounts";
 import TopStoresManager from "./TopStoresManager";
-import { Crown, Sparkles, Award } from "lucide-react";
+import { Crown, Sparkles, Award, FileCheck } from "lucide-react";
 import SupplierPenaltyManagement from "./SupplierPenaltyManagement";
 import AdminBanners from "./AdminBanners";
+import AdminConciergeRequests from "./AdminConciergeRequests";
 import CodeEditor from "./CodeEditor";
 import { ZopitLogo } from "../ZopitLogo";
 import { useSyncTabWithUrl } from "../../utils/routeSync";
@@ -102,7 +103,8 @@ export default function SuperAdminDashboard({
     "logs",
     "health",
     "dev-tools",
-    "penalty-management"
+    "penalty-management",
+    "concierge-requests"
   ];
 
   // Sync tab with URL with fallback protection
@@ -139,6 +141,7 @@ export default function SuperAdminDashboard({
     { id: "all-users", label: "کل کاربران", icon: Users },
     { id: "leads", label: "تأمین‌یاب‌ها", icon: Target },
     { id: "products", label: "محصولات", icon: Package },
+    { id: "concierge-requests", label: "درخواست‌های ورود محصول", icon: FileCheck },
     { id: "orders", label: "سفارشات", icon: ShoppingCart, badge: badges.orders },
     { id: "settlements", label: "تسویه حساب", icon: Wallet, badge: badges.settlements },
     { id: "pro-accounts", label: "اکانت پرو مکس (PRO MAX)", icon: Crown },
@@ -285,6 +288,7 @@ export default function SuperAdminDashboard({
           )}
           {activeTab === "penalty-management" && <SystemSettings initialTab="supplier_rules" />}
           {activeTab === "products" && <ProductsList />}
+          {activeTab === "concierge-requests" && <AdminConciergeRequests />}
           {activeTab === "leads" && <LeadsManager />}
           {activeTab === "orders" && <OrdersList />}
           {activeTab === "financial" && <Financial />}

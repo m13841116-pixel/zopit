@@ -90,6 +90,12 @@ export default function ProductsList() {
   // Modals state
   const [showMarginModal, setShowMarginModal] = useState(false);
   const [showAddEditModal, setShowAddEditModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectActionType, setRejectActionType] = useState<"REJECT" | "REVISION">("REJECT");
+  const [rejectTargetProduct, setRejectTargetProduct] = useState<any>(null);
+  const [rejectReasonText, setRejectReasonText] = useState("");
+  const [isSubmittingDecision, setIsSubmittingDecision] = useState(false);
+
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formError, setFormError] = useState("");
@@ -293,44 +299,147 @@ export default function ProductsList() {
       fetchExploreProducts();
     }
   }, [subTab]);
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!selectedProduct) return;
-    /* calculate final price */ let finalPrice =
-      selectedProduct.supplierBasePrice;
-    if (publishData.marginType === "PERCENTAGE") {
-      finalPrice =
-        selectedProduct.supplierBasePrice * (1 + publishData.marginValue / 100);
-    } else {
-      finalPrice = selectedProduct.supplierBasePrice + publishData.marginValue;
+    const basePrice = Number(selectedProduct.supplierBasePrice || 0);
+    const marginVal = Number(publishData.marginValue);
+
+    if (isNaN(marginVal) || marginVal < 0) {
+      toast("تعیین مقدار معتبر مارجین سود (بزرگتر یا مساوی صفر) الزامی است.", "error");
+      return;
     }
-    fetch(`/api/admin/products/${selectedProduct.id}/publish`, { credentials: "include",
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem("token")}`
-      },
-      body: JSON.stringify({
-        ...publishData,
-        finalPrice,
-        publishStartDate: publishData.publishStartDate || null,
-        publishEndDate: publishData.publishEndDate || null,
-      }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const error = await res.json();
-          toast(error.error || "خطا در انتشار محصول", "error");
-          return;
-        }
-        setShowMarginModal(false);
-        fetchProducts();
-      })
-      .catch((err) => {
-        console.error(err);
-        toast("خطا در ارتباط با سرور", "error");
+
+    /* calculate final price */
+    let finalPrice = basePrice;
+    if (publishData.marginType === "PERCENTAGE") {
+      finalPrice = Math.round(basePrice * (1 + marginVal / 100));
+    } else {
+      finalPrice = Math.round(basePrice + marginVal);
+    }
+
+    try {
+      setIsSubmittingDecision(true);
+      const res = await fetch(`/api/admin/products/${selectedProduct.id}/publish`, {
+        credentials: "include",
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+          ...publishData,
+          marginValue: marginVal,
+          finalPrice,
+          publishStartDate: publishData.publishStartDate || null,
+          publishEndDate: publishData.publishEndDate || null,
+        }),
       });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data.error || "خطا در انتشار محصول", "error");
+        return;
+      }
+
+      toast("محصول با موفقیت تایید و با سود مصوب در فروشگاه منتشر گردید.", "success");
+      setShowMarginModal(false);
+      fetchProducts();
+    } catch (err) {
+      console.error(err);
+      toast("خطا در ارتباط با سرور", "error");
+    } finally {
+      setIsSubmittingDecision(false);
+    }
   };
+
+  const openRejectOrRevisionModal = (product: any, actionType: "REJECT" | "REVISION") => {
+    setRejectTargetProduct(product);
+    setRejectActionType(actionType);
+    setRejectReasonText(product.rejectionReason || "");
+    setShowRejectModal(true);
+  };
+
+  const handleRejectOrRevisionSubmit = async () => {
+    if (!rejectTargetProduct) return;
+    const cleanReason = rejectReasonText.trim();
+    if (!cleanReason) {
+      toast(
+        rejectActionType === "REJECT"
+          ? "لطفاً علت رد محصول را وارد فرمایید."
+          : "لطفاً توضیحات موارد نیازمند اصلاح را بنویسید.",
+        "error"
+      );
+      return;
+    }
+
+    try {
+      setIsSubmittingDecision(true);
+      const endpoint = rejectActionType === "REJECT"
+        ? `/api/admin/products/${rejectTargetProduct.id}/reject`
+        : `/api/admin/products/${rejectTargetProduct.id}/request-revision`;
+
+      const res = await fetch(endpoint, {
+        credentials: "include",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({ reason: cleanReason }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data.error || "خطا در ثبت تصمیم", "error");
+        return;
+      }
+
+      toast(
+        rejectActionType === "REJECT"
+          ? "محصول رد گردید و به تامین‌کننده اطلاع‌رسانی شد."
+          : "درخواست اصلاح برای تامین‌کننده با موفقیت ارسال شد.",
+        "success"
+      );
+      setShowRejectModal(false);
+      setRejectTargetProduct(null);
+      setRejectReasonText("");
+      fetchProducts();
+    } catch (err) {
+      toast("خطا در ارتباط با سرور", "error");
+    } finally {
+      setIsSubmittingDecision(false);
+    }
+  };
+
   const handleChangeStatus = (id: number, status: string) => {
+    const target = products.find(p => p.id === id);
+    if ((status === "PUBLISHED" || status === "ACTIVE") && target) {
+      setSelectedProduct(target);
+      setPublishData({
+        marginType: target.marginType || "PERCENTAGE",
+        marginValue: target.marginValue !== null && target.marginValue !== undefined ? target.marginValue : 10,
+        publishStartDate: target.publishStartDate
+          ? new Date(target.publishStartDate).toISOString().slice(0, 16)
+          : "",
+        publishEndDate: target.publishEndDate
+          ? new Date(target.publishEndDate).toISOString().slice(0, 16)
+          : "",
+        isPinned: target.isPinned || false,
+      });
+      setShowMarginModal(true);
+      return;
+    }
+
+    if (status === "REJECTED" && target) {
+      openRejectOrRevisionModal(target, "REJECT");
+      return;
+    }
+
+    if (status === "NEEDS_REVISION" && target) {
+      openRejectOrRevisionModal(target, "REVISION");
+      return;
+    }
+
     fetch(`/api/admin/products/${id}/status`, { credentials: "include",
       method: "PATCH",
       headers: {
@@ -343,7 +452,10 @@ export default function ProductsList() {
         if (!res.ok) return null;
         return res.json().catch(() => null);
       })
-      .then(() => fetchProducts());
+      .then(() => {
+        toast("وضعیت محصول بروزرسانی شد.", "success");
+        fetchProducts();
+      });
   };
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -555,11 +667,14 @@ export default function ProductsList() {
     setImages(parsedImages);
     setShowAddEditModal(true);
   };
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
   const getStatusLabel = (status: string) => {
     const map: Record<string, string> = {
       DRAFT: "پیش‌نویس",
       PENDING_APPROVAL: "در انتظار تایید",
-      SUSPENDED: "در انتظار تایید",
+      NEEDS_REVISION: "نیازمند اصلاح",
+      SUSPENDED: "در انتظار بررسی مجدد",
       ACTIVE: "فعال",
       APPROVED: "تایید شده",
       PUBLISHED: "منتشر شده",
@@ -578,6 +693,8 @@ export default function ProductsList() {
       case "PENDING_APPROVAL":
       case "SUSPENDED":
         return "bg-amber-500 text-white shadow-xs font-black";
+      case "NEEDS_REVISION":
+        return "bg-orange-500 text-white shadow-xs font-black";
       case "REJECTED":
         return "bg-rose-600 text-white shadow-xs font-bold";
       case "OUT_OF_STOCK":
@@ -593,6 +710,7 @@ export default function ProductsList() {
     setSelectedSupplier("ALL");
     setPricingStatus("ALL");
     setApprovalStatus("ALL");
+    setStatusFilter("ALL");
     setMinPrice("");
     setMaxPrice("");
     setDateFilter("ALL");
@@ -601,6 +719,15 @@ export default function ProductsList() {
 
   const filteredProducts = products
     .filter((p) => {
+      // Status Filter
+      if (statusFilter !== "ALL") {
+        if (statusFilter === "PENDING_APPROVAL") {
+          if (p.status !== "PENDING_APPROVAL" && p.status !== "SUSPENDED") return false;
+        } else if (p.status !== statusFilter) {
+          return false;
+        }
+      }
+
       // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -958,61 +1085,100 @@ export default function ProductsList() {
               </div>
             )}
 
-            {/* Row 2: Category Quick Chips & Counter */}
-            <div className="pt-2 border-t border-subtle/50 flex flex-wrap items-center justify-between gap-2">
-              {/* Category Quick Chips Bar */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 max-w-full scrollbar-none flex-1 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory("ALL")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
-                    selectedCategory === "ALL"
-                      ? "bg-primary-default text-inverse shadow-xs"
-                      : "bg-surface hover:bg-surface/80 text-secondary border border-subtle"
-                  }`}
-                >
-                  <span>همه</span>
-                  <span className="bg-black/10 dark:bg-white/15 px-1 py-0.2 rounded-full text-[9px]">
-                    {products.length}
-                  </span>
-                </button>
-                {categories.map((c, idx) => {
-                  const name = c.name && c.name.trim() ? c.name : (DEFAULT_CATEGORIES[idx]?.name || `دسته‌بندی ${c.id}`);
-                  const catCount = products.filter(
-                    (p) => String(p.categoryId) === String(c.id) || p.category?.name === c.name || p.category?.name === name
-                  ).length;
-                  const isSelected = String(selectedCategory) === String(c.id);
+            {/* Row 2: Status & Category Quick Chips & Counter */}
+            <div className="pt-2.5 border-t border-subtle/50 flex flex-col gap-2">
+              {/* Status Quick Filter Bar */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-none">
+                <span className="text-[11px] font-bold text-muted shrink-0 ml-1">وضعیت:</span>
+                {[
+                  { key: "ALL", label: "همه کالاها", color: "bg-slate-700" },
+                  { key: "PENDING_APPROVAL", label: "در انتظار بررسی", color: "bg-amber-600" },
+                  { key: "NEEDS_REVISION", label: "نیازمند اصلاح", color: "bg-orange-600" },
+                  { key: "REJECTED", label: "رد شده", color: "bg-rose-600" },
+                  { key: "PUBLISHED", label: "منتشر شده", color: "bg-emerald-600" },
+                  { key: "DRAFT", label: "پیش‌نویس", color: "bg-slate-600" },
+                ].map((st) => {
+                  const count = st.key === "ALL"
+                    ? products.length
+                    : st.key === "PENDING_APPROVAL"
+                    ? products.filter(p => p.status === "PENDING_APPROVAL" || p.status === "SUSPENDED").length
+                    : products.filter(p => p.status === st.key).length;
+                  const isSelected = statusFilter === st.key;
                   return (
                     <button
-                      key={c.id}
+                      key={st.key}
                       type="button"
-                      onClick={() => setSelectedCategory(String(c.id))}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
+                      onClick={() => setStatusFilter(st.key)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
                         isSelected
-                          ? "bg-purple-600 text-white shadow-xs"
+                          ? `${st.color} text-white shadow-xs`
                           : "bg-surface hover:bg-surface/80 text-secondary border border-subtle"
                       }`}
                     >
-                      <span>{name}</span>
-                      <span className="bg-black/10 dark:bg-white/15 px-1 py-0.2 rounded-full text-[9px]">
-                        {catCount}
+                      <span>{st.label}</span>
+                      <span className="bg-black/20 dark:bg-white/20 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+                        {count}
                       </span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Product Count Display */}
-              <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted shrink-0">
-                <span>
-                  نمایش <strong className="text-primary font-black">{filteredProducts.length}</strong> از{" "}
-                  <strong className="text-primary font-black">{products.length}</strong> کالا
-                </span>
-                {isAnyFilterActive && (
-                  <span className="text-white font-bold bg-emerald-600 px-2 py-0.5 rounded-full text-[10px]">
-                    فیلتر فعال
+              {/* Category Quick Chips Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 max-w-full scrollbar-none flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("ALL")}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
+                      selectedCategory === "ALL"
+                        ? "bg-primary-default text-inverse shadow-xs"
+                        : "bg-surface hover:bg-surface/80 text-secondary border border-subtle"
+                    }`}
+                  >
+                    <span>همه دسته‌ها</span>
+                    <span className="bg-black/10 dark:bg-white/15 px-1 py-0.2 rounded-full text-[9px]">
+                      {products.length}
+                    </span>
+                  </button>
+                  {categories.map((c, idx) => {
+                    const name = c.name && c.name.trim() ? c.name : (DEFAULT_CATEGORIES[idx]?.name || `دسته‌بندی ${c.id}`);
+                    const catCount = products.filter(
+                      (p) => String(p.categoryId) === String(c.id) || p.category?.name === c.name || p.category?.name === name
+                    ).length;
+                    const isSelected = String(selectedCategory) === String(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(String(c.id))}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
+                          isSelected
+                            ? "bg-purple-600 text-white shadow-xs"
+                            : "bg-surface hover:bg-surface/80 text-secondary border border-subtle"
+                        }`}
+                      >
+                        <span>{name}</span>
+                        <span className="bg-black/10 dark:bg-white/15 px-1 py-0.2 rounded-full text-[9px]">
+                          {catCount}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Product Count Display */}
+                <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted shrink-0">
+                  <span>
+                    نمایش <strong className="text-primary font-black">{filteredProducts.length}</strong> از{" "}
+                    <strong className="text-primary font-black">{products.length}</strong> کالا
                   </span>
-                )}
+                  {isAnyFilterActive && (
+                    <span className="text-white font-bold bg-emerald-600 px-2 py-0.5 rounded-full text-[10px]">
+                      فیلتر فعال
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1080,6 +1246,13 @@ export default function ProductsList() {
                                 >
                                   {product.name}
                                 </button>
+                                {product.rejectionReason && (
+                                  <div className="mt-1 text-[11px] bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3 text-rose-500 shrink-0" />
+                                    <span className="font-bold">یادداشت ارزیابی:</span>
+                                    <span className="truncate max-w-[240px]" title={product.rejectionReason}>{product.rejectionReason}</span>
+                                  </div>
+                                )}
                                 <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
                                   {catName ? (
                                     <span className="bg-indigo-50 dark:bg-indigo-950/80 text-indigo-900 dark:text-indigo-200 font-bold px-2.5 py-0.5 rounded-md text-[11px] border border-indigo-300 dark:border-indigo-800 shadow-2xs">
@@ -1156,6 +1329,7 @@ export default function ProductsList() {
                             >
                               <option value="DRAFT">پیش‌نویس</option>
                               <option value="PENDING_APPROVAL">در انتظار تایید</option>
+                              <option value="NEEDS_REVISION">نیازمند اصلاح</option>
                               <option value="APPROVED">تایید شده</option>
                               <option value="PUBLISHED">منتشر شده</option>
                               <option value="REJECTED">رد شده</option>
@@ -1165,6 +1339,27 @@ export default function ProductsList() {
                           </td>
                           <td className="px-6 py-4 text-center whitespace-nowrap">
                             <div className="flex gap-1.5 justify-center items-center">
+                              {/* Quick Review Actions for Pending / Revision Products */}
+                              {(product.status === "PENDING_APPROVAL" || product.status === "SUSPENDED" || product.status === "NEEDS_REVISION") && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openRejectOrRevisionModal(product, "REVISION")}
+                                    className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                                    title="درخواست بازبینی و ارسال یادداشت به تامین‌کننده"
+                                  >
+                                    <span>اصلاح</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openRejectOrRevisionModal(product, "REJECT")}
+                                    className="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                                    title="رد قطعی محصول با ذکر علت"
+                                  >
+                                    <span>رد</span>
+                                  </button>
+                                </>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setPreviewProduct(product)}
@@ -1179,7 +1374,7 @@ export default function ProductsList() {
                                   setSelectedProduct(product);
                                   setPublishData({
                                     marginType: product.marginType || "PERCENTAGE",
-                                    marginValue: product.marginValue || 10,
+                                    marginValue: product.marginValue !== null && product.marginValue !== undefined ? product.marginValue : 10,
                                     publishStartDate: product.publishStartDate
                                       ? new Date(product.publishStartDate).toISOString().slice(0, 16)
                                       : "",
@@ -1365,53 +1560,76 @@ export default function ProductsList() {
                     </div>
 
                     {/* Card Actions Footer */}
-                    <div className="p-3 bg-surface/50 border-t border-subtle flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewProduct(product)}
-                        className="flex-1 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>نمایش محصول</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setPublishData({
-                            marginType: product.marginType || "PERCENTAGE",
-                            marginValue: product.marginValue || 10,
-                            publishStartDate: product.publishStartDate
-                              ? new Date(product.publishStartDate).toISOString().slice(0, 16)
-                              : "",
-                            publishEndDate: product.publishEndDate
-                              ? new Date(product.publishEndDate).toISOString().slice(0, 16)
-                              : "",
-                            isPinned: product.isPinned || false,
-                          });
-                          setShowMarginModal(true);
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                        title="تعیین سود"
-                      >
-                        <DollarSign className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(product)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                        title="ویرایش محصول"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950 text-rose-600 border border-rose-200 dark:border-rose-800 p-2 rounded-xl text-xs transition-all cursor-pointer"
-                        title="حذف"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <div className="p-3 bg-surface/50 border-t border-subtle flex flex-col gap-2">
+                      {/* Review Buttons for Pending / Needs Revision items */}
+                      {(product.status === "PENDING_APPROVAL" || product.status === "SUSPENDED" || product.status === "NEEDS_REVISION") && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openRejectOrRevisionModal(product, "REVISION")}
+                            className="bg-amber-500 hover:bg-amber-600 text-white py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center"
+                            title="درخواست اصلاح"
+                          >
+                            درخواست اصلاح
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openRejectOrRevisionModal(product, "REJECT")}
+                            className="bg-rose-600 hover:bg-rose-700 text-white py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center"
+                            title="رد محصول"
+                          >
+                            رد محصول
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewProduct(product)}
+                          className="flex-1 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>نمایش</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setPublishData({
+                              marginType: product.marginType || "PERCENTAGE",
+                              marginValue: product.marginValue !== null && product.marginValue !== undefined ? product.marginValue : 10,
+                              publishStartDate: product.publishStartDate
+                                ? new Date(product.publishStartDate).toISOString().slice(0, 16)
+                                : "",
+                              publishEndDate: product.publishEndDate
+                                ? new Date(product.publishEndDate).toISOString().slice(0, 16)
+                                : "",
+                              isPinned: product.isPinned || false,
+                            });
+                            setShowMarginModal(true);
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          title="تعیین سود و انتشار"
+                        >
+                          <DollarSign className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(product)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          title="ویرایش محصول"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950 text-rose-600 border border-rose-200 dark:border-rose-800 p-2 rounded-xl text-xs transition-all cursor-pointer"
+                          title="حذف"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1710,20 +1928,96 @@ export default function ProductsList() {
                 </p>
               </div>
               <div className="pt-4 flex gap-3">
-                
                 <button
+                  type="button"
                   onClick={() => setShowMarginModal(false)}
                   className="flex-1 px-4 py-3 bg-surface text-secondary rounded-xl font-medium text-sm hover:bg-surface transition-colors cursor-pointer"
                 >
-                  
                   انصراف
                 </button>
                 <button
+                  type="button"
+                  disabled={isSubmittingDecision}
                   onClick={handlePublish}
-                  className="flex-1 px-4 py-3 bg-primary-default text-inverse rounded-xl font-medium text-sm hover:bg-primary-hover transition-colors cursor-pointer"
+                  className="flex-1 px-4 py-3 bg-primary-default text-inverse rounded-xl font-black text-sm hover:bg-primary-hover transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-primary-default/20 disabled:opacity-50"
                 >
-                  
-                  ذخیره و انتشار محصول
+                  <Check className="w-4 h-4" />
+                  <span>تایید و انتشار نهایی</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection & Revision Decision Modal */}
+      {showRejectModal && rejectTargetProduct && (
+        <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-card rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-subtle">
+            <div className={`p-5 border-b border-subtle flex justify-between items-center ${rejectActionType === "REJECT" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                <h3 className="font-bold text-base">
+                  {rejectActionType === "REJECT" ? "رد قطعی محصول" : "درخواست بازبینی و اصلاح از تامین‌کننده"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectTargetProduct(null);
+                }}
+                className="text-muted hover:text-primary p-1.5 rounded-full hover:bg-surface transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="bg-surface p-3.5 rounded-xl border border-subtle text-xs space-y-1">
+                <div className="font-bold text-primary truncate">{rejectTargetProduct.name}</div>
+                <div className="text-muted flex items-center justify-between">
+                  <span>شناسه کالا: #{rejectTargetProduct.id}</span>
+                  <span>قیمت پایه: {Number(rejectTargetProduct.supplierBasePrice || 0).toLocaleString()} تومان</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-secondary mb-1.5">
+                  {rejectActionType === "REJECT" ? "دلیل رد محصول (جهت نمایش به تامین‌کننده):" : "توضیحات و موارد نیازمند اصلاح:"}
+                </label>
+                <textarea
+                  rows={4}
+                  value={rejectReasonText}
+                  onChange={(e) => setRejectReasonText(e.target.value)}
+                  placeholder={rejectActionType === "REJECT" ? "علت عدم پذیرش کالا را توضیح دهید..." : "موارد ناقص مانند تصاویر، قیمت، مشخصات فنی یا شرح کالا را قید فرمایید..."}
+                  className="w-full p-3 bg-background border border-subtle rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-default resize-none leading-relaxed text-primary"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRejectModal(false);
+                    setRejectTargetProduct(null);
+                  }}
+                  className="flex-1 py-2.5 px-4 bg-surface hover:bg-surface/80 text-secondary rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingDecision}
+                  onClick={handleRejectOrRevisionSubmit}
+                  className={`flex-1 py-2.5 px-4 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
+                    rejectActionType === "REJECT"
+                      ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20"
+                      : "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
+                  }`}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{rejectActionType === "REJECT" ? "ثبت رد کالا" : "ارسال به تامین‌کننده"}</span>
                 </button>
               </div>
             </div>

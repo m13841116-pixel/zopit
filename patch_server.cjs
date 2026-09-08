@@ -1,91 +1,37 @@
 const fs = require('fs');
-let content = fs.readFileSync('server.ts', 'utf8');
+let code = fs.readFileSync('server.ts', 'utf8');
 
-const injectionPoint = `// 7. Super Admin Update Pro Account`;
+const regexPost1 = /const \{ categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl \} = req.body;/g;
+const replacementPost1 = `const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl, status } = req.body;`;
 
-const newRoutes = `
-// Super Admin Discount Codes API
-app.get('/api/admin/discounts', authenticateToken, requireAdmin, async (req: any, res: any) => {
-  try {
-    const discounts = await prisma.discountCode.findMany({ orderBy: { createdAt: 'desc' } });
-    res.json(discounts);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch discount codes' });
+const regexPost2 = /status: 'PENDING_APPROVAL', \/\/ Require admin approval and profit margin setting before entering marketplace/g;
+const replacementPost2 = `status: (status === 'DRAFT' ? 'DRAFT' : 'PENDING_APPROVAL'),`;
+
+const regexPut1 = /const \{ categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl \} = req.body;/g;
+const replacementPut1 = `const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl, status } = req.body;`;
+
+const regexPut2 = /let newStatus = existing.status;/g;
+const replacementPut2 = `let newStatus = existing.status;
+    if (status === 'DRAFT') {
+      newStatus = 'DRAFT';
+    } else if (status === 'PENDING_APPROVAL' && existing.status === 'DRAFT') {
+      newStatus = 'PENDING_APPROVAL';
+    }`;
+
+code = code.replace(regexPost1, replacementPost1);
+code = code.replace(regexPost2, replacementPost2);
+
+// Only replace first occurrence of put1
+let put1Replaced = false;
+code = code.replace(regexPut1, (match) => {
+  if (!put1Replaced) {
+    put1Replaced = true;
+    return replacementPut1;
   }
+  return match;
 });
 
-app.post('/api/admin/discounts', authenticateToken, requireAdmin, async (req: any, res: any) => {
-  try {
-    const { code, discountType, discountValue, maxUses, expiryDate } = req.body;
-    if (!code || !discountValue) return res.status(400).json({ error: 'Invalid data' });
-    
-    const existing = await prisma.discountCode.findUnique({ where: { code } });
-    if (existing) return res.status(400).json({ error: 'کد تخفیف تکراری است' });
+code = code.replace(regexPut2, replacementPut2);
 
-    const newDiscount = await prisma.discountCode.create({
-      data: {
-        code,
-        discountType: discountType || 'PERCENTAGE',
-        discountValue: parseFloat(discountValue),
-        maxUses: maxUses ? parseInt(maxUses) : null,
-        expiryDate: expiryDate ? new Date(expiryDate) : null
-      }
-    });
-    res.json(newDiscount);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create discount code' });
-  }
-});
-
-app.delete('/api/admin/discounts/:id', authenticateToken, requireAdmin, async (req: any, res: any) => {
-  try {
-    const id = parseInt(req.params.id);
-    await prisma.discountCode.delete({ where: { id } });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete' });
-  }
-});
-
-app.patch('/api/admin/discounts/:id', authenticateToken, requireAdmin, async (req: any, res: any) => {
-  try {
-    const id = parseInt(req.params.id);
-    const { isActive } = req.body;
-    await prisma.discountCode.update({
-      where: { id },
-      data: { isActive }
-    });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update' });
-  }
-});
-
-app.post('/api/store-manager/pro/apply-discount', authenticateToken, requireStoreManager, async (req: any, res: any) => {
-  try {
-    const { code } = req.body;
-    const discount = await prisma.discountCode.findUnique({ where: { code } });
-    if (!discount || !discount.isActive) {
-      return res.status(400).json({ error: 'کد تخفیف نامعتبر یا منقضی شده است' });
-    }
-    if (discount.expiryDate && new Date() > discount.expiryDate) {
-      return res.status(400).json({ error: 'کد تخفیف منقضی شده است' });
-    }
-    if (discount.maxUses && discount.usedCount >= discount.maxUses) {
-      return res.status(400).json({ error: 'ظرفیت این کد تخفیف به پایان رسیده است' });
-    }
-    
-    res.json({
-      success: true,
-      discountType: discount.discountType,
-      discountValue: discount.discountValue
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-`;
-
-content = content.replace(injectionPoint, newRoutes + injectionPoint);
-fs.writeFileSync('server.ts', content);
+fs.writeFileSync('server.ts', code);
+console.log('patched server.ts');

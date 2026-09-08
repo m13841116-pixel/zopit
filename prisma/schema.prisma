@@ -27,6 +27,7 @@ model User {
   city                   String?
   postalCode             String?
   telephone              String?
+  originAddress          String?
   website                String?
   accountHolderName      String?
   shaba                  String?
@@ -121,6 +122,10 @@ model Product {
   sku                    String?
   brand                  String?
   status                 String                  @default("DRAFT")
+  rejectionReason        String?
+  reviewNotes            String?
+  featuredStatus         String?                 @default("NONE")
+  featuredUntil          DateTime?
   marginType             String?
   marginValue            Float?
   finalPrice             Float?
@@ -129,6 +134,9 @@ model Product {
   minOrderQuantity       Int                     @default(1)
   isPinned               Boolean                 @default(false)
   inventory              Int                     @default(0)
+  externalSource         String?
+  externalId             String?
+  lastSyncedAt           DateTime?
   customerOrderItems     CustomerOrderItem[]     @relation("ProductCustomerOrderItems")
   dailySelections        DailySelection[]
   orderItems             OrderItem[]
@@ -253,20 +261,28 @@ model StoreSettings {
   platformType   String?
   apiKey         String?
   webhookUrl     String?
+  monthlyTarget  Float?
   storeManager   User    @relation(fields: [storeManagerId], references: [id])
 }
 
 model Ticket {
-  id         Int             @id @default(autoincrement())
-  userId     Int
-  subject    String
-  department String
-  priority   String
-  status     String          @default("OPEN")
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  user       User            @relation(fields: [userId], references: [id])
-  messages   TicketMessage[]
+  id                 Int             @id @default(autoincrement())
+  userId             Int
+  subject            String
+  department         String
+  priority           String
+  status             String          @default("OPEN")
+  approxProductCount Int?
+  categories         String?
+  catalogUrl         String?
+  websiteUrl         String?
+  internalNotes      String?
+  completionStats    String?
+  attachments        String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  user               User            @relation(fields: [userId], references: [id])
+  messages           TicketMessage[]
 }
 
 model TicketMessage {
@@ -275,6 +291,7 @@ model TicketMessage {
   userId        Int
   message       String
   attachmentUrl String?
+  isInternal    Boolean? @default(false)
   createdAt     DateTime @default(now())
   user          User     @relation(fields: [userId], references: [id])
   ticket        Ticket   @relation(fields: [ticketId], references: [id])
@@ -841,4 +858,22 @@ model Lead {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   ambassador       User?    @relation("AmbassadorLeads", fields: [ambassadorId], references: [id])
+}
+
+model ProductImportHistory {
+  id            Int      @id @default(autoincrement())
+  supplierId    Int
+  fileName      String?
+  fileType      String?  @default("xlsx")
+  source        String?  @default("FILE")
+  totalRows     Int      @default(0)
+  importedCount Int      @default(0)
+  updatedCount  Int      @default(0)
+  skippedCount  Int      @default(0)
+  errorCount    Int      @default(0)
+  status        String   @default("COMPLETED")
+  errorReport   String?
+  createdAt     DateTime @default(now())
+
+  @@index([supplierId, createdAt])
 }
