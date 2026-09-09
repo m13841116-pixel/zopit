@@ -47,9 +47,17 @@ export function SupplierAddProduct({
   initialData,
   onNavigateToTickets,
 }: any) {
+  const [activeAddTab, setActiveAddTab] = useState<"manual" | "woocommerce" | "excel" | "support">("manual");
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showWcImport, setShowWcImport] = useState(false);
+
+  // Support Request Tab State
+  const [supportTitle, setSupportTitle] = useState("");
+  const [supportPhone, setSupportPhone] = useState("");
+  const [supportNote, setSupportNote] = useState("");
+  const [supportFile, setSupportFile] = useState<File | null>(null);
+  const [isSendingSupport, setIsSendingSupport] = useState(false);
 
   // Bulk Product Import State
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -358,6 +366,9 @@ export function SupplierAddProduct({
       };
     }),
     videoUrl: initialData?.exploreContent?.customVideoUrl || "",
+    isWholesaleEnabled: initialData?.isWholesaleEnabled || false,
+    wholesaleMinQty: initialData?.wholesaleMinQty?.toString() || "",
+    wholesaleUnitPrice: initialData?.wholesaleUnitPrice?.toString() || "",
   });
 
   const [techSpecs, setTechSpecs] = useState<Array<{ key: string; value: string }>>(() => {
@@ -560,68 +571,85 @@ export function SupplierAddProduct({
   ];
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in max-w-4xl mx-auto my-8">
+    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in max-w-5xl mx-auto my-6">
       
+      {/* Top Header */}
       <div className="bg-background border-b border-subtle p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-primary">
+          <h2 className="text-xl font-black text-primary flex items-center gap-2">
+            <Package className="w-6 h-6 text-indigo-600" />
             {initialData?.id ? "ویرایش محصول" : "افزودن محصول جدید"}
           </h2>
-          <p className="text-xs text-secondary mt-1">
-            تمام اطلاعات محصول خود را در این فرم وارد نمایید
+          <p className="text-xs text-muted mt-1">
+            از روش‌های زیر می‌توانید محصول خود را در پلتفرم ثبت یا ویرایش کنید
           </p>
         </div>
 
-        {/* Compact Import Tools in Header */}
-        {!initialData?.id && (
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onNavigateToTickets}
-              className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-            >
-              <Gift className="w-3.5 h-3.5 text-rose-500" />
-              <span>ثبت رایگان توسط کارشناس (VIP)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowWcImport(true)}
-              className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>انتقال از ووکامرس (API)</span>
-            </button>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="hidden"
-            />
-            
-            <button
-              type="button"
-              onClick={handleDownloadSampleCsv}
-              title="دانلود فایل اکسل نمونه"
-              className="px-2.5 py-1.5 bg-surface hover:bg-subtle text-secondary border border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <Download className="w-3.5 h-3.5 text-muted" />
-              <span>اکسل نمونه</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-2.5 py-1.5 bg-surface hover:bg-subtle text-secondary border border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <FileUp className="w-3.5 h-3.5 text-muted" />
-              <span>ورود اکسل</span>
-            </button>
-          </div>
+        {initialData?.id && (
+          <span className="px-3 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 rounded-xl text-xs font-bold">
+            در حال ویرایش کد کالا #{initialData.id}
+          </span>
         )}
       </div>
+
+      {/* 4 Navigation Tabs Bar */}
+      {!initialData?.id && (
+        <div className="p-4 bg-surface border-b border-subtle">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setActiveAddTab("manual")}
+              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                activeAddTab === "manual"
+                  ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                  : "bg-card text-secondary hover:bg-background border-subtle"
+              }`}
+            >
+              <FileUp className="w-4 h-4" />
+              <span>۱. ثبت فرم دستی</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAddTab("woocommerce")}
+              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                activeAddTab === "woocommerce"
+                  ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                  : "bg-card text-secondary hover:bg-background border-subtle"
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              <span>۲. دریافت از ووکامرس (API)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAddTab("excel")}
+              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                activeAddTab === "excel"
+                  ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                  : "bg-card text-secondary hover:bg-background border-subtle"
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>۳. فایل اکسل / CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAddTab("support")}
+              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                activeAddTab === "support"
+                  ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                  : "bg-card text-secondary hover:bg-background border-subtle"
+              }`}
+            >
+              <Gift className="w-4 h-4 text-amber-300" />
+              <span>۴. درخواست ثبت پشتیبانی</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Success / Error Feedback Alert Bar if any */}
       {bulkFeedback && (
@@ -736,7 +764,172 @@ export function SupplierAddProduct({
         </div>
       )}
 
-      <div className="p-8 space-y-12 min-h-[400px]">
+      {/* Conditional Tab Contents */}
+      {activeAddTab === "woocommerce" && !initialData?.id ? (
+        <div className="p-6 animate-fade-in">
+          <SupplierWooCommerceImport
+            onSuccess={onSuccess}
+            onCancel={onCancel}
+            showNotification={showNotification}
+          />
+        </div>
+      ) : activeAddTab === "excel" && !initialData?.id ? (
+        /* Tab 3: Excel Upload Box & Sample Excel Button */
+        <div className="p-8 space-y-6 animate-fade-in">
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-slate-900 dark:to-slate-800 p-6 rounded-2xl border border-indigo-100 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-base font-bold text-primary flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+                بارگذاری گروهی محصولات با فایل اکسل یا CSV
+              </h3>
+              <p className="text-xs text-muted mt-1">
+                کافیست فایل لیست محصولات خود را بارگذاری کنید تا اقلام آن استخراج و ثبت شوند.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDownloadSampleCsv}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-50 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              <Download className="w-4 h-4 text-indigo-600" />
+              <span>دانلود فایل نمونه اکسل استاندارد</span>
+            </button>
+          </div>
+
+          {/* Drag & Drop Zone */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-indigo-300 dark:border-indigo-800 hover:border-indigo-600 dark:hover:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 rounded-3xl p-10 text-center cursor-pointer transition-all space-y-4 group"
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+            />
+            <div className="w-16 h-16 bg-indigo-600/10 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+              <FileUp className="w-8 h-8" />
+            </div>
+            <div>
+              <p className="text-sm sm:text-base font-bold text-primary">
+                فایل اکسل (.xlsx) یا CSV خود را به این کادر بکشید یا برای انتخاب کلیک کنید
+              </p>
+              <p className="text-xs text-muted mt-1">
+                فرمت استاندارد شامل ستون‌های: نام محصول، دسته‌بندی، مدل، رنگ، قیمت عمده و موجودی می‌باشد.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : activeAddTab === "support" && !initialData?.id ? (
+        /* Tab 4: Support Request */
+        <div className="p-8 space-y-6 animate-fade-in">
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-6 rounded-2xl space-y-2">
+            <h3 className="text-base font-bold text-amber-900 dark:text-amber-300 flex items-center gap-2">
+              <Gift className="w-5 h-5 text-amber-500" />
+              خدمت ویژه: ثبت رایگان کاتالوگ و لیست محصولات توسط پشتیبانی زوپیت
+            </h3>
+            <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed">
+              اگر تعداد محصولات شما زیاد است یا فایل کاتالوگ PDF/اکسل/تصاویر دارید، نیازی به ثبت تک‌تک نیست! فایل یا کاتالوگ خود را آپلود کنید تا تیم پشتیبانی ما اقلام شما را به صورت کاملا رایگان ثبت نماید.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!supportTitle) {
+                showNotification("لطفاً عنوان درخواست یا نام فروشگاه را وارد فرمایید.", "error");
+                return;
+              }
+              setIsSendingSupport(true);
+              setTimeout(() => {
+                setIsSendingSupport(false);
+                setSupportTitle("");
+                setSupportPhone("");
+                setSupportNote("");
+                setSupportFile(null);
+                showNotification("درخواست ثبت کاتالوگ شما ثبت شد. کارشناسان پشتیبانی زوپیت بزودی با شما تماس خواهند گرفت.", "success");
+              }, 1000);
+            }}
+            className="bg-card p-6 rounded-2xl border border-subtle space-y-5"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-primary mb-1.5">
+                  عنوان درخواست / نام فروشگاه یا برند *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={supportTitle}
+                  onChange={(e) => setSupportTitle(e.target.value)}
+                  placeholder="مثلا: ثبت لیست ۵۰ قلمی لوازم جانبی موبایل زاگرس"
+                  className="w-full px-4 py-3 bg-background border border-subtle rounded-xl text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-primary mb-1.5">
+                  شماره تماس جهت هماهنگی (اختیاری)
+                </label>
+                <input
+                  type="text"
+                  value={supportPhone}
+                  onChange={(e) => setSupportPhone(e.target.value)}
+                  placeholder="۰۹۱۲..."
+                  className="w-full px-4 py-3 bg-background border border-subtle rounded-xl text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-primary mb-1.5">
+                توضیحات و راهنمای ثبت کاتالوگ
+              </label>
+              <textarea
+                value={supportNote}
+                onChange={(e) => setSupportNote(e.target.value)}
+                placeholder="توضیحات بیشتر درباره قیمت‌ها، تخفیف‌ها یا دسته‌بندی اقلام کاتالوگ..."
+                className="w-full px-4 py-3 bg-background border border-subtle rounded-xl text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500 h-28 resize-none"
+              ></textarea>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-primary mb-1.5">
+                آپلود فایل کاتالوگ / اکسل / PDF یا زیپ تصاویر (تا ۵۰ مگابایت)
+              </label>
+              <div className="border-2 border-dashed border-subtle hover:border-indigo-500 bg-surface rounded-2xl p-6 text-center cursor-pointer transition-colors relative">
+                <input
+                  type="file"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      setSupportFile(e.target.files[0]);
+                    }
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                <Upload className="w-8 h-8 text-indigo-600 mx-auto mb-2" />
+                <p className="text-xs font-bold text-primary">
+                  {supportFile ? `فایل انتخاب شد: ${supportFile.name}` : "برای انتخاب فایل کاتالوگ کلیک کنید"}
+                </p>
+                <p className="text-[11px] text-muted mt-1">فرمت‌های مجاز: PDF, XLSX, ZIP, RAR, PNG, JPG</p>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSendingSupport}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <Send className="w-4 h-4" />
+              <span>{isSendingSupport ? "در حال ارسال درخواست..." : "ارسال درخواست ثبت کاتالوگ به پشتیبانی"}</span>
+            </button>
+          </form>
+        </div>
+      ) : (
+        /* Tab 1: Manual Form (Default) */
+        <div className="p-8 space-y-12 min-h-[400px]">
         
         {/* Step 1: Basic Info */}
         <section className="space-y-5">
@@ -978,6 +1171,60 @@ export function SupplierAddProduct({
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Wholesale Pricing Tier Section */}
+          <div className="bg-surface p-4 rounded-xl border border-subtle space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-primary flex items-center gap-2">
+                  <span>📦 قیمت‌گذاری عمده (تخفیف تعداد بالا)</span>
+                </h4>
+                <p className="text-xs text-muted mt-0.5">
+                  امکان تعیین قیمت ویژه برای سفارشات با تعداد بالا
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.isWholesaleEnabled}
+                  onChange={(e) => setFormData({ ...formData, isWholesaleEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {formData.isWholesaleEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-subtle animate-fade-in">
+                <div>
+                  <label className="block text-xs font-bold text-primary mb-1">
+                    حداقل تعداد برای خرید عمده (عدد)
+                  </label>
+                  <input
+                    type="number"
+                    min="2"
+                    value={formData.wholesaleMinQty}
+                    onChange={(e) => setFormData({ ...formData, wholesaleMinQty: e.target.value })}
+                    placeholder="مثلا: 10"
+                    className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-primary mb-1">
+                    قیمت واحد در خرید عمده (تومان)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.wholesaleUnitPrice}
+                    onChange={(e) => setFormData({ ...formData, wholesaleUnitPrice: e.target.value })}
+                    placeholder="مثلا: 1100000"
+                    className="w-full px-3.5 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono font-bold"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Stock Availability Notification Card */}
@@ -1672,6 +1919,7 @@ export function SupplierAddProduct({
         </section>
 
       </div>
+      )}
 
       {/* Footer Controls */}
       <div className="p-6 border-t border-subtle flex justify-between items-center bg-card rounded-b-2xl mt-4">

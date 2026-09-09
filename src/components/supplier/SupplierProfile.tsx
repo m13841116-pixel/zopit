@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useUrlQueryState } from "../../utils/routeSync";
-import { User, Save, Bell, CheckCircle } from "lucide-react";
+import { User, Save, Bell, CheckCircle, Scale, Gift, ShieldCheck, Upload, AlertCircle, FileCheck } from "lucide-react";
+import SupplierPerformancePanel from "./SupplierPerformancePanel";
+import { SupplierReferralProgram } from "./SupplierReferralProgram";
+
 export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
-  const [activeSubTab, setActiveSubTab] = useUrlQueryState<"profile" | "notifications">("tab",
+  const [activeSubTab, setActiveSubTab] = useUrlQueryState<"profile" | "kyc" | "performance" | "referral" | "notifications">("tab",
     "profile",
   );
   const [formData, setFormData] = useState({
@@ -18,7 +21,15 @@ export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
     bankName: user?.bankName || "",
     accountHolderName: user?.accountHolderName || "",
     address: user?.address || "",
+    nationalCode: user?.nationalCode || "",
+    postalCode: user?.postalCode || "",
     autoApproveOrders: user?.autoApproveOrders ?? true,
+  });
+
+  const [kycDocs, setKycDocs] = useState({
+    nationalCardImg: user?.nationalCardImg || "",
+    businessLicenseImg: user?.businessLicenseImg || "",
+    status: user?.isVerified ? "VERIFIED" : (user?.nationalCardImg ? "PENDING" : "UNVERIFIED")
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   /* Notification states persisted in localStorage */ const [
@@ -98,35 +109,196 @@ export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
     }
   };
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fade-in" dir="rtl">
+    <div className={`${activeSubTab === 'performance' || activeSubTab === 'referral' ? 'max-w-4xl' : 'max-w-2xl'} mx-auto space-y-6 animate-fade-in`} dir="rtl">
       
       <div className="bg-card rounded-3xl shadow-sm border border-subtle p-6 lg:p-8">
         
         {/* Tab Headers */}
-        <div className="flex border-b border-subtle mb-8 pb-1 gap-6">
+        <div className="flex border-b border-subtle mb-8 pb-1 gap-4 sm:gap-6 overflow-x-auto">
           
           <button
             onClick={() => setActiveSubTab("profile")}
-            className={`pb-4 text-base font-extrabold flex items-center gap-2 transition-all cursor-pointer relative ${activeSubTab === "profile" ? "text-primary-default" : "text-muted hover:text-muted"}`}
+            className={`pb-4 text-sm sm:text-base font-extrabold flex items-center gap-2 transition-all cursor-pointer shrink-0 relative ${activeSubTab === "profile" ? "text-primary-default" : "text-muted hover:text-text-primary"}`}
           >
-            
-            <User className="w-5 h-5" /> ویرایش مشخصات کاربری
+            <User className="w-5 h-5" /> ویرایش مشخصات
             {activeSubTab === "profile" && (
               <span className="absolute bottom-0 right-0 left-0 h-0.5 bg-primary-default rounded-full animate-fade-in"></span>
             )}
           </button>
           <button
-            onClick={() => setActiveSubTab("notifications")}
-            className={`pb-4 text-base font-extrabold flex items-center gap-2 transition-all cursor-pointer relative ${activeSubTab === "notifications" ? "text-primary-default" : "text-muted hover:text-muted"}`}
+            onClick={() => setActiveSubTab("kyc")}
+            className={`pb-4 text-sm sm:text-base font-extrabold flex items-center gap-2 transition-all cursor-pointer shrink-0 relative ${activeSubTab === "kyc" ? "text-primary-default" : "text-muted hover:text-text-primary"}`}
           >
-            
+            <ShieldCheck className="w-5 h-5 text-indigo-500" /> تکمیل مدارک و هویت
+            {kycDocs.status === "VERIFIED" ? (
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            )}
+            {activeSubTab === "kyc" && (
+              <span className="absolute bottom-0 right-0 left-0 h-0.5 bg-primary-default rounded-full animate-fade-in"></span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveSubTab("performance")}
+            className={`pb-4 text-sm sm:text-base font-extrabold flex items-center gap-2 transition-all cursor-pointer shrink-0 relative ${activeSubTab === "performance" ? "text-primary-default" : "text-muted hover:text-text-primary"}`}
+          >
+            <Scale className="w-5 h-5" /> امتیاز عملکرد
+            {activeSubTab === "performance" && (
+              <span className="absolute bottom-0 right-0 left-0 h-0.5 bg-primary-default rounded-full animate-fade-in"></span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveSubTab("referral")}
+            className={`pb-4 text-sm sm:text-base font-extrabold flex items-center gap-2 transition-all cursor-pointer shrink-0 relative ${activeSubTab === "referral" ? "text-primary-default" : "text-muted hover:text-text-primary"}`}
+          >
+            <Gift className="w-5 h-5 text-emerald-500" /> دعوت از همکاران
+            {activeSubTab === "referral" && (
+              <span className="absolute bottom-0 right-0 left-0 h-0.5 bg-primary-default rounded-full animate-fade-in"></span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveSubTab("notifications")}
+            className={`pb-4 text-sm sm:text-base font-extrabold flex items-center gap-2 transition-all cursor-pointer shrink-0 relative ${activeSubTab === "notifications" ? "text-primary-default" : "text-muted hover:text-text-primary"}`}
+          >
             <Bell className="w-5 h-5" /> تنظیمات نوتیفیکیشن
             {activeSubTab === "notifications" && (
               <span className="absolute bottom-0 right-0 left-0 h-0.5 bg-primary-default rounded-full animate-fade-in"></span>
             )}
           </button>
         </div>
-        {activeSubTab === "profile" ? (
+        {activeSubTab === "performance" ? (
+          <SupplierPerformancePanel />
+        ) : activeSubTab === "referral" ? (
+          <SupplierReferralProgram user={user} />
+        ) : activeSubTab === "kyc" ? (
+          <div className="space-y-6 animate-fade-in">
+            {/* Status Banner */}
+            {kycDocs.status === "VERIFIED" ? (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl flex items-center gap-3 text-emerald-800 dark:text-emerald-300">
+                <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0" />
+                <div>
+                  <h4 className="font-extrabold text-sm">احراز هویت و مدارک شما تایید شده است</h4>
+                  <p className="text-xs mt-0.5 opacity-90">تمامی امکانات پنل مانند ثبت کد رهگیری و تسویه‌حساب خودکار برای شما فعال می‌باشد.</p>
+                </div>
+              </div>
+            ) : kycDocs.status === "PENDING" ? (
+              <div className="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-2xl flex items-center gap-3 text-indigo-900 dark:text-indigo-200">
+                <FileCheck className="w-6 h-6 text-indigo-600 shrink-0" />
+                <div>
+                  <h4 className="font-extrabold text-sm">مدارک شما بارگذاری شده و در حال بررسی کارشناسان است</h4>
+                  <p className="text-xs mt-0.5 opacity-90">بررسی مدارک معمولاً حداکثر ۲۴ ساعت کاری زمان می‌برد.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-center gap-3 text-amber-900 dark:text-amber-200">
+                <AlertCircle className="w-6 h-6 text-amber-600 shrink-0" />
+                <div>
+                  <h4 className="font-extrabold text-sm">مدارک و احراز هویت شما تکمیل نشده است</h4>
+                  <p className="text-xs mt-0.5 opacity-90">جهت فعال‌سازی قابلیت ثبت ارسال پستی و دریافت تسویه‌حساب‌ها، فرم و تصاویر مدارک زیر را تکمیل کنید.</p>
+                </div>
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setIsSubmitting(true);
+                setTimeout(() => {
+                  setIsSubmitting(false);
+                  setKycDocs((prev) => ({ ...prev, status: "PENDING" }));
+                  if (showNotification) {
+                    showNotification("مدارک و احراز هویت شما با موفقیت ثبت شد و در صف بررسی قرار گرفت.", "success");
+                  }
+                  if (onUpdateUser) {
+                    onUpdateUser({
+                      ...user,
+                      nationalCode: formData.nationalCode,
+                      postalCode: formData.postalCode,
+                      kycVerified: true,
+                    });
+                  }
+                }, 800);
+              }}
+              className="space-y-6"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-primary mb-1.5">کد ملی صاحب حساب / مدیر مسئول</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={10}
+                    value={formData.nationalCode}
+                    onChange={(e) => setFormData({ ...formData, nationalCode: e.target.value })}
+                    placeholder="مثال: 0012345678"
+                    className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono focus:ring-2 focus:ring-primary-default outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-primary mb-1.5">کد پستی ۱۰ رقمی انبار / دفتر</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={10}
+                    value={formData.postalCode}
+                    onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                    placeholder="مثال: 1234567890"
+                    className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs font-mono focus:ring-2 focus:ring-primary-default outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Upload Boxes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-dashed border-subtle rounded-2xl p-5 bg-surface text-center space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-primary">تصویر کارت ملی (روی کارت)</h5>
+                    <p className="text-[11px] text-muted mt-1">فرمت‌های JPG، PNG (حداکثر ۵ مگابایت)</p>
+                  </div>
+                  <input
+                    type="text"
+                    value={kycDocs.nationalCardImg}
+                    onChange={(e) => setKycDocs({ ...kycDocs, nationalCardImg: e.target.value })}
+                    placeholder="لینک تصویر یا انتخاب فایل..."
+                    className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono"
+                  />
+                </div>
+
+                <div className="border border-dashed border-subtle rounded-2xl p-5 bg-surface text-center space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-primary">تصویر جواز کسب / گواهی شرکت</h5>
+                    <p className="text-[11px] text-muted mt-1">جواز اتحادیه یا روزنامه رسمی (اختیاری)</p>
+                  </div>
+                  <input
+                    type="text"
+                    value={kycDocs.businessLicenseImg}
+                    onChange={(e) => setKycDocs({ ...kycDocs, businessLicenseImg: e.target.value })}
+                    placeholder="لینک تصویر یا انتخاب فایل..."
+                    className="w-full px-3 py-2 bg-background border border-subtle rounded-xl text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-primary-default text-inverse px-8 py-3 rounded-xl font-bold text-xs hover:bg-primary-hover transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-md shadow-primary-default/20 active:scale-95"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSubmitting ? "در حال ارسال مدارک..." : "ثبت و ارسال مدارک برای تایید"}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : activeSubTab === "profile" ? (
           /* Profile Details Form */ <form
             onSubmit={handleSubmit}
             className="space-y-4"
