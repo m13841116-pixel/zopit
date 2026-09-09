@@ -6,6 +6,7 @@ import {
   XCircle,
   Clock,
   Settings,
+  Sparkles,
   Ticket,
   Search,
   Eye,
@@ -82,8 +83,16 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
 
   // Global Pro Settings states
   const [autoApprove, setAutoApprove] = useState(true);
+  const [startupMonthlyPrice, setStartupMonthlyPrice] = useState("259000");
+  const [startupOriginalValue, setStartupOriginalValue] = useState("1200000");
   const [proMonthlyPrice, setProMonthlyPrice] = useState("2490000");
+  const [proMonthlyOriginalValue, setProMonthlyOriginalValue] = useState("4800000");
   const [proAnnualPrice, setProAnnualPrice] = useState("24900000");
+  const [proAnnualOriginalValue, setProAnnualOriginalValue] = useState("4800000");
+  const [vipMonthlyPrice, setVipMonthlyPrice] = useState("599000");
+  const [vipMonthlyOriginalValue, setVipMonthlyOriginalValue] = useState("2400000");
+  const [vipAnnualPrice, setVipAnnualPrice] = useState("3999000");
+  const [vipAnnualOriginalValue, setVipAnnualOriginalValue] = useState("8500000");
   const [proAccountPrice, setProAccountPrice] = useState("189000");
   const [promaxAccountPrice, setPromaxAccountPrice] = useState("299000");
   const [hostRenewalPrice, setHostRenewalPrice] = useState("500000");
@@ -93,6 +102,16 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
   const [termsContent, setTermsContent] = useState("");
   const [proVideoUrl, setProVideoUrl] = useState("");
   const [proAudioUrl, setProAudioUrl] = useState("");
+  
+  // Custom subscription pricing and promotion control states
+  const [promoText, setPromoText] = useState("");
+  const [promoStart, setPromoStart] = useState("");
+  const [promoEnd, setPromoEnd] = useState("");
+  const [countdownVisible, setCountdownVisible] = useState(true);
+  const [featuredPlan, setFeaturedPlan] = useState("PRO_ANNUAL");
+  const [discountBadge, setDiscountBadge] = useState("");
+  const [promoActionAfterExpiry, setPromoActionAfterExpiry] = useState("HIDE_PROMOTION");
+
   const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
@@ -137,6 +156,32 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
         setTermsContent(data.termsContent || "");
         setProVideoUrl(data.videoUrl || "");
         setProAudioUrl(data.audioUrl || "");
+      }
+
+      const subConfigsRes = await fetch("/api/store-manager/subscription/configs", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (subConfigsRes.ok) {
+        const subConfigs = await subConfigsRes.json();
+        setStartupMonthlyPrice(String(subConfigs.STARTUP?.salePrice || subConfigs.STARTUP?.priceToman || "259000"));
+        setStartupOriginalValue(String(subConfigs.STARTUP?.originalValue || "1200000"));
+        setProMonthlyPrice(String(subConfigs.PRO_MONTHLY?.salePrice || subConfigs.PRO_MONTHLY?.priceToman || "2490000"));
+        setProMonthlyOriginalValue(String(subConfigs.PRO_MONTHLY?.originalValue || "4800000"));
+        setProAnnualPrice(String(subConfigs.PRO_ANNUAL?.salePrice || subConfigs.PRO_ANNUAL?.priceToman || "24900000"));
+        setProAnnualOriginalValue(String(subConfigs.PRO_ANNUAL?.originalValue || "4800000"));
+        setVipMonthlyPrice(String(subConfigs.VIP_MONTHLY?.salePrice || subConfigs.VIP_MONTHLY?.priceToman || "599000"));
+        setVipMonthlyOriginalValue(String(subConfigs.VIP_MONTHLY?.originalValue || "2400000"));
+        setVipAnnualPrice(String(subConfigs.VIP_ANNUAL?.salePrice || subConfigs.VIP_ANNUAL?.priceToman || "3999000"));
+        setVipAnnualOriginalValue(String(subConfigs.VIP_ANNUAL?.originalValue || "8500000"));
+        if (subConfigs.promotionConfig) {
+          setPromoText(subConfigs.promotionConfig.text || "");
+          setPromoStart(subConfigs.promotionConfig.start || "");
+          setPromoEnd(subConfigs.promotionConfig.end || "");
+          setCountdownVisible(subConfigs.promotionConfig.visible !== false);
+          setFeaturedPlan(subConfigs.promotionConfig.featuredPlan || "PRO_ANNUAL");
+          setDiscountBadge(subConfigs.promotionConfig.discountBadge || "");
+          setPromoActionAfterExpiry(subConfigs.promotionConfig.promotionActionAfterExpiry || "HIDE_PROMOTION");
+        }
       }
     } catch (err) {
       console.error("Error fetching pro settings:", err);
@@ -370,7 +415,22 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
         },
         body: JSON.stringify({
           monthlyPrice: proMonthlyPrice,
-          annualPrice: proAnnualPrice
+          annualPrice: proAnnualPrice,
+          promotionText: promoText,
+          promotionStart: promoStart,
+          promotionEnd: promoEnd,
+          countdownVisible: countdownVisible,
+          featuredPlan: featuredPlan,
+          discountBadge: discountBadge,
+          promotionActionAfterExpiry: promoActionAfterExpiry,
+          startupMonthlyPrice,
+          startupOriginalValue,
+          proMonthlyOriginalValue,
+          proAnnualOriginalValue,
+          vipMonthlyPrice,
+          vipMonthlyOriginalValue,
+          vipAnnualPrice,
+          vipAnnualOriginalValue
         })
       }).catch(() => {});
 
@@ -840,6 +900,274 @@ export default function SuperAdminProAccounts({ showNotification }: SuperAdminPr
                 onChange={(e) => setTorobPrice(e.target.value)}
                 className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
               />
+            </div>
+
+            {/* Zopit Subscription Core Pricing & Promo Campaign */}
+            <div className="col-span-1 sm:col-span-2 pt-6 border-t border-border-subtle">
+              <h3 className="text-xs font-black text-primary flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>قیمت‌گذاری و جشنواره‌های تخفیف پکیج‌های اشتراک زوپیت:</span>
+              </h3>
+              <p className="text-[11px] text-muted mb-4">
+                تغییر قیمت‌های دوره اشتراک (استارتاپ، پرو، VIP)، ارزش واقعی خدمات (Value Stack)، زمان‌بندی جشنواره‌های تخفیف، شمارش معکوس و رفتارهای انقضای تخفیف.
+              </p>
+            </div>
+
+            {/* 1. STARTUP TIER */}
+            <div className="col-span-1 sm:col-span-2 p-4 rounded-2xl bg-slate-500/5 border border-slate-500/10 space-y-3">
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                <span>۱. پلن استارتاپ (پایه - کف قیمت)</span>
+                <span className="text-[10px] text-muted">فقط پرداخت ماهانه</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    قیمت ماهانه استارتاپ (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={startupMonthlyPrice}
+                    onChange={(e) => setStartupMonthlyPrice(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۲۵۹,۰۰۰ تومان</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    ارزش واقعی خدمات استارتاپ (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={startupOriginalValue}
+                    onChange={(e) => setStartupOriginalValue(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۱,۲۰۰,۰۰۰ تومان</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. PRO TIER */}
+            <div className="col-span-1 sm:col-span-2 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/15 space-y-3">
+              <div className="text-xs font-bold text-indigo-700 dark:text-indigo-400 flex items-center justify-between">
+                <span>۲. پلن حرفه‌ای Pro (پلن پیشنهادی و پرطرفدار)</span>
+                <span className="text-[10px] text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-md font-bold">هدیه ای‌نماد و قالب اورجینال</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    قیمت ماهانه پرو (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={proMonthlyPrice}
+                    onChange={(e) => setProMonthlyPrice(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۲,۴۹۰,۰۰۰ تومان</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    ارزش واقعی خدمات پرو ماهانه (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={proMonthlyOriginalValue}
+                    onChange={(e) => setProMonthlyOriginalValue(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۴,۸۰۰,۰۰۰ تومان</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    قیمت سالانه پرو (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={proAnnualPrice}
+                    onChange={(e) => setProAnnualPrice(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۲۴,۹۰۰,۰۰۰ تومان</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    ارزش واقعی خدمات پرو سالانه (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={proAnnualOriginalValue}
+                    onChange={(e) => setProAnnualOriginalValue(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۴,۸۰۰,۰۰۰ تومان</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. VIP TIER */}
+            <div className="col-span-1 sm:col-span-2 p-4 rounded-2xl bg-purple-500/5 border border-purple-500/15 space-y-3">
+              <div className="text-xs font-bold text-purple-700 dark:text-purple-400 flex items-center justify-between">
+                <span>۳. پلن ویژه VIP سازمانی (پربازدید و اختصاصی)</span>
+                <span className="text-[10px] text-purple-600 bg-purple-50 dark:bg-purple-950/50 px-2 py-0.5 rounded-md font-bold">۳۰ گیگ هاست + ترب اختصاصی</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    قیمت ماهانه VIP (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={vipMonthlyPrice}
+                    onChange={(e) => setVipMonthlyPrice(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۵۹۹,۰۰۰ تومان</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    ارزش واقعی خدمات VIP ماهانه (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={vipMonthlyOriginalValue}
+                    onChange={(e) => setVipMonthlyOriginalValue(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۲,۴۰۰,۰۰۰ تومان</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    قیمت سالانه VIP (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={vipAnnualPrice}
+                    onChange={(e) => setVipAnnualPrice(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۳,۹۹۹,۰۰۰ تومان</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-secondary mb-1">
+                    ارزش واقعی خدمات VIP سالانه (تومان):
+                  </label>
+                  <input
+                    type="number"
+                    value={vipAnnualOriginalValue}
+                    onChange={(e) => setVipAnnualOriginalValue(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[10px] text-muted mt-0.5 block">پیش‌فرض: ۸,۵۰۰,۰۰۰ تومان</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Promo Text */}
+            <div className="col-span-1 sm:col-span-2">
+              <label className="block text-xs font-bold text-secondary mb-1.5">
+                متن بنر کمپین تبلیغاتی جشنواره:
+              </label>
+              <input
+                type="text"
+                value={promoText}
+                onChange={(e) => setPromoText(e.target.value)}
+                placeholder="مثال: فرصت ویژه ثبت‌نام با تعرفه کف قیمت استارتاپ (۲۵۹,۰۰۰ تومان)"
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+              <span className="text-[10px] text-muted mt-1 block">در صورت خالی بودن، به متن استاندارد یا مقدار پیش‌فرض تغییر می‌کند.</span>
+            </div>
+
+            {/* Promo Start Date */}
+            <div>
+              <label className="block text-xs font-bold text-secondary mb-1.5">
+                تاریخ شروع جشنواره (ISO / میلادی):
+              </label>
+              <input
+                type="text"
+                value={promoStart}
+                onChange={(e) => setPromoStart(e.target.value)}
+                placeholder="2026-09-01T00:00:00.000Z"
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+              <span className="text-[10px] text-muted mt-1 block">خالی بگذارید تا فوراً فعال شود.</span>
+            </div>
+
+            {/* Promo End Date */}
+            <div>
+              <label className="block text-xs font-bold text-secondary mb-1.5">
+                تاریخ پایان جشنواره و انقضا (ISO / میلادی):
+              </label>
+              <input
+                type="text"
+                value={promoEnd}
+                onChange={(e) => setPromoEnd(e.target.value)}
+                placeholder="2026-09-30T23:59:59.000Z"
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary font-mono text-left focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+              <span className="text-[10px] text-muted mt-1 block">در صورت خالی بودن، شمارشگر تا ساعت ۱۲ هر شب فعال می‌ماند.</span>
+            </div>
+
+            {/* Annual Discount Badge */}
+            <div>
+              <label className="block text-xs font-bold text-secondary mb-1.5">
+                عنوان برچسب تخفیف سالانه:
+              </label>
+              <input
+                type="text"
+                value={discountBadge}
+                onChange={(e) => setDiscountBadge(e.target.value)}
+                placeholder="مثال: ۸۰٪ صرفه‌جویی"
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+              <span className="text-[10px] text-muted mt-1 block">برچسب چشمک‌زن روی تب پرداخت سالانه</span>
+            </div>
+
+            {/* Featured Plan Selector */}
+            <div>
+              <label className="block text-xs font-bold text-secondary mb-1.5">
+                پلن برجسته و منتخب (Featured Plan):
+              </label>
+              <select
+                value={featuredPlan}
+                onChange={(e) => setFeaturedPlan(e.target.value)}
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
+                <option value="PRO_MONTHLY">PRO ماهانه</option>
+                <option value="PRO_ANNUAL">PRO سالانه (پیشنهادی)</option>
+              </select>
+              <span className="text-[10px] text-muted mt-1 block">کارتی که جلوه بصری بیشتری خواهد داشت</span>
+            </div>
+
+            {/* Countdown Visibility */}
+            <div>
+              <label className="block text-xs font-bold text-secondary mb-1.5">
+                نمایش شمارش معکوس جشنواره:
+              </label>
+              <select
+                value={String(countdownVisible)}
+                onChange={(e) => setCountdownVisible(e.target.value === "true")}
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
+                <option value="true">نمایش شمارنده معکوس زنده</option>
+                <option value="false">عدم نمایش شمارنده معکوس</option>
+              </select>
+            </div>
+
+            {/* Action After Expiry */}
+            <div>
+              <label className="block text-xs font-bold text-secondary mb-1.5">
+                رفتار سیستم پس از سررسید انقضا:
+              </label>
+              <select
+                value={promoActionAfterExpiry}
+                onChange={(e) => setPromoActionAfterExpiry(e.target.value)}
+                className="w-full px-4 py-2.5 bg-background border border-subtle rounded-xl text-xs text-primary focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
+                <option value="NONE">بدون واکنش (نمایش تخفیف دائمی)</option>
+                <option value="HIDE_PROMOTION">مخفی کردن بنر جشنواره و بازگشت به تعرفه پایه</option>
+                <option value="HIDE_DISCOUNT_BADGE">مخفی کردن برچسب تخفیف سالانه</option>
+              </select>
             </div>
 
             {/* Media URLs Section Header */}

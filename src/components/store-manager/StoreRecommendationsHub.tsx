@@ -47,6 +47,8 @@ interface RecommendationItem {
   } | null;
   isImported: boolean;
   score: number;
+  isPaidFeatured?: boolean;
+  isZopitSelected?: boolean;
   reasonCodes: string[];
   primaryReason: string;
   recommendationType: string;
@@ -132,6 +134,26 @@ export function StoreRecommendationsHub({ onProductAdded, compact = false }: Sto
           score
         })
       });
+
+      // Track paid placement engine events if product is a sponsored item
+      const productItem = products.find(p => p.id === productId);
+      if (productItem?.isPaidFeatured) {
+        let promoEvent = "IMPRESSION";
+        if (eventType === "recommendation_click") promoEvent = "CLICK";
+        if (eventType === "recommendation_import") promoEvent = "IMPORT";
+
+        fetch("/api/store-manager/featured/event", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            productId,
+            eventType: promoEvent
+          })
+        }).catch(() => {});
+      }
     } catch (e) {
       // silent background analytics
     }
@@ -280,6 +302,24 @@ export function StoreRecommendationsHub({ onProductAdded, compact = false }: Sto
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       loading="lazy"
                     />
+
+                    {/* Paid Featured and Zopit Selected Badge Indicators */}
+                    {product.isPaidFeatured && (
+                      <div className="absolute top-2.5 left-2.5 z-10">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] font-black bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md border border-amber-400">
+                          <Zap className="w-2.5 h-2.5 fill-white" />
+                          ویژه 🌟
+                        </span>
+                      </div>
+                    )}
+                    {!product.isPaidFeatured && product.isZopitSelected && (
+                      <div className="absolute top-2.5 left-2.5 z-10">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] font-black bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md border border-emerald-500">
+                          <Sparkles className="w-2.5 h-2.5 fill-white" />
+                          منتخب زوپیت ✨
+                        </span>
+                      </div>
+                    )}
 
                     {/* Reason Tag Badge */}
                     <div className="absolute top-2.5 right-2.5 max-w-[85%] z-10">

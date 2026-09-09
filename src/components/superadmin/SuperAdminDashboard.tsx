@@ -144,6 +144,7 @@ export default function SuperAdminDashboard({
     { id: "concierge-requests", label: "درخواست‌های ورود محصول", icon: FileCheck },
     { id: "orders", label: "سفارشات", icon: ShoppingCart, badge: badges.orders },
     { id: "settlements", label: "تسویه حساب", icon: Wallet, badge: badges.settlements },
+    { id: "financial", label: "مرکز کنترل مالی", icon: ShieldCheck },
     { id: "pro-accounts", label: "اکانت پرو مکس (PRO MAX)", icon: Crown },
     { id: "tickets", label: "تیکت‌ها", icon: MessageSquare, badge: badges.tickets },
     { id: "top-stores", label: "فروشندگان برتر و VIP", icon: Award },

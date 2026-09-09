@@ -78,6 +78,18 @@ export function startCronJobs() {
         }
       }
 
+      // 3. Auto-expire completed featured placements
+      try {
+        const { FeaturedPlacementService } = await import('./services/FeaturedPlacementService.js');
+        const featuredService = new FeaturedPlacementService();
+        const expiredCount = await featuredService.expireCompletedPlacements();
+        if (expiredCount > 0) {
+          console.log(`[Cron Job] Automatically expired ${expiredCount} completed featured placements.`);
+        }
+      } catch (err) {
+        console.error('Failed to run featured placement expiration job:', err);
+      }
+
     } catch (err) {
       console.error('Error running cron jobs:', err);
     }

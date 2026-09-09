@@ -46,6 +46,7 @@ import {
   sendMelliPayamakPattern 
 } from './src/services/sms/SmsService.js';
 import { WalletService } from './src/services/WalletService.js';
+import { maskShaba, maskCard, maskMobile } from './src/utils/masking.js';
 import { StoreRecommendationService } from './src/services/StoreRecommendationService.js';
 import { StoreGrowthService } from './src/services/StoreGrowthService.js';
 import { StoreActionPriorityService } from './src/services/StoreActionPriorityService.js';
@@ -151,6 +152,13 @@ import registerOrderLabel from './src/services/orderLabelRoute.js';
 import registerPenaltyRoutes from './src/services/penaltyRoute.js';
 import { registerDiscountRoutes } from './src/services/discountRoutes.js';
 import registerAIStudioRoute from './src/services/aiStudioRoute.js';
+import registerSupplierAiRoute from './src/services/supplierAiRoute.js';
+import financialControlRoutes from './src/services/financialControlRoutes.js';
+import notificationRoutes from './src/services/notificationRoutes.js';
+import { appEvents } from './src/services/NotificationService.js';
+import { registerWholesaleRoutes } from './src/services/wholesaleRoute.js';
+import { registerBusinessIntelligenceRoutes } from './src/services/businessIntelligenceRoute.js';
+import { calculateAuthoritativeWholesalePricing, buildWholesaleOrderSnapshot, validateWholesaleTiers } from './src/services/pricing/wholesalePricingEngine.js';
 
 import { z } from 'zod';
 
@@ -1511,6 +1519,22 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "shortDescription" TEXT;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "longDescription" TEXT;`,
       `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "technicalSpecs" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "warranty" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "warrantyDuration" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "dimensions" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "weight" TEXT;`,
+      `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "color" TEXT;`,
+
+      // WholesalePriceTier table
+      `CREATE TABLE IF NOT EXISTS "WholesalePriceTier" (
+        "id" SERIAL PRIMARY KEY,
+        "productId" INTEGER NOT NULL,
+        "minQuantity" INTEGER NOT NULL,
+        "maxQuantity" INTEGER,
+        "unitPrice" DOUBLE PRECISION NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
 
       // StoreInvoice table columns
       `ALTER TABLE "StoreInvoice" ADD COLUMN IF NOT EXISTS "storeManagerId" INTEGER;`,
@@ -2652,13 +2676,13 @@ app.post('/api/auth/register/supplier', async (req, res) => {
     });
 
     // Create supplier wallet if not exists
-    await prisma.supplierWallet.upsert({
+    await prisma.wallet.upsert({
       where: { supplierId: user.id },
       update: {},
       create: {
         supplierId: user.id,
         balance: 0,
-        pending: 0
+        
       }
     }).catch(console.error);
 
@@ -3553,7 +3577,7 @@ app.get('/api/supplier/products', authenticateToken, requireSupplier, async (req
     const supplierId = parseInt(req.user.userId);
     let products = await prisma.product.findMany({
       where: { supplierId },
-      include: { category: true, images: true, variants: true, exploreContent: true },
+      include: { category: true, images: true, variants: true, exploreContent: true, wholesaleTiers: true },
       orderBy: { id: 'desc' }
     });
 
@@ -3601,7 +3625,7 @@ app.get('/api/supplier/products', authenticateToken, requireSupplier, async (req
 
       products = await prisma.product.findMany({
         where: { supplierId },
-        include: { category: true, images: true, variants: true, exploreContent: true },
+        include: { category: true, images: true, variants: true, exploreContent: true, wholesaleTiers: true },
         orderBy: { id: 'desc' }
       });
     }
@@ -3616,7 +3640,7 @@ app.get('/api/supplier/products', authenticateToken, requireSupplier, async (req
 // Add a new product
 app.post('/api/supplier/products', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
-    const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl, status } = req.body;
+    const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl, status, warranty, warrantyDuration, dimensions, weight, color, wholesaleTiers } = req.body;
     
     let supplierId = safeParseInt(req.user?.userId || req.user?.id, 0);
     if (!supplierId || supplierId <= 0) {
@@ -3704,6 +3728,18 @@ app.post('/api/supplier/products', authenticateToken, requireSupplier, async (re
         rejectionReason: null,
         externalSource: 'MANUAL',
         inventory: totalInventory,
+        warranty: warranty || null,
+        warrantyDuration: warrantyDuration || null,
+        dimensions: dimensions || null,
+        weight: weight || null,
+        color: color || null,
+        wholesaleTiers: (wholesaleTiers && wholesaleTiers.length > 0) ? {
+          create: wholesaleTiers.map((tier: any) => ({
+            minQuantity: safeParseInt(tier.minQuantity, 1),
+            maxQuantity: tier.maxQuantity ? safeParseInt(tier.maxQuantity) : null,
+            unitPrice: safeParseFloat(tier.unitPrice, 0)
+          }))
+        } : undefined,
         exploreContent: videoUrl ? {
           create: {
             customVideoUrl: videoUrl,
@@ -5185,7 +5221,7 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
     if (!supplierId) {
       return res.status(401).json({ error: 'اطلاعات کاربری نامعتبر است.' });
     }
-    const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl, status } = req.body;
+    const { categoryId, name, shortDescription, longDescription, technicalSpecs, supplierBasePrice, discount, sku, brand, stock, images, mainImage, variants, videoUrl, status, warranty, warrantyDuration, dimensions, weight, color, wholesaleTiers } = req.body;
     
     // Ensure product exists
     const existing = await prisma.product.findFirst({
@@ -5212,9 +5248,10 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
       actualCategoryId = firstCategory ? firstCategory.id : existing.categoryId;
     }
 
-    // Clean up previous variants and images to allow clean overwrite
+    // Clean up previous variants, images and wholesale tiers to allow clean overwrite
     await prisma.productImage.deleteMany({ where: { productId: parseInt(id) } });
     await prisma.productVariant.deleteMany({ where: { productId: parseInt(id) } });
+    await prisma.wholesalePriceTier.deleteMany({ where: { productId: parseInt(id) } });
 
     const totalInventory = (variants && variants.length > 0)
       ? variants.reduce((sum: number, v: any) => sum + safeParseInt(v.stock), 0)
@@ -5333,6 +5370,18 @@ app.put('/api/supplier/products/:id', authenticateToken, requireSupplier, async 
         status: newStatus,
         rejectionReason: clearRejectionReason ? null : existing.rejectionReason,
         inventory: totalInventory,
+        warranty: warranty || null,
+        warrantyDuration: warrantyDuration || null,
+        dimensions: dimensions || null,
+        weight: weight || null,
+        color: color || null,
+        wholesaleTiers: (wholesaleTiers && wholesaleTiers.length > 0) ? {
+          create: wholesaleTiers.map((tier: any) => ({
+            minQuantity: safeParseInt(tier.minQuantity, 1),
+            maxQuantity: tier.maxQuantity ? safeParseInt(tier.maxQuantity) : null,
+            unitPrice: safeParseFloat(tier.unitPrice, 0)
+          }))
+        } : undefined,
         exploreContent: {
           upsert: {
             create: { customVideoUrl: videoUrl || null, isPublished: false },
@@ -5418,6 +5467,143 @@ app.patch('/api/supplier/products/:id/price', authenticateToken, requireSupplier
 });
 
 // Get orders containing this supplier's products with pagination
+
+// --- Supplier Shipping Endpoints ---
+
+// Get shipping profile
+app.get('/api/supplier/shipping-profile', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    let profile = await prisma.supplierShippingProfile.findUnique({
+      where: { supplierId: req.user.userId }
+    });
+    if (!profile) {
+      profile = await prisma.supplierShippingProfile.create({
+        data: { supplierId: req.user.userId, active: true }
+      });
+    }
+    return res.json(profile);
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در دریافت پروفایل پستی' });
+  }
+});
+
+// Update shipping profile
+app.put('/api/supplier/shipping-profile', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const { provider, accountId, originAddress } = req.body;
+    const profile = await prisma.supplierShippingProfile.upsert({
+      where: { supplierId: req.user.userId },
+      update: { provider, accountId, originAddress },
+      create: { supplierId: req.user.userId, provider, accountId, originAddress, active: true }
+    });
+    return res.json(profile);
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در ذخیره پروفایل پستی' });
+  }
+});
+
+// Update tracking code & status for a supplier order group
+app.put('/api/supplier/order-groups/:groupId/tracking', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const groupId = parseInt(req.params.groupId);
+    const { trackingCode, carrier, newStatus } = req.body;
+
+    const group = await prisma.supplierOrderGroup.findFirst({
+      where: { id: groupId, supplierId: req.user.userId },
+      include: { order: true }
+    });
+
+    if (!group) return res.status(404).json({ error: 'گروه سفارش یافت نشد.' });
+    if (!group.order) return res.status(404).json({ error: 'سفارش اصلی یافت نشد.' });
+
+    // Validate before marking as SHIPPED
+    if (newStatus === 'SHIPPED' && group.status !== 'SHIPPED') {
+      const invalidStatuses = ['WAITING_STORE_ADDRESS', 'WAITING_SHIPPING_COST', 'PENDING_PAYMENT', 'CANCELLED', 'FAILED', 'RETURNED', 'REJECTED', 'OUT_OF_STOCK'];
+      if (invalidStatuses.includes(group.order.status)) {
+        return res.status(400).json({ error: 'وضعیت سفارش اجازه ارسال را نمی‌دهد.' });
+      }
+      if (!trackingCode && !group.trackingCode) {
+        return res.status(400).json({ error: 'کد رهگیری برای ثبت ارسال الزامی است.' });
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (trackingCode && trackingCode !== group.trackingCode) {
+        await tx.trackingHistory.create({
+          data: {
+            supplierOrderGroupId: groupId,
+            oldTrackingCode: group.trackingCode,
+            newTrackingCode: trackingCode,
+            carrier: carrier || group.shippingProvider,
+            changedBy: req.user.username
+          }
+        });
+      }
+
+      await tx.supplierOrderGroup.update({
+        where: { id: groupId },
+        data: {
+          trackingCode,
+          shippingProvider: carrier || group.shippingProvider,
+          status: newStatus || group.status,
+          ...(newStatus === 'SHIPPED' && group.status !== 'SHIPPED' ? { shippedAt: new Date() } : {})
+        }
+      });
+      
+      if (newStatus === 'SHIPPED' && group.status !== 'SHIPPED') {
+         await tx.orderItem.updateMany({
+           where: { supplierGroupId: groupId },
+           data: { status: 'SHIPPED' }
+         });
+
+         // Record Audit Events
+         await tx.auditTrail.create({
+           data: {
+             userId: req.user.userId,
+             action: 'SUPPLIER_ORDER_SHIPPED',
+             details: `Supplier shipped group ${groupId} for order ${group.orderId}`,
+             ipAddress: req.ip || '',
+             userAgent: req.headers['user-agent'] || ''
+           }
+         });
+      }
+      
+      // Sync parent order status dynamically
+      await syncSupplierGroupAndParentStatus(group.orderId, req.user.userId, tx);
+    });
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در ثبت کد رهگیری' });
+  }
+});
+
+// Upload shipping label
+app.post('/api/supplier/order-groups/:groupId/label', authenticateToken, requireSupplier, multerFn({ dest: rootUploadsDir }).single('file'), async (req: any, res: any) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'فایلی انتخاب نشده است.' });
+    
+    const groupId = parseInt(req.params.groupId);
+    const group = await prisma.supplierOrderGroup.findFirst({
+      where: { id: groupId, supplierId: req.user.userId }
+    });
+
+    if (!group) return res.status(404).json({ error: 'گروه سفارش یافت نشد.' });
+
+    const labelUrl = `/uploads/${req.file.filename}`;
+    
+    await prisma.supplierOrderGroup.update({
+      where: { id: groupId },
+      data: { shippingLabelUrl: labelUrl }
+    });
+    
+    return res.json({ labelUrl });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در بارگذاری لیبل' });
+  }
+});
+
+
 app.get('/api/supplier/orders', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
@@ -5436,6 +5622,7 @@ app.get('/api/supplier/orders', authenticateToken, requireSupplier, async (req: 
               store: true
             }
           },
+          supplierGroup: true,
           product: true,
           variant: true
         },
@@ -5504,12 +5691,9 @@ app.post('/api/supplier/orders/ship-batch', authenticateToken, requireSupplier, 
       updatedItems = items;
       
       // Update parent order statuses
-      const orderIds = Array.from(new Set(items.map(i => i.orderId)));
+      const orderIds = Array.from(new Set(items.map(i => i.orderId))) as number[];
       for (const orderId of orderIds) {
-        await tx.order.update({
-          where: { id: orderId },
-          data: { status: 'SHIPPED' },
-        });
+        await syncSupplierGroupAndParentStatus(orderId, req.user.userId, tx);
         
         await tx.orderStatusHistory.create({
           data: {
@@ -5541,7 +5725,7 @@ app.post('/api/supplier/orders/ship-batch', authenticateToken, requireSupplier, 
                data: {
                  supplierId: item.supplierId,
                  balance: supplierShare,
-                 pending: 0
+                 
                }
              });
            } else {
@@ -5698,49 +5882,6 @@ app.patch('/api/supplier/orders/:itemId', authenticateToken, requireSupplier, as
     const isStage5 = ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(status);
     const wasStage5 = ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(item.status);
 
-    if (isStage5 && !wasStage5) {
-      // Inventory was already deducted when store manager paid the order.
-      // Automatically credit supplier wallet on shipping if not already credited
-      try {
-        const existingTx = await prisma.supplierWalletTransaction.findFirst({
-          where: { orderItemId: item.id }
-        });
-        if (!existingTx) {
-          const supplierShare = (item.quantity || 1) * (item.supplierPrice || 0);
-          if (supplierShare > 0) {
-            const wallet = await prisma.supplierWallet.findUnique({ where: { supplierId: item.supplierId } });
-            if (!wallet) {
-              await prisma.supplierWallet.create({
-                data: {
-                  supplierId: item.supplierId,
-                  balance: supplierShare,
-                  pending: 0
-                }
-              });
-            } else {
-              await prisma.supplierWallet.update({
-                where: { supplierId: item.supplierId },
-                data: { balance: { increment: supplierShare } }
-              });
-            }
-            await prisma.supplierWalletTransaction.create({
-              data: {
-                supplierId: item.supplierId,
-                amount: supplierShare,
-                type: 'CREDIT',
-                status: 'COMPLETED',
-                description: `تسویه آنی برای تحویل و ارسال سفارش #${item.orderId}`,
-                orderId: item.orderId,
-                orderItemId: item.id
-              }
-            });
-          }
-        }
-      } catch (wErr) {
-        console.warn('Supplier wallet crediting error:', wErr);
-      }
-    }
-
     // Sync parent order status and tracking code
     if (trackingCode) {
       await prisma.order.update({
@@ -5748,6 +5889,8 @@ app.patch('/api/supplier/orders/:itemId', authenticateToken, requireSupplier, as
         data: { trackingCode }
       });
     }
+
+    await syncSupplierGroupAndParentStatus(item.orderId, item.supplierId, prisma);
 
     const parentOrder = await prisma.order.findUnique({
       where: { id: item.orderId },
@@ -5891,21 +6034,59 @@ app.post('/api/supplier/payout/request', authenticateToken, requireSupplier, pay
     const supplierId = req.user.userId;
 
     const user = await prisma.user.findUnique({ where: { id: supplierId } });
-    if (!user || !user.shaba) {
-      return res.status(400).json({ error: 'لطفا ابتدا شماره شبا خود را در پروفایل ثبت کنید' });
+    if (!user) {
+      return res.status(404).json({ error: 'کاربر تامین‌کننده یافت نشد.' });
+    }
+
+    if (!user.shaba || !user.shaba.trim()) {
+      return res.status(400).json({ error: 'لطفاً ابتدا شماره شبا خود را در پروفایل ثبت کنید.' });
+    }
+
+    const cleanShaba = user.shaba.trim().replace(/\s+/g, '').toUpperCase();
+    if (!/^IR\d{24}$/i.test(cleanShaba)) {
+      return res.status(400).json({ error: 'شماره شبا نامعتبر است. شماره شبا باید با IR شروع شده و دارای ۲۴ رقم باشد.' });
     }
 
     const wallet = await prisma.wallet.findUnique({ where: { supplierId } });
     if (!wallet) {
-      return res.status(404).json({ error: 'کیف پول یافت نشد' });
+      return res.status(404).json({ error: 'کیف پول یافت نشد.' });
+    }
+
+    // Determine authoritative minimum payout threshold
+    let minPayoutTomans = 50000;
+    const minConfig = await prisma.systemConfig.findUnique({ where: { key: 'MIN_PAYOUT_AMOUNT' } }).catch(() => null);
+    if (minConfig && minConfig.value) {
+      const val = Number(minConfig.value);
+      if (!isNaN(val) && val > 0) {
+        minPayoutTomans = val >= 1000000 ? Math.floor(val / 10) : val;
+      }
+    }
+
+    if (amount < minPayoutTomans) {
+      return res.status(400).json({
+        error: `مبلغ درخواستی کمتر از حداقل مجاز برداشت (${minPayoutTomans.toLocaleString('fa-IR')} تومان) است.`
+      });
+    }
+
+    // Never trust frontend balance: check available balance
+    if (Number(wallet.balance) < amount) {
+      return res.status(400).json({
+        error: `موجودی قابل برداشت کافی نیست. موجودی فعلی شما ${Number(wallet.balance).toLocaleString('fa-IR')} تومان است.`
+      });
     }
 
     const { WalletService } = await import('./src/services/WalletService.js');
     const walletService = new WalletService();
 
-    const payoutRequest = await walletService.requestPayout(wallet.id, amount, user.shaba);
+    const payoutRequest = await walletService.requestPayout(wallet.id, amount, cleanShaba, {
+      bankName: user.bankName || 'بانک نامشخص',
+      accountHolderName: user.accountHolderName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username,
+      supplierId: user.id,
+      supplierName: `${user.firstName || ''} ${user.lastName || ''} (${user.brandName || 'تامین‌کننده'})`.trim(),
+      minThreshold: minPayoutTomans,
+    });
 
-    res.json({ success: true, message: 'درخواست تسویه با موفقیت ثبت شد', payoutRequest });
+    res.json({ success: true, message: 'درخواست برداشت شما ثبت شد.', payoutRequest });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: (err as any).errors?.map((e: any) => e.message).join(', ') || err.message });
@@ -5947,6 +6128,49 @@ app.get('/api/supplier/reports', authenticateToken, requireSupplier, async (req:
       _sum: { amount: true }
     });
 
+    // Calculate pending base balance: items belonging to this supplier in paid/processing orders not yet shipped
+    const pendingItems = await prisma.orderItem.findMany({
+      where: {
+        supplierId,
+        status: { in: ['PAID', 'PROCESSING', 'READY_TO_SHIP', 'PREPARING', 'REQUESTED', 'PENDING'] },
+        order: {
+          status: { in: ['PAID', 'PROCESSING', 'READY_TO_SHIP', 'PREPARING', 'PARTIALLY_SHIPPED'] }
+        }
+      },
+      include: { product: true }
+    });
+    const pendingBalance = pendingItems.reduce((sum: number, item: any) => {
+      const basePrice = item.supplierPrice || item.product?.supplierBasePrice || item.price || 0;
+      return sum + (basePrice * (item.quantity || 1));
+    }, 0);
+
+    // Calculate active payout requests (locked funds)
+    const activePayouts = await prisma.payoutRequest.aggregate({
+      where: {
+        walletId: wallet.id,
+        status: { in: ['PENDING', 'PROCESSING'] }
+      },
+      _sum: { amount: true }
+    });
+    const payoutRequested = Number(activePayouts._sum.amount || 0);
+
+    // Calculate completed payouts
+    const completedPayouts = await prisma.payoutRequest.aggregate({
+      where: {
+        walletId: wallet.id,
+        status: 'SUCCESS'
+      },
+      _sum: { amount: true }
+    });
+    const payoutCompleted = Number(completedPayouts._sum.amount || 0);
+
+    // Fetch payout requests list
+    const payouts = await prisma.payoutRequest.findMany({
+      where: { walletId: wallet.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     
@@ -5964,11 +6188,26 @@ app.get('/api/supplier/reports', authenticateToken, requireSupplier, async (req:
 
     const totalHistory = await prisma.ledgerEntry.count({ where: whereClause });
 
+    // Determine minimum payout threshold
+    let minPayoutTomans = 50000;
+    const minConfig = await prisma.systemConfig.findUnique({ where: { key: 'MIN_PAYOUT_AMOUNT' } }).catch(() => null);
+    if (minConfig && minConfig.value) {
+      const val = Number(minConfig.value);
+      if (!isNaN(val) && val > 0) {
+        minPayoutTomans = val >= 1000000 ? Math.floor(val / 10) : val;
+      }
+    }
+
     res.json({
       balance: wallet.balance.toString(),
+      pendingBalance: pendingBalance.toString(),
+      payoutRequested: payoutRequested.toString(),
+      payoutCompleted: payoutCompleted.toString(),
       totalEarnings: (earningsResult._sum.amount || 0).toString(),
       totalWithdrawn: Math.abs(parseFloat((withdrawnResult._sum.amount || 0).toString())).toString(),
+      minPayoutAmount: minPayoutTomans,
       history,
+      payouts,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -7147,6 +7386,7 @@ app.get('/api/store-manager/marketplace-products', authenticateToken, requireSto
           category: true,
           images: true,
           variants: true,
+          wholesaleTiers: true,
           supplier: {
             select: {
               id: true,
@@ -8011,7 +8251,22 @@ app.get('/api/store-manager/daily-limit', authenticateToken, requireStoreManager
 app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, async (req: any, res: any) => {
   try {
     const storeId = req.user.userId;
-    const { items: requestItems, productId, variantId, quantity, notes, shippingAddressType, shippingAddress, shippingMethod, postalLabel, postalCode } = req.body;
+    const { 
+      items: requestItems, 
+      productId, 
+      variantId, 
+      quantity, 
+      notes, 
+      shippingAddressType, 
+      shippingAddress, 
+      shippingMethod, 
+      postalLabel, 
+      postalCode,
+      customerName,
+      customerPhone,
+      customerAddress,
+      customerCardNumber
+    } = req.body;
 
     // Normalize input into an array of item requests
     let rawItems: Array<{ productId: number; variantId?: number | null; quantity?: number; notes?: string }> = [];
@@ -8024,26 +8279,34 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
       return res.status(400).json({ error: 'کد محصول یا لیست اقلام الزامی است.' });
     }
 
-    // Resolve products and details via Batch queries to eliminate N+1 overhead
+    // Resolve products, variants, and wholesale tiers in batch to avoid N+1
     const productIds = Array.from(new Set(rawItems.map(i => i.productId).filter(Boolean)));
     const variantIds = Array.from(new Set(rawItems.map(i => i.variantId).filter((v): v is number => Boolean(v))));
 
     const [products, variants] = await Promise.all([
-      prisma.product.findMany({ where: { id: { in: productIds } } }),
+      prisma.product.findMany({ 
+        where: { id: { in: productIds } },
+        include: { wholesaleTiers: true, supplier: true }
+      }),
       variantIds.length > 0 ? prisma.productVariant.findMany({ where: { id: { in: variantIds } } }) : Promise.resolve([])
     ]);
 
     const productMap = new Map<number, any>(products.map((p: any) => [p.id, p]));
     const variantMap = new Map<number, any>(variants.map((v: any) => [v.id, v]));
 
+    // 1. Rigorous Server-Side Verification of every item request
     const resolvedItems: Array<{
       product: any;
       variantId: number | null;
       quantity: number;
       price: number;
       supplierPrice: number;
+      storeAcquisitionPrice: number;
+      wholesalePricing: any;
       supplierId: number;
       notes: string;
+      sku: string;
+      productName: string;
     }> = [];
 
     for (const itemReq of rawItems) {
@@ -8053,36 +8316,55 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
         return res.status(404).json({ error: `محصول با کد ${itemReq.productId} یافت نشد.` });
       }
 
-      let price = product.finalPrice || product.supplierBasePrice || 0;
-      let supplierPrice = product.supplierBasePrice || 0;
+      // Check product publication status
+      if (product.status !== 'PUBLISHED') {
+        return res.status(400).json({ error: `محصول "${product.name}" غیرفعال است یا منتشر نشده است.` });
+      }
+
+      // Check supplier active status
+      if (product.supplier?.status === 'SUSPENDED' || product.supplier?.status === 'BLOCKED') {
+        return res.status(400).json({ error: `امکان سفارش از تامین‌کننده محصول "${product.name}" به دلیل تعلیق وجود ندارد.` });
+      }
+
+      const orderQty = Math.max(1, itemReq.quantity || 1);
+
+      // Check selected variant
       let finalVariantId: number | null = null;
+      let selectedVariant: any = null;
+      let snapshotSku = product.sku || `PROD-${product.id}`;
 
       if (itemReq.variantId) {
         const variant: any = variantMap.get(itemReq.variantId);
         if (variant && variant.productId === product.id) {
           finalVariantId = variant.id;
-          supplierPrice = variant.supplierBasePrice || product.supplierBasePrice || 0;
-          let vfPrice = variant.finalPrice;
-          if (!vfPrice) {
-            vfPrice = supplierPrice;
-            if (product.marginType === 'PERCENTAGE' && product.marginValue) {
-              vfPrice = supplierPrice * (1 + product.marginValue / 100);
-            } else if (product.marginType === 'FIXED' && product.marginValue) {
-              vfPrice = supplierPrice + product.marginValue;
-            }
-          }
-          price = vfPrice;
+          selectedVariant = variant;
+          snapshotSku = variant.sku || snapshotSku;
         }
       }
+
+      // Authoritative Wholesale Pricing Calculation
+      const wholesalePricing = calculateAuthoritativeWholesalePricing({
+        product,
+        variant: selectedVariant,
+        quantity: orderQty
+      });
+
+      const supplierPrice = wholesalePricing.supplierUnitPrice;
+      const storeAcquisitionUnitPrice = wholesalePricing.storeAcquisitionUnitPrice;
+      const retailPrice = wholesalePricing.suggestedRetailUnitPrice;
 
       resolvedItems.push({
         product,
         variantId: finalVariantId,
-        quantity: itemReq.quantity || 1,
-        price,
-        supplierPrice,
+        quantity: orderQty,
+        price: retailPrice,
+        supplierPrice: supplierPrice,
+        storeAcquisitionPrice: storeAcquisitionUnitPrice,
+        wholesalePricing,
         supplierId: product.supplierId,
-        notes: itemReq.notes || notes || ''
+        notes: itemReq.notes || notes || '',
+        sku: snapshotSku,
+        productName: product.name
       });
     }
 
@@ -8090,92 +8372,164 @@ app.post('/api/store-manager/orders', authenticateToken, requireStoreManager, as
       return res.status(400).json({ error: 'هیچ آیتم معتبری یافت نشد.' });
     }
 
-    // Group items by supplierId for order splitting
-    const itemsBySupplier = new Map<number, typeof resolvedItems>();
-    for (const item of resolvedItems) {
-      const suppId = item.supplierId || 0;
-      if (!itemsBySupplier.has(suppId)) {
-        itemsBySupplier.set(suppId, []);
-      }
-      itemsBySupplier.get(suppId)!.push(item);
+    // 2. Calculate totals and check idempotency (double submission prevention)
+    const wholesaleTotal = resolvedItems.reduce((sum, i) => sum + (i.storeAcquisitionPrice * i.quantity), 0);
+    
+    const tenSecondsAgo = new Date(Date.now() - 10000);
+    const duplicateOrder = await prisma.order.findFirst({
+      where: {
+        storeId,
+        createdAt: { gte: tenSecondsAgo },
+        totalAmount: wholesaleTotal,
+        customerPhone: customerPhone || null
+      },
+      include: { items: true }
+    });
+
+    if (duplicateOrder) {
+      return res.status(409).json({ 
+        message: 'سفارش مشابهی در ۱۰ ثانیه گذشته ثبت شده است. لطفاً بخش تاریخچه را بررسی نمایید.',
+        order: duplicateOrder 
+      });
     }
 
-    const createdOrders: any[] = [];
-    const hasAddress = Boolean(shippingAddress && shippingAddress.trim().length > 5);
+    // 3. Database Transaction: Pre-validate Inventory & Parent Order Creation
+    const hasAddress = Boolean((shippingAddress && shippingAddress.trim().length > 5) || (customerAddress && customerAddress.trim().length > 5));
     const initialOrderStatus = hasAddress ? 'WAITING_SHIPPING_COST' : 'WAITING_STORE_ADDRESS';
 
-    for (const [suppId, groupItems] of itemsBySupplier.entries()) {
-      // Store manager pays wholesale base price (supplierPrice * quantity)
-      const wholesaleTotal = groupItems.reduce((sum, i) => sum + (i.supplierPrice * i.quantity), 0);
-      
-      const initialStatusNote = itemsBySupplier.size > 1
-        ? `سفارش به صورت تفکیک‌شده برای تامین‌کننده (شناسه #${suppId}) ثبت گردید تا پنل پستی و هزینه ارسال آن به طور مجزا صادر شود.`
-        : (hasAddress
-          ? 'سفارش و مشخصات مقصد ثبت شد و در صف برآورد هزینه ارسال توسط مدیریت مجموعه قرار گرفت.'
-          : 'سفارش ثبت شد و در انتظار تکمیل مشخصات پستی و آدرس مقصد است.');
+    const parentOrder = await prisma.$transaction(async (tx) => {
+      // Sort items deterministically by Variant/Product to guarantee deadlock immunity
+      const sortedItems = [...resolvedItems].sort((a: any, b: any) => 
+        ((a.variantId || 0) - (b.variantId || 0)) || ((a.product.id || 0) - (b.product.id || 0))
+      );
 
-      const order = await prisma.order.create({
+      // Pre-check Inventory Availability without early deduction (Deduction happens ONLY on verified payment)
+      for (const item of sortedItems) {
+        if (item.variantId) {
+          const v = await tx.productVariant.findUnique({ where: { id: item.variantId } });
+          if (!v || v.stock < item.quantity) {
+            throw new Error(`موجودی تنوع کالا با شناسه ${item.variantId} برای تعداد ${item.quantity} کافی نمی‌باشد.`);
+          }
+        } else if (item.product.id) {
+          const p = await tx.product.findUnique({ where: { id: item.product.id } });
+          if (!p || p.inventory < item.quantity) {
+            throw new Error(`موجودی محصول "${item.productName}" برای تعداد ${item.quantity} کافی نمی‌باشد.`);
+          }
+        }
+      }
+
+      // Create the single Parent Order object
+      const createdOrder = await tx.order.create({
         data: {
           storeId,
           totalAmount: wholesaleTotal,
           status: initialOrderStatus,
           shippingAddressType: shippingAddressType || 'OTHER_ADDRESS',
-          shippingAddress: shippingAddress || '',
+          shippingAddress: shippingAddress || customerAddress || '',
           shippingMethod: shippingMethod || 'POST',
           postalCode: postalCode || null,
           postalLabel: null,
-          orderSource: itemsBySupplier.size > 1 ? `store (تفکیک - تامین‌کننده #${suppId})` : 'store',
-          items: {
-            create: groupItems.map(i => ({
-              productId: i.product.id,
-              variantId: i.variantId,
-              supplierId: i.supplierId,
-              quantity: i.quantity,
-              notes: i.notes,
-              price: i.price,
-              supplierPrice: i.supplierPrice,
-              status: 'SUPPLIER_APPROVED'
-            }))
-          },
+          orderSource: 'store',
+          customerName: customerName || null,
+          customerPhone: customerPhone || null,
+          customerAddress: customerAddress || null,
+          customerCardNumber: customerCardNumber || null,
           statusHistory: {
             create: {
               fromStatus: null,
               toStatus: initialOrderStatus,
               actorRole: 'STORE_MANAGER',
               actorName: req.user.username || 'فروشگاه',
-              note: initialStatusNote
+              note: hasAddress 
+                ? 'سفارش ثبت شد و در صف برآورد هزینه ارسال توسط مجموعه قرار گرفت.' 
+                : 'سفارش ثبت شد و در انتظار تکمیل مشخصات پستی و آدرس مقصد است.'
             }
           }
-        },
-        include: { items: true }
+        }
       });
 
-      // Notify supplier via SMS
-      if (suppId) {
-        prisma.user.findUnique({ where: { id: suppId } }).then((supplier) => {
-          if (supplier?.mobile) {
-            notifySupplierNewOrder(supplier.mobile, order.id, supplier.brandName || supplier.username);
-          }
-        }).catch((smsErr) => console.warn('SMS supplier notification error:', smsErr));
+      // Group items by supplier for creating supplier groups
+      const itemsBySupplier = new Map<number, typeof resolvedItems>();
+      for (const item of resolvedItems) {
+        if (!itemsBySupplier.has(item.supplierId)) {
+          itemsBySupplier.set(item.supplierId, []);
+        }
+        itemsBySupplier.get(item.supplierId)!.push(item);
       }
 
-      createdOrders.push(order);
+      // Create SupplierOrderGroup records and the related immutable OrderItems
+      for (const [suppId, supplierItems] of itemsBySupplier.entries()) {
+        const subtotal = supplierItems.reduce((sum, i) => sum + (i.supplierPrice * i.quantity), 0);
+        
+        // Create the SupplierOrderGroup for this supplier under the parent order
+        const supplierGroup = await tx.supplierOrderGroup.create({
+          data: {
+            orderId: createdOrder.id,
+            supplierId: suppId,
+            status: 'PENDING',
+            subtotal,
+            shippingCost: 0
+          }
+        });
+
+        // Create the actual snapshotted items connected to the supplier group
+        for (const item of supplierItems) {
+          // Snapshotted commercial info in item notes to preserve name/SKU/wholesale tier immutably
+          const tierInfo = item.wholesalePricing.isWholesaleTierApplied && item.wholesalePricing.applicableTier
+            ? ` [پله عمده: ${item.wholesalePricing.applicableTier.minQuantity}+ عدد به قیمت واحد ${item.supplierPrice.toLocaleString('fa-IR')} ت]`
+            : '';
+          const immutableSnapshot = `نام کالا: ${item.productName} | شناسه (SKU): ${item.sku} | قیمت همکاری: ${item.storeAcquisitionPrice.toLocaleString('fa-IR')} ت | تامین: ${item.supplierPrice.toLocaleString('fa-IR')} ت${tierInfo}`;
+          const finalNotes = item.notes 
+            ? `${item.notes} (${immutableSnapshot})`
+            : immutableSnapshot;
+
+          await tx.orderItem.create({
+            data: {
+              orderId: createdOrder.id,
+              supplierId: item.supplierId,
+              productId: item.product.id,
+              variantId: item.variantId,
+              status: 'PENDING',
+              quantity: item.quantity,
+              notes: finalNotes,
+              price: item.price,
+              supplierPrice: item.supplierPrice,
+              supplierGroupId: supplierGroup.id
+            }
+          });
+        }
+      }
+
+      return tx.order.findUnique({
+        where: { id: createdOrder.id },
+        include: { 
+          items: { include: { product: true, variant: true } },
+          supplierOrderGroups: { include: { supplier: true } }
+        }
+      });
+    });
+
+    // 4. Send non-blocking SMS notifications to suppliers
+    if (parentOrder && parentOrder.supplierOrderGroups) {
+      for (const group of parentOrder.supplierOrderGroups) {
+        if (group.supplier?.mobile) {
+          notifySupplierNewOrder(
+            group.supplier.mobile, 
+            parentOrder.id, 
+            group.supplier.brandName || group.supplier.username
+          ).catch((smsErr) => console.warn('SMS supplier notification error:', smsErr));
+        }
+      }
     }
 
-    const isSplit = createdOrders.length > 1;
-    const msg = isSplit
-      ? `سفارش شما به دلیل تعدد تامین‌کنندگان، به صورت هوشمند به ${createdOrders.length} سفارش مجزا تفکیک گردید تا پنل پستی هر تامین‌کننده مشخص و هزینه ارسال دقیق محاسبه شود.`
-      : 'سفارش با موفقیت ثبت شد و در صف برآورد هزینه ارسال قرار گرفت.';
-
     return res.status(201).json({
-      message: msg,
-      isSplit,
-      orderCount: createdOrders.length,
-      orders: createdOrders,
-      order: createdOrders[0]
+      message: 'سفارش شما با موفقیت ثبت شد و در صف برآورد هزینه ارسال قرار گرفت.',
+      isSplit: parentOrder.supplierOrderGroups.length > 1,
+      orderCount: parentOrder.supplierOrderGroups.length,
+      order: parentOrder
     });
   } catch (err: any) {
-    res.status(500).json({ error: 'خطا در ثبت سفارش', details: err.message });
+    res.status(500).json({ error: 'خطا در ثبت سفارش: ' + err.message });
   }
 });
 
@@ -8211,7 +8565,8 @@ app.get('/api/store-manager/orders', authenticateToken, requireStoreManager, asy
         where: whereClause,
         include: {
           invoice: true,
-          items: { include: { product: { include: { supplier: true } }, variant: true } }
+          items: { include: { product: { include: { supplier: true } }, variant: true } },
+          supplierOrderGroups: { include: { supplier: true } }
         },
         orderBy: { id: 'desc' },
         skip,
@@ -8265,7 +8620,8 @@ app.get('/api/store-manager/notifications/check-new-orders', authenticateToken, 
             product: true,
             variant: true
           }
-        }
+        },
+        supplierOrderGroups: { include: { supplier: true } }
       },
       orderBy: { id: 'desc' },
       take: 10
@@ -8935,6 +9291,98 @@ app.put('/api/store-manager/orders/:id/shipping', authenticateToken, requireStor
   }
 });
 
+// Helper to sync SupplierOrderGroup status and parent Order status dynamically
+async function syncSupplierGroupAndParentStatus(orderId: number, supplierId: number, tx: any = prisma) {
+  // 1. Find all items belonging to this supplier in this order
+  const groupItems = await tx.orderItem.findMany({
+    where: { orderId, supplierId }
+  });
+  
+  if (groupItems.length === 0) return;
+  
+  // 2. Derive the group status
+  const itemStatuses = groupItems.map((i: any) => i.status);
+  let groupStatus = "PENDING";
+  
+  if (itemStatuses.every((s: string) => s === "SHIPPED")) {
+    groupStatus = "SHIPPED";
+  } else if (itemStatuses.every((s: string) => s === "DELIVERED" || s === "COMPLETED")) {
+    groupStatus = "DELIVERED";
+  } else if (itemStatuses.every((s: string) => s === "CANCELLED" || s === "REJECTED")) {
+    groupStatus = "CANCELLED";
+  } else if (itemStatuses.some((s: string) => ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(s))) {
+    groupStatus = "PROCESSING";
+  } else if (itemStatuses.some((s: string) => s === "PROCESSING" || s === "SUPPLIER_APPROVED")) {
+    groupStatus = "PROCESSING";
+  }
+  
+  // 3. Find or create the SupplierOrderGroup
+  const group = await tx.supplierOrderGroup.findFirst({
+    where: { orderId, supplierId }
+  });
+  
+
+  
+  const subtotal = groupItems.reduce((sum: number, i: any) => sum + (i.supplierPrice * i.quantity), 0);
+  const groupTrackingCode = groupItems.find((i: any) => i.trackingCode)?.trackingCode || null;
+  
+  if (group) {
+    await tx.supplierOrderGroup.update({
+      where: { id: group.id },
+      data: { 
+        status: groupStatus, 
+        subtotal,
+        trackingCode: groupTrackingCode || group.trackingCode
+      }
+    });
+    
+    if (groupStatus === 'SHIPPED' || groupStatus === 'DELIVERED' || groupStatus === 'COMPLETED') {
+      await creditSupplierForShippedGroup(tx, group.id);
+    }
+  } else {
+    await tx.supplierOrderGroup.create({
+      data: {
+        orderId,
+        supplierId,
+        status: groupStatus,
+        subtotal,
+        shippingCost: 0,
+        trackingCode: groupTrackingCode
+      }
+    });
+  }
+  
+  // 4. Derive parent order status based on all SupplierOrderGroups of this order
+  const allGroups = await tx.supplierOrderGroup.findMany({
+    where: { orderId }
+  });
+  
+  if (allGroups.length > 0) {
+    const groupStatuses = allGroups.map((g: any) => g.status);
+    let parentStatus = "PENDING";
+    
+    if (groupStatuses.every((s: string) => s === "DELIVERED")) {
+      parentStatus = "DELIVERED";
+    } else if (groupStatuses.every((s: string) => s === "CANCELLED")) {
+      parentStatus = "CANCELLED";
+    } else if (groupStatuses.every((s: string) => s === "SHIPPED")) {
+      parentStatus = "SHIPPED";
+    } else if (groupStatuses.some((s: string) => s === "SHIPPED" || s === "DELIVERED")) {
+      parentStatus = groupStatuses.every((s: string) => s === "SHIPPED" || s === "DELIVERED") ? "SHIPPED" : "PARTIALLY_SHIPPED";
+    } else if (groupStatuses.some((s: string) => s === "PROCESSING")) {
+      parentStatus = "PROCESSING";
+    } else {
+      const currentParent = await tx.order.findUnique({ where: { id: orderId } });
+      parentStatus = currentParent?.status || "PENDING";
+    }
+    
+    await tx.order.update({
+      where: { id: orderId },
+      data: { status: parentStatus }
+    });
+  }
+}
+
 // Helper to deduct product & variant inventory immediately when order is paid by store manager
 async function deductOrderInventory(tx: any, orders: any[]) {
   for (const o of orders) {
@@ -9006,6 +9454,182 @@ async function restoreOrderInventory(tx: any, orderOrOrders: any) {
     for (const item of items) {
       await restoreOrderItemInventory(tx, item);
     }
+  }
+}
+
+
+// Helper to atomically and idempotently credit a supplier's wallet for a shipped order group
+async function creditSupplierForShippedGroup(tx: any, groupId: number) {
+  const group = await tx.supplierOrderGroup.findUnique({
+    where: { id: groupId },
+    include: { 
+      items: { include: { product: true } },
+      order: true
+    }
+  });
+  if (!group || !['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(group.status)) return;
+  
+  // Validate that parent order is not in an unpaid, cancelled, or returned state
+  const invalidStatuses = ['WAITING_STORE_ADDRESS', 'WAITING_SHIPPING_COST', 'PENDING_PAYMENT', 'CANCELLED', 'FAILED', 'RETURNED', 'REJECTED', 'OUT_OF_STOCK'];
+  if (group.order && invalidStatuses.includes(group.order.status)) {
+    console.warn(`[Financial Engine] Skipping credit for group ${groupId}: Parent order #${group.orderId} is in invalid status ${group.order.status}`);
+    return;
+  }
+  
+  // Calculate total base cost for this group (supplier base price * quantity)
+  // Financial Separation: NEVER credit customer gross price or platform markup
+  let totalAmount = 0;
+  for (const item of group.items) {
+    const basePrice = item.supplierPrice || item.product?.supplierBasePrice || item.price || 0;
+    totalAmount += basePrice * (item.quantity || 1);
+  }
+  
+  if (totalAmount <= 0) return;
+  
+  // Find or create wallet
+  let wallet = await tx.wallet.findUnique({
+    where: { supplierId: group.supplierId }
+  });
+  if (!wallet) {
+    wallet = await tx.wallet.create({
+      data: { supplierId: group.supplierId, balance: 0 }
+    });
+  }
+  
+  // Check if ledger entry already exists to ensure idempotency (Database Idempotency)
+  const existingLedger = await tx.ledgerEntry.findFirst({
+    where: {
+      walletId: wallet.id,
+      referenceId: `GROUP_${groupId}`,
+      type: 'ORDER_REVENUE'
+    }
+  });
+  
+  if (existingLedger) return; // Already credited idempotently
+  
+  // Credit wallet available balance
+  await tx.wallet.update({
+    where: { id: wallet.id },
+    data: { balance: { increment: totalAmount } }
+  });
+  
+  // Create immutable authoritative ledger entry
+  await tx.ledgerEntry.create({
+    data: {
+      walletId: wallet.id,
+      amount: totalAmount,
+      type: 'ORDER_REVENUE',
+      status: 'COMPLETED',
+      referenceId: `GROUP_${groupId}`,
+      description: `درآمد حاصل از ارسال بسته سفارش #${group.orderId} (اعتبار پس از ارسال)`
+    }
+  });
+
+  // Record audit event
+  await tx.auditTrail.create({
+    data: {
+      userId: group.supplierId,
+      action: 'SUPPLIER_BALANCE_CREDITED',
+      details: `Supplier credited ${totalAmount} for shipped group ${groupId} of order ${group.orderId} (authoritative Shipped credit)`,
+      ipAddress: 'SYSTEM',
+      userAgent: 'SYSTEM'
+    }
+  });
+
+  // Send in-app notification to supplier confirming credit after shipping
+  try {
+    await tx.notification.create({
+      data: {
+        userId: group.supplierId,
+        title: `🚚 شارژ موجودی - ارسال سفارش #${group.orderId}`,
+        message: `مبلغ ${totalAmount.toLocaleString()} تومان بابت ارسال مرسوله سفارش #${group.orderId} به موجودی قابل تسویه شما افزوده شد. (اعتبار پس از ارسال)`,
+        type: 'SUCCESS',
+        isRead: false
+      }
+    });
+  } catch (e) {
+    console.warn('Supplier notification error:', e);
+  }
+}
+
+// Helper to reverse supplier credit for an individual group (Compensating Financial Event)
+async function reverseSupplierCreditForGroup(tx: any, groupId: number, reason?: string) {
+  const group = await tx.supplierOrderGroup.findUnique({
+    where: { id: groupId }
+  });
+  if (!group) return;
+
+  const wallet = await tx.wallet.findUnique({
+    where: { supplierId: group.supplierId }
+  });
+  if (!wallet) return;
+
+  const revenueLedger = await tx.ledgerEntry.findFirst({
+    where: {
+      walletId: wallet.id,
+      referenceId: `GROUP_${groupId}`,
+      type: 'ORDER_REVENUE'
+    }
+  });
+  if (!revenueLedger) return; // Never credited
+
+  const existingRefund = await tx.ledgerEntry.findFirst({
+    where: {
+      walletId: wallet.id,
+      referenceId: `REFUND_GROUP_${groupId}`,
+      type: 'REFUND'
+    }
+  });
+  if (existingRefund) return; // Already reversed
+
+  const amountToDebit = Number(revenueLedger.amount);
+  if (amountToDebit <= 0) return;
+
+  // Decrement wallet balance (allow negative balance to record debt/platform liability)
+  await tx.wallet.update({
+    where: { id: wallet.id },
+    data: {
+      balance: {
+        decrement: amountToDebit
+      }
+    }
+  });
+
+  // Create immutable compensating ledger entry
+  await tx.ledgerEntry.create({
+    data: {
+      walletId: wallet.id,
+      amount: -amountToDebit,
+      type: 'REFUND',
+      status: 'COMPLETED',
+      referenceId: `REFUND_GROUP_${groupId}`,
+      description: `سند اصلاحی کسر از حساب بابت لغو / مرجوعی مرسوله گروه ${groupId} سفارش #${group.orderId} (ابطال درآمد ارسال)`
+    }
+  });
+
+  // Record audit trail
+  await tx.auditTrail.create({
+    data: {
+      userId: group.supplierId,
+      action: 'SUPPLIER_BALANCE_REVERSED',
+      details: `Supplier ${group.supplierId} balance reversed by ${amountToDebit} for group ${groupId} (order #${group.orderId})`,
+      ipAddress: 'SYSTEM',
+      userAgent: 'SYSTEM'
+    }
+  });
+
+  try {
+    await tx.notification.create({
+      data: {
+        userId: group.supplierId,
+        title: `⚠️ ثبت سند اصلاحی کسر از حساب - مرسوله #${groupId}`,
+        message: `مبلغ ${amountToDebit.toLocaleString()} تومان بابت ${reason || 'لغو یا مرجوعی'} مرسوله از کیف پول شما کسر گردید.`,
+        type: 'WARNING',
+        isRead: false
+      }
+    });
+  } catch (e) {
+    console.warn('Supplier notification error:', e);
   }
 }
 
@@ -9117,7 +9741,7 @@ async function syncAllPaidOrdersSupplierWallets() {
       }
     });
     if (paidOrders.length > 0) {
-      await creditSuppliersForOrders(prisma, paidOrders);
+      // await creditSuppliersForOrders(prisma, paidOrders); // MOVED TO SHIPPED EVENT
     }
   } catch (err) {
     console.error('Error syncing supplier wallets:', err);
@@ -9129,7 +9753,10 @@ async function debitSupplierForRejectedOrder(tx: any, orderId: number, supplierI
   try {
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      include: { items: { include: { product: true } } }
+      include: { 
+        items: { include: { product: true } },
+        supplierGroups: true
+      }
     });
     if (!order) return;
 
@@ -9142,6 +9769,9 @@ async function debitSupplierForRejectedOrder(tx: any, orderId: number, supplierI
         const sId = item.supplierId || item.product?.supplierId;
         if (sId) suppliersToProcess.add(sId);
       });
+      (order.supplierGroups || []).forEach((g: any) => {
+        if (g.supplierId) suppliersToProcess.add(g.supplierId);
+      });
     }
 
     for (const suppId of suppliersToProcess) {
@@ -9150,81 +9780,113 @@ async function debitSupplierForRejectedOrder(tx: any, orderId: number, supplierI
       });
       if (!wallet) continue;
 
+      // Collect all potential reference IDs for this order: order ID and all group IDs
+      const groupsForSupp = (order.supplierGroups || []).filter((g: any) => g.supplierId === suppId);
+      const groupRefIds = groupsForSupp.map((g: any) => `GROUP_${g.id}`);
+      const allRefIds = [String(orderId), ...groupRefIds];
+
+      // Find all authoritative ORDER_REVENUE ledger entries credited for this order
       const revenueLedgers = await tx.ledgerEntry.findMany({
         where: {
           walletId: wallet.id,
-          referenceId: String(orderId),
+          referenceId: { in: allRefIds },
           type: 'ORDER_REVENUE'
         }
       });
 
-      if (revenueLedgers.length === 0) continue;
+      if (revenueLedgers.length === 0) continue; // Never credited, nothing to reverse!
 
-      const existingRefund = await tx.ledgerEntry.findFirst({
-        where: {
-          walletId: wallet.id,
-          referenceId: String(orderId),
-          type: 'REFUND'
-        }
-      });
+      let totalDebitedForSupplier = 0;
 
-      if (existingRefund) continue;
+      for (const revEntry of revenueLedgers) {
+        // Compensating reference key
+        const refundRefId = `REFUND_${revEntry.referenceId}`;
 
-      const totalRevenue = revenueLedgers.reduce((sum: number, entry: any) => sum + Number(entry.amount), 0);
-      if (totalRevenue <= 0) continue;
-
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          balance: {
-            decrement: totalRevenue
-          }
-        }
-      });
-
-      await tx.ledgerEntry.create({
-        data: {
-          walletId: wallet.id,
-          amount: -totalRevenue,
-          type: 'REFUND',
-          status: 'COMPLETED',
-          referenceId: String(orderId),
-          description: `کسر وجه به علت لغو / اعلام اتمام موجودی سفارش شماره ${orderId}`
-        }
-      });
-
-      try {
-        await tx.notification.create({
-          data: {
-            userId: suppId,
-            title: `⚠️ کسر از کیف پول - سفارش #${orderId}`,
-            message: `مبلغ ${totalRevenue.toLocaleString()} تومان بابت لغو / عدم موجودی سفارش شماره ${orderId} از کیف پول شما کسر گردید.`,
-            type: 'WARNING',
-            isRead: false
+        // Check if already reversed (Database Idempotency)
+        const existingRefund = await tx.ledgerEntry.findFirst({
+          where: {
+            walletId: wallet.id,
+            referenceId: { in: [refundRefId, revEntry.referenceId] },
+            type: 'REFUND'
           }
         });
-      } catch (e) {
-        console.warn('Supplier warning notification error:', e);
+
+        if (existingRefund) continue; // Already reversed
+
+        const entryAmount = Number(revEntry.amount);
+        if (entryAmount <= 0) continue;
+
+        // Decrement wallet balance (allow negative balance to record debt/platform payable)
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance: {
+              decrement: entryAmount
+            }
+          }
+        });
+
+        // Create immutable compensating ledger entry
+        await tx.ledgerEntry.create({
+          data: {
+            walletId: wallet.id,
+            amount: -entryAmount,
+            type: 'REFUND',
+            status: 'COMPLETED',
+            referenceId: refundRefId,
+            description: `سند اصلاحی کسر از حساب بابت لغو / مرجوعی سفارش شماره #${orderId} (ابطال درآمد مرسوله ${revEntry.referenceId})`
+          }
+        });
+
+        totalDebitedForSupplier += entryAmount;
       }
 
-      // Alert superadmins to refund customer
-      const superAdmins = await tx.user.findMany({
-        where: { role: 'SUPER_ADMIN' }
-      });
+      if (totalDebitedForSupplier > 0) {
+        // Record audit trail
+        await tx.auditTrail.create({
+          data: {
+            userId: suppId,
+            action: 'SUPPLIER_BALANCE_REVERSED',
+            details: `Supplier ${suppId} balance reversed by ${totalDebitedForSupplier} due to order #${orderId} cancellation/return`,
+            ipAddress: 'SYSTEM',
+            userAgent: 'SYSTEM'
+          }
+        });
 
-      for (const admin of superAdmins) {
+        // Send warning notification to supplier
         try {
           await tx.notification.create({
             data: {
-              userId: admin.id,
-              title: `🚨 اخطار لغو سفارش و لزوم عودت وجه خریدار - سفارش #${orderId}`,
-              message: `سفارش #${orderId} لغو / اعلام عدم موجودی گردید. مبلغ ${totalRevenue.toLocaleString()} تومان از کیف پول تامین‌کننده کسر شد. نسبت به عودت وجه به کارت خریدار اقدام فرمایید.`,
-              type: 'DANGER',
+              userId: suppId,
+              title: `⚠️ ثبت سند اصلاحی کسر از کیف پول - سفارش #${orderId}`,
+              message: `مبلغ ${totalDebitedForSupplier.toLocaleString()} تومان بابت ${reason || 'لغو یا مرجوعی'} سفارش شماره #${orderId} از موجودی شما کسر شد (سند اصلاحی).`,
+              type: 'WARNING',
               isRead: false
             }
           });
         } catch (e) {
-          console.warn('SuperAdmin alert error:', e);
+          console.warn('Supplier warning notification error:', e);
+        }
+
+        // Alert superadmins to refund customer
+        const superAdmins = await tx.user.findMany({
+          where: { role: 'SUPER_ADMIN' }
+        });
+
+        for (const admin of superAdmins) {
+          try {
+            await tx.notification.create({
+              data: {
+                userId: admin.id,
+                title: `🚨 اخطار لغو سفارش و لزوم عودت وجه خریدار - سفارش #${orderId}`,
+                message: `سفارش #${orderId} لغو / مرجوع گردید. مبلغ ${totalDebitedForSupplier.toLocaleString()} تومان از کیف پول تامین‌کننده با سند اصلاحی کسر شد. نسبت به عودت وجه به کارت خریدار اقدام فرمایید.`,
+                type: 'DANGER',
+                isRead: false
+              }
+            });
+          } catch (e) {
+            console.warn('SuperAdmin alert error:', e);
+          }
         }
       }
     }
@@ -9724,7 +10386,7 @@ app.post('/api/admin/manual-invoices/:id/approve', authenticateToken, requireAdm
       await deductOrderInventory(tx, orders);
 
       // Automatically credit supplier wallets for these paid orders
-      await creditSuppliersForOrders(tx, orders);
+      // await creditSuppliersForOrders(tx, orders); // MOVED TO SHIPPED EVENT
     });
 
     res.json({ message: 'فیش واریزی با موفقیت تایید و سفارشات تسویه شدند.' });
@@ -10183,7 +10845,7 @@ app.get('/api/public/store-invoice/callback', async (req: any, res: any) => {
         await deductOrderInventory(tx, currentInvoice.orders);
 
         // Automatically credit supplier wallets for these paid orders
-        await creditSuppliersForOrders(tx, currentInvoice.orders);
+        // await creditSuppliersForOrders(tx, currentInvoice.orders); // MOVED TO SHIPPED EVENT
       });
       return res.redirect(`${baseUrl}/?payment_status=success&invoiceId=${invoiceId}&trackId=${resolvedTrackId}&refId=${refId}`);
     } else {
@@ -10261,7 +10923,7 @@ app.get('/api/public/store-invoice/pay-simulate', async (req: any, res: any) => 
       await deductOrderInventory(tx, orders);
 
       // Automatically credit supplier wallets for these paid orders
-      await creditSuppliersForOrders(tx, orders);
+      // await creditSuppliersForOrders(tx, orders); // MOVED TO SHIPPED EVENT
     });
 
     // Redirect to frontend with success parameters
@@ -10419,11 +11081,53 @@ app.get('/api/admin/subscriptions', authenticateToken, requireAdmin, async (req:
 
 app.post('/api/admin/subscriptions/plan-config', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
-    const { monthlyPrice, annualPrice } = req.body;
-    await SubscriptionService.adminUpdatePlanPrices(req.user.userId, parseInt(monthlyPrice, 10), parseInt(annualPrice, 10));
-    res.json({ message: 'قیمت‌های جدید اشتراک با موفقیت ثبت شدند.' });
+    const { 
+      monthlyPrice, 
+      annualPrice,
+      promotionText,
+      promotionStart,
+      promotionEnd,
+      countdownVisible,
+      featuredPlan,
+      discountBadge,
+      valueStackServices,
+      promotionActionAfterExpiry,
+      startupMonthlyPrice,
+      startupOriginalValue,
+      proMonthlyOriginalValue,
+      proAnnualOriginalValue,
+      vipMonthlyPrice,
+      vipMonthlyOriginalValue,
+      vipAnnualPrice,
+      vipAnnualOriginalValue
+    } = req.body;
+
+    await SubscriptionService.adminUpdatePlanPrices(
+      req.user.userId, 
+      parseInt(monthlyPrice, 10), 
+      parseInt(annualPrice, 10),
+      {
+        promotionText,
+        promotionStart,
+        promotionEnd,
+        countdownVisible: countdownVisible !== undefined ? String(countdownVisible) === "true" : undefined,
+        featuredPlan,
+        discountBadge,
+        valueStackServices,
+        promotionActionAfterExpiry,
+        startupMonthlyPrice: startupMonthlyPrice ? parseInt(startupMonthlyPrice, 10) : undefined,
+        startupOriginalValue: startupOriginalValue ? parseInt(startupOriginalValue, 10) : undefined,
+        proMonthlyOriginalValue: proMonthlyOriginalValue ? parseInt(proMonthlyOriginalValue, 10) : undefined,
+        proAnnualOriginalValue: proAnnualOriginalValue ? parseInt(proAnnualOriginalValue, 10) : undefined,
+        vipMonthlyPrice: vipMonthlyPrice ? parseInt(vipMonthlyPrice, 10) : undefined,
+        vipMonthlyOriginalValue: vipMonthlyOriginalValue ? parseInt(vipMonthlyOriginalValue, 10) : undefined,
+        vipAnnualPrice: vipAnnualPrice ? parseInt(vipAnnualPrice, 10) : undefined,
+        vipAnnualOriginalValue: vipAnnualOriginalValue ? parseInt(vipAnnualOriginalValue, 10) : undefined
+      }
+    );
+    res.json({ message: 'قیمت‌ها و تنظیمات جدید جشنواره اشتراک با موفقیت ثبت شدند.' });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || 'خطا در به‌روزرسانی قیمت‌های اشتراک' });
+    res.status(400).json({ error: err.message || 'خطا در به‌روزرسانی تنظیمات اشتراک' });
   }
 });
 
@@ -11407,12 +12111,14 @@ app.get('/api/admin/settlements', authenticateToken, requireAdmin, async (req: a
         requestedAmount: parseFloat(p.amount?.toString() || '0'),
         remainingBalance: parseFloat(p.remainingBalance?.toString() || '0') || parseFloat(p.wallet?.balance?.toString() || '0'),
         iban: p.shaba,
+        maskedIban: maskShaba(p.shaba),
         bankName: p.bankName || supplier?.bankName || 'نامشخص',
         accountHolderName: p.accountHolderName || supplier?.accountHolderName || `${supplier?.firstName || ''} ${supplier?.lastName || ''}`,
         requestDate: p.createdAt.toISOString(),
         status: p.status, // PENDING, PROCESSING, SUCCESS, FAILED
         trackId: p.trackId,
-        supplierMobile: supplier?.mobile || 'ثبت نشده',
+        supplierMobile: supplier?.mobile ? maskMobile(supplier.mobile) : 'ثبت نشده',
+        rawMobile: supplier?.mobile || '',
         supplierEmail: supplier?.email || 'ثبت نشده',
       };
     });
@@ -11426,6 +12132,9 @@ app.get('/api/admin/settlements', authenticateToken, requireAdmin, async (req: a
 app.post('/api/admin/settlements/:id/approve', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
     const payoutId = req.params.id;
+    const adminId = req.user?.userId;
+    const { autoPay } = req.body || {};
+
     const payoutRequest = await prisma.payoutRequest.findUnique({
       where: { id: payoutId },
       include: { wallet: { include: { supplier: true } } }
@@ -11434,92 +12143,58 @@ app.post('/api/admin/settlements/:id/approve', authenticateToken, requireAdmin, 
       return res.status(404).json({ error: 'درخواست تسویه یافت نشد' });
     }
     if (payoutRequest.status !== 'PENDING' && payoutRequest.status !== 'PROCESSING') {
-      return res.status(400).json({ error: 'درخواست در وضعیت نهایی است' });
+      return res.status(400).json({ error: `درخواست در وضعیت ${payoutRequest.status} است و امکان تایید ندارد` });
     }
 
-    const shaba = payoutRequest.shaba || payoutRequest.wallet?.supplier?.shaba;
-    if (!shaba) {
-      return res.status(400).json({ error: 'شماره شبای تامین‌کننده یافت نشد.' });
-    }
+    const { WalletService } = await import('./src/services/WalletService.js');
+    const walletService = new WalletService();
 
-    const paymentGateway = await PaymentServiceFactory.getService();
-    const payoutResult = await paymentGateway.requestPayout(
-      payoutRequest.amount * 10,
-      shaba,
-      `تسویه حساب تامین‌کننده ${payoutRequest.wallet?.supplier?.companyName || payoutRequest.wallet?.supplier?.firstName || ''} - شماره ${payoutRequest.id}`
-    );
+    if (autoPay) {
+      const shaba = payoutRequest.shaba || payoutRequest.wallet?.supplier?.shaba;
+      if (!shaba) {
+        return res.status(400).json({ error: 'شماره شبای تامین‌کننده یافت نشد.' });
+      }
 
-    if (payoutResult.success) {
-      await prisma.$transaction(async (tx) => {
-        const currentPR = await tx.payoutRequest.findUnique({ where: { id: payoutId } });
-        if (!currentPR || (currentPR.status !== 'PENDING' && currentPR.status !== 'PROCESSING')) {
-          throw new Error('درخواست قبلاً نهایی شده است یا تغییر وضعیت داده است.');
+      try {
+        const paymentGateway = await PaymentServiceFactory.getService();
+        const payoutResult = await paymentGateway.requestPayout(
+          Number(payoutRequest.amount) * 10,
+          shaba,
+          `تسویه حساب زوپیت - درخواست ${payoutRequest.id}`
+        );
+
+        if (payoutResult.success) {
+          const updated = await walletService.markPaid(payoutId, adminId, {
+            transactionRef: payoutResult.trackId,
+            paymentNotes: 'پرداخت خودکار موفق از طریق درگاه بانکی'
+          });
+          return res.json({ success: true, message: 'تسویه حساب با موفقیت از طریق درگاه پرداخت انجام و نهایی شد.', payout: updated });
         }
-
-        await tx.payoutRequest.update({
-          where: { id: payoutId },
-          data: { 
-            status: 'SUCCESS',
-            trackId: payoutResult.trackId,
-            paymentDate: new Date(),
-            paymentNotes: 'پرداخت خودکار از طریق درگاه زیبال',
-            financiallyLocked: true
-          }
-        });
-        await tx.ledgerEntry.updateMany({
-          where: { referenceId: payoutId, type: 'WITHDRAWAL' },
-          data: { status: 'COMPLETED' }
-        });
-      });
-      return res.json({ success: true, message: 'تسویه حساب با موفقیت از طریق درگاه پرداخت انجام و نهایی شد.' });
-    } else {
-      await prisma.payoutRequest.update({
-        where: { id: payoutId },
-        data: { status: 'PROCESSING' }
-      });
-      return res.json({ success: true, message: 'درخواست تسویه تایید شد و در وضعیت در حال پردازش قرار گرفت. (انتقال خودکار ناموفق بود)' });
+      } catch (gateErr: any) {
+        console.warn('Auto gateway payout failed, approving to PROCESSING state:', gateErr.message);
+      }
     }
+
+    // Default flow: approve into PROCESSING state
+    const updated = await walletService.approvePayout(payoutId, adminId);
+    res.json({ success: true, message: 'درخواست تسویه حساب تایید شد و در صف پرداخت قرار گرفت.', payout: updated });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
+
 app.post('/api/admin/settlements/:id/reject', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
     const payoutId = req.params.id;
+    const adminId = req.user?.userId;
+    const { reason } = req.body || {};
 
-    await prisma.$transaction(async (tx) => {
-      const currentPR = await tx.payoutRequest.findUnique({ where: { id: payoutId } });
-      if (!currentPR) {
-        throw new Error('درخواست تسویه یافت نشد');
-      }
-      if (currentPR.status === 'SUCCESS' || currentPR.status === 'FAILED') {
-        throw new Error('درخواست قبلاً نهایی شده است');
-      }
+    const { WalletService } = await import('./src/services/WalletService.js');
+    const walletService = new WalletService();
 
-      // Set status to FAILED/REJECTED
-      await tx.payoutRequest.update({
-        where: { id: payoutId },
-        data: { status: 'FAILED' }
-      });
+    const updated = await walletService.rejectPayout(payoutId, adminId, reason);
 
-      // Update associated ledger entries
-      await tx.ledgerEntry.updateMany({
-        where: { referenceId: payoutId, type: 'WITHDRAWAL' },
-        data: { status: 'FAILED' }
-      });
-
-      // Return the amount to the wallet balance
-      await tx.wallet.update({
-        where: { id: currentPR.walletId },
-        data: {
-          balance: {
-            increment: currentPR.amount
-          }
-        }
-      });
-    });
-
-    res.json({ success: true, message: 'درخواست تسویه رد شد و مبلغ به کیف پول بازگردانده شد.' });
+    res.json({ success: true, message: 'درخواست تسویه رد شد و وجه به کیف پول تامین‌کننده بازگردانده شد.', payout: updated });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -11528,38 +12203,20 @@ app.post('/api/admin/settlements/:id/reject', authenticateToken, requireAdmin, a
 app.post('/api/admin/settlements/:id/pay', authenticateToken, requireAdmin, async (req: any, res: any) => {
   try {
     const payoutId = req.params.id;
+    const adminId = req.user?.userId;
     const { receiptUrl, transactionRef, paymentDate, paymentNotes } = req.body;
 
-    await prisma.$transaction(async (tx) => {
-      const currentPR = await tx.payoutRequest.findUnique({ where: { id: payoutId } });
-      if (!currentPR) {
-        throw new Error('درخواست تسویه یافت نشد');
-      }
-      if (currentPR.status === 'SUCCESS' || currentPR.status === 'FAILED') {
-        throw new Error('درخواست قبلاً نهایی شده است');
-      }
+    const { WalletService } = await import('./src/services/WalletService.js');
+    const walletService = new WalletService();
 
-      // Set status to SUCCESS
-      await tx.payoutRequest.update({
-        where: { id: payoutId },
-        data: {
-          status: 'SUCCESS',
-          receiptUrl,
-          transactionRef,
-          paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
-          paymentNotes,
-          financiallyLocked: true
-        }
-      });
-
-      // Update associated ledger entry
-      await tx.ledgerEntry.updateMany({
-        where: { referenceId: payoutId, type: 'WITHDRAWAL' },
-        data: { status: 'COMPLETED' }
-      });
+    const updated = await walletService.markPaid(payoutId, adminId, {
+      receiptUrl,
+      transactionRef,
+      paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+      paymentNotes
     });
 
-    res.json({ success: true, message: 'پرداخت با موفقیت نهایی و ثبت شد.' });
+    res.json({ success: true, message: 'پرداخت با موفقیت نهایی و ثبت شد.', payout: updated });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -11597,6 +12254,7 @@ app.get('/api/admin/settlements/:id', authenticateToken, requireAdmin, async (re
       requestedAmount: parseFloat(p.amount?.toString() || '0'),
       remainingBalance: parseFloat(p.remainingBalance?.toString() || '0') || parseFloat(p.wallet?.balance?.toString() || '0'),
       iban: p.shaba,
+      maskedIban: maskShaba(p.shaba),
       bankName: p.bankName || supplier?.bankName || 'نامشخص',
       accountHolderName: p.accountHolderName || supplier?.accountHolderName || `${supplier?.firstName || ''} ${supplier?.lastName || ''}`,
       requestDate: p.createdAt.toISOString(),
@@ -11617,12 +12275,23 @@ app.get('/api/admin/settlements/:id', authenticateToken, requireAdmin, async (re
       }))
     };
 
-    // Calculate a breakdown of orders for this supplier that are PAID
+    // Related Ledger Entries
+    const relatedLedgerEntries = await prisma.ledgerEntry.findMany({
+      where: {
+        OR: [
+          { referenceId: payoutId },
+          { payoutRequestId: payoutId }
+        ]
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Calculate a breakdown of orders for this supplier that are SHIPPED or PAID
     const orderItems = await prisma.orderItem.findMany({
       where: {
         supplierId: supplier?.id || 0,
         order: {
-          status: 'PAID'
+          status: { in: ['SHIPPED', 'PAID', 'DELIVERED', 'PROCESSING'] }
         }
       },
       include: {
@@ -11662,6 +12331,15 @@ app.get('/api/admin/settlements/:id', authenticateToken, requireAdmin, async (re
     };
 
     // Audit history logs
+    const auditTrails = await prisma.auditTrail.findMany({
+      where: {
+        resource: 'PAYOUT',
+        metadata: { contains: payoutId }
+      },
+      include: { actor: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
     const logs = await prisma.activityLog.findMany({
       where: {
         userId: supplier?.id
@@ -11672,16 +12350,25 @@ app.get('/api/admin/settlements/:id', authenticateToken, requireAdmin, async (re
       take: 10
     });
 
-    const auditHistory = logs.map((log: any) => ({
-      id: String(log.id),
-      action: log.action,
-      details: log.details || '',
-      createdAt: log.createdAt.toISOString()
-    }));
+    const auditHistory = [
+      ...auditTrails.map((at: any) => ({
+        id: `at-${at.id}`,
+        action: at.action,
+        details: at.metadata ? `${at.actor ? `${at.actor.firstName || ''} ${at.actor.lastName || ''}` : 'مدیر'}: ${at.metadata}` : at.action,
+        createdAt: at.createdAt.toISOString()
+      })),
+      ...logs.map((log: any) => ({
+        id: String(log.id),
+        action: log.action,
+        details: log.details || '',
+        createdAt: log.createdAt.toISOString()
+      }))
+    ];
 
     res.json({
       success: true,
       settlement: mappedSettlement,
+      relatedLedgerEntries,
       breakdown,
       accountingSummary,
       auditHistory
@@ -12189,6 +12876,12 @@ export async function approveAndPublishProductCore(params: {
     'SUCCESS'
   );
 
+  appEvents.emit('product.status_changed', {
+    productId: updatedProduct.id,
+    supplierId: updatedProduct.supplierId,
+    status: 'APPROVED'
+  });
+
   return { success: true, product: updatedProduct };
 }
 
@@ -12238,6 +12931,13 @@ export async function rejectProductCore(params: {
     'ERROR'
   );
 
+  appEvents.emit('product.status_changed', {
+    productId: updated.id,
+    supplierId: updated.supplierId,
+    status: 'REJECTED',
+    reason: cleanReason
+  });
+
   return { success: true, product: updated };
 }
 
@@ -12286,6 +12986,13 @@ export async function requestRevisionProductCore(params: {
     `کالای «${existing.name}» نیازمند اصلاح است. توضیحات کارشناس: ${cleanReason}. لطفاً پس از ویرایش، مجدداً ارسال نمایید.`,
     'WARNING'
   );
+
+  appEvents.emit('product.status_changed', {
+    productId: updated.id,
+    supplierId: updated.supplierId,
+    status: 'REVISION',
+    reason: cleanReason
+  });
 
   return { success: true, product: updated };
 }
@@ -13550,46 +14257,6 @@ app.patch('/api/admin/orders/:id/postal-label', authenticateToken, requireAdmin,
     });
 
     if (isTransitioningToProcessing) {
-      // Credit suppliers for direct orders
-      if (order.orderSource === 'direct' && order.items && order.items.length > 0) {
-        try {
-          await prisma.$transaction(async (tx) => {
-            for (const item of order.items) {
-              if (!item.supplierId) continue;
-              
-              const supplierAmount = item.supplierPrice * item.quantity;
-              
-              let wallet = await tx.wallet.findUnique({
-                where: { supplierId: item.supplierId }
-              });
-              if (!wallet) {
-                wallet = await tx.wallet.create({
-                  data: { supplierId: item.supplierId }
-                });
-              }
-              
-              await tx.wallet.update({
-                where: { id: wallet.id },
-                data: { balance: { increment: supplierAmount } }
-              });
-              
-              await tx.ledgerEntry.create({
-                data: {
-                  walletId: wallet.id,
-                  amount: supplierAmount,
-                  type: 'DEPOSIT',
-                  status: 'COMPLETED',
-                  description: `شارژ اتوماتیک بابت سفارش مستقیم #${orderId}`,
-                  referenceId: orderId.toString()
-                }
-              });
-            }
-          });
-        } catch (walletErr) {
-          console.error('Error crediting supplier wallets:', walletErr);
-        }
-      }
-
       try {
         await prisma.orderStatusHistory.create({
           data: {
@@ -13690,16 +14357,188 @@ app.get('/api/admin/financial', authenticateToken, requireAdmin, async (req, res
   try {
     const totalRevenue = await prisma.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: 'PAID' } });
     const pendingStorePayments = await prisma.storeInvoice.aggregate({ _sum: { totalAmount: true }, where: { status: 'PENDING' } });
-    const supplierWalletTotal = await prisma.supplierWallet.aggregate({ _sum: { balance: true, pending: true } });
+    const supplierWalletTotal = await prisma.wallet.aggregate({ _sum: { balance: true } });
     
+    // Start of today for daily metrics
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    // Today's credits (ORDER_REVENUE on shipped event)
+    const todayCreditsAgg = await prisma.ledgerEntry.aggregate({
+      where: {
+        type: 'ORDER_REVENUE',
+        createdAt: { gte: startOfToday }
+      },
+      _sum: { amount: true },
+      _count: { id: true }
+    });
+
+    // Shipped credits (all completed order revenue)
+    const shippedCreditsAgg = await prisma.ledgerEntry.aggregate({
+      where: {
+        type: 'ORDER_REVENUE',
+        status: 'COMPLETED'
+      },
+      _sum: { amount: true },
+      _count: { id: true }
+    });
+
+    // Payout requests (Pending & Processing)
+    const payoutRequestsAgg = await prisma.payoutRequest.aggregate({
+      where: {
+        status: { in: ['PENDING', 'PROCESSING'] }
+      },
+      _sum: { amount: true },
+      _count: { id: true }
+    });
+
+    // Completed payouts
+    const completedPayoutsAgg = await prisma.payoutRequest.aggregate({
+      where: {
+        status: 'SUCCESS'
+      },
+      _sum: { amount: true },
+      _count: { id: true }
+    });
+
+    // Reversals (Compensating REFUND entries)
+    const reversalsAgg = await prisma.ledgerEntry.aggregate({
+      where: {
+        type: 'REFUND'
+      },
+      _sum: { amount: true },
+      _count: { id: true }
+    });
+
+    // Outstanding liabilities (sum of all positive supplier wallet balances)
+    const positiveWallets = await prisma.wallet.findMany({
+      where: { balance: { gt: 0 } },
+      select: { balance: true }
+    });
+    const outstandingSupplierLiabilities = positiveWallets.reduce((sum, w) => sum + Number(w.balance), 0);
+
+    // Negative balances (suppliers in debt due to cancellations/reversals)
+    const negativeWallets = await prisma.wallet.findMany({
+      where: { balance: { lt: 0 } },
+      select: { balance: true }
+    });
+    const negativeBalancesTotal = negativeWallets.reduce((sum, w) => sum + Math.abs(Number(w.balance)), 0);
+
     res.json({
       totalRevenue: totalRevenue._sum.totalAmount || 0,
       pendingStorePayments: pendingStorePayments._sum.totalAmount || 0,
       supplierWalletBalance: supplierWalletTotal._sum.balance || 0,
-      supplierWalletPending: supplierWalletTotal._sum.pending || 0
+      supplierWalletPending: 0,
+      todayCredits: Number(todayCreditsAgg._sum.amount || 0),
+      todayCreditsCount: todayCreditsAgg._count.id || 0,
+      shippedCredits: Number(shippedCreditsAgg._sum.amount || 0),
+      shippedCreditsCount: shippedCreditsAgg._count.id || 0,
+      payoutRequestsTotal: Number(payoutRequestsAgg._sum.amount || 0),
+      payoutRequestsCount: payoutRequestsAgg._count.id || 0,
+      completedPayoutsTotal: Number(completedPayoutsAgg._sum.amount || 0),
+      completedPayoutsCount: completedPayoutsAgg._count.id || 0,
+      reversalsTotal: Math.abs(Number(reversalsAgg._sum.amount || 0)),
+      reversalsCount: reversalsAgg._count.id || 0,
+      outstandingSupplierLiabilities,
+      negativeBalancesTotal,
+      negativeBalancesCount: negativeWallets.length
     });
   } catch (err) {
-     res.status(500).json({ error: 'خطا' });
+    res.status(500).json({ error: 'خطا در دریافت آمار مالی' });
+  }
+});
+
+app.get('/api/admin/financial/supplier-overview', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [
+      totalWallets,
+      todayCreditsAgg,
+      shippedCreditsAgg,
+      payoutRequestsAgg,
+      completedPayoutsAgg,
+      reversalsAgg,
+      positiveWallets,
+      negativeWallets,
+      recentTransactions
+    ] = await Promise.all([
+      prisma.wallet.aggregate({ _sum: { balance: true } }),
+      prisma.ledgerEntry.aggregate({
+        where: { type: 'ORDER_REVENUE', createdAt: { gte: startOfToday } },
+        _sum: { amount: true },
+        _count: { id: true }
+      }),
+      prisma.ledgerEntry.aggregate({
+        where: { type: 'ORDER_REVENUE', status: 'COMPLETED' },
+        _sum: { amount: true },
+        _count: { id: true }
+      }),
+      prisma.payoutRequest.aggregate({
+        where: { status: { in: ['PENDING', 'PROCESSING'] } },
+        _sum: { amount: true },
+        _count: { id: true }
+      }),
+      prisma.payoutRequest.aggregate({
+        where: { status: 'SUCCESS' },
+        _sum: { amount: true },
+        _count: { id: true }
+      }),
+      prisma.ledgerEntry.aggregate({
+        where: { type: 'REFUND' },
+        _sum: { amount: true },
+        _count: { id: true }
+      }),
+      prisma.wallet.findMany({ where: { balance: { gt: 0 } }, select: { balance: true } }),
+      prisma.wallet.findMany({ where: { balance: { lt: 0 } }, select: { balance: true } }),
+      prisma.ledgerEntry.findMany({
+        orderBy: { id: 'desc' },
+        take: 15,
+        include: {
+          wallet: {
+            include: {
+              supplier: {
+                select: { id: true, brandName: true, firstName: true, lastName: true, mobile: true }
+              }
+            }
+          }
+        }
+      })
+    ]);
+
+    const outstandingSupplierLiabilities = positiveWallets.reduce((sum, w) => sum + Number(w.balance), 0);
+    const negativeBalancesTotal = negativeWallets.reduce((sum, w) => sum + Math.abs(Number(w.balance)), 0);
+
+    res.json({
+      totalSupplierBalances: totalWallets._sum.balance || 0,
+      todayCredits: Number(todayCreditsAgg._sum.amount || 0),
+      todayCreditsCount: todayCreditsAgg._count.id || 0,
+      shippedCredits: Number(shippedCreditsAgg._sum.amount || 0),
+      shippedCreditsCount: shippedCreditsAgg._count.id || 0,
+      payoutRequestsTotal: Number(payoutRequestsAgg._sum.amount || 0),
+      payoutRequestsCount: payoutRequestsAgg._count.id || 0,
+      completedPayoutsTotal: Number(completedPayoutsAgg._sum.amount || 0),
+      completedPayoutsCount: completedPayoutsAgg._count.id || 0,
+      reversalsTotal: Math.abs(Number(reversalsAgg._sum.amount || 0)),
+      reversalsCount: reversalsAgg._count.id || 0,
+      outstandingSupplierLiabilities,
+      negativeBalancesTotal,
+      negativeBalancesCount: negativeWallets.length,
+      recentTransactions: recentTransactions.map((tx: any) => ({
+        id: tx.id,
+        amount: Number(tx.amount),
+        type: tx.type,
+        status: tx.status,
+        referenceId: tx.referenceId,
+        description: tx.description,
+        createdAt: tx.createdAt,
+        supplierName: tx.wallet?.supplier?.brandName || `${tx.wallet?.supplier?.firstName || ''} ${tx.wallet?.supplier?.lastName || ''}`.trim() || 'تامین‌کننده',
+        supplierMobile: tx.wallet?.supplier?.mobile
+      }))
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در دریافت نمای جامع مالی تامین‌کنندگان' });
   }
 });
 
@@ -14126,7 +14965,7 @@ const safeUploadMulter = multerFn({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB maximum file size
 });
 
-app.post('/api/upload', authenticateToken, safeUploadMulter.single('file'), async (req: any, res: any) => {
+app.post('/api/upload', authenticateToken, multerFn({ dest: rootUploadsDir }).single('file'), async (req: any, res: any) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'هیچ فایلی برای آپلود انتخاب نشده است.' });
@@ -14586,6 +15425,7 @@ app.get('/api/public/products', async (req, res) => {
       include: {
         images: true,
         exploreContent: true,
+        wholesaleTiers: true,
         supplier: {
           select: {
             storeUrl: true,
@@ -15178,7 +16018,7 @@ app.get('/api/public/checkout/callback', async (req, res) => {
         await deductOrderInventory(tx, [updatedOrder]);
 
         // Credit supplier revenue
-        await creditSuppliersForOrders(tx, [updatedOrder]);
+        // await creditSuppliersForOrders(tx, [updatedOrder]); // MOVED TO SHIPPED EVENT
       });
 
       return res.redirect(`${baseUrl}/?payment_status=success&trackId=${resolvedTrackId}&orderId=${orderId}&refNumber=${refId}`);
@@ -15444,37 +16284,59 @@ const handlePaymentCallback = async (req: any, res: any) => {
     if (verification && verification.success) {
       const refId = verification.refId || String(trackId);
       if (orderToUpdate) {
-        await prisma.$transaction(async (tx) => {
-          const currentOrder = await tx.order.findUnique({
-            where: { id: orderToUpdate.id }
-          });
-          if (!currentOrder || currentOrder.status === 'PAID' || currentOrder.status === 'SUCCESS' || currentOrder.status === 'COMPLETED') {
-            return; // Idempotently exit
-          }
+        try {
+          await prisma.$transaction(async (tx) => {
+            const currentOrder = await tx.order.findUnique({
+              where: { id: orderToUpdate.id }
+            });
+            if (!currentOrder || currentOrder.status === 'PAID' || currentOrder.status === 'SUCCESS' || currentOrder.status === 'COMPLETED') {
+              return; // Idempotently exit
+            }
 
-          const updatedOrder = await tx.order.update({
+            const updatedOrder = await tx.order.update({
+              where: { id: orderToUpdate.id },
+              data: {
+                status: 'PAID',
+                trackingCode: refId,
+                statusHistory: {
+                  create: {
+                    fromStatus: currentOrder.status,
+                    toStatus: 'PAID',
+                    actorRole: 'SYSTEM',
+                    actorName: 'درگاه پرداخت زیبال',
+                    note: `پرداخت با موفقیت تایید شد. کد رهگیری: ${refId}`
+                  }
+                }
+              }
+            });
+
+            // Deduct inventory for paid order
+            await deductOrderInventory(tx, [updatedOrder]);
+          });
+        } catch (txErr: any) {
+          console.error("Payment verified but inventory failed:", txErr);
+          
+          // Fallback transaction to record the failed fulfillment
+          await prisma.order.update({
             where: { id: orderToUpdate.id },
             data: {
-              status: 'PAID',
-              trackingCode: refId,
+              status: 'OUT_OF_STOCK',
               statusHistory: {
                 create: {
-                  fromStatus: currentOrder.status,
-                  toStatus: 'PAID',
+                  fromStatus: orderToUpdate.status,
+                  toStatus: 'OUT_OF_STOCK',
                   actorRole: 'SYSTEM',
-                  actorName: 'درگاه پرداخت زیبال',
-                  note: `پرداخت با موفقیت تایید شد. کد رهگیری: ${refId}`
+                  actorName: 'سیستم انبار',
+                  note: `موجودی کافی نبود. پرداخت تایید شد اما سفارش لغو شد جهت عودت وجه. دلیل: ${txErr.message}`
                 }
               }
             }
-          });
-
-          // Deduct inventory for paid order
-          await deductOrderInventory(tx, [updatedOrder]);
-
-          // Credit supplier revenue
-          await creditSuppliersForOrders(tx, [updatedOrder]);
-        });
+          }).catch(console.error);
+          
+          return res.redirect(
+            `${baseUrl}/checkout/failed?trackId=${trackId}&orderId=${orderToUpdate?.id || orderId || ''}&message=${encodeURIComponent('پرداخت انجام شد اما متاسفانه موجودی انبار به اتمام رسیده است. وجه شما به زودی عودت داده خواهد شد.')}`
+          );
+        }
       }
 
       return res.redirect(
@@ -15505,6 +16367,11 @@ registerOrderLabel(app, prisma);
 registerPenaltyRoutes(app, prisma, authenticateToken);
 registerDiscountRoutes(app, authenticateToken, requireSuperAdmin);
 registerAIStudioRoute(app);
+registerSupplierAiRoute(app, prisma, authenticateToken, requireSupplier);
+registerWholesaleRoutes(app, prisma, authenticateToken, requireSupplier, requireStoreManager, requireAdmin);
+registerBusinessIntelligenceRoutes(app, prisma, authenticateToken, requireStoreManager, requireSupplier, requireAdmin);
+app.use('/api/admin/financial-control', authenticateToken, requireAdmin, financialControlRoutes);
+app.use('/api/notifications', authenticateToken, notificationRoutes);
 
 
 // Helper function: Auto-match Leads (تامینیاب‌ها) with registered suppliers by mobile/landline or brand name
@@ -17222,8 +18089,121 @@ app.get('/api/financial/reports', authenticateToken, requireAdmin, async (req: a
     }
   });
 
-  // Register AI Studio Route
-  registerAIStudioRoute(app);
+  // =========================================================================
+  // PROMPT 19 - ZOPIT FEATURED PRODUCTS & SPONSORED PLACEMENT ENGINE API ROUTES
+  // =========================================================================
+  const { FeaturedPlacementService } = await import('./src/services/FeaturedPlacementService.js');
+  const featuredPlacementService = new FeaturedPlacementService();
+
+  // 1. Supplier: Checkout Featured Placement
+  app.post('/api/supplier/featured-placement/checkout', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      const { productId, callbackUrl } = req.body;
+
+      if (!supplierId || !productId || !callbackUrl) {
+        return res.status(400).json({ error: 'شناسه محصول و آدرس بازگشت الزامی است', success: false });
+      }
+
+      const checkoutRes = await featuredPlacementService.checkoutFeatured(
+        Number(productId),
+        Number(supplierId),
+        callbackUrl
+      );
+
+      return res.json({ success: true, ...checkoutRes });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/featured-placement/checkout:', err);
+      return res.status(400).json({ error: err.message || 'خطا در ثبت درخواست پرداخت', success: false });
+    }
+  });
+
+  // 2. Public: Gateway Callback Handler (Server-Verified & Idempotent)
+  app.get('/api/public/featured-payment/callback', async (req: any, res: any) => {
+    try {
+      const authority = req.query.Authority || req.query.authority;
+      const status = req.query.Status || req.query.status; // 'OK' or 'NOK'
+
+      if (!authority) {
+        return res.status(400).send('کد پیگیری تراکنش یافت نشد.');
+      }
+
+      const verifyRes = await featuredPlacementService.verifyFeaturedPayment(authority as string);
+
+      // Redirect back to Supplier Featured Products dashboard tab with query state parameters
+      const statusParam = verifyRes.success ? 'success' : 'failed';
+      return res.redirect(`/supplier?tab=featured_products&payment_status=${statusParam}`);
+    } catch (err: any) {
+      console.error('Error in featured payment callback:', err);
+      return res.redirect(`/supplier?tab=featured_products&payment_status=error&message=${encodeURIComponent(err.message)}`);
+    }
+  });
+
+  // 3. Supplier: Dashboard (Metrics, Statuses, Configurations)
+  app.get('/api/supplier/featured-placement/dashboard', authenticateToken, requireSupplier, async (req: any, res: any) => {
+    try {
+      const supplierId = req.user?.userId || req.user?.id;
+      if (!supplierId) {
+        return res.status(401).json({ error: 'عدم احراز هویت تأمین‌کننده', success: false });
+      }
+
+      const result = await featuredPlacementService.getSupplierFeaturedDashboard(Number(supplierId));
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('Error in /api/supplier/featured-placement/dashboard:', err);
+      return res.status(500).json({ error: 'خطا در دریافت اطلاعات تبلیغات ویژه تأمین‌کننده', success: false });
+    }
+  });
+
+  // 4. Store-Manager: Track Ads Interactions (Impressions, Clicks, etc.)
+  app.post('/api/store-manager/featured/event', authenticateToken, requireStoreManager, async (req: any, res: any) => {
+    try {
+      const storeId = req.user?.userId || req.user?.id;
+      const { productId, eventType } = req.body;
+
+      if (!storeId || !productId || !eventType) {
+        return res.status(400).json({ error: 'شناسه محصول و نوع رویداد الزامی است', success: false });
+      }
+
+      await featuredPlacementService.recordAnalytics(
+        Number(productId),
+        eventType,
+        Number(storeId)
+      );
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('Error in /api/store-manager/featured/event:', err);
+      return res.status(500).json({ error: 'خطا در ثبت رویداد تحلیلی تبلیغات ویژه', success: false });
+    }
+  });
+
+  // 5. Admin: Dashboard Stats & Configurations (Revenues, Controls)
+  app.get('/api/admin/featured-placement/dashboard', authenticateToken, requireSuperAdmin, async (req: any, res: any) => {
+    try {
+      const result = await featuredPlacementService.getAdminFeaturedDashboard();
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('Error in /api/admin/featured-placement/dashboard:', err);
+      return res.status(500).json({ error: 'خطا در دریافت گزارش تبلیغات مدیریت', success: false });
+    }
+  });
+
+  // 6. Admin: Save Pricing & Duration Configuration
+  app.post('/api/admin/featured-placement/configs', authenticateToken, requireSuperAdmin, async (req: any, res: any) => {
+    try {
+      const { priceToman, durationHours } = req.body;
+      if (priceToman == null || durationHours == null) {
+        return res.status(400).json({ error: 'مقادیر ورودی نامعتبر هستند', success: false });
+      }
+
+      await featuredPlacementService.saveConfigs(Number(priceToman), Number(durationHours));
+      return res.json({ success: true, message: 'تنظیمات تبلیغات ویژه با موفقیت ذخیره شد' });
+    } catch (err: any) {
+      console.error('Error in /api/admin/featured-placement/configs:', err);
+      return res.status(500).json({ error: 'خطا در ذخیره‌سازی تنظیمات', success: false });
+    }
+  });
 
   // Global error handler middleware (Always returns JSON to prevent HTML leakage on API errors)
   app.use((err: any, req: any, res: any, next: any) => {

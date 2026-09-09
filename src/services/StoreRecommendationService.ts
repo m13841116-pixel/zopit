@@ -499,6 +499,10 @@ export class StoreRecommendationService {
 
       const isImported = profile.importedProductIds.has(p.id);
 
+      const isPaidFeatured = p.featuredStatus === 'ACTIVE' && p.featuredUntil && new Date(p.featuredUntil) >= new Date();
+      // Dynamically determine ZOPIT SELECTED based on actual signals scored by the recommendation engine (score >= 75)
+      const isZopitSelected = !isPaidFeatured && scoreData.score >= 75;
+
       return {
         id: p.id,
         name: p.exploreContent?.customTitle || p.name,
@@ -514,6 +518,8 @@ export class StoreRecommendationService {
         supplierInfo,
         isImported,
         score: scoreData.score,
+        isPaidFeatured,
+        isZopitSelected,
         reasonCodes: scoreData.reasonCodes,
         primaryReason: scoreData.primaryReason,
         recommendationType: scoreData.recommendationType,
@@ -525,29 +531,40 @@ export class StoreRecommendationService {
       };
     });
 
-    // 4. Sort deterministically by Score DESC
-    scoredList.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return b.id - a.id;
-    });
+    // 4. Implement Defined Placement Zone for Paid Placement
+    // Extract eligible highly-relevant Paid Featured products (matching score >= 50)
+    const activeFeaturedList = scoredList.filter(item => item.isPaidFeatured && item.score >= 50);
+    const normalList = scoredList.filter(item => !item.isPaidFeatured || item.score < 50);
+
+    // Sort both sub-lists deterministically by Score DESC
+    activeFeaturedList.sort((a, b) => b.score - a.score || b.id - a.id);
+    normalList.sort((a, b) => b.score - a.score || b.id - a.id);
+
+    // Take up to 2 featured placements for the premium top zone
+    const topFeatured = activeFeaturedList.slice(0, 2);
+    // Any remaining featured placements are mixed organically back into normal list
+    const remainingFeatured = activeFeaturedList.slice(2);
+    const combinedNormal = [...remainingFeatured, ...normalList];
+    combinedNormal.sort((a, b) => b.score - a.score || b.id - a.id);
 
     // 5. Diversity Interleaving (Avoid consecutive items from identical supplier if alternatives exist)
     const diversifiedList: typeof scoredList = [];
     const seenSuppliers = new Map<string, number>();
 
-    for (const item of scoredList) {
+    // We keep the top premium featured zone intact
+    diversifiedList.push(...topFeatured);
+
+    for (const item of combinedNormal) {
       const suppKey = item.supplierInfo?.username || String(item.id);
       const count = seenSuppliers.get(suppKey) || 0;
-      if (count < 3 || scoredList.length < safeLimit * 2) {
+      if (count < 3 || combinedNormal.length < safeLimit * 2) {
         diversifiedList.push(item);
         seenSuppliers.set(suppKey, count + 1);
       }
     }
 
     // Fallback if filtering was too aggressive
-    const finalList = diversifiedList.length >= safeLimit ? diversifiedList : scoredList;
+    const finalList = diversifiedList.length >= safeLimit ? diversifiedList : [...topFeatured, ...combinedNormal];
 
     // 6. Pagination
     const total = finalList.length;

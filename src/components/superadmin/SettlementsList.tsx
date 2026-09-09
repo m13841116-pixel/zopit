@@ -18,6 +18,10 @@ import {
   Calendar,
   Phone,
   Copy,
+  CreditCard,
+  Truck,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 interface SettlementRequest {
   id: string;
@@ -27,13 +31,19 @@ interface SettlementRequest {
   requestedAmount: number;
   remainingBalance: number;
   iban: string;
+  rawIban?: string;
+  maskedIban?: string;
   bankName: string;
   accountHolderName: string;
   requestDate: string;
   status: string;
   trackId: string | null;
   supplierMobile?: string;
+  rawMobile?: string;
   supplierEmail?: string;
+  receiptUrl?: string;
+  paymentNotes?: string;
+  paymentDate?: string | null;
   role?: string;
 }
 export default function SettlementsList() {
@@ -77,6 +87,11 @@ export default function SettlementsList() {
     paymentNotes: "",
   });
   const [loadingPayment, setLoadingPayment] = useState(false);
+  /* Rejection Modal */
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [loadingReject, setLoadingReject] = useState(false);
   /* Adjustment Modal */ const [adjustmentModalOpen, setAdjustmentModalOpen] =
     useState(false);
   const [adjustmentData, setAdjustmentData] = useState({
@@ -86,6 +101,8 @@ export default function SettlementsList() {
     reason: "",
   });
   const [loadingAdjustment, setLoadingAdjustment] = useState(false);
+  const [financialOverview, setFinancialOverview] = useState<any>(null);
+
   const fetchSettlements = () => {
     setLoading(true);
     const query = statusFilter ? `?status=${statusFilter}` : "";
@@ -100,6 +117,17 @@ export default function SettlementsList() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    // Fetch comprehensive financial overview
+    fetch('/api/admin/financial/supplier-overview', {
+      credentials: 'include',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error) setFinancialOverview(data);
+      })
+      .catch((err) => console.warn('Financial overview error:', err));
   };
   useEffect(() => {
     fetchSettlements();
@@ -125,25 +153,41 @@ export default function SettlementsList() {
       toast("خطا در ارتباط با سرور", "error");
     }
   };
-  const handleReject = async (id: string) => {
+  const handleOpenRejectModal = (id: string) => {
+    setRejectingId(id);
+    setRejectReason("");
+    setRejectModalOpen(true);
+  };
+  const handleConfirmReject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingId) return;
+    setLoadingReject(true);
     try {
-      const res = await fetch(`/api/admin/settlements/${id}/reject`, { credentials: "include",
+      const res = await fetch(`/api/admin/settlements/${rejectingId}/reject`, {
+        credentials: "include",
         method: "POST",
         headers: {
-          
           "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
+        body: JSON.stringify({ reason: rejectReason }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast("درخواست تسویه با موفقیت رد شد", "success");
+        toast("درخواست تسویه با موفقیت رد شد و وجه به کیف پول بازگردانده شد", "success");
+        setRejectModalOpen(false);
         fetchSettlements();
       } else {
         toast(data.error || "خطایی رخ داد", "error");
       }
     } catch (err) {
       toast("خطا در ارتباط با سرور", "error");
+    } finally {
+      setLoadingReject(false);
     }
+  };
+  const handleReject = async (id: string) => {
+    handleOpenRejectModal(id);
   };
   const handleOpenPaymentModal = (id: string) => {
     setPaymentData({
@@ -405,78 +449,130 @@ export default function SettlementsList() {
           </button>
         </div>
       </div>
+      {/* Financial Overview & Ledger Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-primary-default/10 rounded-xl">
+            <CreditCard className="w-6 h-6 text-primary-default" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-muted block">
+              تعهدات پلتفرم (موجودی کل کیف پول‌ها)
+            </span>
+            <span className="text-lg font-black text-primary mt-1 block">
+              {financialOverview ? Number(financialOverview.totalSupplierBalances || 0).toLocaleString() : '...'} <span className="text-xs font-normal text-muted">تومان</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-blue-500/10 rounded-xl">
+            <Truck className="w-6 h-6 text-blue-600" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-muted block">
+              اعتبارات امروز (اعتبار پس از ارسال)
+            </span>
+            <span className="text-lg font-black text-blue-600 mt-1 block">
+              {financialOverview ? Number(financialOverview.todayCredits || 0).toLocaleString() : '...'} <span className="text-xs font-normal text-muted">تومان</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-500/10 rounded-xl">
+            <CheckCircle className="w-6 h-6 text-emerald-600" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-muted block">
+              کل اعتبارات ارسالی (Shipped Credits)
+            </span>
+            <span className="text-lg font-black text-emerald-600 mt-1 block">
+              {financialOverview ? Number(financialOverview.shippedCredits || 0).toLocaleString() : '...'} <span className="text-xs font-normal text-muted">تومان</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-rose-500/10 rounded-xl">
+            <RotateCcw className="w-6 h-6 text-rose-600" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-muted block">
+              سندهای اصلاحی و مرجوعی (Reversals)
+            </span>
+            <span className="text-lg font-black text-rose-600 mt-1 block">
+              {financialOverview ? Number(financialOverview.reversalsTotal || 0).toLocaleString() : '...'} <span className="text-xs font-normal text-muted">تومان</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {financialOverview && financialOverview.negativeBalancesCount > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 p-4 rounded-xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <span className="text-sm font-bold text-amber-900 dark:text-amber-200">
+              توجه: تعداد {financialOverview.negativeBalancesCount} تامین‌کننده دارای مانده منفی (کسری حساب به علت مرجوعی/ابطال سفارش) هستند.
+            </span>
+          </div>
+          <span className="text-sm font-extrabold text-amber-800 dark:text-amber-300">
+            مجموع بدهی: {Number(financialOverview.negativeBalancesTotal || 0).toLocaleString()} تومان
+          </span>
+        </div>
+      )}
+
       {/* Metrics Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        
-        <div className="bg-card p-6 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
-          
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
           <div className="p-3.5 bg-warning/10 rounded-xl border border-amber-100">
-            
             <Clock className="w-6 h-6 text-warning" />
           </div>
           <div>
-            
             <span className="text-xs font-bold text-muted block uppercase tracking-wider">
-              در انتظار بررسی
+              در انتظار بررسی تسویه
             </span>
             <span className="text-xl font-extrabold text-primary mt-1 block">
-              
-              {requests.filter((r) => r.status === "PENDING").length}
-              درخواست
+              {requests.filter((r) => r.status === "PENDING").length} درخواست
             </span>
           </div>
         </div>
-        <div className="bg-card p-6 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
-          
+        <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
           <div className="p-3.5 bg-surface rounded-xl border border-blue-100">
-            
             <TrendingUp className="w-6 h-6 text-blue-600" />
           </div>
           <div>
-            
             <span className="text-xs font-bold text-muted block uppercase tracking-wider">
-              تایید شده (در انتظار پرداخت)
+              تایید شده (قفل‌شده در انتظار پرداخت)
             </span>
             <span className="text-xl font-extrabold text-primary mt-1 block">
-              
-              {requests.filter((r) => r.status === "PROCESSING").length}
-              درخواست
+              {requests.filter((r) => r.status === "PROCESSING").length} درخواست
             </span>
           </div>
         </div>
-        <div className="bg-card p-6 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
-          
+        <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
           <div className="p-3.5 bg-success/10 rounded-xl border border-emerald-100">
-            
             <CheckCircle className="w-6 h-6 text-success" />
           </div>
           <div>
-            
             <span className="text-xs font-bold text-muted block uppercase tracking-wider">
-              پرداخت شده
+              پرداخت شده کامل
             </span>
             <span className="text-xl font-extrabold text-primary mt-1 block">
-              
-              {requests.filter((r) => r.status === "SUCCESS").length}
-              درخواست
+              {requests.filter((r) => r.status === "SUCCESS").length} درخواست
             </span>
           </div>
         </div>
-        <div className="bg-card p-6 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
-          
+        <div className="bg-card p-5 rounded-2xl border border-subtle shadow-sm flex items-center gap-4">
           <div className="p-3.5 bg-danger/10 rounded-xl border border-rose-100">
-            
             <XCircle className="w-6 h-6 text-danger" />
           </div>
           <div>
-            
             <span className="text-xs font-bold text-muted block uppercase tracking-wider">
               رد شده
             </span>
             <span className="text-xl font-extrabold text-primary mt-1 block">
-              
-              {requests.filter((r) => r.status === "FAILED").length}
-              درخواست
+              {requests.filter((r) => r.status === "FAILED").length} درخواست
             </span>
           </div>
         </div>
@@ -614,14 +710,14 @@ export default function SettlementsList() {
                               className="block text-xs font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/50 px-2 py-0.5 rounded-lg"
                               dir="ltr"
                             >
-                              {req.iban}
+                              {req.maskedIban || req.iban}
                             </span>
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(req.iban);
+                                navigator.clipboard.writeText(req.rawIban || req.iban);
                                 toast("شماره شبا کپی شد", "success");
                               }}
-                              className="p-1 hover:bg-slate-100 rounded text-muted hover:text-indigo-600 transition-colors"
+                              className="p-1 hover:bg-slate-100 rounded text-muted hover:text-indigo-600 transition-colors cursor-pointer"
                               title="کپی شماره شبا"
                             >
                               <Copy className="w-3 h-3" />
@@ -2253,6 +2349,61 @@ export default function SettlementsList() {
                 ثبت نهایی اصلاحیه
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Rejection Modal */}
+      {rejectModalOpen && (
+        <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-card rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-subtle transform transition-all animate-scale-up font-sans">
+            <div className="p-5 border-b border-subtle flex items-center justify-between bg-background">
+              <h3 className="text-base font-extrabold text-danger flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-danger" />
+                رد درخواست تسویه حساب
+              </h3>
+              <button
+                onClick={() => setRejectModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-surface hover:bg-surface text-muted font-bold flex items-center justify-center transition-colors text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleConfirmReject} className="p-6 space-y-4 text-right">
+              <p className="text-xs text-muted leading-relaxed font-bold">
+                آیا از رد این درخواست تسویه مطمئن هستید؟ با رد این درخواست، وجه بلوکه‌شده آزاد شده و مجدداً در موجودی قابل برداشت تامین‌کننده قرار می‌گیرد.
+              </p>
+              <div>
+                <label className="block text-xs font-bold text-secondary mb-1">
+                  دلیل رد درخواست (اختیاری):
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="مثال: اطلاعات حساب یا شبا با نام دارنده مطابقت ندارد..."
+                  className="w-full px-3 py-2 text-xs bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-danger outline-none min-h-[80px]"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectModalOpen(false)}
+                  className="px-4 py-2 bg-surface hover:bg-surface text-secondary font-bold rounded-xl text-xs transition-colors"
+                  disabled={loadingReject}
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  disabled={loadingReject}
+                  className="px-4 py-2 bg-danger hover:bg-rose-700 text-inverse font-bold rounded-xl text-xs transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loadingReject && (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  )}
+                  تایید رد درخواست
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
