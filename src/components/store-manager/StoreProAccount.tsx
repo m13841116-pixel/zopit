@@ -48,6 +48,19 @@ import { ProAccountMediaShowcase } from "./ProAccountMediaShowcase";
 import { requestClientSideZibalPayment } from "../../services/payment/clientPaymentBridge";
 import { PricingPlansTable, PlanId, BillingCycle } from "./PricingPlansTable";
 
+const getPlanPrice = (plan: PlanId, cycle: BillingCycle): number => {
+  if (plan === "STARTUP") {
+    return cycle === "ANNUAL" ? 2490000 : 259000;
+  }
+  if (plan === "PRO") {
+    return cycle === "ANNUAL" ? 3990000 : 499000;
+  }
+  if (plan === "VIP") {
+    return cycle === "ANNUAL" ? 9900000 : 1290000;
+  }
+  return 0;
+};
+
 interface StoreProAccountProps {
   user?: any;
   showNotification?: (message: string, type: "success" | "error") => void;
@@ -58,7 +71,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
   const [loading, setLoading] = useState(true);
   const [proAccount, setProAccount] = useState<any>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanId>("PRO");
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("ANNUAL");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY");
   const [formStep, setFormStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
   const [renewingHost, setRenewingHost] = useState(false);
@@ -159,7 +172,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       }
 
       // Calculate applied discount amount
-      const planCost = selectedPlan === 'VIP' ? (billingCycle === 'ANNUAL' ? 9900000 : 1490000) : selectedPlan === 'PRO' ? (billingCycle === 'ANNUAL' ? 1490000 : 599000) : 259000;
+      const planCost = getPlanPrice(selectedPlan, billingCycle);
       const adminServicesCost = (selectedPlan === 'STARTUP' && hasEnamad) ? 50000 : 0;
       const totalCost = planCost + adminServicesCost;
       
@@ -499,7 +512,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     const canvas = canvasRef.current;
     const signatureImage = signatureDataUrl || (canvas ? canvas.toDataURL("image/png") : "");
 
-    const planCost = selectedPlan === 'VIP' ? (billingCycle === 'ANNUAL' ? 9900000 : 1490000) : selectedPlan === 'PRO' ? (billingCycle === 'ANNUAL' ? 1490000 : 599000) : 259000;
+    const planCost = getPlanPrice(selectedPlan, billingCycle);
     const adminServicesCost = (selectedPlan === 'STARTUP' && hasEnamad) ? 50000 : 0;
     const subtotal = planCost + adminServicesCost;
     const calculatedAmount = Math.max(0, subtotal - appliedDiscount);
@@ -755,6 +768,22 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
       value: "۵۵۰,۰۰۰ تومان",
       icon: Building2,
       color: "from-blue-500/20 to-blue-600/5 text-blue-500"
+    },
+    {
+      id: 13,
+      title: "ویژه پلن رشد / حرفه‌ای: + شامل تمامی امکانات و زیرساخت‌های پلن استارت‌آپ",
+      desc: "بهره‌مندی رایگان و همزمان از هاست ابری پرسرعت، درگاه مستقیم بانکی، پرونده مالیاتی زوپیت و قالب پیشرفته",
+      value: "هدیه رایگان زوپیت",
+      icon: CheckCircle2,
+      color: "from-indigo-500/20 to-indigo-600/5 text-indigo-600 font-bold"
+    },
+    {
+      id: 14,
+      title: "ویژه پلن VIP: + شامل تمامی امکانات و امکانات پیشرفته پلن رشد",
+      desc: "بهره‌مندی رایگان و همزمان از امکانات پیشرفته شامل هاست ابری فوق‌سریع، سامانه پیامک هوشمند، طراحی لوگو اختصاصی و پشتیبانی فوری",
+      value: "هدیه رایگان زوپیت",
+      icon: CheckCircle2,
+      color: "from-purple-500/20 to-purple-600/5 text-purple-600 font-bold"
     }
   ];
 
@@ -1324,17 +1353,19 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
           {formStep > 1 && (
             <div id="pro-register-wizard-container" className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-10 space-y-8 shadow-xs">
               {/* Back to plans button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setFormStep(1);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-indigo-600 cursor-pointer transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>بازگشت به انتخاب پلن</span>
-              </button>
+              <div className="flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormStep(1);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-600 hover:text-indigo-600 cursor-pointer transition-all bg-white hover:bg-slate-50 shadow-2xs"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                  <span>بازگشت به انتخاب پلن</span>
+                </button>
+              </div>
 
               <div className="border-b border-slate-100 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
@@ -1355,16 +1386,11 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     <Timer className="w-5 h-5 text-amber-700" />
                   </div>
                   <div>
-                    <div className="text-xs sm:text-sm font-extrabold text-amber-950 flex items-center gap-2 flex-wrap">
-                      <span>تخفیف و تعرفه ویژه راه‌اندازی (معتبر تا ۲۴:۰۰ امشب)</span>
-                      <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300">
-                        تمدید خودکار هر شب ساعت ۱۲ شب
-                      </span>
+                    <div className="text-xs sm:text-sm font-extrabold text-amber-950">
+                      ⚡ فرصت ویژه ثبت‌نام با نرخ پایه مصوب - مهلت استفاده از این تعرفه تا پایان امروز (ساعت ۲۴:۰۰)
                     </div>
                     <p className="text-[11px] text-slate-600 mt-0.5">
-                      {selectedPlan === "STARTUP"
-                        ? "پلن استارتاپ بر اساس کف قیمت مصوب سرور ابری محاسبه شده و ثبت‌نام تا پایان امروز معتبر است."
-                        : "تعرفه‌های تخفیف سالانه و ماهانه تا پایان امروز فعال بوده و هر شب ساعت ۱۲ تمدید می‌شوند."}
+                      پس از پایان مهلت زمانی امروز، تعرفه‌ها به قیمت‌های غیراختصاصی بازگشته و تخفیف‌ها منقضی خواهند شد.
                     </p>
                   </div>
                 </div>
@@ -1396,7 +1422,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder="مثال: محمد رضایی"
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium text-slate-900 transition-colors"
+                        className="w-full px-4 py-2.5 bg-white border border-[#D1D5DB] rounded-xl text-xs font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 shadow-2xs transition-colors"
                         required
                       />
                     </div>
@@ -1410,7 +1436,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                         onChange={(e) => setNationalCode(e.target.value)}
                         placeholder="۱۰ رقم کد ملی"
                         maxLength={10}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-left focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 transition-colors"
+                        className="w-full px-4 py-2.5 bg-white border border-[#D1D5DB] rounded-xl text-xs font-mono font-bold text-left focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 shadow-2xs transition-colors"
                         required
                       />
                     </div>
@@ -1423,7 +1449,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                         value={mobile}
                         onChange={(e) => setMobile(e.target.value)}
                         placeholder="09123456789"
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-left focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 transition-colors"
+                        className="w-full px-4 py-2.5 bg-white border border-[#D1D5DB] rounded-xl text-xs font-mono font-bold text-left focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 shadow-2xs transition-colors"
                         required
                       />
                     </div>
@@ -1570,7 +1596,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-slate-500">هزینه پلن:</span>
                       <span className="text-slate-900 font-bold">
-                        {Math.max(0, (selectedPlan === 'VIP' ? (billingCycle === 'ANNUAL' ? 9900000 : 1490000) : selectedPlan === 'PRO' ? (billingCycle === 'ANNUAL' ? 1490000 : 599000) : 259000)).toLocaleString()} تومان
+                        {getPlanPrice(selectedPlan, billingCycle).toLocaleString()} تومان
                       </span>
                     </div>
 
@@ -1658,11 +1684,7 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                       <span className="text-indigo-600 font-extrabold text-xl">
                         {Math.max(
                           0, 
-                          (selectedPlan === 'VIP' 
-                            ? (billingCycle === 'ANNUAL' ? 9900000 : 1490000) 
-                            : selectedPlan === 'PRO' 
-                              ? (billingCycle === 'ANNUAL' ? 1490000 : 599000) 
-                              : 259000) 
+                          getPlanPrice(selectedPlan, billingCycle) 
                           + ((selectedPlan === 'STARTUP' && hasEnamad) ? 50000 : 0) 
                           - appliedDiscount
                         ).toLocaleString()} تومان
@@ -1731,14 +1753,14 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
                     type="button"
                     onClick={(e) => handleRegister(e as any)}
                     disabled={submitting}
-                    className="w-full md:w-[75%] mx-auto py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-base rounded-2xl shadow-sm transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.005] disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="w-full py-4 bg-[#6366F1] hover:bg-[#5558e3] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-3 cursor-pointer transform hover:scale-[1.002] active:scale-[0.99] disabled:opacity-75 disabled:cursor-not-allowed"
                   >
                     {submitting ? (
                       <RefreshCw className="w-5 h-5 animate-spin" />
                     ) : (
                       <>
-                        <span>ارتقا و پرداخت نهایی</span>
-                        <ChevronLeft className="w-5 h-5" />
+                        <Lock className="w-5 h-5" />
+                        <span>ارتقا و پرداخت امن ({getPlanPrice(selectedPlan, billingCycle).toLocaleString()} تومان)</span>
                       </>
                     )}
                   </button>

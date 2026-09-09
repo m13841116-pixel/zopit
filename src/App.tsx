@@ -18,6 +18,7 @@ import { useTheme } from "./components/ThemeProvider";
 import { ThemeToggleFloating } from "./components/ThemeToggleFloating";
 import { GlobalToast } from "./components/GlobalToast";
 import { GlobalModals } from "./components/GlobalModals";
+import { AuthPage } from "./components/auth/AuthPage";
 import { SupplierRegisterForm } from "./components/auth/SupplierRegisterForm";
 import { StoreManagerRegisterForm } from "./components/auth/StoreManagerRegisterForm";
 
@@ -1691,6 +1692,32 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           />
         )}
         {view !== "dashboard" && view !== "explore" && (
+          <AuthPage
+            initialMode={view === "login" ? "login" : view === "forgot_password" ? "forgot_password" : "register"}
+            initialRole={
+              view === "store_manager_form" 
+                ? "store" 
+                : view === "ambassador_form" 
+                  ? "ambassador" 
+                  : "supplier"
+            }
+            onSuccess={(user, token) => {
+              localStorage.setItem("user", JSON.stringify(user));
+              localStorage.setItem("token", token);
+              setToken(token);
+              setCurrentUser(user);
+              setView("dashboard");
+            }}
+            showNotification={showNotification}
+            onShowTerms={(termsType) => {
+              setTermsTab(termsType === "supplier" ? "supplier" : "store");
+              setTermsModalOpen(true);
+            }}
+            onNavigateToExplore={() => setView("explore")}
+          />
+        )}
+        {/* Legacy block removed */}
+        {false && (
           <main className="flex-1 flex flex-col relative z-10 p-4 md:p-8 lg:p-12 items-center justify-center bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] dark:bg-[radial-gradient(#1e293b_1.2px,transparent_1.2px)] [background-size:24px_24px]">
             {" "}
             <div

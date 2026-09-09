@@ -30,6 +30,8 @@ import {
   ShoppingBag,
   Copy,
   Check,
+  Pencil,
+  Edit3,
   Printer,
   RefreshCw,
   Scale,
@@ -42,6 +44,7 @@ import {
   Megaphone,
   Activity,
   ShieldCheck,
+  MapPin,
   Folder,
   Globe,
   CreditCard,
@@ -220,6 +223,52 @@ export function SupplierDashboard({
   const [quickEditValues, setQuickEditValues] = useState<Record<number, { stock: number; supplierBasePrice: number }>>({});
   const [isSavingQuickEdit, setIsSavingQuickEdit] = useState(false);
   const [printLabelOrder, setPrintLabelOrder] = useState<any>(null);
+
+  // Quick Inline Single-Cell Edit States
+  const [inlineEditingCell, setInlineEditingCell] = useState<{ productId: number; field: 'stock' | 'supplierBasePrice' } | null>(null);
+  const [inlineEditTemp, setInlineEditTemp] = useState<number | ''>('');
+  const [isSavingInlineCell, setIsSavingInlineCell] = useState<number | null>(null);
+
+  const handleSaveInlineCell = async (productId: number, field: 'stock' | 'supplierBasePrice', val: number) => {
+    setIsSavingInlineCell(productId);
+    try {
+      const token = localStorage.getItem("token") || "";
+      await fetch(`/api/supplier/products/${productId}/quick-update`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ [field]: val })
+      });
+
+      setProducts(prev => prev.map(p => {
+        if (p.id === productId) {
+          if (field === 'supplierBasePrice') {
+            return { ...p, supplierBasePrice: val };
+          } else {
+            return {
+              ...p,
+              inventory: val,
+              variants: p.variants?.map((v: any, idx: number) => idx === 0 ? { ...v, stock: val } : v)
+            };
+          }
+        }
+        return p;
+      }));
+
+      if (showNotification) {
+        showNotification(field === 'stock' ? "موجودی انبار با موفقیت به‌روزرسانی شد." : "قیمت پایه با موفقیت به‌روزرسانی شد.", "success");
+      }
+    } catch (err) {
+      if (showNotification) {
+        showNotification("خطا در به‌روزرسانی سریع", "error");
+      }
+    } finally {
+      setIsSavingInlineCell(null);
+      setInlineEditingCell(null);
+    }
+  };
   
   // Supplier Push Notification States
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
@@ -1198,19 +1247,19 @@ export function SupplierDashboard({
                   
                   {/* Supplier Order / Request Announcement Alert */}
                   {orders.length > 0 && (
-                    <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-2 border-amber-500/40 p-5 rounded-3xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="bg-[#FFFBEB] border-2 border-[#FDE68A] p-5 rounded-3xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                       <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-md animate-pulse">
-                          <Bell className="w-6 h-6" />
+                        <div className="w-12 h-12 rounded-2xl bg-[#92400E] text-white flex items-center justify-center font-bold shrink-0 shadow-md">
+                          <Bell className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="font-extrabold text-base text-primary flex items-center gap-2">
+                          <h3 className="font-extrabold text-base text-[#92400E] flex items-center gap-2">
                             <span>اطلاعیه ثبت درخواست جدید برای تامین‌کننده</span>
-                            <span className="bg-amber-500 text-white text-xs px-2.5 py-0.5 rounded-full font-bold">
+                            <span className="bg-[#92400E]/15 text-[#92400E] border border-[#92400E]/30 text-xs px-2.5 py-0.5 rounded-full font-bold">
                               {orders.filter(o => o.status === "REQUESTED" || o.status === "PAID" || o.status === "PENDING").length} درخواست جدید
                             </span>
                           </h3>
-                          <p className="text-xs text-secondary mt-1 leading-relaxed">
+                          <p className="text-xs text-[#92400E] mt-1 leading-relaxed font-semibold">
                             همکار گرامی، درخواست‌ها و سفارش‌های جدیدی از طرف فروشگاه‌ها و معرفی‌کنندگان زوپیت برای مجموعه شما ثبت شده است. جهت پردازش و ارسال، لیست سفارشات را بررسی نمایید.
                           </p>
                         </div>
@@ -1220,18 +1269,18 @@ export function SupplierDashboard({
                           <button
                             type="button"
                             onClick={handleRequestPushPermission}
-                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow cursor-pointer flex items-center gap-1.5"
+                            className="px-5 py-2.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white font-bold text-xs rounded-xl transition-all shadow cursor-pointer flex items-center gap-1.5"
                           >
-                            <BellRing className="w-4 h-4 animate-bounce" />
+                            <BellRing className="w-4 h-4 text-white" />
                             <span>فعال‌سازی اعلان مرورگر</span>
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => setActiveTab("orders")}
-                          className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow cursor-pointer flex items-center gap-1.5"
+                          className="px-5 py-2.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white font-bold text-xs rounded-xl transition-all shadow cursor-pointer flex items-center gap-1.5"
                         >
-                          <ShoppingCart className="w-4 h-4" />
+                          <ShoppingCart className="w-4 h-4 text-white" />
                           <span>مشاهده و بررسی سفارشات</span>
                         </button>
                       </div>
@@ -1790,8 +1839,20 @@ export function SupplierDashboard({
                         <button
                           onClick={async () => {
                             setIsSavingQuickEdit(true);
-                            setTimeout(() => {
-                              // Apply quickEditValues to local products state
+                            try {
+                              const token = localStorage.getItem("token") || "";
+                              await Promise.all(
+                                Object.entries(quickEditValues).map(([pId, edit]) =>
+                                  fetch(`/api/supplier/products/${pId}/quick-update`, {
+                                    method: "PATCH",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      Authorization: `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify(edit)
+                                  }).catch(() => {})
+                                )
+                              );
                               setProducts((prev) =>
                                 prev.map((p) => {
                                   if (quickEditValues[p.id]) {
@@ -1808,12 +1869,17 @@ export function SupplierDashboard({
                                   return p;
                                 })
                               );
-                              setIsSavingQuickEdit(false);
-                              setQuickEditValues({});
                               if (showNotification) {
                                 showNotification("تغییرات قیمت و موجودی اکسلی با موفقیت ذخیره شد.", "success");
                               }
-                            }, 600);
+                            } catch (e) {
+                              if (showNotification) {
+                                showNotification("خطا در ذخیره دسته‌جمعی تغییرات", "error");
+                              }
+                            } finally {
+                              setIsSavingQuickEdit(false);
+                              setQuickEditValues({});
+                            }
                           }}
                           disabled={isSavingQuickEdit}
                           className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-2 rounded-xl font-black text-xs transition-all shadow-md flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
@@ -1912,12 +1978,60 @@ export function SupplierDashboard({
                                         }}
                                         className="w-24 px-3 py-1.5 bg-background border-2 border-indigo-400 rounded-lg text-xs font-mono font-bold text-center outline-none focus:ring-2 focus:ring-indigo-600"
                                       />
+                                    ) : inlineEditingCell?.productId === product.id && inlineEditingCell?.field === "stock" ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          autoFocus
+                                          value={inlineEditTemp}
+                                          onChange={(e) => setInlineEditTemp(e.target.value === "" ? "" : parseInt(e.target.value))}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                              handleSaveInlineCell(product.id, "stock", Number(inlineEditTemp || 0));
+                                            } else if (e.key === "Escape") {
+                                              setInlineEditingCell(null);
+                                            }
+                                          }}
+                                          className="w-20 px-2 py-1 text-xs font-mono font-bold bg-white dark:bg-slate-900 border-2 border-indigo-500 rounded-lg outline-none text-center shadow-inner"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSaveInlineCell(product.id, "stock", Number(inlineEditTemp || 0))}
+                                          disabled={isSavingInlineCell === product.id}
+                                          className="p-1.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-all shadow-xs cursor-pointer active:scale-95"
+                                          title="ذخیره"
+                                        >
+                                          <Check className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setInlineEditingCell(null)}
+                                          className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 rounded-lg transition-all cursor-pointer active:scale-95"
+                                          title="انصراف"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
                                     ) : (
-                                      <span className={`font-mono font-bold text-xs px-2.5 py-1 rounded-lg ${
-                                        currentStock > 0 ? "bg-slate-100 dark:bg-slate-800 text-secondary" : "bg-rose-50 text-rose-600 dark:bg-rose-950/30"
-                                      }`}>
-                                        {currentStock} عدد
-                                      </span>
+                                      <div className="flex items-center gap-1.5 group">
+                                        <span className={`font-mono font-bold text-xs px-2.5 py-1 rounded-lg ${
+                                          currentStock > 0 ? "bg-slate-100 dark:bg-slate-800 text-secondary" : "bg-rose-50 text-rose-600 dark:bg-rose-950/30"
+                                        }`}>
+                                          {currentStock} عدد
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setInlineEditingCell({ productId: product.id, field: "stock" });
+                                            setInlineEditTemp(currentStock);
+                                          }}
+                                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
+                                          title="ویرایش سریع موجودی"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
                                     )}
                                   </td>
 
@@ -1941,10 +2055,59 @@ export function SupplierDashboard({
                                         }}
                                         className="w-32 px-3 py-1.5 bg-background border-2 border-indigo-400 rounded-lg text-xs font-mono font-bold text-center outline-none focus:ring-2 focus:ring-indigo-600"
                                       />
+                                    ) : inlineEditingCell?.productId === product.id && inlineEditingCell?.field === "supplierBasePrice" ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <input
+                                          type="number"
+                                          step="1000"
+                                          autoFocus
+                                          value={inlineEditTemp}
+                                          onChange={(e) => setInlineEditTemp(e.target.value === "" ? "" : parseInt(e.target.value))}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                              handleSaveInlineCell(product.id, "supplierBasePrice", Number(inlineEditTemp || 0));
+                                            } else if (e.key === "Escape") {
+                                              setInlineEditingCell(null);
+                                            }
+                                          }}
+                                          className="w-28 px-2 py-1 text-xs font-mono font-bold bg-white dark:bg-slate-900 border-2 border-indigo-500 rounded-lg outline-none text-center shadow-inner"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSaveInlineCell(product.id, "supplierBasePrice", Number(inlineEditTemp || 0))}
+                                          disabled={isSavingInlineCell === product.id}
+                                          className="p-1.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-all shadow-xs cursor-pointer active:scale-95"
+                                          title="ذخیره"
+                                        >
+                                          <Check className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setInlineEditingCell(null)}
+                                          className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 rounded-lg transition-all cursor-pointer active:scale-95"
+                                          title="انصراف"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
                                     ) : (
-                                      <span className="font-mono font-black text-indigo-600 dark:text-indigo-400 text-sm">
-                                        {currentPrice.toLocaleString("fa-IR")}
-                                      </span>
+                                      <div className="flex items-center gap-1.5 group">
+                                        <span className="font-mono font-black text-indigo-600 dark:text-indigo-400 text-sm">
+                                          {currentPrice.toLocaleString("fa-IR")}
+                                        </span>
+                                        <span className="text-[10px] text-muted font-normal">تومان</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setInlineEditingCell({ productId: product.id, field: "supplierBasePrice" });
+                                            setInlineEditTemp(currentPrice);
+                                          }}
+                                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
+                                          title="ویرایش سریع قیمت پایه"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
                                     )}
                                   </td>
 
@@ -2076,51 +2239,51 @@ export function SupplierDashboard({
                             onClick={() => setOrderStatusFilter("all")}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               orderStatusFilter === "all"
-                                ? "bg-primary-default text-white shadow-md shadow-primary-default/20"
-                                : "bg-surface text-secondary hover:bg-border/60"
+                                ? "bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/20"
+                                : "bg-[#F3F4F6] text-[#4B5563] hover:bg-gray-200"
                             }`}
                           >
-                            همه سفارشات ({orders.length})
+                            همه سفارشات ({orders?.length || 0})
                           </button>
                           <button
                             onClick={() => setOrderStatusFilter("PENDING")}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               orderStatusFilter === "PENDING"
-                                ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
-                                : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                                ? "bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D] shadow-sm"
+                                : "bg-[#F3F4F6] text-[#4B5563] hover:bg-gray-200"
                             }`}
                           >
-                            در انتظار تایید ({orders.filter(o => ["REQUESTED", "PENDING", "NEW", "WAITING_SUPPLIER_CONFIRMATION"].includes(o.status)).length})
+                            در انتظار تایید ({orders?.filter(o => ["REQUESTED", "PENDING", "NEW", "WAITING_SUPPLIER_CONFIRMATION"].includes(o?.status || "")).length || 0})
                           </button>
                           <button
                             onClick={() => setOrderStatusFilter("CONFIRMED")}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               orderStatusFilter === "CONFIRMED"
-                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                                : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                ? "bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/20"
+                                : "bg-[#F3F4F6] text-[#4B5563] hover:bg-gray-200"
                             }`}
                           >
-                            تایید شده / در حال آماده‌سازی ({orders.filter(o => ["CONFIRMED", "PREPARING", "PENDING_POSTAL_LABEL", "PROCESSING", "PAID"].includes(o.status)).length})
+                            تایید شده / در حال آماده‌سازی ({orders?.filter(o => ["CONFIRMED", "PREPARING", "PENDING_POSTAL_LABEL", "PROCESSING", "PAID"].includes(o?.status || "")).length || 0})
                           </button>
                           <button
                             onClick={() => setOrderStatusFilter("SHIPPED")}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               orderStatusFilter === "SHIPPED"
-                                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-                                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                ? "bg-[#D1FAE5] text-[#065F46] border border-[#A7F3D0] shadow-sm"
+                                : "bg-[#F3F4F6] text-[#4B5563] hover:bg-gray-200"
                             }`}
                           >
-                            ارسال شده ({orders.filter(o => ["SHIPPED", "DELIVERED", "COMPLETED"].includes(o.status)).length})
+                            ارسال شده ({orders?.filter(o => ["SHIPPED", "DELIVERED", "COMPLETED"].includes(o?.status || "")).length || 0})
                           </button>
                           <button
                             onClick={() => setOrderStatusFilter("CANCELLED")}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               orderStatusFilter === "CANCELLED"
-                                ? "bg-rose-600 text-white shadow-md shadow-rose-600/20"
-                                : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                ? "bg-[#FEE2E2] text-[#991B1B] border border-[#FCA5A5] shadow-sm"
+                                : "bg-[#F3F4F6] text-[#4B5563] hover:bg-gray-200"
                             }`}
                           >
-                            لغو / رد شده ({orders.filter(o => ["CANCELLED", "REJECTED"].includes(o.status)).length})
+                            لغو / رد شده ({orders?.filter(o => ["CANCELLED", "REJECTED"].includes(o?.status || "")).length || 0})
                           </button>
                         </div>
 
@@ -2385,20 +2548,20 @@ export function SupplierDashboard({
                                         <span
                                           className={`px-3 py-1 rounded-full text-xs font-black border shadow-xs inline-flex items-center gap-1 ${
                                             order.status === "REQUESTED" || order.status === "NEW" || order.status === "WAITING_SUPPLIER_CONFIRMATION" || order.status === "PENDING"
-                                              ? "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400"
+                                              ? "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]"
                                               : order.status === "SHIPPED" || order.status === "PAID" || order.status === "COMPLETED" || order.status === "DELIVERED"
-                                                ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400"
+                                                ? "bg-[#D1FAE5] text-[#065F46] border-[#A7F3D0]"
                                                 : order.status === "CONFIRMED" || order.status === "PREPARING" || order.status === "PENDING_POSTAL_LABEL" || order.status === "PROCESSING"
-                                                  ? "bg-indigo-500/10 text-indigo-700 border-indigo-500/30 dark:text-indigo-400"
-                                                  : "bg-rose-500/10 text-rose-700 border-rose-500/30 dark:text-rose-400"
+                                                  ? "bg-indigo-100 text-indigo-900 border-indigo-200"
+                                                  : "bg-[#FEE2E2] text-[#991B1B] border-[#FCA5A5]"
                                           }`}
                                         >
                                           <span className={`w-1.5 h-1.5 rounded-full ${
                                             ["SHIPPED", "COMPLETED", "DELIVERED"].includes(order.status)
-                                              ? "bg-emerald-500"
+                                              ? "bg-[#065F46]"
                                               : ["REQUESTED", "PENDING", "NEW"].includes(order.status)
-                                                ? "bg-amber-500 animate-pulse"
-                                                : "bg-indigo-500"
+                                                ? "bg-[#92400E] animate-pulse"
+                                                : "bg-indigo-600"
                                           }`}></span>
                                           {getPersianStatus(order.status)}
                                         </span>
@@ -2414,9 +2577,9 @@ export function SupplierDashboard({
                                               setChangeStatus(order.status);
                                               setChangeTracking(order.trackingCode || "");
                                             }}
-                                            className="w-full sm:w-auto px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                                            className="w-full sm:w-auto px-3.5 py-2 bg-[#10B981] hover:bg-[#059669] active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                                           >
-                                            <Package className="w-3.5 h-3.5" />
+                                            <Package className="w-3.5 h-3.5 text-white" />
                                             <span>مشاهده و ثبت ارسال</span>
                                           </button>
 
@@ -2437,13 +2600,15 @@ export function SupplierDashboard({
                             </table>
                           </div>
                         ) : (
-                          <div className="text-center py-16 text-muted">
-                            <ShoppingCart className="w-16 h-16 mx-auto text-muted mb-4 opacity-50" />
-                            <p className="text-lg font-medium text-secondary mb-1">
-                              سفارشی مطابق فیلتر یافت نشد
-                            </p>
-                            <p className="text-xs text-text-muted">
-                              می‌توانید فیلترهای جستجو یا تاریخ را تغییر دهید.
+                          <div className="text-center py-20 px-4 bg-card rounded-2xl border border-subtle my-2 shadow-xs">
+                            <div className="w-20 h-20 mx-auto rounded-3xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center mb-4 shadow-inner">
+                              <ShoppingCart className="w-10 h-10 stroke-[1.5]" />
+                            </div>
+                            <h3 className="text-lg font-black text-primary mb-1.5">
+                              در حال حاضر سفارشی ثبت نشده است
+                            </h3>
+                            <p className="text-xs text-text-muted max-w-md mx-auto font-medium leading-relaxed">
+                              هیچ سفارشی برای پنل تامین‌کننده شما ثبت نشده یا مطابق با فیلترهای انتخابی یافت نشد.
                             </p>
                           </div>
                         )}
@@ -3108,6 +3273,7 @@ export function SupplierDashboard({
                   renderMaintenance("افزودن محصول")
                 ) : (
                   <SupplierAddProduct
+                    user={user}
                     onSuccess={() => {
                       fetchData();
                       setActiveTab("products");
@@ -3134,6 +3300,7 @@ export function SupplierDashboard({
               {/* EDIT PRODUCT TAB */}
               {activeTab === "edit-product" && productToEdit && (
                 <SupplierAddProduct
+                  user={user}
                   initialData={productToEdit}
                   onSuccess={() => {
                     fetchData();

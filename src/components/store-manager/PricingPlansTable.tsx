@@ -69,7 +69,7 @@ export function PricingPlansTable({
   onSelectPlan, 
   onProceedToForm 
 }: PricingPlansTableProps) {
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>(externalBillingCycle || "ANNUAL");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(externalBillingCycle || "MONTHLY");
   const countdown = useMidnightCountdown();
 
   useEffect(() => {
@@ -156,14 +156,11 @@ export function PricingPlansTable({
               </span>
               <span className="text-xs sm:text-sm font-extrabold text-amber-950 flex items-center gap-1.5">
                 <Timer className="w-4 h-4 text-amber-600" />
-                فرصت ویژه ثبت‌نام با تعرفه کف قیمت استارتاپ (۲۵۹,۰۰۰ تومان)
-              </span>
-              <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
-                تمدید خودکار هر شب ساعت ۱۲ شب
+                ⚡ فرصت ویژه ثبت‌نام با نرخ پایه مصوب - مهلت استفاده از این تعرفه تا پایان امروز (ساعت ۲۴:۰۰)
               </span>
             </div>
-            <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
-              این تعرفه صرفاً با پوشش حداقل هزینه‌های هاست ابری و با کف قیمت مصوب ارائه شده است. مهلت استفاده تا پایان امروز (ساعت ۲۴:۰۰) معتبر بوده و در پایان هر شب به صورت خودکار تمدید می‌گردد.
+            <p className="text-xs text-slate-600 leading-relaxed max-w-2xl font-medium">
+              این تعرفه استثنایی صرفاً برای ثبت‌نام‌های امروز فعال بوده و پس از اتمام زمان باقیمانده، به پایان خواهد رسید.
             </p>
           </div>
 
@@ -198,7 +195,7 @@ export function PricingPlansTable({
         
         {/* CARD 1: STARTUP PLAN */}
         <div
-          onClick={() => handleSelect("STARTUP", "MONTHLY")}
+          onClick={() => handleSelect("STARTUP", billingCycle)}
           className={`relative rounded-3xl p-7 sm:p-8 flex flex-col justify-between transition-all duration-200 cursor-pointer bg-white ${
             selectedPlan === "STARTUP"
               ? "border-2 border-indigo-600 shadow-md ring-4 ring-indigo-500/5"
@@ -227,11 +224,15 @@ export function PricingPlansTable({
             {/* Price Box with Countdown */}
             <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2">
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">۲۵۹,۰۰۰</span>
-                <span className="text-xs font-medium text-slate-500">تومان / ماهانه</span>
+                <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                  {billingCycle === "ANNUAL" ? "۲,۴۹۰,۰۰۰" : "۲۵۹,۰۰۰"}
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  تومان / {billingCycle === "ANNUAL" ? "سالانه" : "ماهانه"}
+                </span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
-                دوره‌ی تمدید: فقط ماهانه (کف قیمت زیرساخت)
+                {billingCycle === "ANNUAL" ? "شامل ۲ ماه تخفیف رایگان (پرداخت سالانه)" : "پرداخت منعطف ماهانه با امکان تمدید یا ارتقا"}
               </p>
               <div className="flex items-center justify-between text-[10px] text-amber-900 bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg">
                 <span className="flex items-center gap-1 font-bold">
@@ -282,7 +283,7 @@ export function PricingPlansTable({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                handleProceed("STARTUP", "MONTHLY");
+                handleProceed("STARTUP", billingCycle);
               }}
               className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-150 cursor-pointer flex items-center justify-center gap-2 ${
                 selectedPlan === "STARTUP"
@@ -338,7 +339,7 @@ export function PricingPlansTable({
             <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-2">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-                  {billingCycle === "ANNUAL" ? "۱,۴۹۰,۰۰۰" : "۵۹۹,۰۰۰"}
+                  {billingCycle === "ANNUAL" ? "۳,۹۹۰,۰۰۰" : "۴۹۹,۰۰۰"}
                 </span>
                 <span className="text-xs font-medium text-slate-600">
                   تومان / {billingCycle === "ANNUAL" ? "سالانه" : "ماهانه"}
@@ -347,7 +348,7 @@ export function PricingPlansTable({
               {billingCycle === "ANNUAL" ? (
                 <div className="text-[11px] font-bold text-indigo-700 bg-indigo-100/70 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
                   <BadgePercent className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>شامل ۸۰٪ تخفیف خرید سالانه (صرفه‌جویی چشمگیر)</span>
+                  <span>شامل تخفیف ویژه خرید سالانه (صرفه‌جویی چشمگیر)</span>
                 </div>
               ) : (
                 <div className="text-[11px] text-slate-500 font-medium">
@@ -367,6 +368,11 @@ export function PricingPlansTable({
               <FeatureItem active highlight>سامانه پیامک هوشمند و ارسال کد تایید خودکار</FeatureItem>
               <FeatureItem active highlight>پشتیبانی ویژه تیکتی (پاسخ سریع زیر ۶ ساعت)</FeatureItem>
               <FeatureItem active={false}>اتصال مستقیم با وب‌سرویس به ترب و ایمالز</FeatureItem>
+              
+              <div className="mt-3 pt-2.5 border-t border-indigo-100 text-indigo-700 font-extrabold text-[11px] flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                <span>+ شامل تمامی امکانات و زیرساخت‌های پلن استارت‌آپ</span>
+              </div>
             </div>
           </div>
 
@@ -420,7 +426,7 @@ export function PricingPlansTable({
             <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-                  {billingCycle === "ANNUAL" ? "۹,۹۰۰,۰۰۰" : "۱,۴۹۰,۰۰۰"}
+                  {billingCycle === "ANNUAL" ? "۹,۹۰۰,۰۰۰" : "۱,۲۹۰,۰۰۰"}
                 </span>
                 <span className="text-xs font-medium text-slate-500">
                   تومان / {billingCycle === "ANNUAL" ? "سالانه" : "ماهانه"}
@@ -441,6 +447,11 @@ export function PricingPlansTable({
               <FeatureItem active highlight>ثبت دامنه اختصاصی ir به نام مالک با هزینه رایگان</FeatureItem>
               <FeatureItem active highlight>قالب و افزونه‌های پریمیوم لایسنس‌دار نامحدود</FeatureItem>
               <FeatureItem active highlight>پشتیبانی مستقیم تلگرام + تماس + تیکت اولویت فوری</FeatureItem>
+              
+              <div className="mt-3 pt-2.5 border-t border-purple-100 text-purple-700 font-extrabold text-[11px] flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                <span>+ شامل تمامی امکانات و امکانات پیشرفته پلن رشد</span>
+              </div>
             </div>
           </div>
 
@@ -511,17 +522,17 @@ export function PricingPlansTable({
                 <TableRow
                   title="قیمت در حالت ماهانه"
                   v1={<span className="font-bold text-slate-800">۲۵۹,۰۰۰ تومان</span>}
-                  v2={<span className="font-bold text-indigo-600">۵۹۹,۰۰۰ تومان</span>}
-                  v3={<span className="font-bold text-slate-900">۱,۴۹۰,۰۰۰ تومان</span>}
+                  v2={<span className="font-bold text-indigo-600">۴۹۹,۰۰۰ تومان</span>}
+                  v3={<span className="font-bold text-slate-900">۱,۲۹۰,۰۰۰ تومان</span>}
                   isFeaturedColumn
                 />
                 <TableRow
                   title="قیمت در حالت سالانه"
-                  v1={<span className="text-slate-400">تنها پرداخت ماهانه دارد</span>}
+                  v1={<span className="font-bold text-slate-800">۲,۴۹۰,۰۰۰ تومان</span>}
                   v2={
                     <div className="space-y-0.5">
-                      <span className="font-bold text-indigo-600">۱,۴۹۰,۰۰۰ تومان</span>
-                      <span className="block text-[10px] text-emerald-600 font-bold">۸۰٪ صرفه‌جویی ویژه</span>
+                      <span className="font-bold text-indigo-600">۳,۹۹۰,۰۰۰ تومان</span>
+                      <span className="block text-[10px] text-emerald-600 font-bold">۲ ماه رایگان (تخفیف ویژه)</span>
                     </div>
                   }
                   v3={<span className="font-bold text-slate-900">۹,۹۰۰,۰۰۰ تومان</span>}

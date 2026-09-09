@@ -46,6 +46,7 @@ export function SupplierAddProduct({
   showNotification,
   initialData,
   onNavigateToTickets,
+  user,
 }: any) {
   const [activeAddTab, setActiveAddTab] = useState<"manual" | "woocommerce" | "excel" | "support">("manual");
   const [step, setStep] = useState(1);
@@ -307,23 +308,37 @@ export function SupplierAddProduct({
   React.useEffect(() => {
     (async () => {
       try {
+        let fetchedList: any[] = [];
         const res = await fetch("/api/public/categories");
         if (res.ok) {
           const data = await res.json();
-          const list = Array.isArray(data) ? data : (data?.categories || []);
-          if (list.length > 0) {
-            setCategories(list);
-            setFormData(prev => ({ ...prev, categoryId: prev.categoryId || String(list[0].id) }));
-            return;
+          fetchedList = Array.isArray(data) ? data : (data?.categories || []);
+        }
+        if (!fetchedList || fetchedList.length === 0) {
+          const res2 = await fetch("/api/categories");
+          if (res2.ok) {
+            const data2 = await res2.json();
+            fetchedList = Array.isArray(data2) ? data2 : (data2?.categories || []);
           }
         }
-        const res2 = await fetch("/api/categories");
-        if (res2.ok) {
-          const data2 = await res2.json();
-          const list2 = Array.isArray(data2) ? data2 : (data2?.categories || []);
-          if (list2.length > 0) {
-            setCategories(list2);
-            return;
+
+        if (fetchedList && fetchedList.length > 0) {
+          // Deduplicate categories by normalized category name
+          const uniqueMap = new Map();
+          fetchedList.forEach((cat: any) => {
+            const nameKey = (cat.name || cat.title || cat.categoryName || "").trim();
+            if (nameKey && !uniqueMap.has(nameKey)) {
+              uniqueMap.set(nameKey, {
+                id: cat.id,
+                name: nameKey,
+              });
+            }
+          });
+
+          const uniqueList = Array.from(uniqueMap.values());
+          if (uniqueList.length > 0) {
+            setCategories(uniqueList);
+            setFormData(prev => ({ ...prev, categoryId: prev.categoryId || String(uniqueList[0].id) }));
           }
         }
       } catch (err) {
@@ -519,8 +534,11 @@ export function SupplierAddProduct({
         .filter((s) => s.key && s.key.trim() && s.value && s.value.trim())
         .map(s => ({ key: s.key.trim(), value: s.value.trim() }));
 
+      const calculatedSupplierCode = user?.supplierCode || user?.code || (user?.id ? `ZP-${String(user.id).padStart(4, "0")}` : "ZP-8402");
+
       const payload = {
         ...formData,
+        supplierCode: calculatedSupplierCode,
         name: cleanedName,
         categoryId: cleanedCategoryId,
         supplierBasePrice: cleanedBasePrice,
@@ -956,11 +974,34 @@ export function SupplierAddProduct({
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <label className="text-sm font-bold text-secondary">
-                دسته‌بندی محصول * (یکی از موارد زیر را انتخاب کنید)
+                دسته‌بندی محصول * (انتخاب سریع یا از منوی کشویی)
               </label>
               <span className="text-xs text-muted font-normal">
-                {categories.length} دسته‌بندی در دسترس
+                {categories.length} دسته‌بندی اصلی یکتا
               </span>
+            </div>
+
+            {/* Quick Category Chips Grid */}
+            <div className="mb-3 flex flex-wrap gap-1.5 p-3 bg-surface rounded-2xl border border-subtle max-h-48 overflow-y-auto">
+              {categories.map((cat) => {
+                const cName = cat.name || cat.title || cat.categoryName || `دسته‌بندی ${cat.id}`;
+                const isSelected = String(cat.id) === formData.categoryId;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, categoryId: String(cat.id) })}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                      isSelected
+                        ? "bg-[#6366F1] text-white border-[#6366F1] shadow-sm scale-[1.02]"
+                        : "bg-[#F3F4F6] text-[#4B5563] border-transparent hover:bg-gray-200"
+                    }`}
+                  >
+                    {isSelected && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                    <span>{cName}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Category Select Dropdown */}
@@ -971,7 +1012,7 @@ export function SupplierAddProduct({
                 className="w-full px-4 py-3 bg-card text-primary border border-subtle rounded-xl font-medium outline-none focus:ring-2 focus:ring-primary-default text-sm cursor-pointer"
               >
                 <option value="" className="text-slate-900 bg-white dark:bg-slate-800 dark:text-slate-100">
-                  -- انتخاب دسته‌بندی محصول از منوی کشویی --
+                  -- انتخاب از لیست کامل دسته‌بندی‌ها ({categories.length} مورد) --
                 </option>
                 {categories.map((cat) => {
                   const cName = cat.name || cat.title || cat.categoryName || `دسته‌بندی ${cat.id}`;
@@ -1003,13 +1044,13 @@ export function SupplierAddProduct({
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, categoryId: "" })}
-                  className="text-xs text-danger hover:underline cursor-pointer"
+                  className="text-xs text-danger hover:underline cursor-pointer font-bold"
                 >
                   تغییر دسته‌بندی
                 </button>
               </div>
             ) : (
-              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+              <p className="mt-1.5 text-xs text-[#92400E] font-semibold flex items-center gap-1">
                 <Info className="w-3.5 h-3.5" />
                 جهت ادامه ثبت محصول، حتماً یکی از دسته‌بندی‌های فوق را انتخاب کنید.
               </p>

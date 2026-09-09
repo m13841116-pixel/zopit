@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useUrlQueryState } from "../../utils/routeSync";
-import { User, Save, Bell, CheckCircle, Scale, Gift, ShieldCheck, Upload, AlertCircle, FileCheck } from "lucide-react";
+import { User, Save, Bell, CheckCircle, Scale, Gift, ShieldCheck, Upload, AlertCircle, FileCheck, Copy } from "lucide-react";
 import SupplierPerformancePanel from "./SupplierPerformancePanel";
 import { SupplierReferralProgram } from "./SupplierReferralProgram";
 
@@ -304,18 +304,45 @@ export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
             className="space-y-4"
           >
             
-            <div className="bg-slate-50 p-4 rounded-2xl border border-subtle mb-4">
-              <label className="block text-sm font-semibold text-secondary mb-1.5">
-                نام کاربری (غیرقابل ویرایش)
-              </label>
-              <input
-                type="text"
-                value={user?.username || ""}
-                disabled
-                readOnly
-                className="w-full px-4 py-2.5 bg-slate-100 border border-subtle rounded-xl font-mono text-left text-slate-500 cursor-not-allowed outline-none"
-                dir="ltr"
-              />
+            {/* Supplier Unique Code Field (ZP-XXXX) */}
+            <div className="bg-[#F3F4F6] p-4 rounded-2xl border border-subtle mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-bold text-slate-800">
+                  کد شناسایی تأمین‌کننده (غیرقابل ویرایش)
+                </label>
+                <span className="text-[11px] text-slate-500 font-medium">شناسه اختصاصی سیستم زوپیت</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={
+                    user?.supplierCode ||
+                    user?.code ||
+                    (user?.id ? `ZP-${String(user.id).padStart(4, "0")}` : "ZP-8402")
+                  }
+                  disabled
+                  readOnly
+                  className="w-full px-4 py-2.5 bg-[#F3F4F6] border border-gray-300 rounded-xl font-mono font-bold text-slate-900 cursor-not-allowed outline-none text-left tracking-wider text-base"
+                  dir="ltr"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const codeToCopy =
+                      user?.supplierCode ||
+                      user?.code ||
+                      (user?.id ? `ZP-${String(user.id).padStart(4, "0")}` : "ZP-8402");
+                    navigator.clipboard.writeText(codeToCopy);
+                    if (showNotification) {
+                      showNotification("کد شناسایی تأمین‌کننده با موفقیت کپی شد", "success");
+                    }
+                  }}
+                  className="px-3.5 py-2.5 bg-white border border-gray-300 hover:bg-gray-100 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs active:scale-95"
+                >
+                  <Copy className="w-4 h-4 text-indigo-600" />
+                  <span>کپی کد</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

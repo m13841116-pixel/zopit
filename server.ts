@@ -4856,6 +4856,47 @@ app.patch('/api/supplier/profile', authenticateToken, requireSupplier, async (re
   }
 });
 
+// Quick Update Stock / Base Price for Supplier Product
+app.patch('/api/supplier/products/:id/quick-update', authenticateToken, requireSupplier, async (req: any, res: any) => {
+  try {
+    const productId = parseInt(req.params.id, 10);
+    const supplierId = req.user.userId;
+    const { supplierBasePrice, stock } = req.body;
+
+    const product = await prisma.product.findFirst({
+      where: { id: productId, supplierId }
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'محصول یافت نشد یا دسترسی مجاز نیست.' });
+    }
+
+    const updateData: any = {};
+    if (supplierBasePrice !== undefined && supplierBasePrice !== null) {
+      updateData.supplierBasePrice = Number(supplierBasePrice);
+    }
+    if (stock !== undefined && stock !== null) {
+      updateData.inventory = Number(stock);
+    }
+
+    const updatedProduct = await prisma.product.update({
+      where: { id: productId },
+      data: updateData
+    });
+
+    if (stock !== undefined && stock !== null) {
+      await prisma.productVariant.updateMany({
+        where: { productId },
+        data: { stock: Number(stock) }
+      }).catch(() => {});
+    }
+
+    res.json({ message: 'بروزرسانی سریع با موفقیت انجام شد.', product: updatedProduct });
+  } catch (err: any) {
+    res.status(500).json({ error: 'خطا در بروزرسانی سریع محصول', details: err.message });
+  }
+});
+
 // Get tickets
 app.get('/api/supplier/tickets', authenticateToken, requireSupplier, async (req: any, res) => {
   try {
