@@ -66,24 +66,13 @@ import {
   Menu,
   Play,
   Gift,
-  ArrowLeft,
-  FileSpreadsheet,
-  FileCheck,
-  Zap,
-  RotateCcw,
-  AlertTriangle
+  ArrowLeft
 } from "lucide-react";
 import { EducationModal } from "../EducationModal";
 import { SupplierOnboardingWidget } from "./SupplierOnboardingWidget";
 import { AutomationVideoModal } from "../AutomationVideoModal";
 import { ZopitLogo } from "../ZopitLogo";
 import { SupplierReferralProgram } from "./SupplierReferralProgram";
-import { SupplierBulkImport } from "./SupplierBulkImport";
-import { SupplierConciergeImport } from "./SupplierConciergeImport";
-import { SupplierGrowthCenter } from "./SupplierGrowthCenter";
-import { SupplierStoreMatches } from "./SupplierStoreMatches";
-import { SupplierProductOpportunities } from "./SupplierProductOpportunities";
-import { SupplierFeaturedProducts } from "./SupplierFeaturedProducts";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -130,8 +119,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Grid,
   Info,
   Layers,
-  Store,
-  FileSpreadsheet
+  Store
 };
 
 const getIconComponent = (iconName: any) => {
@@ -147,9 +135,6 @@ import { SupplierWooCommerceImport } from "./SupplierWooCommerceImport";
 import { SupplierTickets } from "./SupplierTickets";
 import { SupplierProfile } from "./SupplierProfile";
 import SupplierPerformancePanel from "./SupplierPerformancePanel";
-import SupplierShippingPanel from "./SupplierShippingPanel";
-import SupplierOrderTracker from "./SupplierOrderTracker";
-import { maskShaba } from "../../utils/masking";
 import {
   isBrowserNotificationSupported,
   getNotificationPermission,
@@ -179,7 +164,7 @@ export function SupplierDashboard({
   showNotification,
   onUpdateUser,
 }: any) {
-  const [activeTab, setActiveTabRaw] = useState(() => {
+  const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       const initialTab = sessionStorage.getItem("supplier_initial_tab");
       if (initialTab) {
@@ -205,15 +190,9 @@ export function SupplierDashboard({
   // Valid supplier tabs for routing fallback
   const validSupplierTabs = [
     "overview",
-    "growth-center",
-    "store-matches",
-    "product-opportunities",
-    "featured-products",
     "products",
     "add-product",
-    "bulk-import",
     "woocommerce-import",
-    "concierge-import",
     "orders",
     "wallet",
     "performance",
@@ -223,40 +202,7 @@ export function SupplierDashboard({
   ];
 
   // Sync tab with URL
-  
-  const hasBusinessInfo = Boolean(
-    (user?.firstName && user?.lastName) &&
-    user?.brandName &&
-    user?.activityType &&
-    user?.activityType.length > 2
-  );
-
-  const hasAddressInfo = Boolean(
-    user?.province &&
-    user?.city &&
-    user?.originAddress && user.originAddress.trim().length >= 10 &&
-    user?.postalCode && user.postalCode.trim().length >= 10
-  );
-
-  const hasBankInfo = Boolean(
-    (user?.shaba && user.shaba.replace(/\D/g, '').length >= 24) &&
-    user?.accountHolderName &&
-    user?.bankName
-  );
-
-  const isFullyCompleted = hasBusinessInfo && hasAddressInfo && hasBankInfo;
-
-  const setActiveTab = (tab: any) => {
-    if (!isFullyCompleted && (tab === "add-product" || tab === "woocommerce-import")) {
-      showNotification("لطفاً ابتدا فرآیند تکمیل حساب (اطلاعات هویتی، آدرس مبدا، اطلاعات بانکی) را تکمیل کنید.", "error");
-      setActiveTabRaw("overview");
-      return;
-    }
-    setActiveTabRaw(tab);
-  };
-
-  useSyncTabWithUrl("/supplier", activeTab, setActiveTabRaw, "overview", validSupplierTabs);
-
+  useSyncTabWithUrl("/supplier", activeTab, setActiveTab, "overview", validSupplierTabs);
 
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [showAutomationVideoModal, setShowAutomationVideoModal] = useState(false);
@@ -470,13 +416,8 @@ export function SupplierDashboard({
   const handleWithdrawalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(withdrawalAmount);
-    const minPayout = Number(walletInfo.minPayoutAmount || 50000);
     if (!amount || amount <= 0) {
       showNotification("لطفاً مبلغ معتبری وارد کنید", "error");
-      return;
-    }
-    if (amount < minPayout) {
-      showNotification(`حداقل مبلغ مجاز برای برداشت ${minPayout.toLocaleString()} تومان می‌باشد.`, "error");
       return;
     }
     if (amount > Number(walletInfo.balance || 0)) {
@@ -496,7 +437,7 @@ export function SupplierDashboard({
       });
       const data = await res.json();
       if (res.ok) {
-        showNotification(data.message || "درخواست برداشت شما ثبت شد.", "success");
+        showNotification("درخواست تسویه حساب شما با موفقیت ثبت شد", "success");
         setIsWithdrawalModalOpen(false);
         setWithdrawalAmount("");
         fetchData(); /* Refresh wallet state */
@@ -806,26 +747,6 @@ export function SupplierDashboard({
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
-      id: "growth-center",
-      label: "مرکز رشد و عملکرد 🚀",
-      icon: <TrendingUp className="w-5 h-5 text-emerald-500" />,
-    },
-    {
-      id: "store-matches",
-      label: "فروشگاه‌های مناسب 🎯",
-      icon: <Users className="w-5 h-5 text-indigo-500" />,
-    },
-    {
-      id: "product-opportunities",
-      label: "فرصت‌های محصول 💡",
-      icon: <Sparkles className="w-5 h-5 text-amber-500" />,
-    },
-    {
-      id: "featured-products",
-      label: "تبلیغات و ارتقای محصول 🌟",
-      icon: <Zap className="w-5 h-5 text-amber-500" />,
-    },
-    {
       id: "products",
       label: "محصولات من",
       icon: <Package className="w-5 h-5" />,
@@ -836,29 +757,14 @@ export function SupplierDashboard({
       icon: <PlusCircle className="w-5 h-5" />,
     },
     {
-      id: "bulk-import",
-      label: "ورود اکسل / CSV",
-      icon: <FileSpreadsheet className="w-5 h-5 text-emerald-500" />,
-    },
-    {
       id: "woocommerce-import",
       label: "دریافت از ووکامرس (API)",
       icon: <Globe className="w-5 h-5 text-indigo-500" />,
     },
     {
-      id: "concierge-import",
-      label: "محصولاتم را شما وارد کنید",
-      icon: <FileCheck className="w-5 h-5 text-amber-500" />,
-    },
-    {
       id: "orders",
       label: "سفارشات",
       icon: <ShoppingCart className="w-5 h-5" />,
-    },
-    {
-      id: "shipping",
-      label: "پروفایل پستی و ارسال",
-      icon: <Truck className="w-5 h-5" />,
     },
     {
       id: "wallet",
@@ -1077,33 +983,9 @@ export function SupplierDashboard({
           ) : (
             <>
               
-              {/* STORE MATCHES TAB */}
-              {activeTab === "store-matches" && (
-                <SupplierStoreMatches
-                  onNavigateTab={(tab) => setActiveTab(tab)}
-                  showNotification={showNotification}
-                />
-              )}
-
-              {/* GROWTH CENTER TAB */}
-              {activeTab === "growth-center" && (
-                <SupplierGrowthCenter
-                  user={user}
-                  onNavigateTab={(tab) => setActiveTab(tab)}
-                  showNotification={showNotification}
-                />
-              )}
-
               {/* OVERVIEW TAB */}
               {activeTab === "overview" && (
                 <div className="space-y-8 animate-fade-in">
-                  
-                  {/* Embedded Supplier Growth Center Component */}
-                  <SupplierGrowthCenter
-                    user={user}
-                    onNavigateTab={(tab) => setActiveTab(tab)}
-                    showNotification={showNotification}
-                  />
                   
                   {/* Supplier Order / Request Announcement Alert */}
                   {orders.length > 0 && (
@@ -1644,22 +1526,6 @@ export function SupplierDashboard({
                   />
                 </div>
               )}
-              {/* GROWTH CENTER TAB */}
-              {activeTab === "growth-center" && (
-                <SupplierGrowthCenter user={user} onNavigateTab={(tab) => setActiveTab(tab)} showNotification={showNotification} />
-              )}
-              {/* STORE MATCHES TAB */}
-              {activeTab === "store-matches" && (
-                <SupplierStoreMatches />
-              )}
-              {/* PRODUCT OPPORTUNITIES TAB */}
-              {activeTab === "product-opportunities" && (
-                <SupplierProductOpportunities />
-              )}
-              {/* FEATURED PRODUCTS TAB */}
-              {activeTab === "featured-products" && (
-                <SupplierFeaturedProducts />
-              )}
               {/* PRODUCTS TAB */}
               {activeTab === "products" &&
                 (sysConfig["SUPPLIER_CATALOG_ENABLED"] === false ? (
@@ -1682,22 +1548,10 @@ export function SupplierDashboard({
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setActiveTab("concierge-import")}
-                          className="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
-                        >
-                          <FileCheck className="w-4 h-4" /> محصولاتم را شما وارد کنید
-                        </button>
-                        <button
-                          onClick={() => setActiveTab("bulk-import")}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
-                        >
-                          <FileSpreadsheet className="w-4 h-4" /> ورود اکسل / CSV
-                        </button>
-                        <button
                           onClick={() => setActiveTab("woocommerce-import")}
-                          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+                          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
                         >
-                          <Globe className="w-4 h-4" /> دریافت از ووکامرس
+                          <Globe className="w-4 h-4" /> دریافت خودکار از ووکامرس
                         </button>
                         <button
                           onClick={() => setActiveTab("add-product")}
@@ -2404,7 +2258,7 @@ export function SupplierDashboard({
                                                   }}
                                                   className="text-[10px] text-slate-500 hover:text-slate-800 underline block mt-1 cursor-pointer"
                                                 >
-                                                  📦 پیگیری ارسال
+                                                  مشاهده تاریخچه و رهگیری
                                                 </button>
                                               </div>
                                             ) : (
@@ -2425,7 +2279,7 @@ export function SupplierDashboard({
                                                 }}
                                                 className="text-[11px] text-muted hover:text-primary font-bold py-1 transition-colors cursor-pointer text-center"
                                               >
-                                                📦 ثبت ارسال
+                                                مشاهده تاریخچه سفارش
                                               </button>
                                             )}
                                           </>
@@ -2469,14 +2323,9 @@ export function SupplierDashboard({
                           
                           <div>
                             
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <p className="text-slate-200 font-bold">
-                                موجودی قابل برداشت (تومان)
-                              </p>
-                              <span className="bg-white/20 text-white text-[11px] px-2.5 py-0.5 rounded-full font-bold">
-                                حداقل برداشت: {Number(walletInfo.minPayoutAmount || 50000).toLocaleString()} تومان
-                              </span>
-                            </div>
+                            <p className="text-slate-200 font-bold mb-1">
+                              موجودی قابل تسویه (تومان)
+                            </p>
                             <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white">
                               
                               {Number(
@@ -2489,8 +2338,8 @@ export function SupplierDashboard({
                                 
                                 <CheckCircle className="w-4 h-4 text-success" />
                                 <span>شماره شبا ثبت شده:</span>
-                                <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded text-xs" dir="ltr">
-                                  {user?.shaba ? maskShaba(user.shaba) : "ثبت نشده"}
+                                <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded text-xs">
+                                  {user?.shaba || "ثبت نشده"}
                                 </span>
                               </div>
                               {user?.bankName && (
@@ -2525,7 +2374,8 @@ export function SupplierDashboard({
                               onClick={() => setIsWithdrawalModalOpen(true)}
                               className="bg-white text-indigo-950 px-6 py-3.5 rounded-2xl font-extrabold shadow-lg hover:bg-indigo-50 active:scale-95 transition-all whitespace-nowrap self-stretch md:self-auto text-center cursor-pointer"
                             >
-                              درخواست برداشت
+                              
+                              درخواست تسویه حساب
                             </button>
                             <div className="flex gap-2">
                               
@@ -2551,52 +2401,56 @@ export function SupplierDashboard({
                       </div>
 
                       <div className="flex flex-col gap-4">
-                        {Number(walletInfo.balance || 0) < 0 && (
-                          <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-3xl p-4 flex items-center gap-3">
-                            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
-                            <div className="text-xs font-bold leading-relaxed">
-                              توجه: حساب شما دارای مانده منفی به مبلغ {Math.abs(Number(walletInfo.balance || 0)).toLocaleString()} تومان به علت لغو یا مرجوعی اقلام ارسال شده است. با ارسال سفارش‌های بعدی یا شارژ حساب، این مبلغ جبران خواهد شد.
-                            </div>
-                          </div>
-                        )}
-
+                        
                         <div className="bg-warning/10 rounded-3xl p-5 border border-amber-100 shadow-sm flex flex-col justify-center">
+                          
                           <p className="text-amber-800 font-medium mb-1 text-sm">
-                            موجودی در انتظار ارسال (تومان)
+                            موجودی در انتظار تسویه (تومان)
                           </p>
                           <h3 className="text-2xl font-bold text-amber-900">
+                            
                             {Number(
                               walletInfo.pendingBalance || 0,
                             ).toLocaleString()}
                           </h3>
                           <div className="mt-2 text-xs font-medium text-warning flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-warning" /> سفارش‌های در جریان (اعتبار پس از ثبت «ارسال شد»)
+                            
+                            <Clock className="w-3 h-3 text-warning" /> سفارش‌های
+                            در جریان (تسویه‌نشده)
                           </div>
                         </div>
                         <div className="bg-card rounded-3xl p-5 border border-subtle shadow-sm flex flex-col justify-center">
+                          
                           <p className="text-muted font-medium mb-1 text-sm">
                             کل درآمدهای شما (تومان)
                           </p>
                           <h3 className="text-2xl font-bold text-primary">
+                            
                             {Number(
                               walletInfo.totalEarnings || 0,
                             ).toLocaleString()}
                           </h3>
                           <div className="mt-2 text-xs font-medium text-success flex items-center gap-1">
-                            <TrendingUp className="w-3 h-3" /> درآمد کل کسب شده
+                            
+                            <TrendingUp className="w-3 h-3" /> درآمد کل کسب
+                            شده
                           </div>
                         </div>
                         <div className="bg-card rounded-3xl p-5 border border-subtle shadow-sm flex flex-col justify-center">
+                          
                           <p className="text-muted font-medium mb-1 text-sm">
                             کل تسویه شده (تومان)
                           </p>
                           <h3 className="text-2xl font-bold text-primary">
+                            
                             {Number(
                               walletInfo.totalWithdrawn || 0,
                             ).toLocaleString()}
                           </h3>
                           <div className="mt-2 text-xs font-medium text-primary-default flex items-center gap-1">
-                            <Wallet className="w-3 h-3" /> مبالغ واریز شده به حساب
+                            
+                            <Wallet className="w-3 h-3" /> مبالغ واریز شده به
+                            حساب
                           </div>
                         </div>
                       </div>
@@ -2618,7 +2472,8 @@ export function SupplierDashboard({
                             onClick={() => setWalletSubTab("payouts")}
                             className={`pb-3 font-bold text-base transition-colors relative ${walletSubTab === "payouts" ? "text-primary-default border-b-2 border-primary-default" : "text-muted hover:text-muted"}`}
                           >
-                            وضعیت درخواست‌های قبلی تسویه و برداشت
+                            
+                            تاریخچه درخواست‌های تسویه حساب
                           </button>
                         </div>
                         {walletSubTab === "ledger" && (
@@ -2653,42 +2508,35 @@ export function SupplierDashboard({
                               >
                                 
                                 <div className="flex items-center gap-4">
+                                  
                                   <div
-                                    className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
-                                      tx.type === "ORDER_REVENUE" || tx.type === "CREDIT" || tx.type === "DEPOSIT"
-                                        ? "bg-success/20 text-success"
-                                        : tx.type === "REFUND"
-                                        ? "bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400"
-                                        : "bg-danger/20 text-danger"
-                                    }`}
+                                    className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${tx.type === "ORDER_REVENUE" || tx.type === "CREDIT" ? "bg-success/20 text-success" : "bg-danger/20 text-danger"}`}
                                   >
-                                    {tx.type === "ORDER_REVENUE" ? (
-                                      <Truck className="w-6 h-6" />
-                                    ) : tx.type === "REFUND" ? (
-                                      <RotateCcw className="w-6 h-6" />
-                                    ) : tx.type === "CREDIT" || tx.type === "DEPOSIT" ? (
+                                    
+                                    {tx.type === "ORDER_REVENUE" ||
+                                    tx.type === "CREDIT" ? (
                                       <TrendingUp className="w-6 h-6" />
                                     ) : (
-                                      <Wallet className="w-6 h-6" />
+                                      <TrendingUp className="w-6 h-6 transform rotate-180" />
                                     )}
                                   </div>
                                   <div>
-                                    <p className="font-bold text-primary text-base flex items-center gap-2">
-                                      {tx.type === "ORDER_REVENUE"
-                                        ? "اعتبار ارسال سفارش (ارسال شد)"
-                                        : tx.type === "REFUND"
-                                        ? "سند اصلاحی / کسر مرجوعی یا لغو"
-                                        : tx.type === "DEPOSIT"
-                                        ? "شارژ حساب"
-                                        : tx.type === "CREDIT"
-                                        ? "بستانکار"
+                                    
+                                    <p className="font-bold text-primary text-base">
+                                      
+                                      {tx.type === "ORDER_REVENUE" ||
+                                      tx.type === "CREDIT"
+                                        ? "درآمد حاصل از فروش"
                                         : "درخواست تسویه حساب"}
                                     </p>
                                     <p className="text-sm text-muted mt-1">
+                                      
                                       {tx.description}
                                     </p>
                                     <div className="flex gap-3 mt-2 text-xs">
+                                      
                                       <span className="font-mono text-muted">
+                                        
                                         {new Date(
                                           tx.createdAt,
                                         ).toLocaleDateString("fa-IR")}
@@ -2701,35 +2549,30 @@ export function SupplierDashboard({
                                         })}
                                       </span>
                                       <span
-                                        className={`px-2 py-0.5 rounded-full font-medium ${
-                                          tx.status === "COMPLETED"
-                                            ? "bg-success/20 text-success"
-                                            : tx.status === "PENDING"
-                                            ? "bg-warning/20 text-warning"
-                                            : "bg-danger/20 text-danger"
-                                        }`}
+                                        className={`px-2 py-0.5 rounded-full font-medium ${tx.status === "COMPLETED" ? "bg-success/20 text-success" : tx.status === "PENDING" ? "bg-warning/20 text-warning" : "bg-danger/20 text-danger"}`}
                                       >
+                                        
                                         {tx.status === "COMPLETED"
                                           ? "موفق"
                                           : tx.status === "PENDING"
-                                          ? "در حال پردازش"
-                                          : "ناموفق"}
+                                            ? "در حال پردازش"
+                                            : "ناموفق"}
                                       </span>
                                     </div>
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end shrink-0">
+                                  
                                   <span
-                                    className={`text-lg font-bold ${
-                                      tx.type === "ORDER_REVENUE" || tx.type === "CREDIT" || tx.type === "DEPOSIT"
-                                        ? "text-success"
-                                        : "text-danger"
-                                    }`}
+                                    className={`text-lg font-bold ${tx.type === "ORDER_REVENUE" || tx.type === "CREDIT" ? "text-success" : "text-danger"}`}
                                   >
-                                    {tx.type === "ORDER_REVENUE" || tx.type === "CREDIT" || tx.type === "DEPOSIT"
+                                    
+                                    {tx.type === "ORDER_REVENUE" ||
+                                    tx.type === "CREDIT"
                                       ? "+"
                                       : "-"}
-                                    {Math.abs(Number(tx.amount)).toLocaleString()} تومان
+                                    {Number(tx.amount).toLocaleString()}
+                                    تومان
                                   </span>
                                 </div>
                               </div>
@@ -2814,8 +2657,8 @@ export function SupplierDashboard({
                                         ? `${remBalance.toLocaleString()} تومان`
                                         : "محاسبه شده"}
                                     </td>
-                                    <td className="p-4 font-mono text-xs" dir="ltr">
-                                      {maskShaba(po.shaba)}
+                                    <td className="p-4 font-mono text-xs">
+                                      {po.shaba}
                                     </td>
                                     <td className="p-4">
                                       
@@ -2956,15 +2799,10 @@ export function SupplierDashboard({
                           
                           <div className="flex justify-between">
                             
-                            <span>موجودی قابل برداشت:</span>
+                            <span>موجودی قابل تسویه:</span>
                             <span className="font-bold text-primary-default">
-                              {Number(walletInfo.balance || 0).toLocaleString()} تومان
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>حداقل برداشت مجاز:</span>
-                            <span className="font-bold text-muted">
-                              {Number(walletInfo.minPayoutAmount || 50000).toLocaleString()} تومان
+                              {Number(walletInfo.balance || 0).toLocaleString()}
+                              تومان
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -2986,8 +2824,8 @@ export function SupplierDashboard({
                             <span>شماره شبا:</span>
                             <div className="flex items-center gap-2">
                               
-                              <span className="font-mono text-primary" dir="ltr">
-                                {maskShaba(user.shaba)}
+                              <span className="font-mono text-primary">
+                                {user.shaba}
                               </span>
                               <button
                                 type="button"
@@ -3009,7 +2847,7 @@ export function SupplierDashboard({
                         <div className="text-right">
                           
                           <label className="block text-sm font-semibold text-secondary mb-1.5">
-                            مبلغ برداشت (تومان)
+                            مبلغ درخواستی (تومان)
                           </label>
                           <div className="relative">
                             
@@ -3093,18 +2931,7 @@ export function SupplierDashboard({
                               Number(walletInfo.balance || 0) && (
                               <p className="text-xs text-danger font-medium mt-1">
                                 خطا: مبلغ درخواستی نمی‌تواند بیشتر از موجودی
-                                قابل برداشت باشد.
-                              </p>
-                            )}
-                            {Number(withdrawalAmount) > 0 &&
-                              Number(withdrawalAmount) <
-                                Number(walletInfo.minPayoutAmount || 50000) && (
-                              <p className="text-xs text-danger font-medium mt-1">
-                                خطا: حداقل مبلغ مجاز برای برداشت{" "}
-                                {Number(
-                                  walletInfo.minPayoutAmount || 50000,
-                                ).toLocaleString()}{" "}
-                                تومان می‌باشد.
+                                قابل تسویه باشد.
                               </p>
                             )}
                           </div>
@@ -3115,16 +2942,15 @@ export function SupplierDashboard({
                             isSubmittingWithdrawal ||
                             !withdrawalAmount ||
                             Number(withdrawalAmount) <= 0 ||
-                            Number(withdrawalAmount) <
-                              Number(walletInfo.minPayoutAmount || 50000) ||
                             Number(withdrawalAmount) >
                               Number(walletInfo.balance || 0)
                           }
-                          className="w-full bg-primary-default hover:bg-primary-hover disabled:opacity-50 text-inverse font-bold py-3 rounded-xl transition-colors text-center mt-4 cursor-pointer"
+                          className="w-full bg-primary-default hover:bg-primary-hover disabled:opacity-50 text-inverse font-bold py-3 rounded-xl transition-colors text-center mt-4"
                         >
+                          
                           {isSubmittingWithdrawal
                             ? "در حال ثبت درخواست..."
-                            : "درخواست برداشت"}
+                            : "ثبت نهایی درخواست"}
                         </button>
                       </form>
                     )}
@@ -3147,30 +2973,8 @@ export function SupplierDashboard({
                       setActiveTicketDepartment("🎁 ثبت رایگان محصولات توسط زوپیت (ارسال لیست قیمت / کاتالوگ)");
                       setActiveTab("tickets");
                     }}
-                    onNavigateToConciergeImport={() => setActiveTab("concierge-import")}
-                    onNavigateToBulkImport={() => setActiveTab("bulk-import")}
                   />
                 ))}
-              {/* CONCIERGE IMPORT TAB */}
-              {activeTab === "concierge-import" && (
-                <SupplierConciergeImport
-                  user={user}
-                  onBack={() => setActiveTab("products")}
-                  onNavigateToAddProduct={() => setActiveTab("add-product")}
-                  onNavigateToProducts={() => setActiveTab("products")}
-                />
-              )}
-              {/* BULK IMPORT TAB */}
-              {activeTab === "bulk-import" && (
-                <SupplierBulkImport
-                  onSuccess={() => {
-                    fetchData();
-                    setActiveTab("products");
-                  }}
-                  onCancel={() => setActiveTab("products")}
-                  showNotification={showNotification}
-                />
-              )}
               {/* WOOCOMMERCE IMPORT TAB */}
               {activeTab === "woocommerce-import" && (
                 <SupplierWooCommerceImport
@@ -3201,10 +3005,6 @@ export function SupplierDashboard({
                     setActiveTab("tickets");
                   }}
                 />
-              )}
-              {/* SHIPPING TAB */}
-              {activeTab === "shipping" && (
-                <SupplierShippingPanel showNotification={showNotification} />
               )}
               {/* TICKETS TAB */}
               {activeTab === "tickets" && (
@@ -3503,8 +3303,67 @@ export function SupplierDashboard({
                     </div>
                   )}
                 </div>
+
                 {/* Status Execution Box */}
-                <SupplierOrderTracker orderItem={changingOrder} onUpdated={() => { fetchData(); setChangingOrder(null); }} showNotification={showNotification} />
+                {["SHIPPED", "DELIVERED", "COMPLETED"].includes(changingOrder.status) ? (
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-right space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-black text-sm">
+                      <CheckCircle className="w-5 h-5" />
+                      <span>این مرسوله تحویل پست داده شده است</span>
+                    </div>
+                    <p className="text-xs text-muted leading-relaxed">
+                      وضعیت سفارش به «ارسال شد» تغییر یافته و مبلغ درآمد به صورت خودکار به کیف پول شما اضافه گردیده است.
+                    </p>
+                    {changingOrder.trackingCode && (
+                      <p className="text-xs font-mono font-bold text-primary pt-1">
+                        کد پیگیری مرسوله: <span className="text-emerald-600 dark:text-emerald-400">{changingOrder.trackingCode}</span>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <form onSubmit={handleChangeOrderSubmit} className="space-y-4">
+                    <div className="p-4 bg-surface rounded-2xl border border-subtle space-y-3">
+                      <p className="text-xs font-bold text-primary">تایید ارسال توسط تامین‌کننده:</p>
+                      <p className="text-xs text-muted leading-relaxed">
+                        پس از بسته‌بندی کالا، الصاق برچسب پستی زوپیت و تحویل بسته به اداره پست یا مامور تیپاکس، دکمه زیر را بزنید.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await updateOrderStatus(changingOrder.id, "SHIPPED");
+                          setChangingOrder(null);
+                        }}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black py-3 px-4 rounded-xl transition-all text-xs md:text-sm shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Truck className="w-4 h-4" />
+                        <span>📦 تحویل به پست دادم (ثبت ارسال و شارژ آنی کیف پول)</span>
+                      </button>
+                    </div>
+
+                    {/* Optional extra tracking if supplier has custom tipax code */}
+                    <details className="text-xs text-muted cursor-pointer bg-surface/50 p-2.5 rounded-xl border border-subtle">
+                      <summary className="font-bold text-primary hover:text-emerald-600">
+                        ثبت اختیاری شماره پیگیری تیپاکس/باربری (اختیاری)
+                      </summary>
+                      <div className="mt-2.5 pt-2 border-t border-subtle space-y-2">
+                        <input
+                          type="text"
+                          value={changeTracking}
+                          onChange={(e) => setChangeTracking(e.target.value)}
+                          placeholder="در صورت داشتن کد رهگیری دستی..."
+                          className="w-full bg-background text-primary border border-subtle rounded-xl px-3 py-2 text-xs font-mono"
+                        />
+                        <button
+                          type="submit"
+                          className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-lg text-xs cursor-pointer"
+                        >
+                          ذخیره کد پیگیری
+                        </button>
+                      </div>
+                    </details>
+                  </form>
+                )}
 
                 <div className="pt-2 flex justify-end">
                   <button

@@ -174,19 +174,9 @@ export function DigikalaProductModal({
     } catch {}
   };
 
-  // Interactive Profit Simulator State
-  const [simulatorMarkupPercent, setSimulatorMarkupPercent] = useState(25);
-  const [customRetailInput, setCustomRetailInput] = useState<string>("");
-
-  const simulatedRetailPrice = useMemo(() => {
-    if (customRetailInput && !isNaN(Number(customRetailInput)) && Number(customRetailInput) > 0) {
-      return Number(customRetailInput);
-    }
-    return Math.round(currentPrice * (1 + simulatorMarkupPercent / 100));
-  }, [currentPrice, simulatorMarkupPercent, customRetailInput]);
-
-  const simulatedProfit = Math.max(0, simulatedRetailPrice - currentPrice);
-  const simulatedMarginPercent = currentPrice > 0 ? Math.round((simulatedProfit / currentPrice) * 100) : 0;
+  // Estimated suggested retail price (30% margin)
+  const suggestedRetailPrice = Math.round(currentPrice * 1.3);
+  const potentialProfit = suggestedRetailPrice - currentPrice;
 
   return (
     <div
@@ -505,10 +495,10 @@ export function DigikalaProductModal({
                   </div>
                 </div>
 
-                {/* Cooperation Price & Wholesale Bulk Box */}
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm">
+                {/* Wholesale Price Box */}
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold">قیمت همکاری (تک‌فروشی):</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">قیمت خرید عمده:</span>
                     {product.discount > 0 && (
                       <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md">
                         {product.discount}٪ تخفیف
@@ -523,97 +513,15 @@ export function DigikalaProductModal({
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">تومان</span>
                   </div>
 
-                  {/* Wholesale Tiers (خرید عمده) when available */}
-                  {Array.isArray(product.wholesaleTiers) && product.wholesaleTiers.length > 0 && (
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                          پله‌های تخفیف خرید عمده:
-                        </span>
-                        <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md font-bold">
-                          قیمت همکاری متغیر
-                        </span>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        {product.wholesaleTiers
-                          .slice()
-                          .sort((a: any, b: any) => a.minQuantity - b.minQuantity)
-                          .map((tier: any, idx: number) => {
-                            const discountPct = currentPrice > 0 && tier.unitPrice < currentPrice
-                              ? Math.round(((currentPrice - tier.unitPrice) / currentPrice) * 100)
-                              : 0;
-
-                            return (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-xs"
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-5 h-5 rounded-lg bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-[10px]">
-                                    {idx + 1}
-                                  </span>
-                                  <span className="font-bold text-slate-700 dark:text-slate-300">
-                                    {tier.minQuantity} {tier.maxQuantity ? `تا ${tier.maxQuantity}` : 'عدد یا بیشتر'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {discountPct > 0 && (
-                                    <span className="bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-[10px] font-black px-1.5 py-0.5 rounded-md">
-                                      {discountPct}٪ تخفیف
-                                    </span>
-                                  )}
-                                  <span className="font-black text-slate-900 dark:text-white font-mono">
-                                    {Number(tier.unitPrice).toLocaleString()} ت
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Interactive Margin & Profit Simulator */}
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400 font-bold">
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                        محاسبه‌گر سود فروشگاه:
-                      </span>
-                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                        +{simulatedProfit.toLocaleString()} ت ({simulatedMarginPercent}٪)
-                      </span>
-                    </div>
-
-                    {/* Quick Markup Presets */}
-                    <div className="flex items-center gap-1.5">
-                      {[15, 20, 25, 30, 40].map((pct) => (
-                        <button
-                          key={pct}
-                          type="button"
-                          onClick={() => {
-                            setSimulatorMarkupPercent(pct);
-                            setCustomRetailInput("");
-                          }}
-                          className={`flex-1 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                            simulatorMarkupPercent === pct && !customRetailInput
-                              ? "bg-emerald-600 text-white shadow-sm"
-                              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900"
-                          }`}
-                        >
-                          {pct}٪
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-[11px]">
-                      <span className="text-slate-500">قیمت پیشنهادی فروش در سایت:</span>
-                      <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                        {simulatedRetailPrice.toLocaleString()} تومان
-                      </span>
-                    </div>
+                  {/* Profit Estimation Helper */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      تخمین سود فروش:
+                    </span>
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      +{potentialProfit.toLocaleString()} ت
+                    </span>
                   </div>
                 </div>
 

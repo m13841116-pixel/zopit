@@ -278,6 +278,15 @@ export default function StoreOrders({
     const prod = selObj.product;
     const prodSupId = Number(prod.supplierId || prod.supplier?.id || 0);
 
+    // Check supplier consistency
+    if (orderItems.length > 0) {
+      const existingSupId = Number(orderItems[0].supplierId);
+      if (existingSupId > 0 && prodSupId > 0 && existingSupId !== prodSupId) {
+        setError("تمامی کالاهای یک سفارش باید از یک تامین‌کننده باشند. جهت ثبت سفارش از تامین‌کننده دیگر، سفارش مجزا ثبت کنید.");
+        return;
+      }
+    }
+
     let variantName = "";
     let finalPrice = prod.finalPrice || prod.supplierBasePrice || 0;
     let vIdParsed: number | null = null;
@@ -2245,45 +2254,12 @@ export default function StoreOrders({
                       </span>
                     </div>
 
-                    {selectedOrderForDetails.supplierOrderGroups && selectedOrderForDetails.supplierOrderGroups.length > 0 ? (
-                      <div className="space-y-2 mt-4 pt-4 border-t border-subtle">
-                        <span className="text-muted block mb-2 font-bold">رهگیری مرسولات (چند تامین‌کننده):</span>
-                        {selectedOrderForDetails.supplierOrderGroups.map((group: any) => (
-                          <div key={group.id} className="bg-surface p-3 rounded-xl border border-subtle">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="font-bold text-primary">{group.supplier?.brandName || group.supplier?.username}</span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full ${group.status === 'SHIPPED' ? 'bg-emerald-500/20 text-emerald-700' : 'bg-amber-500/20 text-amber-700'}`}>
-                                {group.status === 'SHIPPED' ? 'ارسال شده' : 'در حال پردازش'}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-[10px]">
-                              <div>
-                                <span className="text-muted">حامل: </span>
-                                <span className="font-bold text-primary">{group.shippingProvider || 'ثبت نشده'}</span>
-                              </div>
-                              <div className="text-left dir-ltr">
-                                <span className="text-muted">کد رهگیری: </span>
-                                <span className="font-mono font-bold text-emerald-600">{group.trackingCode || 'ندارد'}</span>
-                              </div>
-                            </div>
-                            {group.shippingLabelUrl && (
-                              <div className="mt-2 pt-2 border-t border-subtle/50 text-left">
-                                <a href={group.shippingLabelUrl} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline font-bold inline-flex items-center gap-1">
-                                  مشاهده رسید ارسال
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted">کد رهگیری مرسوله:</span>
-                        <span className="font-mono font-bold text-primary-hover">
-                          {selectedOrderForDetails.trackingCode || "در انتظار ارسال و صدور بارنامه"}
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted">کد رهگیری مرسوله:</span>
+                      <span className="font-mono font-bold text-primary-hover">
+                        {selectedOrderForDetails.trackingCode || "در انتظار ارسال و صدور بارنامه"}
+                      </span>
+                    </div>
 
                     {/* Postal Label Actions */}
                     {selectedOrderForDetails.postalLabel ? (

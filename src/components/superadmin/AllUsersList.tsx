@@ -701,15 +701,7 @@ export default function AllUsersList({
                         <span>{activeModalUser.brandName ? `(${activeModalUser.brandName})` : "تامین‌کننده"}</span>
                       </p>
                       <p className="text-xs text-text-secondary leading-relaxed bg-surface p-3 rounded-xl border border-subtle">
-                        آدرس کامل انبار فرستنده جهت درج روی مرسوله پستی: {activeModalUser.province || "---"}، {activeModalUser.city || "---"}، {activeModalUser.originAddress || activeModalUser.address || "آدرس ثبت نشده"} (کد پستی: {activeModalUser.postalCode || "---"})
-                      </p>
-                      <p className="text-xs text-text-secondary leading-relaxed bg-surface p-3 rounded-xl border border-subtle mt-2">
-                        دسته‌بندی فعالیت: {activeModalUser.activityType || "ثبت نشده"}
-                        <br/>
-                        تلفن ثابت: {activeModalUser.telephone || "ثبت نشده"}
-                        <br/>
-                        وب‌سایت: {activeModalUser.website || "ثبت نشده"}
-                      
+                        آدرس کامل انبار فرستنده جهت درج روی مرسوله پستی: {activeModalUser.province || "---"}، {activeModalUser.city || "---"}، {activeModalUser.address || "آدرس ثبت نشده"} (کد پستی: {activeModalUser.postalCode || "---"})
                       </p>
                     </div>
                   )}

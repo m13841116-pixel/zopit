@@ -27,7 +27,6 @@ model User {
   city                   String?
   postalCode             String?
   telephone              String?
-  originAddress          String?
   website                String?
   accountHolderName      String?
   shaba                  String?
@@ -76,70 +75,37 @@ model User {
   messages               TicketMessage[]
   wallet                 Wallet?
   proAccount             ProAccount?
-  subscriptionEvents     SubscriptionEvent[]
-  supplierOrderGroups    SupplierOrderGroup[]
-  shippingProfile        SupplierShippingProfile?
-
-  @@index([username])
 }
 
 model ProAccount {
-  id                  Int      @id @default(autoincrement())
-  userId              Int      @unique
-  planType            String?  @default("PRO_ANNUAL")
-  status              String   @default("PENDING")
-  acceptedTerms       Boolean  @default(true)
-  signatureImage      String?
-  nationalCode        String?
-  fullName            String?
-  mobile              String?
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique
+  planType          String?  @default("PRO")
+  status            String   @default("PENDING")
+  acceptedTerms     Boolean  @default(true)
+  signatureImage    String?
+  nationalCode      String?
+  fullName          String?
+  mobile            String?
 
-  domainName          String?
-  cpanelUrl           String?
-  cpanelUsername      String?
-  cpanelPassword      String?
-  wpAdminUrl          String?
-  wpUsername          String?
-  wpPassword          String?
-  hasEnamad           Boolean  @default(false)
-  hasGateway          Boolean  @default(false)
-  hasTaxProfile       Boolean  @default(false)
-  hostExpiresAt       DateTime?
-  torobConnected      Boolean  @default(false)
-  payLink             String?
+  domainName        String?
+  cpanelUrl         String?
+  cpanelUsername    String?
+  cpanelPassword    String?
+  wpAdminUrl        String?
+  wpUsername        String?
+  wpPassword        String?
+  hasEnamad         Boolean  @default(false)
+  hasGateway        Boolean  @default(false)
+  hasTaxProfile     Boolean  @default(false)
+  hostExpiresAt     DateTime?
+  torobConnected    Boolean  @default(false)
+  payLink           String?
 
-  startDate           DateTime?
-  expiresAt           DateTime?
-  lastRenewedAt       DateTime?
-  renewalCount        Int      @default(0)
-  freeMonthCredits    Int      @default(0)
-  lastRewardAppliedAt DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model SubscriptionEvent {
-  id             String    @id @default(uuid())
-  userId         Int
-  proAccountId   Int?
-  eventType      String    // SUBSCRIPTION_CREATED, SUBSCRIPTION_ACTIVATED, SUBSCRIPTION_RENEWED, SUBSCRIPTION_EXPIRED, SUBSCRIPTION_CANCELLED, PAYMENT_FAILED
-  planType       String    // PRO_MONTHLY, PRO_ANNUAL
-  amount         Float     @default(0)
-  durationMonths Int       @default(1)
-  startDate      DateTime?
-  endDate        DateTime?
-  paymentRef     String?
-  metadata       String?
-  createdAt      DateTime  @default(now())
-
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([eventType])
-  @@index([createdAt])
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Product {
@@ -155,10 +121,6 @@ model Product {
   sku                    String?
   brand                  String?
   status                 String                  @default("DRAFT")
-  rejectionReason        String?
-  reviewNotes            String?
-  featuredStatus         String?                 @default("NONE")
-  featuredUntil          DateTime?
   marginType             String?
   marginValue            Float?
   finalPrice             Float?
@@ -167,9 +129,6 @@ model Product {
   minOrderQuantity       Int                     @default(1)
   isPinned               Boolean                 @default(false)
   inventory              Int                     @default(0)
-  externalSource         String?
-  externalId             String?
-  lastSyncedAt           DateTime?
   customerOrderItems     CustomerOrderItem[]     @relation("ProductCustomerOrderItems")
   dailySelections        DailySelection[]
   orderItems             OrderItem[]
@@ -184,16 +143,6 @@ model Product {
   variants               ProductVariant[]
   selectionCartItems     SelectionCartItem[]
   storeProductSelections StoreProductSelection[]
-  warranty               String?
-  warrantyDuration       String?
-  dimensions             String?
-  weight                 String?
-  color                  String?
-  wholesaleTiers         WholesalePriceTier[]
-
-  @@index([supplierId, status])
-  @@index([categoryId, status])
-  @@index([status, isPinned, id])
 }
 
 model Category {
@@ -221,8 +170,6 @@ model ProductVariant {
   imageUrl          String?
   orderItems        OrderItem[]
   product           Product     @relation(fields: [productId], references: [id])
-
-  @@index([productId])
 }
 
 model Order {
@@ -249,12 +196,6 @@ model Order {
   items               OrderItem[]
   shippingInvoice     ShippingInvoice?
   statusHistory       OrderStatusHistory[]
-  supplierOrderGroups SupplierOrderGroup[]
-
-  @@index([storeId, status])
-  @@index([customerPhone])
-  @@index([storeInvoiceId])
-  @@index([createdAt])
 }
 
 model OrderItem {
@@ -269,15 +210,9 @@ model OrderItem {
   trackingCode  String?
   price         Float           @default(0)
   supplierPrice Float           @default(0)
-  supplierGroupId Int?
-  supplierGroup SupplierOrderGroup? @relation(fields: [supplierGroupId], references: [id], onDelete: SetNull)
   variant       ProductVariant? @relation(fields: [variantId], references: [id])
   product       Product         @relation(fields: [productId], references: [id])
   order         Order           @relation(fields: [orderId], references: [id])
-
-  @@index([supplierId, status])
-  @@index([orderId])
-  @@index([productId, variantId])
 }
 
 model StoreInvoice {
@@ -303,28 +238,20 @@ model StoreSettings {
   platformType   String?
   apiKey         String?
   webhookUrl     String?
-  monthlyTarget  Float?
   storeManager   User    @relation(fields: [storeManagerId], references: [id])
 }
 
 model Ticket {
-  id                 Int             @id @default(autoincrement())
-  userId             Int
-  subject            String
-  department         String
-  priority           String
-  status             String          @default("OPEN")
-  approxProductCount Int?
-  categories         String?
-  catalogUrl         String?
-  websiteUrl         String?
-  internalNotes      String?
-  completionStats    String?
-  attachments        String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  user               User            @relation(fields: [userId], references: [id])
-  messages           TicketMessage[]
+  id         Int             @id @default(autoincrement())
+  userId     Int
+  subject    String
+  department String
+  priority   String
+  status     String          @default("OPEN")
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  user       User            @relation(fields: [userId], references: [id])
+  messages   TicketMessage[]
 }
 
 model TicketMessage {
@@ -333,7 +260,6 @@ model TicketMessage {
   userId        Int
   message       String
   attachmentUrl String?
-  isInternal    Boolean? @default(false)
   createdAt     DateTime @default(now())
   user          User     @relation(fields: [userId], references: [id])
   ticket        Ticket   @relation(fields: [ticketId], references: [id])
@@ -900,87 +826,4 @@ model Lead {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   ambassador       User?    @relation("AmbassadorLeads", fields: [ambassadorId], references: [id])
-}
-
-model ProductImportHistory {
-  id            Int      @id @default(autoincrement())
-  supplierId    Int
-  fileName      String?
-  fileType      String?  @default("xlsx")
-  source        String?  @default("FILE")
-  totalRows     Int      @default(0)
-  importedCount Int      @default(0)
-  updatedCount  Int      @default(0)
-  skippedCount  Int      @default(0)
-  errorCount    Int      @default(0)
-  status        String   @default("COMPLETED")
-  errorReport   String?
-  createdAt     DateTime @default(now())
-
-  @@index([supplierId, createdAt])
-}
-
-model WholesalePriceTier {
-  id          Int      @id @default(autoincrement())
-  productId   Int
-  minQuantity Int
-  maxQuantity Int?
-  unitPrice   Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId])
-}
-
-model SupplierOrderGroup {
-  id           Int       @id @default(autoincrement())
-  orderId      Int
-  supplierId   Int
-  status       String    @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
-  subtotal     Float     @default(0)
-  shippingCost Float     @default(0)
-  shippingProvider String?
-  shippingLabelUrl String?
-  trackingCode String?
-  shippedAt    DateTime?
-  deliveredAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  supplier     User      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  items        OrderItem[]
-  trackingHistories TrackingHistory[]
-
-  @@index([orderId])
-  @@index([supplierId])
-}
-
-model SupplierShippingProfile {
-  id                Int      @id @default(autoincrement())
-  supplierId        Int      @unique
-  provider          String?
-  accountId         String?
-  originAddress     String?
-  active            Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  supplier          User     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-}
-
-model TrackingHistory {
-  id                   Int                @id @default(autoincrement())
-  supplierOrderGroupId Int
-  oldTrackingCode      String?
-  newTrackingCode      String?
-  carrier              String?
-  changedBy            String?
-  createdAt            DateTime           @default(now())
-
-  supplierOrderGroup   SupplierOrderGroup @relation(fields: [supplierOrderGroupId], references: [id], onDelete: Cascade)
-
-  @@index([supplierOrderGroupId])
 }

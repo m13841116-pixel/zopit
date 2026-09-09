@@ -40,11 +40,6 @@ export default function MyCatalog() {
   const [batchMarkupInput, setBatchMarkupInput] = useState<string>("20000");
   const [submittingBatchMarkup, setSubmittingBatchMarkup] = useState(false);
 
-  // Filter & Search state in catalog
-  const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogStatusFilter, setCatalogStatusFilter] = useState("ALL");
-  const [togglingStatusId, setTogglingStatusId] = useState<number | null>(null);
-
   const fetchCatalog = async () => {
     try {
       const token = localStorage.getItem("token") || "";
@@ -65,42 +60,6 @@ export default function MyCatalog() {
   useEffect(() => {
     fetchCatalog();
   }, []);
-
-  const handleToggleActivation = async (productId: number, currentStatus: string) => {
-    setTogglingStatusId(productId);
-    try {
-      const token = localStorage.getItem("token") || "";
-      const isCurrentlyActive = currentStatus === "ACTIVE" || currentStatus === "SYNCED";
-      const targetStatus = isCurrentlyActive ? "INACTIVE" : "ACTIVE";
-
-      const res = await fetch(`/api/store-manager/products/${productId}/status`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: targetStatus })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        toast(data.message || (targetStatus === "ACTIVE" ? "محصول در فروشگاه فعال شد." : "نمایش محصول در فروشگاه غیرفعال شد."), "success");
-        setCatalog((prev) =>
-          prev.map((item) =>
-            item.productId === productId || item.product?.id === productId
-              ? { ...item, status: targetStatus }
-              : item
-          )
-        );
-      } else {
-        toast(data.error || "خطا در تغییر وضعیت نمایش محصول", "error");
-      }
-    } catch (err) {
-      toast("خطای شبکه در تغییر وضعیت محصول", "error");
-    } finally {
-      setTogglingStatusId(null);
-    }
-  };
 
   const handleBatchMarkup = async (amount: number) => {
     if (amount < 0) return;
@@ -376,71 +335,20 @@ export default function MyCatalog() {
         </div>
       </div>
 
-      {/* Search & Filter Toolbar */}
-      <div className="bg-card p-4 rounded-2xl shadow-sm border border-subtle flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <input
-            type="text"
-            placeholder="جستجو در کاتالوگ شما..."
-            value={catalogSearch}
-            onChange={(e) => setCatalogSearch(e.target.value)}
-            className="w-full bg-surface border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none focus:ring-2 focus:ring-primary-default"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <select
-            value={catalogStatusFilter}
-            onChange={(e) => setCatalogStatusFilter(e.target.value)}
-            className="bg-surface border border-subtle rounded-xl px-3 py-2 text-xs text-secondary outline-none"
-          >
-            <option value="ALL">همه وضعیت‌ها ({catalog.length})</option>
-            <option value="ACTIVE">فعال در فروشگاه</option>
-            <option value="INACTIVE">غیرفعال / موقت</option>
-            <option value="PROFITABLE">دارای سود اختصاصی</option>
-          </select>
-        </div>
-      </div>
-
       {loading ? (
         <div className="text-center p-12 text-muted">در حال بارگذاری...</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {catalog
-            .filter((item) => {
-              const prod = item.product;
-              if (!prod) return false;
-              if (catalogSearch.trim()) {
-                const query = catalogSearch.toLowerCase();
-                const matchName = prod.name?.toLowerCase().includes(query);
-                const matchCustom = prod.customization?.customTitle?.toLowerCase().includes(query);
-                if (!matchName && !matchCustom) return false;
-              }
-              if (catalogStatusFilter === "ACTIVE") {
-                return item.status === "ACTIVE" || item.status === "SYNCED" || !item.status;
-              }
-              if (catalogStatusFilter === "INACTIVE") {
-                return item.status === "INACTIVE";
-              }
-              if (catalogStatusFilter === "PROFITABLE") {
-                const p = prod.calculatedProfit || (prod.finalPrice - (prod.wholesalePrice || prod.supplierBasePrice || 0));
-                return p > 0;
-              }
-              return true;
-            })
-            .map((item) => {
+          {catalog.map((item) => {
             const product = item.product;
             const wholesale = product.wholesalePrice || product.supplierBasePrice || 0;
             const selling = product.finalPrice || wholesale;
             const profit = product.calculatedProfit || Math.max(0, selling - wholesale);
-            const isActiveInStore = item.status === "ACTIVE" || item.status === "SYNCED" || !item.status;
 
             return (
               <div
                 key={item.id}
-                className={`bg-card rounded-2xl shadow-sm border ${
-                  isActiveInStore ? "border-subtle" : "border-slate-300 dark:border-slate-700 opacity-75"
-                } overflow-hidden flex flex-col group hover:shadow-md transition-all relative cursor-pointer`}
+                className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden flex flex-col group hover:shadow-md transition-shadow relative cursor-pointer"
                 onClick={(e) => {
                   if ((e.target as any).closest("button") || (e.target as any).closest("input")) return;
                   setSelectedProduct(product);
@@ -472,30 +380,24 @@ export default function MyCatalog() {
                       +{profit.toLocaleString("fa-IR")} تومان سود
                     </span>
                   )}
-
-                  {/* Active / Inactive Badge Overlay */}
-                  <div className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-white flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${isActiveInStore ? "bg-emerald-400" : "bg-rose-400"}`} />
-                    <span>{isActiveInStore ? "فعال در فروشگاه" : "غیرفعال"}</span>
-                  </div>
                 </div>
-                <div className="p-4 flex-1 flex flex-col">
+                <div className="p-5 flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-2">
-                    <p className="text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded-lg border border-emerald-100">
-                      {product.category?.name || "عمومی"}
+                    <p className="text-xs font-semibold text-success bg-success/10 px-2 py-1 rounded">
+                      {product.category?.name}
                     </p>
                   </div>
-                  <h3 className="font-bold text-primary text-base mb-2 leading-tight">
+                  <h3 className="font-bold text-primary text-lg mb-2 leading-tight">
                     {product.customization?.customTitle || product.name}
                   </h3>
                   <p className="text-xs text-muted mb-3 line-clamp-2">
                     {product.customization?.customDescription || product.description || product.shortDescription || "بدون توضیحات"}
                   </p>
-                  <div className="mt-auto pt-3 flex flex-col gap-3 border-t border-subtle">
+                  <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-subtle">
                     {/* Price Breakdown */}
                     <div className="space-y-1 bg-surface p-2.5 rounded-xl border border-subtle text-xs">
                       <div className="flex justify-between items-center text-muted">
-                        <span>قیمت خرید عمده:</span>
+                        <span>قیمت زوپیتی:</span>
                         <span className="font-bold text-primary">{wholesale.toLocaleString("fa-IR")} تومان</span>
                       </div>
                       <div className="flex justify-between items-center pt-1 border-t border-subtle/50">
@@ -506,36 +408,17 @@ export default function MyCatalog() {
                       </div>
                     </div>
 
-                    {/* Activation Toggle Switch */}
-                    <div className="flex items-center justify-between bg-background p-2 rounded-xl border border-subtle">
-                      <span className="text-[11px] font-bold text-secondary">وضعیت فروشگاه:</span>
-                      <button
-                        type="button"
-                        disabled={togglingStatusId === product.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleActivation(product.id, item.status || "ACTIVE");
-                        }}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center gap-1 ${
-                          isActiveInStore
-                            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20"
-                            : "bg-slate-200 dark:bg-slate-800 text-muted border border-subtle hover:text-primary"
-                        }`}
-                      >
-                        {togglingStatusId === product.id ? (
-                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : isActiveInStore ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            <span>فعال</span>
-                          </>
-                        ) : (
-                          <span>غیرفعال (فعال‌سازی)</span>
-                        )}
-                      </button>
+                    <div className="flex justify-between items-center text-xs font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted text-[11px]">وضعیت:</span>
+                        <HighContrastStatusBadge status={item.status || "SYNCED"} size="sm" />
+                      </div>
+                      <span className="text-muted text-[11px]">
+                        {new Date(item.selected_at).toLocaleDateString("fa-IR")}
+                      </span>
                     </div>
 
-                    <div className="space-y-2 mt-1">
+                    <div className="space-y-2 mt-2">
                       <button
                         type="button"
                         onClick={(e) => {
