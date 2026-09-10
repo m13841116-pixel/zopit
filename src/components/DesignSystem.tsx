@@ -327,20 +327,20 @@ const statusMapping: Record<string, { label: string; colorClass: string }> = {
   DELIVERED: { label: "تحویل شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
   PUBLISHED: { label: "منتشر شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
 
-  // Pending states
-  PENDING: { label: "در انتظار بررسی", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
-  PENDING_APPROVAL: { label: "در انتظار تایید", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
-  PENDING_REVIEW: { label: "در حال بازبینی", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
-  REQUESTED: { label: "ثبت اولیه / در انتظار", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  // Pending states (Purple / Violet with crisp white text)
+  PENDING: { label: "در انتظار بررسی", colorClass: "bg-[#552370] text-white font-black shadow-sm" },
+  PENDING_APPROVAL: { label: "در انتظار تایید", colorClass: "bg-[#552370] text-white font-black shadow-sm" },
+  PENDING_REVIEW: { label: "در حال بازبینی", colorClass: "bg-[#552370] text-white font-black shadow-sm" },
+  REQUESTED: { label: "ثبت اولیه / در انتظار", colorClass: "bg-[#552370] text-white font-black shadow-sm" },
   NEW: { label: "جدید", colorClass: "bg-indigo-600 text-white font-black shadow-sm" },
-  PENDING_SYNC: { label: "در انتظار اتصال", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  PENDING_SYNC: { label: "در انتظار اتصال", colorClass: "bg-[#552370] text-white font-black shadow-sm" },
   SYNCED: { label: "متصل / سینک شده", colorClass: "bg-emerald-600 text-white font-black shadow-sm" },
   
-  // Warning / Suspension states
-  UNDER_REVIEW: { label: "در حال بازبینی عملکرد", colorClass: "bg-amber-600 text-white font-black shadow-sm" },
-  WARNING: { label: "دارای اخطار انضباطی", colorClass: "bg-amber-600 text-white font-black shadow-sm" },
+  // Warning / Review states
+  UNDER_REVIEW: { label: "در حال بازبینی عملکرد", colorClass: "bg-purple-800 text-white font-black shadow-sm" },
+  WARNING: { label: "دارای اخطار انضباطی", colorClass: "bg-purple-900 text-white font-black shadow-sm" },
   TEMPORARILY_SUSPENDED: { label: "تعلیق موقت", colorClass: "bg-rose-600 text-white font-black shadow-sm" },
-  SUSPENDED: { label: "در انتظار تایید", colorClass: "bg-amber-500 text-slate-950 font-black shadow-sm" },
+  SUSPENDED: { label: "در انتظار تایید", colorClass: "bg-[#552370] text-white font-black shadow-sm" },
   BLOCKED: { label: "مسدود شده", colorClass: "bg-rose-700 text-white font-black shadow-sm" },
 
   // Danger / Terminated states

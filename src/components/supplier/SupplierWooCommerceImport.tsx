@@ -363,7 +363,7 @@ export function SupplierWooCommerceImport({
       {/* Top Breadcrumb & Actions Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-5 rounded-3xl border border-subtle shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-default to-purple-600 text-white flex items-center justify-center shadow-md shadow-primary-default/20">
             <Globe className="w-6 h-6" />
           </div>
           <div>
@@ -412,7 +412,7 @@ export function SupplierWooCommerceImport({
             <div className="bg-card p-6 md:p-8 rounded-3xl border border-subtle shadow-sm space-y-6">
               <div className="border-b border-subtle pb-4">
                 <h3 className="text-base font-extrabold text-primary flex items-center gap-2">
-                  <Key className="w-5 h-5 text-indigo-600" />
+                  <Key className="w-5 h-5 text-primary-default" />
                   <span>اطلاعات اتصال به سایت ووکامرس شما</span>
                 </h3>
                 <p className="text-xs text-muted mt-1">
@@ -434,7 +434,7 @@ export function SupplierWooCommerceImport({
                       value={storeUrl}
                       onChange={(e) => setStoreUrl(e.target.value)}
                       placeholder="https://myshop.ir"
-                      className="w-full pl-10 pr-4 py-3 bg-background border border-subtle rounded-2xl text-sm font-mono text-primary focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-background border border-subtle rounded-2xl text-sm font-mono text-primary focus:outline-none focus:ring-2 focus:ring-primary-default text-left transition-all"
                     />
                     <Globe className="w-4 h-4 text-muted absolute left-3 top-3.5" />
                   </div>
@@ -456,7 +456,7 @@ export function SupplierWooCommerceImport({
                       value={consumerKey}
                       onChange={(e) => setConsumerKey(e.target.value)}
                       placeholder="ck_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className="w-full pl-10 pr-4 py-3 bg-background border border-subtle rounded-2xl text-xs font-mono text-primary focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-background border border-subtle rounded-2xl text-xs font-mono text-primary focus:outline-none focus:ring-2 focus:ring-primary-default text-left transition-all"
                     />
                     <Key className="w-4 h-4 text-muted absolute left-3 top-3.5" />
                   </div>
@@ -475,7 +475,7 @@ export function SupplierWooCommerceImport({
                       value={consumerSecret}
                       onChange={(e) => setConsumerSecret(e.target.value)}
                       placeholder="cs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className="w-full pl-10 pr-4 py-3 bg-background border border-subtle rounded-2xl text-xs font-mono text-primary focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-background border border-subtle rounded-2xl text-xs font-mono text-primary focus:outline-none focus:ring-2 focus:ring-primary-default text-left transition-all"
                     />
                     <Lock className="w-4 h-4 text-muted absolute left-3 top-3.5" />
                   </div>
@@ -493,7 +493,7 @@ export function SupplierWooCommerceImport({
                         onClick={() => setCurrencyUnit("toman")}
                         className={`py-2 text-xs font-black rounded-xl transition-all ${
                           currencyUnit === "toman"
-                            ? "bg-indigo-600 text-white shadow-xs"
+                            ? "bg-primary-default text-white shadow-xs"
                             : "text-muted hover:text-primary"
                         }`}
                       >
@@ -504,7 +504,7 @@ export function SupplierWooCommerceImport({
                         onClick={() => setCurrencyUnit("rial")}
                         className={`py-2 text-xs font-black rounded-xl transition-all ${
                           currencyUnit === "rial"
-                            ? "bg-indigo-600 text-white shadow-xs"
+                            ? "bg-primary-default text-white shadow-xs"
                             : "text-muted hover:text-primary"
                         }`}
                       >
@@ -519,7 +519,7 @@ export function SupplierWooCommerceImport({
                         type="checkbox"
                         checked={saveCredentials}
                         onChange={(e) => setSaveCredentials(e.target.checked)}
-                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-subtle"
+                        className="w-4 h-4 rounded text-primary-default focus:ring-primary-default border-subtle"
                       />
                       <span>ذخیره کلیدها برای فراخوانی‌های بعدی</span>
                     </label>
@@ -531,7 +531,7 @@ export function SupplierWooCommerceImport({
                   <button
                     type="submit"
                     disabled={isConnecting}
-                    className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.99]"
+                    className="w-full py-3.5 bg-gradient-to-r from-primary-default to-purple-600 hover:from-primary-hover hover:to-purple-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-primary-default/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.99]"
                   >
                     {isConnecting ? (
                       <>
@@ -554,7 +554,7 @@ export function SupplierWooCommerceImport({
           <div className="lg:col-span-5 space-y-5">
             <div className="bg-surface border border-subtle p-6 md:p-7 rounded-3xl space-y-4 shadow-sm">
               <div className="flex items-center gap-2.5 text-primary">
-                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                <div className="p-2 rounded-xl bg-primary-default/10 text-primary-default dark:text-indigo-400 border border-primary-default/20">
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <h4 className="text-sm font-black text-primary">
@@ -568,7 +568,7 @@ export function SupplierWooCommerceImport({
 
               <div className="space-y-3">
                 <div className="p-3 bg-background rounded-2xl border border-subtle flex items-start gap-3 shadow-2xs">
-                  <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-black flex items-center justify-center shrink-0 border border-indigo-500/20">
+                  <span className="w-6 h-6 rounded-full bg-primary-default/10 text-primary-default dark:text-indigo-400 text-xs font-black flex items-center justify-center shrink-0 border border-primary-default/20">
                     ۱
                   </span>
                   <div className="text-xs space-y-0.5">
@@ -579,8 +579,8 @@ export function SupplierWooCommerceImport({
                   </div>
                 </div>
 
-                <div className="p-3 bg-white/90 dark:bg-card/90 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 flex items-start gap-3 shadow-2xs">
-                  <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0">
+                <div className="p-3 bg-white/90 dark:bg-card/90 rounded-2xl border border-primary-default/10 dark:border-primary-default/20/40 flex items-start gap-3 shadow-2xs">
+                  <span className="w-6 h-6 rounded-full bg-primary-default/10 text-primary-hover text-xs font-black flex items-center justify-center shrink-0">
                     ۲
                   </span>
                   <div className="text-xs space-y-0.5">
@@ -591,8 +591,8 @@ export function SupplierWooCommerceImport({
                   </div>
                 </div>
 
-                <div className="p-3 bg-white/90 dark:bg-card/90 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 flex items-start gap-3 shadow-2xs">
-                  <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0">
+                <div className="p-3 bg-white/90 dark:bg-card/90 rounded-2xl border border-primary-default/10 dark:border-primary-default/20/40 flex items-start gap-3 shadow-2xs">
+                  <span className="w-6 h-6 rounded-full bg-primary-default/10 text-primary-hover text-xs font-black flex items-center justify-center shrink-0">
                     ۳
                   </span>
                   <div className="text-xs space-y-0.5">
@@ -604,9 +604,9 @@ export function SupplierWooCommerceImport({
                 </div>
               </div>
 
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-2xl border border-amber-200 dark:border-amber-800/40 flex items-start gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-amber-900 dark:text-amber-300 font-medium leading-relaxed">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200 dark:border-emerald-800/40 flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-emerald-900 dark:text-emerald-300 font-medium leading-relaxed">
                   <strong>امنیت کامل:</strong> کلیه اطلاعات ارتباطی رمزنگاری شده و صرفاً برای خواندن اطلاعات کاتالوگ فروشگاه شما استفاده می‌گردد.
                 </p>
               </div>
@@ -619,11 +619,11 @@ export function SupplierWooCommerceImport({
       {currentStep === 2 && (
         <div className="space-y-6">
           {/* COMPETITIVE MOTIVATIONAL BANNER */}
-          <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/5 border border-indigo-500/20 text-primary p-6 md:p-7 rounded-3xl shadow-xs relative overflow-hidden">
+          <div className="bg-gradient-to-r from-primary-default/10 via-purple-500/10 to-primary-default/5 border border-primary-default/20 text-primary p-6 md:p-7 rounded-3xl shadow-xs relative overflow-hidden">
             <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
               <div className="space-y-2 max-w-2xl">
-                <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full text-amber-600 dark:text-amber-400 text-xs font-black">
-                  <Flame className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-emerald-600 dark:text-emerald-400 text-xs font-black">
+                  <Flame className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
                   <span>راز فروش ۵ تا ۱۰ برابری در پلتفرم زوپیت</span>
                 </div>
                 <h3 className="text-xl font-black text-primary">
@@ -639,14 +639,14 @@ export function SupplierWooCommerceImport({
                 <span className="text-[11px] text-muted font-bold block">
                   میانگین حاشیه سود فعلی شما
                 </span>
-                <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                   {avgMargin > 0 ? `${avgMargin}٪` : "۲۰٪"}
                 </div>
                 <span
                   className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full inline-block ${
                     avgMargin >= 20
                       ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
-                      : "bg-amber-500/15 text-amber-600 border border-amber-500/30"
+                      : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
                   }`}
                 >
                   {avgMargin >= 20 ? "🔥 بسیار جذاب برای فروشگاه‌ها" : "✨ قابل قبول"}
@@ -659,7 +659,7 @@ export function SupplierWooCommerceImport({
           <div className="bg-card p-5 rounded-3xl border border-subtle shadow-sm space-y-4">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-subtle pb-4">
               <div className="flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-indigo-600" />
+                <Sliders className="w-5 h-5 text-primary-default" />
                 <div>
                   <h4 className="text-sm font-black text-primary">
                     ابزارهای قیمت‌گذاری سریع دسته‌جمعی (Quick Bulk Pricing)
@@ -691,7 +691,7 @@ export function SupplierWooCommerceImport({
                 <button
                   type="button"
                   onClick={() => applyBulkDiscount(25)}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="px-3 py-1.5 bg-primary-default hover:bg-primary-hover text-white rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
                 >
                   ۲۵٪ (فروش ویژه 🔥)
                 </button>
@@ -717,7 +717,7 @@ export function SupplierWooCommerceImport({
                   <button
                     type="button"
                     onClick={() => applyBulkDiscount(bulkDiscountPercent)}
-                    className="px-2 py-0.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-lg text-[10px] font-black cursor-pointer"
+                    className="px-2 py-0.5 bg-primary-default/10 text-primary-hover hover:bg-indigo-200 rounded-lg text-[10px] font-black cursor-pointer"
                   >
                     اعمال
                   </button>
@@ -744,7 +744,7 @@ export function SupplierWooCommerceImport({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="جستجو در بین کالاهای فراخوانی‌شده..."
-                    className="w-full pl-9 pr-4 py-2 bg-background border border-subtle rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-9 pr-4 py-2 bg-background border border-subtle rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-default"
                   />
                   <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-3" />
                 </div>
@@ -753,7 +753,7 @@ export function SupplierWooCommerceImport({
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="py-2 px-3 bg-background border border-subtle rounded-xl text-xs font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="py-2 px-3 bg-background border border-subtle rounded-xl text-xs font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary-default"
                   >
                     <option value="all">همه دسته‌بندی‌ها ({products.length})</option>
                     {categoriesList.map((cat) => (
@@ -773,7 +773,7 @@ export function SupplierWooCommerceImport({
                 <button
                   type="button"
                   onClick={() => toggleSelectAll(true)}
-                  className="text-indigo-600 hover:text-indigo-800 underline text-[11px] cursor-pointer"
+                  className="text-primary-default hover:text-indigo-800 underline text-[11px] cursor-pointer"
                 >
                   انتخاب همه
                 </button>
@@ -800,14 +800,14 @@ export function SupplierWooCommerceImport({
                         type="checkbox"
                         checked={selectedCount === products.length && products.length > 0}
                         onChange={(e) => toggleSelectAll(e.target.checked)}
-                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-subtle cursor-pointer"
+                        className="w-4 h-4 rounded text-primary-default focus:ring-primary-default border-subtle cursor-pointer"
                       />
                     </th>
                     <th className="py-4 px-4">مشخصات و تصویر کالا</th>
                     <th className="py-4 px-4">دسته‌بندی</th>
                     <th className="py-4 px-4 text-center">موجودی</th>
                     <th className="py-4 px-4">قیمت در سایت شما</th>
-                    <th className="py-4 px-4 text-indigo-700 dark:text-indigo-400">
+                    <th className="py-4 px-4 text-primary-hover dark:text-indigo-400">
                       قیمت عمده برای زوپیت (تومان)
                     </th>
                     <th className="py-4 px-4 text-center">سود و جذابیت فروشگاه</th>
@@ -829,7 +829,7 @@ export function SupplierWooCommerceImport({
                       <React.Fragment key={product.wcId}>
                         <tr
                           className={`hover:bg-background/60 transition-colors ${
-                            product.isSelected ? "bg-indigo-50/20 dark:bg-indigo-950/10" : "opacity-60"
+                            product.isSelected ? "bg-primary-default/5/20 dark:bg-indigo-950/10" : "opacity-60"
                           }`}
                         >
                           {/* Checkbox */}
@@ -838,7 +838,7 @@ export function SupplierWooCommerceImport({
                               type="checkbox"
                               checked={product.isSelected}
                               onChange={() => toggleSelectProduct(product.wcId)}
-                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-subtle cursor-pointer"
+                              className="w-4 h-4 rounded text-primary-default focus:ring-primary-default border-subtle cursor-pointer"
                             />
                           </td>
 
@@ -872,7 +872,7 @@ export function SupplierWooCommerceImport({
                                           )
                                         );
                                       }}
-                                      className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
+                                      className="text-primary-default dark:text-indigo-400 font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
                                     >
                                       <span>{product.variations.length} تنوع محصول</span>
                                       {product.expandedVariations ? (
@@ -899,7 +899,7 @@ export function SupplierWooCommerceImport({
                             {product.stock > 0 ? (
                               <span>{product.stock.toLocaleString("fa-IR")} عدد</span>
                             ) : (
-                              <span className="text-amber-500 font-bold">ناموجود</span>
+                              <span className="text-emerald-500 font-bold">ناموجود</span>
                             )}
                           </td>
 
@@ -930,7 +930,7 @@ export function SupplierWooCommerceImport({
                                     Math.max(0, Number(e.target.value))
                                   )
                                 }
-                                className="w-full pl-7 pr-3 py-1.5 bg-background border-2 border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-black text-indigo-900 dark:text-indigo-200 focus:outline-none focus:border-indigo-600 text-left"
+                                className="w-full pl-7 pr-3 py-1.5 bg-background border-2 border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-black text-primary-default/20 dark:text-indigo-200 focus:outline-none focus:border-primary-default text-left"
                               />
                               <span className="text-[10px] text-muted absolute left-2 top-2">
                                 ت
@@ -946,7 +946,7 @@ export function SupplierWooCommerceImport({
                                 <span>🔥 پرفروش</span>
                               </span>
                             ) : discountPercent >= 10 ? (
-                              <span className="inline-flex items-center gap-1 bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2.5 py-1 rounded-full text-[10px] font-black border border-amber-500/20">
+                              <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-amber-700 dark:text-emerald-300 px-2.5 py-1 rounded-full text-[10px] font-black border border-emerald-500/20">
                                 <span>+{discountPercent}٪ سود</span>
                                 <span>خوب</span>
                               </span>
@@ -973,9 +973,9 @@ export function SupplierWooCommerceImport({
 
                         {/* Expandable Variations Rows */}
                         {product.hasVariations && product.expandedVariations && (
-                          <tr className="bg-indigo-50/40 dark:bg-indigo-950/20 border-b border-indigo-100 dark:border-indigo-900/40">
+                          <tr className="bg-primary-default/5/40 dark:bg-indigo-950/20 border-b border-primary-default/10 dark:border-primary-default/20/40">
                             <td colSpan={8} className="p-4 pr-14 space-y-2">
-                              <div className="flex items-center gap-2 text-xs font-black text-indigo-900 dark:text-indigo-300 mb-2">
+                              <div className="flex items-center gap-2 text-xs font-black text-primary-default/20 dark:text-indigo-300 mb-2">
                                 <Layers className="w-4 h-4" />
                                 <span>تنوع‌ها و قیمت‌های متغیر این کالا:</span>
                               </div>
@@ -993,7 +993,7 @@ export function SupplierWooCommerceImport({
                                   return (
                                     <div
                                       key={v.id}
-                                      className="p-3 bg-white dark:bg-card rounded-2xl border border-indigo-200 dark:border-indigo-900 shadow-2xs space-y-2"
+                                      className="p-3 bg-white dark:bg-card rounded-2xl border border-indigo-200 dark:border-primary-default/20 shadow-2xs space-y-2"
                                     >
                                       <div className="flex items-center justify-between">
                                         <span className="text-xs font-bold text-primary truncate max-w-[160px]">
@@ -1019,7 +1019,7 @@ export function SupplierWooCommerceImport({
                                                 Math.max(0, Number(e.target.value))
                                               )
                                             }
-                                            className="w-24 px-2 py-1 bg-background border border-indigo-300 rounded-lg text-xs font-black text-indigo-900 dark:text-indigo-200 text-left"
+                                            className="w-24 px-2 py-1 bg-background border border-indigo-300 rounded-lg text-xs font-black text-primary-default/20 dark:text-indigo-200 text-left"
                                           />
                                           <span className="text-[10px] text-emerald-600 font-bold">
                                             +{vDiscount}٪
@@ -1049,9 +1049,9 @@ export function SupplierWooCommerceImport({
           </div>
 
           {/* STICKY BOTTOM CONFIRMATION BAR */}
-          <div className="sticky bottom-4 z-20 bg-card/95 backdrop-blur-md p-4 md:p-5 rounded-3xl border-2 border-indigo-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="sticky bottom-4 z-20 bg-card/95 backdrop-blur-md p-4 md:p-5 rounded-3xl border-2 border-primary-default/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4 text-right">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-primary-default text-white flex items-center justify-center shadow-lg shadow-primary-default/30 shrink-0">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <div>
@@ -1129,7 +1129,7 @@ export function SupplierWooCommerceImport({
               <button
                 type="button"
                 onClick={onSuccess}
-                className="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-8 py-3.5 bg-primary-default hover:bg-primary-hover text-white font-black text-sm rounded-2xl shadow-lg shadow-primary-default/25 transition-all cursor-pointer"
               >
                 مشاهده محصولات من در کاتالوگ
               </button>

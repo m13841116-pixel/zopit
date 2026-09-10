@@ -114,8 +114,8 @@ export function HighContrastStatusBadge({
     // Vibrant Emerald / Success
     styleClasses = "bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-50 dark:border-emerald-700 shadow-xs";
   } else if (["PENDING", "PENDING_APPROVAL", "WAITING_FOR_APPROVAL", "REQUESTED", "NEW", "WAITING_SHIPPING_COST", "PENDING_PAYMENT", "WAITING_FOR_PAYMENT", "WAITING_SHIPPING_PAYMENT", "UNDER_REVIEW", "WARNING", "SUSPENDED"].includes(norm)) {
-    // High-Contrast Amber / Warning
-    styleClasses = "bg-amber-400 text-slate-950 border-amber-500 dark:bg-amber-400 dark:text-slate-950 dark:border-amber-300 shadow-xs font-black";
+    // Rich Purple / Violet with crisp white text
+    styleClasses = "bg-[#552370] text-white border-purple-900 dark:bg-[#552370] dark:text-white dark:border-purple-800 shadow-xs font-black";
   } else if (["REJECTED", "FAILED", "CANCELLED", "BLOCKED", "TEMPORARILY_SUSPENDED", "OUT_OF_STOCK"].includes(norm)) {
     // Vibrant Crimson / Danger
     styleClasses = "bg-rose-100 text-rose-950 border-rose-300 dark:bg-rose-900 dark:text-rose-50 dark:border-rose-700 shadow-xs";

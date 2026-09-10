@@ -9,22 +9,22 @@ interface Category {
 }
 
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: 1, name: "موبایل", isActive: true, sortOrder: 1 },
-  { id: 2, name: "لپ‌تاپ", isActive: true, sortOrder: 2 },
-  { id: 3, name: "کالای دیجیتال", isActive: true, sortOrder: 3 },
+  { id: 1, name: "موبایل و تبلت", isActive: true, sortOrder: 1 },
+  { id: 2, name: "لپ‌تاپ و کامپیوتر", isActive: true, sortOrder: 2 },
+  { id: 3, name: "کالای دیجیتال و جانبی", isActive: true, sortOrder: 3 },
   { id: 4, name: "خانه و آشپزخانه", isActive: true, sortOrder: 4 },
   { id: 5, name: "لوازم خانگی برقی", isActive: true, sortOrder: 5 },
   { id: 6, name: "آرایشی و بهداشتی", isActive: true, sortOrder: 6 },
   { id: 7, name: "مد و پوشاک", isActive: true, sortOrder: 7 },
-  { id: 8, name: "طلا و نقره", isActive: true, sortOrder: 8 },
-  { id: 9, name: "خودرو و موتورسیکلت", isActive: true, sortOrder: 9 },
-  { id: 10, name: "سلامت و پزشکی", isActive: true, sortOrder: 10 },
+  { id: 8, name: "طلا و زیورآلات", isActive: true, sortOrder: 8 },
+  { id: 9, name: "خودرو و ابزارآلات", isActive: true, sortOrder: 9 },
+  { id: 10, name: "سلامت و تجهیزات پزشکی", isActive: true, sortOrder: 10 },
   { id: 11, name: "ابزارآلات و تجهیزات", isActive: true, sortOrder: 11 },
-  { id: 12, name: "کتاب و هنر", isActive: true, sortOrder: 12 },
+  { id: 12, name: "کتاب، هنر و لوازم تحریر", isActive: true, sortOrder: 12 },
   { id: 13, name: "ورزش و سفر", isActive: true, sortOrder: 13 },
-  { id: 14, name: "اسباب بازی کودک و نوزاد", isActive: true, sortOrder: 14 },
+  { id: 14, name: "اسباب بازی، کودک و نوزاد", isActive: true, sortOrder: 14 },
   { id: 15, name: "محصولات بومی و محلی", isActive: true, sortOrder: 15 },
-  { id: 16, name: "پت شاپ", isActive: true, sortOrder: 16 },
+  { id: 16, name: "پت شاپ و حیوانات خانگی", isActive: true, sortOrder: 16 },
 ];
 
 export default function Categories() {

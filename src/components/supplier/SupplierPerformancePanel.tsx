@@ -216,7 +216,7 @@ export default function SupplierPerformancePanel() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Timeline (Left - 2cols) */}
         <div className="lg:col-span-2 bg-surface p-6 rounded-2xl border border-subtle space-y-6">
-          <h3 className="text-base font-bold text-inverse flex items-center gap-2">
+          <h3 className="text-base font-bold text-primary flex items-center gap-2">
             <Calendar className="w-5 h-5 text-primary-default" />
             تاریخچه و تایم‌لاین ثبت امتیاز اخطارها
           </h3>
@@ -232,7 +232,7 @@ export default function SupplierPerformancePanel() {
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-xs font-bold text-danger">-{p.points} امتیاز</span>
-                      <span className="text-xs text-inverse font-bold mr-2">{p.reason}</span>
+                      <span className="text-xs text-primary font-bold mr-2">{p.reason}</span>
                     </div>
                     <span className="text-[10px] text-muted">
                       {new Date(p.createdAt).toLocaleDateString("fa-IR")}
@@ -260,7 +260,7 @@ export default function SupplierPerformancePanel() {
 
         {/* Affected Orders (Right - 1col) */}
         <div className="bg-surface p-6 rounded-2xl border border-subtle space-y-4">
-          <h3 className="text-base font-bold text-inverse flex items-center gap-2">
+          <h3 className="text-base font-bold text-primary flex items-center gap-2">
             <Layers className="w-5 h-5 text-primary-default" />
             سفارشات اخطاردار ({affectedOrdersCount || 0})
           </h3>
@@ -272,7 +272,7 @@ export default function SupplierPerformancePanel() {
             {distinctAffectedOrders && distinctAffectedOrders.length > 0 ? (
               distinctAffectedOrders.map((orderNo: string, index: number) => (
                 <div key={index} className="bg-background border border-subtle rounded-xl p-3 flex justify-between items-center font-mono">
-                  <span className="text-xs font-semibold text-inverse">{orderNo}</span>
+                  <span className="text-xs font-semibold text-primary">{orderNo}</span>
                   <span className="text-[10px] bg-danger/10 text-danger border border-danger/20 px-2 py-0.5 rounded">دارای اخطار</span>
                 </div>
               ))

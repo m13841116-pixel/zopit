@@ -113,6 +113,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     password: ""
   });
 
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // Auto-fill saved credentials on mount if user had remembered or registered
+  useEffect(() => {
+    try {
+      const savedUser = localStorage.getItem("zopit_saved_username") || localStorage.getItem("saved_username") || "";
+      const savedPass = localStorage.getItem("zopit_saved_password") || "";
+      const isRemember = localStorage.getItem("zopit_remember_me") !== "false";
+      if (savedUser) {
+        setLoginForm(prev => ({
+          usernameOrMobile: savedUser,
+          password: isRemember && savedPass ? savedPass : prev.password
+        }));
+        setOtpMobile(savedUser);
+        setRememberMe(isRemember);
+      }
+    } catch {
+      // Ignore localStorage read errors
+    }
+  }, []);
+
   // OTP Login Form State
   const [otpMobile, setOtpMobile] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -209,11 +230,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       return;
     }
 
-    if (!supplierForm.agreementAccepted) {
-      setError("لطفاً قوانین و مقررات تامین‌کنندگان را تأیید کنید.");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -251,6 +267,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("userRole", "SUPPLIER");
       localStorage.setItem("saved_username", cleanMobile);
+      localStorage.setItem("zopit_remember_me", "true");
+      localStorage.setItem("zopit_saved_username", cleanMobile);
+      localStorage.setItem("zopit_saved_password", supplierForm.password);
 
       onSuccess(data.user, data.token);
     } catch (err: any) {
@@ -320,6 +339,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("userRole", "STORE");
       localStorage.setItem("saved_username", cleanMobile);
+      localStorage.setItem("zopit_remember_me", "true");
+      localStorage.setItem("zopit_saved_username", cleanMobile);
+      localStorage.setItem("zopit_saved_password", storeForm.password);
 
       onSuccess(data.user, data.token);
     } catch (err: any) {
@@ -382,6 +404,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("userRole", "AMBASSADOR");
       localStorage.setItem("saved_username", cleanMobile);
+      localStorage.setItem("zopit_remember_me", "true");
+      localStorage.setItem("zopit_saved_username", cleanMobile);
+      localStorage.setItem("zopit_saved_password", ambassadorForm.password);
 
       onSuccess(data.user, data.token);
     } catch (err: any) {
@@ -427,6 +452,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("saved_username", cleanUsername);
+
+      if (rememberMe) {
+        localStorage.setItem("zopit_remember_me", "true");
+        localStorage.setItem("zopit_saved_username", cleanUsername);
+        localStorage.setItem("zopit_saved_password", loginForm.password);
+      } else {
+        localStorage.removeItem("zopit_remember_me");
+        localStorage.removeItem("zopit_saved_password");
+      }
 
       onSuccess(data.user, data.token);
     } catch (err: any) {
@@ -506,6 +540,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("saved_username", cleanMobile);
 
+      if (rememberMe) {
+        localStorage.setItem("zopit_remember_me", "true");
+        localStorage.setItem("zopit_saved_username", cleanMobile);
+      }
+
       onSuccess(data.user, data.token);
     } catch (err: any) {
       setError(err.message || "کد تایید معتبر نیست");
@@ -515,7 +554,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F9FAFB] flex flex-col justify-between items-center py-8 px-4 relative font-sans text-right" dir="rtl">
+    <div className="min-h-screen w-full bg-[#F9FAFB] flex flex-col justify-between items-center py-4 sm:py-6 px-3 sm:px-4 relative font-sans text-right" dir="rtl">
       {/* 5% Opacity Dot Grid Background */}
       <div 
         className="fixed inset-0 pointer-events-none z-0" 
@@ -527,15 +566,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       />
 
       {/* Top Navbar / Explore Shortcut */}
-      <div className="w-full max-w-[520px] flex items-center justify-between mb-4 z-10">
+      <div className="w-full max-w-[460px] flex items-center justify-between mb-2 z-10">
         <div className="flex items-center gap-2">
           {onNavigateToExplore && (
             <button
               onClick={onNavigateToExplore}
-              className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-black text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-xs font-black text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <ArrowRight className="w-4 h-4 text-gray-500" />
-              <span>بازگشت به اکسپلور</span>
+              <ArrowRight className="w-3.5 h-3.5 text-gray-500" />
+              <span>بازگشت به اکسپلور کالا</span>
             </button>
           )}
         </div>
@@ -543,104 +582,127 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
       {/* Main Authentication Card */}
       <div 
-        className="w-full max-w-[520px] bg-white rounded-[16px] border border-gray-100 p-6 sm:p-8 z-10 transition-all duration-300 relative"
-        style={{ boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}
+        className="w-full max-w-[460px] bg-white rounded-[22px] border border-gray-100 p-5 sm:p-6 z-10 transition-all duration-300 relative shadow-xl shadow-slate-200/50"
       >
-        {/* Logo at Top */}
-        <div className="flex flex-col items-center justify-center mb-6">
-          <ZopitLogo size="lg" />
-          <p className="text-xs text-gray-500 font-bold mt-2 text-center">
-            پلتفرم هوشمند B2B و خدمات تامین کالا
+        {/* Official ZopiT Logo at Top */}
+        <div className="flex flex-col items-center justify-center mb-3.5">
+          <ZopitLogo size="lg" variant="full" />
+          <p className="text-[11px] text-gray-500 font-bold mt-1 text-center">
+            پلتفرم هوشمند B2B و خدمات جامع تامین کالا
           </p>
         </div>
 
-        {/* 3-Role Switcher Tabs */}
-        <div className="bg-gray-100/80 p-1.5 rounded-2xl flex items-center gap-1 mb-6 border border-gray-200/50">
+        {/* Primary Auth Mode Toggle: [ورود به حساب] vs [ثبت‌نام جدید] */}
+        <div className="bg-gray-100/90 p-1 rounded-xl flex items-center gap-1 mb-4 border border-gray-200/60">
           <button
             type="button"
             onClick={() => {
-              setActiveRole("supplier");
-              if (window.history.pushState) window.history.pushState({}, "", "/register/supplier");
+              setMode("login");
+              setError(null);
             }}
-            className={`flex-1 py-2 px-1 rounded-xl text-xs font-black transition-all duration-300 cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeRole === "supplier"
-                ? "bg-[#6366F1] text-white shadow-md shadow-indigo-500/20 scale-[1.02]"
-                : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+            className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-[13px] font-black transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
+              mode === "login"
+                ? "bg-white text-gray-900 shadow-sm scale-[1.01]"
+                : "text-gray-500 hover:text-gray-900"
             }`}
           >
-            <Package className="w-3.5 h-3.5" />
-            <span>تامین‌کننده</span>
+            <Lock className={`w-3.5 h-3.5 ${mode === "login" ? "text-[#552370]" : "text-gray-400"}`} />
+            <span>ورود به حساب کاربری</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
-              setActiveRole("store");
-              if (window.history.pushState) window.history.pushState({}, "", "/register/store");
+              setMode("register");
+              setError(null);
             }}
-            className={`flex-1 py-2 px-1 rounded-xl text-xs font-black transition-all duration-300 cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeRole === "store"
-                ? "bg-[#10B981] text-white shadow-md shadow-emerald-500/20 scale-[1.02]"
-                : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+            className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-[13px] font-black transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
+              mode === "register"
+                ? "bg-white text-gray-900 shadow-sm scale-[1.01]"
+                : "text-gray-500 hover:text-gray-900"
             }`}
           >
-            <Store className="w-3.5 h-3.5" />
-            <span>مدیر فروشگاه</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveRole("ambassador");
-              if (window.history.pushState) window.history.pushState({}, "", "/register/ambassador");
-            }}
-            className={`flex-1 py-2 px-1 rounded-xl text-xs font-black transition-all duration-300 cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeRole === "ambassador"
-                ? "bg-[#3B82F6] text-white shadow-md shadow-blue-500/20 scale-[1.02]"
-                : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>تأمین‌یاب</span>
+            <Sparkles className={`w-3.5 h-3.5 ${mode === "register" ? "text-amber-500" : "text-gray-400"}`} />
+            <span>ثبت‌نام حساب جدید</span>
           </button>
         </div>
 
-        {/* Auth Mode Toggle Tabs (Registration vs Login) */}
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-6">
-          <div className="flex items-center gap-4 text-sm font-black">
-            <button
-              type="button"
-              onClick={() => setMode("register")}
-              className={`pb-2 border-b-2 transition-all cursor-pointer ${
-                mode === "register"
-                  ? `${roleTheme.borderClass} text-gray-900 font-black`
-                  : "border-transparent text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              ثبت‌نام {roleTheme.roleName}
-            </button>
+        {/* 3-Role Switcher Tabs - ONLY DISPLAYED IN REGISTRATION MODE */}
+        {mode === "register" && (
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-gray-800">
+                نوع حساب کاربری خود را انتخاب کنید:
+              </label>
+              <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${roleTheme.badgeBg}`}>
+                {roleTheme.roleName}
+              </span>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setMode("login")}
-              className={`pb-2 border-b-2 transition-all cursor-pointer ${
-                mode === "login"
-                  ? `${roleTheme.borderClass} text-gray-900 font-black`
-                  : "border-transparent text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              ورود به حساب
-            </button>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole("supplier");
+                  if (window.history.pushState) window.history.pushState({}, "", "/register/supplier");
+                }}
+                className={`p-2 rounded-xl border text-center transition-all duration-200 cursor-pointer flex flex-col items-center gap-1 ${
+                  activeRole === "supplier"
+                    ? "bg-indigo-50/70 border-indigo-500 text-indigo-950 shadow-xs ring-2 ring-indigo-500/20"
+                    : "bg-gray-50/60 border-gray-200 text-gray-600 hover:bg-gray-100/70"
+                }`}
+              >
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeRole === "supplier" ? "bg-[#6366F1] text-white" : "bg-gray-200 text-gray-600"}`}>
+                  <Package className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-black">تامین‌کننده</span>
+                <span className="text-[10px] text-gray-500 hidden sm:inline">تولیدی و عمده</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole("store");
+                  if (window.history.pushState) window.history.pushState({}, "", "/register/store");
+                }}
+                className={`p-2 rounded-xl border text-center transition-all duration-200 cursor-pointer flex flex-col items-center gap-1 ${
+                  activeRole === "store"
+                    ? "bg-emerald-50/70 border-emerald-500 text-emerald-950 shadow-xs ring-2 ring-emerald-500/20"
+                    : "bg-gray-50/60 border-gray-200 text-gray-600 hover:bg-gray-100/70"
+                }`}
+              >
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeRole === "store" ? "bg-[#10B981] text-white" : "bg-gray-200 text-gray-600"}`}>
+                  <Store className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-black">مدیر فروشگاه</span>
+                <span className="text-[10px] text-gray-500 hidden sm:inline">سایت و پیج</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole("ambassador");
+                  if (window.history.pushState) window.history.pushState({}, "", "/register/ambassador");
+                }}
+                className={`p-2 rounded-xl border text-center transition-all duration-200 cursor-pointer flex flex-col items-center gap-1 ${
+                  activeRole === "ambassador"
+                    ? "bg-blue-50/70 border-blue-500 text-blue-950 shadow-xs ring-2 ring-blue-500/20"
+                    : "bg-gray-50/60 border-gray-200 text-gray-600 hover:bg-gray-100/70"
+                }`}
+              >
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeRole === "ambassador" ? "bg-[#3B82F6] text-white" : "bg-gray-200 text-gray-600"}`}>
+                  <Users className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-black">تأمین‌یاب</span>
+                <span className="text-[10px] text-gray-500 hidden sm:inline">معرف و بازاریاب</span>
+              </button>
+            </div>
           </div>
-
-          <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${roleTheme.badgeBg}`}>
-            نقش: {roleTheme.roleName}
-          </span>
-        </div>
+        )}
 
         {/* Global Error Banner */}
         {error && (
-          <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2 animate-shake">
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2 animate-shake">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
@@ -812,27 +874,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
                 </div>
 
-                {/* Terms Checkbox */}
-                <div className="flex items-start gap-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="supplier-agreement"
-                    checked={supplierForm.agreementAccepted}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, agreementAccepted: e.target.checked })}
-                    className="mt-0.5 rounded border-gray-300 text-[#6366F1] focus:ring-[#6366F1] w-4 h-4 cursor-pointer shrink-0"
-                  />
-                  <label htmlFor="supplier-agreement" className="text-xs text-[#6B7280] leading-relaxed cursor-pointer">
-                    <button
-                      type="button"
-                      onClick={() => onShowTerms?.("supplier")}
-                      className="text-[#6366F1] font-bold underline hover:opacity-80"
-                    >
-                      قوانین و مقررات تامین‌کنندگان زوپیت
-                    </button>{" "}
-                    را مطالعه نموده و می‌پذیرم.
-                  </label>
-                </div>
-
                 {/* Primary Button */}
                 <button
                   type="submit"
@@ -841,6 +882,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 >
                   {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "ثبت‌نام و ورود مستقیم به پنل تامین‌کننده"}
                 </button>
+
+                {/* Acceptance of Terms Disclaimer */}
+                <p className="text-[11px] text-gray-500 text-center mt-2.5 leading-relaxed">
+                  ثبت‌نام شما به منزله پذیرش کلیه{" "}
+                  <button
+                    type="button"
+                    onClick={() => onShowTerms?.("supplier")}
+                    className="text-[#552370] font-black underline hover:text-purple-950 cursor-pointer"
+                  >
+                    قوانین و مقررات
+                  </button>{" "}
+                  و شرایط استفاده از زوپیت است.
+                </p>
               </form>
             )}
 
@@ -971,6 +1025,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 >
                   {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "ثبت‌نام و ورود به پنل فروشگاه"}
                 </button>
+
+                {/* Acceptance of Terms Disclaimer */}
+                <p className="text-[11px] text-gray-500 text-center mt-2.5 leading-relaxed">
+                  ثبت‌نام شما به منزله پذیرش کلیه{" "}
+                  <button
+                    type="button"
+                    onClick={() => onShowTerms?.("store")}
+                    className="text-[#059669] font-black underline hover:text-emerald-950 cursor-pointer"
+                  >
+                    قوانین و مقررات
+                  </button>{" "}
+                  و شرایط استفاده از زوپیت است.
+                </p>
               </form>
             )}
 
@@ -1065,6 +1132,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 >
                   {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "ثبت‌نام و شروع همکاری"}
                 </button>
+
+                {/* Acceptance of Terms Disclaimer */}
+                <p className="text-[11px] text-gray-500 text-center mt-2.5 leading-relaxed">
+                  ثبت‌نام شما به منزله پذیرش کلیه{" "}
+                  <button
+                    type="button"
+                    onClick={() => onShowTerms?.("general")}
+                    className="text-[#2563EB] font-black underline hover:text-blue-950 cursor-pointer"
+                  >
+                    قوانین و مقررات
+                  </button>{" "}
+                  و شرایط استفاده از زوپیت است.
+                </p>
               </form>
             )}
 
@@ -1121,14 +1201,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
             {/* 1. PASSWORD LOGIN METHOD */}
             {loginMethod === "password" && (
-              <form onSubmit={handlePasswordLogin} className="space-y-4">
+              <form onSubmit={handlePasswordLogin} autoComplete="on" className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#374151] mb-1.5">
+                  <label htmlFor="login_username" className="block text-xs font-bold text-[#374151] mb-1.5">
                     شماره موبایل یا نام کاربری <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <User className="w-4 h-4 text-gray-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
+                      id="login_username"
+                      name="username"
+                      autoComplete="username"
                       type="text"
                       required
                       value={loginForm.usernameOrMobile}
@@ -1138,14 +1221,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       }}
                       placeholder="09121234567"
                       dir="ltr"
-                      className={`w-full pr-10 pl-3 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 text-left outline-none transition-all ${roleTheme.ringClass}`}
+                      className="w-full pr-10 pl-3 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 text-left outline-none transition-all focus:border-[#552370] focus:ring-2 focus:ring-purple-500/20"
                     />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-[#374151]">
+                    <label htmlFor="login_password" className="block text-xs font-bold text-[#374151]">
                       کلمه عبور <span className="text-rose-500">*</span>
                     </label>
                     <button
@@ -1159,13 +1242,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <div className="relative">
                     <Lock className="w-4 h-4 text-gray-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
+                      id="login_password"
+                      name="password"
+                      autoComplete="current-password"
                       type={showPassword ? "text" : "password"}
                       required
                       value={loginForm.password}
                       onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                       placeholder="••••••••"
                       dir="ltr"
-                      className={`w-full pr-10 pl-10 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 text-left outline-none transition-all ${roleTheme.ringClass}`}
+                      className="w-full pr-10 pl-10 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 text-left outline-none transition-all focus:border-[#552370] focus:ring-2 focus:ring-purple-500/20"
                     />
                     <button
                       type="button"
@@ -1180,10 +1266,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`w-full py-3.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${roleTheme.btnClass}`}
+                  className="w-full py-3.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 text-white bg-[#552370] hover:bg-[#431959] shadow-md shadow-purple-950/20 active:scale-[0.99]"
                 >
                   {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "ورود به حساب کاربری"}
                 </button>
+
+                <p className="text-[11px] text-slate-500 text-center mt-2 flex items-center justify-center gap-1.5 font-medium">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#552370]" />
+                  <span>تشخیص هوشمند و هدایت خودکار به پنل کاربری شما</span>
+                </p>
               </form>
             )}
 
@@ -1209,7 +1300,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           }}
                           placeholder="09123456789"
                           dir="ltr"
-                          className={`w-full pr-10 pl-3 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 text-left outline-none transition-all ${roleTheme.ringClass}`}
+                          className="w-full pr-10 pl-3 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 text-left outline-none transition-all focus:border-[#552370] focus:ring-2 focus:ring-purple-500/20"
                         />
                       </div>
                       <p className="text-[11px] text-[#6B7280] mt-1.5 leading-relaxed">
@@ -1220,7 +1311,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     <button
                       type="submit"
                       disabled={loading || !otpMobile.trim()}
-                      className={`w-full py-3.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${roleTheme.btnClass}`}
+                      className="w-full py-3.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 text-white bg-[#552370] hover:bg-[#431959] shadow-md shadow-purple-950/20 active:scale-[0.99]"
                     >
                       {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "ارسال کد یکبارمصرف پیامکی"}
                     </button>
@@ -1268,7 +1359,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         }}
                         placeholder="••••"
                         dir="ltr"
-                        className={`w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-center font-mono font-black text-lg tracking-[0.5em] text-gray-900 outline-none transition-all ${roleTheme.ringClass}`}
+                        className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-center font-mono font-black text-lg tracking-[0.5em] text-gray-900 outline-none transition-all focus:border-[#552370] focus:ring-2 focus:ring-purple-500/20"
                       />
                     </div>
 
@@ -1283,7 +1374,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         <button
                           type="button"
                           onClick={handleSendOtp}
-                          className="text-indigo-600 font-black hover:underline cursor-pointer"
+                          className="text-[#552370] font-black hover:underline cursor-pointer"
                         >
                           ارسال مجدد کد پیامکی
                         </button>
@@ -1293,7 +1384,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     <button
                       type="submit"
                       disabled={loading || otpCode.length < 4}
-                      className={`w-full py-3.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${roleTheme.btnClass}`}
+                      className="w-full py-3.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 text-white bg-[#552370] hover:bg-[#431959] shadow-md shadow-purple-950/20 active:scale-[0.99]"
                     >
                       {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "ورود مستقیم به پنل"}
                     </button>
@@ -1308,11 +1399,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 هنوز حساب کاربری ندارید؟{" "}
                 <button
                   type="button"
-                  onClick={() => setMode("register")}
-                  className="font-black underline cursor-pointer hover:opacity-80"
-                  style={{ color: roleTheme.primaryHex }}
+                  onClick={() => {
+                    setMode("register");
+                    setError(null);
+                  }}
+                  className="font-black text-[#552370] underline cursor-pointer hover:text-purple-950"
                 >
-                  ثبت‌نام سریع {roleTheme.roleName}
+                  ثبت‌نام سریع و رایگان در زوپیت
                 </button>
               </p>
             </div>
@@ -1369,13 +1462,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       </div>
 
       {/* Footer of Auth Pages (Enamad Badge & Copyright) */}
-      <footer className="w-full max-w-[520px] mt-8 text-center space-y-3 z-10">
-        <div className="flex items-center justify-center gap-4">
+      <footer className="w-full max-w-[460px] mt-4 text-center space-y-2 z-10">
+        <div className="flex items-center justify-center gap-3">
           {/* Enamad Badge */}
-          <EnamadBadge />
+          <EnamadBadge variant="compact" />
         </div>
-        <p className="text-[11px] text-[#6B7280] font-bold">
-          © ۲۰۲۶ کلیه حقوق مادی و معنوی این سامانه متعلق به پلتفرم زوپیت می‌باشد.
+        <p className="text-[10px] text-[#6B7280] font-medium">
+          © ۲۰۲۶ پلتفرم یکپارچه تامین و فروش کالا زوپیت • کلیه حقوق محفوظ است.
         </p>
       </footer>
     </div>

@@ -289,8 +289,8 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
               {/* Sub-Tab 1: Public Board (Free Opportunities) */}
               {leadSubTab === "public" && (
                 <div className="p-4 sm:p-6 space-y-4">
-                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 p-3.5 rounded-xl text-xs leading-relaxed flex items-center gap-2.5">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-950 dark:text-purple-100 p-3.5 rounded-xl text-xs leading-relaxed flex items-center gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-[#552370] dark:text-purple-400" />
                     <span>به محض اینکه روی دکمه «قبول و هماهنگی» کلیک کنید، این فرصت از تابلوی عمومی حذف شده و اختصاصاً به پنل شخصی شما منتقل خواهد شد.</span>
                   </div>
 
@@ -372,8 +372,8 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
                                     جذب موفق و ثبت نهایی
                                   </span>
                                 ) : lead.status === "IN_NEGOTIATION" ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                                    <Clock className="w-3 h-3" />
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                                    <Clock className="w-3 h-3 text-[#552370]" />
                                     در حال مذاکره
                                   </span>
                                 ) : (
@@ -427,9 +427,9 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
                               {lead.status === "ASSIGNED" && (
                                 <button
                                   onClick={() => updateLeadStatus(lead.id, "IN_NEGOTIATION")}
-                                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                                  className="px-3.5 py-2 bg-[#552370] hover:bg-[#431959] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
                                 >
-                                  <Clock className="w-3.5 h-3.5" />
+                                  <Clock className="w-3.5 h-3.5 text-white" />
                                   <span>تغییر به در حال مذاکره</span>
                                 </button>
                               )}
@@ -448,7 +448,7 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
                                   setMismatchNewPhone("");
                                   setMismatchNotes("");
                                 }}
-                                className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-amber-500/10 hover:text-amber-600 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1"
+                                className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 hover:text-[#552370] text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1"
                               >
                                 <Phone className="w-3.5 h-3.5" />
                                 <span>شماره تماس متفاوت ثبت شده؟</span>
@@ -547,7 +547,7 @@ export default function AmbassadorDashboard({ user, onLogout }: any) {
                 <button
                   type="submit"
                   disabled={submittingMismatch || !mismatchNewPhone}
-                  className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 bg-[#552370] hover:bg-[#431959] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-purple-900/20 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {submittingMismatch ? "در حال ارسال تیکت..." : "ارسال تیکت استعلام شماره"}
                 </button>

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 260" width="100%" height="100%">
+  <defs>
+    <linearGradient id="zopitOrangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFA000" />
+      <stop offset="100%" stop-color="#F57C00" />
+    </linearGradient>
+  </defs>
+
+  <g id="zopit-symbol" transform="translate(10, 10)">
+    <!-- PURPLE CART BASKET & HANDLE (Behind Z) -->
+    <!-- Cart Handle & Basket Frame -->
+    <path
+      d="M 120 72 
+         L 172 72 
+         C 178 72, 182 68, 185 62 
+         L 194 36 
+         C 197 28, 207 26, 212 32 
+         C 215 36, 214 42, 209 48 
+         L 201 70 
+         C 195 86, 180 98, 162 98 
+         L 115 98 
+         Z"
+      fill="#59257A"
+    />
+
+    <!-- Cart Basket Interior Cutout -->
+    <path
+      d="M 134 75
+         L 168 75
+         C 172 75, 175 78, 173 82
+         L 165 92
+         C 164 94, 161 95, 158 95
+         L 125 95
+         Z"
+      fill="#FFFFFF"
+    />
+
+    <!-- Cart Wheels (Solid Purple) -->
+    <circle cx="126" cy="116" r="14" fill="#59257A" />
+    <circle cx="126" cy="116" r="5" fill="#FFFFFF" />
+    <circle cx="160" cy="116" r="14" fill="#59257A" />
+    <circle cx="160" cy="116" r="5" fill="#FFFFFF" />
+
+    <!-- ORANGE 'Z' (Front overlap) -->
+    <path
+      d="M 68 34
+         L 132 34
+         C 142 34, 148 44, 142 53
+         C 138 59, 131 61, 124 61
+         L 100 61
+         L 72 101
+         C 68 107, 72 116, 80 116
+         L 116 116
+         C 124 116, 130 122, 130 130
+         C 130 138, 124 144, 116 144
+         L 64 144
+         C 50 144, 42 128, 49 116
+         L 85 64
+         L 68 64
+         C 60 64, 54 58, 54 50
+         C 54 41, 60 34, 68 34
+         Z"
+      fill="url(#zopitOrangeGrad)"
+    />
+  </g>
+
+  <!-- TYPOGRAPHY: ZOPiT -->
+  <g id="zopit-text" transform="translate(18, 175)">
+    <!-- Z -->
+    <path d="M 10 10 L 45 10 L 45 18 L 22 50 L 46 50 L 46 58 L 10 58 L 10 50 L 33 18 L 10 18 Z" fill="#59257A" />
+    
+    <!-- O -->
+    <path d="M 80 10 C 96 10, 108 21, 108 34 C 108 48, 96 59, 80 59 C 64 59, 52 48, 52 34 C 52 21, 64 10, 80 10 Z M 80 19 C 70 19, 62 25, 62 34 C 62 43, 70 50, 80 50 C 90 50, 98 43, 98 34 C 98 25, 90 19, 80 19 Z" fill="#59257A" />
+
+    <!-- P -->
+    <path d="M 118 10 L 140 10 C 151 10, 158 17, 158 27 C 158 37, 151 44, 140 44 L 128 44 L 128 58 L 118 58 Z M 128 18 L 128 36 L 139 36 C 145 36, 148 33, 148 27 C 148 21, 145 18, 139 18 Z" fill="#59257A" />
+
+    <!-- i (Lowercase with Orange Dot) -->
+    <!-- Stem -->
+    <rect x="168" y="24" width="10" height="34" rx="2" fill="#59257A" />
+    <!-- Orange Dot -->
+    <circle cx="173" cy="14" r="5.5" fill="#FFA000" />
+
+    <!-- T -->
+    <path d="M 188 10 L 226 10 L 226 18 L 212 18 L 212 58 L 202 58 L 202 18 L 188 18 Z" fill="#59257A" />
+  </g>
+</svg>

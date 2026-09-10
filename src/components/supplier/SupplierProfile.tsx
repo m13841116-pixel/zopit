@@ -191,8 +191,8 @@ export function SupplierProfile({ user, showNotification, onUpdateUser }: any) {
                 </div>
               </div>
             ) : (
-              <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-center gap-3 text-amber-900 dark:text-amber-200">
-                <AlertCircle className="w-6 h-6 text-amber-600 shrink-0" />
+              <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 p-4 rounded-2xl flex items-center gap-3 text-purple-950 dark:text-purple-100">
+                <AlertCircle className="w-6 h-6 text-[#552370] dark:text-purple-400 shrink-0" />
                 <div>
                   <h4 className="font-extrabold text-sm">مدارک و احراز هویت شما تکمیل نشده است</h4>
                   <p className="text-xs mt-0.5 opacity-90">جهت فعال‌سازی قابلیت ثبت ارسال پستی و دریافت تسویه‌حساب‌ها، فرم و تصاویر مدارک زیر را تکمیل کنید.</p>

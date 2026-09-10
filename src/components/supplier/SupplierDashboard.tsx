@@ -986,7 +986,7 @@ export function SupplierDashboard({
       subItems: [
         { id: "products", label: "لیست محصولات", icon: <Package className="w-4 h-4" /> },
         { id: "add-product", label: "افزودن محصول جدید", icon: <PlusCircle className="w-4 h-4" /> },
-        { id: "woocommerce-import", label: "دریافت از ووکامرس", icon: <Globe className="w-4 h-4 text-indigo-500" /> },
+        { id: "woocommerce-import", label: "دریافت از ووکامرس", icon: <Globe className="w-4 h-4 text-primary-default" /> },
       ],
     },
     {
@@ -1289,18 +1289,18 @@ export function SupplierDashboard({
 
                   {/* KYC / Account Activation Alert Banner */}
                   {!(user?.isVerified || user?.kycVerified) && (
-                    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 px-4 py-3 rounded-2xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-fade-in">
+                    <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-950 dark:text-purple-100 px-4 py-3 rounded-2xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-fade-in">
                       <div className="flex items-center gap-2.5 text-right">
-                        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <AlertCircle className="w-5 h-5 text-[#552370] dark:text-purple-400 shrink-0" />
                         <span>
                           حساب شما هنوز فعال نشده است. برای ثبت کد رهگیری سفارش‌ها و تسویه‌حساب{" "}
-                          <strong className="underline decoration-amber-500 font-bold">«تکمیل مدارک»</strong> را کلیک کنید.
+                          <strong className="underline decoration-purple-500 font-bold">«تکمیل مدارک»</strong> را کلیک کنید.
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => setActiveTab("profile")}
-                        className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
+                        className="px-4 py-1.5 bg-[#552370] hover:bg-[#431959] text-white font-bold text-xs rounded-xl transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
                       >
                         تکمیل مدارک
                       </button>
@@ -1308,7 +1308,7 @@ export function SupplierDashboard({
                   )}
 
                   {/* Compact Welcome Banner */}
-                  <div className="bg-gradient-to-r from-primary-default via-indigo-600 to-primary-hover rounded-2xl p-5 text-white shadow-md relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="bg-gradient-to-r from-primary-default via-primary-default to-primary-hover rounded-2xl p-5 text-white shadow-md relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-2xl -mr-20 -mt-20 pointer-events-none"></div>
                     <div className="relative z-10">
                       <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
@@ -1784,7 +1784,7 @@ export function SupplierDashboard({
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-card p-5 rounded-2xl shadow-sm border border-subtle gap-4">
                       <div>
                         <h2 className="text-xl font-black text-primary flex items-center gap-2">
-                          <Package className="w-6 h-6 text-indigo-600" />
+                          <Package className="w-6 h-6 text-primary-default" />
                           مدیریت محصولات
                         </h2>
                         <p className="text-xs text-muted mt-1">
@@ -1794,7 +1794,7 @@ export function SupplierDashboard({
 
                       <button
                         onClick={() => setActiveTab("add-product")}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md hover:shadow-indigo-600/20 flex items-center gap-2 cursor-pointer shrink-0"
+                        className="bg-primary-default hover:bg-primary-hover text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md hover:shadow-primary-default/20 flex items-center gap-2 cursor-pointer shrink-0"
                       >
                         <Plus className="w-4 h-4" />
                         <span>+ افزودن محصول جدید</span>
@@ -1818,7 +1818,7 @@ export function SupplierDashboard({
                         onClick={() => setIsQuickEditMode(!isQuickEditMode)}
                         className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 border ${
                           isQuickEditMode
-                            ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                            ? "bg-primary-default text-white border-primary-hover shadow-md shadow-primary-default/20"
                             : "bg-surface text-secondary hover:bg-border/60 border-subtle"
                         }`}
                       >
@@ -1829,7 +1829,7 @@ export function SupplierDashboard({
 
                     {/* Excel Quick Edit Save Banner */}
                     {isQuickEditMode && Object.keys(quickEditValues).length > 0 && (
-                      <div className="bg-indigo-950 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl border border-indigo-700/50 animate-fade-in">
+                      <div className="bg-primary-hover text-white p-4 rounded-2xl flex items-center justify-between shadow-xl border border-primary-hover/50 animate-fade-in">
                         <div className="flex items-center gap-2.5">
                           <Sparkles className="w-5 h-5 text-amber-400" />
                           <span className="text-xs sm:text-sm font-bold">
@@ -1900,12 +1900,12 @@ export function SupplierDashboard({
                           <thead className="bg-background border-b border-subtle text-muted font-bold text-xs">
                             <tr>
                               <th className="px-4 py-4 text-center">تصویر کالا</th>
-                              <th className="px-6 py-4">نام محصول و شناسه</th>
-                              <th className="px-6 py-4">برند</th>
-                              <th className="px-6 py-4">موجودی انبار</th>
-                              <th className="px-6 py-4">قیمت پایه (تومان)</th>
-                              <th className="px-6 py-4">وضعیت</th>
-                              <th className="px-6 py-4 text-center">عملیات</th>
+                              <th className="px-4 py-2.5">نام محصول و شناسه</th>
+                              <th className="px-4 py-2.5">برند</th>
+                              <th className="px-4 py-2.5">موجودی انبار</th>
+                              <th className="px-4 py-2.5">قیمت پایه (تومان)</th>
+                              <th className="px-4 py-2.5">وضعیت</th>
+                              <th className="px-4 py-2.5 text-center">عملیات</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1925,7 +1925,7 @@ export function SupplierDashboard({
                                 <tr
                                   key={product.id}
                                   className={`hover:bg-background transition-colors ${
-                                    isQuickEditMode ? "bg-indigo-50/20 dark:bg-indigo-950/10" : ""
+                                    isQuickEditMode ? "bg-indigo-50/20 dark:bg-primary-hover/10" : ""
                                   }`}
                                 >
                                   {/* Product Thumbnail (40x40px) */}
@@ -1944,7 +1944,7 @@ export function SupplierDashboard({
                                   </td>
 
                                   {/* Product Name & ID */}
-                                  <td className="px-6 py-4">
+                                  <td className="px-4 py-2.5">
                                     <span className="font-bold text-primary block leading-snug">
                                       {product.name}
                                     </span>
@@ -1954,12 +1954,12 @@ export function SupplierDashboard({
                                   </td>
 
                                   {/* Brand */}
-                                  <td className="px-6 py-4 text-muted text-xs font-medium">
+                                  <td className="px-4 py-2.5 text-muted text-xs font-medium">
                                     {product.brand || "-"}
                                   </td>
 
                                   {/* Stock */}
-                                  <td className="px-6 py-4">
+                                  <td className="px-4 py-2.5">
                                     {isQuickEditMode ? (
                                       <input
                                         type="number"
@@ -1976,7 +1976,7 @@ export function SupplierDashboard({
                                             },
                                           });
                                         }}
-                                        className="w-24 px-3 py-1.5 bg-background border-2 border-indigo-400 rounded-lg text-xs font-mono font-bold text-center outline-none focus:ring-2 focus:ring-indigo-600"
+                                        className="w-24 px-3 py-1.5 bg-background border-2 border-indigo-400 rounded-lg text-xs font-mono font-bold text-center outline-none focus:ring-2 focus:ring-primary-default"
                                       />
                                     ) : inlineEditingCell?.productId === product.id && inlineEditingCell?.field === "stock" ? (
                                       <div className="flex items-center gap-1.5">
@@ -2026,7 +2026,7 @@ export function SupplierDashboard({
                                             setInlineEditingCell({ productId: product.id, field: "stock" });
                                             setInlineEditTemp(currentStock);
                                           }}
-                                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
+                                          className="p-1 text-slate-400 hover:text-primary-default hover:bg-indigo-50 dark:hover:bg-primary-hover/40 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
                                           title="ویرایش سریع موجودی"
                                         >
                                           <Pencil className="w-3.5 h-3.5" />
@@ -2036,7 +2036,7 @@ export function SupplierDashboard({
                                   </td>
 
                                   {/* Base Price */}
-                                  <td className="px-6 py-4">
+                                  <td className="px-4 py-2.5">
                                     {isQuickEditMode ? (
                                       <input
                                         type="number"
@@ -2053,7 +2053,7 @@ export function SupplierDashboard({
                                             },
                                           });
                                         }}
-                                        className="w-32 px-3 py-1.5 bg-background border-2 border-indigo-400 rounded-lg text-xs font-mono font-bold text-center outline-none focus:ring-2 focus:ring-indigo-600"
+                                        className="w-32 px-3 py-1.5 bg-background border-2 border-indigo-400 rounded-lg text-xs font-mono font-bold text-center outline-none focus:ring-2 focus:ring-primary-default"
                                       />
                                     ) : inlineEditingCell?.productId === product.id && inlineEditingCell?.field === "supplierBasePrice" ? (
                                       <div className="flex items-center gap-1.5">
@@ -2092,7 +2092,7 @@ export function SupplierDashboard({
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-1.5 group">
-                                        <span className="font-mono font-black text-indigo-600 dark:text-indigo-400 text-sm">
+                                        <span className="font-mono font-black text-primary-default dark:text-indigo-400 text-sm">
                                           {currentPrice.toLocaleString("fa-IR")}
                                         </span>
                                         <span className="text-[10px] text-muted font-normal">تومان</span>
@@ -2102,7 +2102,7 @@ export function SupplierDashboard({
                                             setInlineEditingCell({ productId: product.id, field: "supplierBasePrice" });
                                             setInlineEditTemp(currentPrice);
                                           }}
-                                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
+                                          className="p-1 text-slate-400 hover:text-primary-default hover:bg-indigo-50 dark:hover:bg-primary-hover/40 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
                                           title="ویرایش سریع قیمت پایه"
                                         >
                                           <Pencil className="w-3.5 h-3.5" />
@@ -2112,7 +2112,7 @@ export function SupplierDashboard({
                                   </td>
 
                                   {/* Status */}
-                                  <td className="px-6 py-4">
+                                  <td className="px-4 py-2.5">
                                     <span
                                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
                                         product.status === "ACTIVE" || product.status === "PUBLISHED"
@@ -2133,13 +2133,13 @@ export function SupplierDashboard({
                                   </td>
 
                                   {/* Operations: Neutral Blue Edit Button */}
-                                  <td className="px-6 py-4 text-center">
+                                  <td className="px-4 py-2.5 text-center">
                                     <button
                                       onClick={() => {
                                         setProductToEdit(product);
                                         setActiveTab("edit-product");
                                       }}
-                                      className="bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs hover:shadow-sm active:scale-95"
+                                      className="bg-primary-default/10 text-primary-default hover:bg-primary-default/20  border border-primary-default/30  px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs hover:shadow-sm active:scale-95"
                                     >
                                       ویرایش
                                     </button>
@@ -2414,7 +2414,7 @@ export function SupplierDashboard({
 
                       {/* Selected Items Batch Floating Banner */}
                       {selectedItems.length > 0 && (
-                        <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in shadow-xl shadow-indigo-950/20 border border-indigo-700/40">
+                        <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in shadow-xl shadow-indigo-950/20 border border-primary-hover/40">
                           <div className="flex items-center gap-3">
                             <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-inner">
                               <Truck className="w-5 h-5" />
@@ -2481,12 +2481,12 @@ export function SupplierDashboard({
                                   return (
                                     <tr
                                       key={order.id}
-                                      className={`hover:bg-background/80 transition-colors ${isSelected ? "bg-indigo-50/40 dark:bg-indigo-950/20" : ""}`}
+                                      className={`hover:bg-background/80 transition-colors ${isSelected ? "bg-indigo-50/40 dark:bg-primary-hover/20" : ""}`}
                                     >
                                       <td className="px-4 py-4 text-center">
                                         <input
                                           type="checkbox"
-                                          className="rounded border-default text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                                          className="rounded border-default text-primary-default focus:ring-indigo-500 w-4 h-4 cursor-pointer"
                                           checked={isSelected}
                                           onChange={(e) => {
                                             if (e.target.checked) {
@@ -2500,7 +2500,7 @@ export function SupplierDashboard({
 
                                       {/* Order ID & Date */}
                                       <td className="px-5 py-4">
-                                        <div className="font-mono font-black text-indigo-600 dark:text-indigo-400 text-sm">
+                                        <div className="font-mono font-black text-primary-default dark:text-indigo-400 text-sm">
                                           #{order.id}
                                         </div>
                                         <div className="text-[11px] text-muted mt-0.5">
@@ -2519,7 +2519,7 @@ export function SupplierDashboard({
                                           <span className="text-muted font-mono bg-surface px-2 py-0.5 rounded border border-subtle">
                                             SKU: {order.product?.sku || "ندارد"}
                                           </span>
-                                          <span className="text-indigo-600 font-medium truncate">
+                                          <span className="text-primary-default font-medium truncate">
                                             {storeName}
                                           </span>
                                         </div>
@@ -2533,7 +2533,7 @@ export function SupplierDashboard({
                                       {/* City & Province */}
                                       <td className="px-5 py-4 text-xs font-semibold text-secondary">
                                         <div className="flex items-center gap-1.5">
-                                          <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                          <MapPin className="w-3.5 h-3.5 text-primary-default shrink-0" />
                                           <span>{cityProvince}</span>
                                         </div>
                                         {order.order?.shippingAddress && (
@@ -2561,7 +2561,7 @@ export function SupplierDashboard({
                                               ? "bg-[#065F46]"
                                               : ["REQUESTED", "PENDING", "NEW"].includes(order.status)
                                                 ? "bg-[#92400E] animate-pulse"
-                                                : "bg-indigo-600"
+                                                : "bg-primary-default"
                                           }`}></span>
                                           {getPersianStatus(order.status)}
                                         </span>
@@ -2589,7 +2589,7 @@ export function SupplierDashboard({
                                             className="p-2 bg-surface hover:bg-subtle text-muted hover:text-primary rounded-xl border border-subtle transition-all cursor-pointer"
                                             title="🖨️ چاپ مستقیم لیبل پستی"
                                           >
-                                            <Printer className="w-4 h-4 text-indigo-600" />
+                                            <Printer className="w-4 h-4 text-primary-default" />
                                           </button>
                                         </div>
                                       </td>
@@ -3551,7 +3551,7 @@ export function SupplierDashboard({
             {/* Modal Header */}
             <div className="p-5 border-b border-subtle flex items-center justify-between sticky top-0 bg-card/90 backdrop-blur-md z-10">
               <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2">
-                <Package className="w-5 h-5 text-indigo-600" />
+                <Package className="w-5 h-5 text-primary-default" />
                 <span>جزئیات و پیگیری مرسوله سفارش #{changingOrder.id}</span>
               </h3>
               <button
@@ -3567,7 +3567,7 @@ export function SupplierDashboard({
               {/* SECTION 1: Horizontal Step-by-Step Status Timeline */}
               <div className="bg-surface p-5 rounded-2xl border border-subtle space-y-3">
                 <h4 className="text-xs font-black text-primary flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600" />
+                  <Clock className="w-4 h-4 text-primary-default" />
                   <span>تایم‌لاین گام‌به‌گام وضعیت مرسوله</span>
                 </h4>
 
@@ -3593,7 +3593,7 @@ export function SupplierDashboard({
                               st.done
                                 ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/25"
                                 : st.active
-                                  ? "bg-indigo-600 text-white ring-4 ring-indigo-500/20"
+                                  ? "bg-primary-default text-white ring-4 ring-indigo-500/20"
                                   : "bg-background text-muted border border-subtle"
                             }`}
                           >
@@ -3616,7 +3616,7 @@ export function SupplierDashboard({
               {/* SECTION 2: Recipient Details & Postal Label Printing (بسیار مهم) */}
               <div className="bg-card p-5 rounded-2xl border-2 border-indigo-500/20 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between border-b border-subtle pb-3">
-                  <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                  <span className="text-xs font-black text-primary-default dark:text-indigo-400 flex items-center gap-1.5">
                     <MapPin className="w-4 h-4" />
                     اطلاعات آدرس و تحویل‌گیرنده سفارش
                   </span>
@@ -3652,7 +3652,7 @@ export function SupplierDashboard({
                 <button
                   type="button"
                   onClick={() => handlePrintPostalLabel(changingOrder)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs sm:text-sm py-3.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/25"
+                  className="w-full bg-primary-default hover:bg-primary-hover active:scale-95 text-white font-black text-xs sm:text-sm py-3.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-primary-default/25"
                 >
                   <Printer className="w-4.5 h-4.5" />
                   <span>🖨️ پرینت آدرس و لیبل پستی (آماده چسباندن روی کارتن)</span>
@@ -3728,7 +3728,7 @@ export function SupplierDashboard({
               {/* Order Timeline Log */}
               <div className="pt-2 border-t border-subtle space-y-2">
                 <h5 className="text-xs font-bold text-primary flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                  <Clock className="w-3.5 h-3.5 text-primary-default" />
                   <span>تاریخچه رویدادهای سفارش:</span>
                 </h5>
                 <OrderTimeline orderId={changingOrder.orderId} />
@@ -3811,7 +3811,7 @@ export function SupplierDashboard({
           <div className="bg-white text-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative space-y-5 my-8">
             {/* Modal Controls */}
             <div className="flex items-center justify-between border-b pb-3 print:hidden">
-              <div className="flex items-center gap-2 text-indigo-700 font-black text-sm md:text-base">
+              <div className="flex items-center gap-2 text-primary-hover font-black text-sm md:text-base">
                 <Printer className="w-5 h-5" />
                 <span>برچسب پستی استاندارد (A5)</span>
               </div>

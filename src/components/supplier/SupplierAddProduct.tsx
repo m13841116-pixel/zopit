@@ -36,7 +36,8 @@ import {
   Globe,
   MessageCircle,
   Gift,
-  Send
+  Send,
+  Search
 } from "lucide-react";
 import { SupplierWooCommerceImport } from "./SupplierWooCommerceImport";
 
@@ -286,24 +287,52 @@ export function SupplierAddProduct({
     }
   };
 
-  const [categories, setCategories] = useState<any[]>([
-    { id: 1, name: "موبایل" },
-    { id: 2, name: "لپ‌تاپ" },
-    { id: 3, name: "کالای دیجیتال" },
-    { id: 4, name: "خانه و آشپزخانه" },
-    { id: 5, name: "لوازم خانگی برقی" },
-    { id: 6, name: "آرایشی و بهداشتی" },
-    { id: 7, name: "مد و پوشاک" },
-    { id: 8, name: "طلا و نقره" },
-    { id: 9, name: "خودرو و موتورسیکلت" },
-    { id: 10, name: "سلامت و پزشکی" },
-    { id: 11, name: "ابزارآلات و تجهیزات" },
-    { id: 12, name: "کتاب و هنر" },
-    { id: 13, name: "ورزش و سفر" },
-    { id: 14, name: "اسباب بازی کودک و نوزاد" },
-    { id: 15, name: "محصولات بومی و محلی" },
-    { id: 16, name: "پت شاپ" }
-  ]);
+  const CANONICAL_CATEGORIES = [
+    { id: 1, name: "موبایل و تبلت", icon: "📱" },
+    { id: 2, name: "لپ‌تاپ و کامپیوتر", icon: "💻" },
+    { id: 3, name: "کالای دیجیتال و جانبی", icon: "🎧" },
+    { id: 4, name: "خانه و آشپزخانه", icon: "🏠" },
+    { id: 5, name: "لوازم خانگی برقی", icon: "⚡" },
+    { id: 6, name: "آرایشی و بهداشتی", icon: "💄" },
+    { id: 7, name: "مد و پوشاک", icon: "👔" },
+    { id: 8, name: "طلا و زیورآلات", icon: "💍" },
+    { id: 9, name: "خودرو و ابزارآلات", icon: "🚗" },
+    { id: 10, name: "سلامت و تجهیزات پزشکی", icon: "🩺" },
+    { id: 11, name: "ابزارآلات و تجهیزات", icon: "🔧" },
+    { id: 12, name: "کتاب، هنر و لوازم تحریر", icon: "📚" },
+    { id: 13, name: "ورزش و سفر", icon: "⚽" },
+    { id: 14, name: "اسباب بازی، کودک و نوزاد", icon: "🧸" },
+    { id: 15, name: "محصولات بومی و محلی", icon: "🍯" },
+    { id: 16, name: "پت شاپ و حیوانات خانگی", icon: "🐾" }
+  ];
+
+  const CANONICAL_MAPPING: Record<string, string> = {
+    "موبایل": "موبایل و تبلت",
+    "تبلت": "موبایل و تبلت",
+    "قاب و گلس": "موبایل و تبلت",
+    "لوازم جانبی موبایل": "موبایل و تبلت",
+    "لپ‌تاپ": "لپ‌تاپ و کامپیوتر",
+    "کامپیوتر": "لپ‌تاپ و کامپیوتر",
+    "کالای دیجیتال": "کالای دیجیتال و جانبی",
+    "دیجیتال": "کالای دیجیتال و جانبی",
+    "کابل و شارژر": "کالای دیجیتال و جانبی",
+    "لوازم جانبی": "کالای دیجیتال و جانبی",
+    "دیجیتال و لوازم الکترونیکی": "کالای دیجیتال و جانبی",
+    "طلا و نقره": "طلا و زیورآلات",
+    "طلا": "طلا و زیورآلات",
+    "نقره": "طلا و زیورآلات",
+    "خودرو و موتورسیکلت": "خودرو و ابزارآلات",
+    "لوازم جانبی خودرو": "خودرو و ابزارآلات",
+    "سلامت و پزشکی": "سلامت و تجهیزات پزشکی",
+    "کتاب و هنر": "کتاب، هنر و لوازم تحریر",
+    "اسباب بازی کودک و نوزاد": "اسباب بازی، کودک و نوزاد",
+    "پت شاپ": "پت شاپ و حیوانات خانگی"
+  };
+
+  const [categories, setCategories] = useState<any[]>(CANONICAL_CATEGORIES);
+  const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"stepper" | "all">("stepper");
   
   React.useEffect(() => {
     (async () => {
@@ -323,14 +352,28 @@ export function SupplierAddProduct({
         }
 
         if (fetchedList && fetchedList.length > 0) {
-          // Deduplicate categories by normalized category name
+          // Normalize and deduplicate into strictly the 16 canonical categories
           const uniqueMap = new Map();
           fetchedList.forEach((cat: any) => {
-            const nameKey = (cat.name || cat.title || cat.categoryName || "").trim();
-            if (nameKey && !uniqueMap.has(nameKey)) {
-              uniqueMap.set(nameKey, {
+            const rawName = (cat.name || cat.title || cat.categoryName || "").trim();
+            const normalizedName = CANONICAL_MAPPING[rawName] || rawName;
+            if (normalizedName && !uniqueMap.has(normalizedName)) {
+              const matchedCanonical = CANONICAL_CATEGORIES.find(c => c.name === normalizedName);
+              uniqueMap.set(normalizedName, {
                 id: cat.id,
-                name: nameKey,
+                name: normalizedName,
+                icon: matchedCanonical?.icon || "📦"
+              });
+            }
+          });
+
+          // Ensure any missing canonical categories are also present
+          CANONICAL_CATEGORIES.forEach(c => {
+            if (!uniqueMap.has(c.name)) {
+              uniqueMap.set(c.name, {
+                id: c.id,
+                name: c.name,
+                icon: c.icon
               });
             }
           });
@@ -419,7 +462,7 @@ export function SupplierAddProduct({
       showNotification("لطفاً تمامی فیلدهای ستاره‌دار این مرحله را پر کنید.", "error");
       return;
     }
-    setStep((prev) => Math.min(prev + 1, 5));
+    setStep((prev) => Math.min(prev + 1, 4));
   };
   const prevStep = () => setStep((prev) => Math.max(prev - 1, 1));
   const addAttribute = () => {
@@ -581,21 +624,20 @@ export function SupplierAddProduct({
     }
   };
   const steps = [
-    "اطلاعات اصلی",
+    "اطلاعات اصلی و دسته‌بندی",
     "قیمت و موجودی",
-    "ویژگی‌ها و متغیرها",
-    "رسانه",
-    "بررسی و ثبت",
+    "تنوع و متغیرها",
+    "رسانه و پیش‌نمایش نهایی",
   ];
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in max-w-5xl mx-auto my-6">
+    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in max-w-6xl mx-auto my-6">
       
       {/* Top Header */}
       <div className="bg-background border-b border-subtle p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black text-primary flex items-center gap-2">
-            <Package className="w-6 h-6 text-indigo-600" />
+            <Package className="w-6 h-6 text-primary-default" />
             {initialData?.id ? "ویرایش محصول" : "افزودن محصول جدید"}
           </h2>
           <p className="text-xs text-muted mt-1">
@@ -619,12 +661,12 @@ export function SupplierAddProduct({
               onClick={() => setActiveAddTab("manual")}
               className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
                 activeAddTab === "manual"
-                  ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                  ? "bg-primary-default text-white border-primary-default shadow-md shadow-primary-default/20"
                   : "bg-card text-secondary hover:bg-background border-subtle"
               }`}
             >
               <FileUp className="w-4 h-4" />
-              <span>۱. ثبت فرم دستی</span>
+              <span>۱. ثبت فرم دستی هوشمند</span>
             </button>
 
             <button
@@ -632,7 +674,7 @@ export function SupplierAddProduct({
               onClick={() => setActiveAddTab("woocommerce")}
               className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
                 activeAddTab === "woocommerce"
-                  ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                  ? "bg-primary-default text-white border-primary-default shadow-md shadow-primary-default/20"
                   : "bg-card text-secondary hover:bg-background border-subtle"
               }`}
             >
@@ -645,7 +687,7 @@ export function SupplierAddProduct({
               onClick={() => setActiveAddTab("excel")}
               className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
                 activeAddTab === "excel"
-                  ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                  ? "bg-primary-default text-white border-primary-default shadow-md shadow-primary-default/20"
                   : "bg-card text-secondary hover:bg-background border-subtle"
               }`}
             >
@@ -658,7 +700,7 @@ export function SupplierAddProduct({
               onClick={() => setActiveAddTab("support")}
               className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
                 activeAddTab === "support"
-                  ? "bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-600/20"
+                  ? "bg-primary-default text-white border-primary-default shadow-md shadow-primary-default/20"
                   : "bg-card text-secondary hover:bg-background border-subtle"
               }`}
             >
@@ -938,7 +980,7 @@ export function SupplierAddProduct({
             <button
               type="submit"
               disabled={isSendingSupport}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 bg-primary-default hover:bg-primary-hover text-white font-black text-sm rounded-xl shadow-md shadow-primary-default/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
               <span>{isSendingSupport ? "در حال ارسال درخواست..." : "ارسال درخواست ثبت کاتالوگ به پشتیبانی"}</span>
@@ -947,115 +989,211 @@ export function SupplierAddProduct({
         </div>
       ) : (
         /* Tab 1: Manual Form (Default) */
-        <div className="p-8 space-y-12 min-h-[400px]">
-        
-        {/* Step 1: Basic Info */}
-        <section className="space-y-5">
-          <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2 flex items-center gap-2">
-             <span className="w-8 h-8 rounded-full bg-primary-default/10 text-primary-default flex items-center justify-center font-bold">1</span>
-             اطلاعات اصلی محصول
-          </h3>
+        <div className="p-4 sm:p-8 space-y-8 min-h-[400px]">
 
-          <div>
-            <label className="block text-sm font-semibold text-secondary mb-1.5">
-              نام محصول *
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-primary font-medium"
-              placeholder="مثال: لپ‌تاپ ایسوس مدل ZenBook"
-            />
-          </div>
-
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <label className="text-sm font-bold text-secondary">
-                دسته‌بندی محصول * (انتخاب سریع یا از منوی کشویی)
-              </label>
-              <span className="text-xs text-muted font-normal">
-                {categories.length} دسته‌بندی اصلی یکتا
-              </span>
-            </div>
-
-            {/* Quick Category Chips Grid */}
-            <div className="mb-3 flex flex-wrap gap-1.5 p-3 bg-surface rounded-2xl border border-subtle max-h-48 overflow-y-auto">
-              {categories.map((cat) => {
-                const cName = cat.name || cat.title || cat.categoryName || `دسته‌بندی ${cat.id}`;
-                const isSelected = String(cat.id) === formData.categoryId;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, categoryId: String(cat.id) })}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
-                      isSelected
-                        ? "bg-[#6366F1] text-white border-[#6366F1] shadow-sm scale-[1.02]"
-                        : "bg-[#F3F4F6] text-[#4B5563] border-transparent hover:bg-gray-200"
-                    }`}
-                  >
-                    {isSelected && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                    <span>{cName}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Category Select Dropdown */}
-            <div className="bg-surface p-3.5 rounded-2xl border border-subtle">
-              <select
-                value={formData.categoryId}
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                className="w-full px-4 py-3 bg-card text-primary border border-subtle rounded-xl font-medium outline-none focus:ring-2 focus:ring-primary-default text-sm cursor-pointer"
-              >
-                <option value="" className="text-slate-900 bg-white dark:bg-slate-800 dark:text-slate-100">
-                  -- انتخاب از لیست کامل دسته‌بندی‌ها ({categories.length} مورد) --
-                </option>
-                {categories.map((cat) => {
-                  const cName = cat.name || cat.title || cat.categoryName || `دسته‌بندی ${cat.id}`;
-                  return (
-                    <option
-                      key={cat.id}
-                      value={String(cat.id)}
-                      className="text-slate-900 bg-white dark:bg-slate-800 dark:text-slate-100 py-1"
-                    >
-                      {cName}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            {/* Selected Category Record Banner */}
-            {formData.categoryId ? (
-              <div className="mt-2.5 p-3 bg-primary-default/10 border border-primary-default/30 text-primary-default rounded-xl text-xs font-bold flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 text-primary-default" />
-                  دسته‌بندی انتخاب‌شده: <strong className="text-sm font-black bg-primary-default text-inverse px-2 py-0.5 rounded-md">
-                    {(() => {
-                      const found = categories.find(c => String(c.id) === formData.categoryId);
-                      return found ? (found.name || found.title || found.categoryName || `دسته‌بندی ${found.id}`) : 'ثبت‌شده';
-                    })()}
-                  </strong>
-                </span>
+          {/* Stepper Header & View Mode Switcher */}
+          <div className="bg-surface p-4 rounded-2xl border border-subtle flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 flex-1">
+              {[
+                { id: 1, title: "اطلاعات و دسته‌بندی", icon: "📋", isDone: !!(formData.name.trim() && formData.categoryId) },
+                { id: 2, title: "قیمت و انبارداری", icon: "💰", isDone: !!(formData.supplierBasePrice && (Number(formData.stock) > 0 || formData.variants.length > 0)) },
+                { id: 3, title: "تنوع و متغیرها", icon: "🎨", isDone: formData.variants.length > 0 },
+                { id: 4, title: "رسانه و بازبینی", icon: "📸", isDone: !!formData.mainImage }
+              ].map((s) => (
                 <button
+                  key={s.id}
                   type="button"
-                  onClick={() => setFormData({ ...formData, categoryId: "" })}
-                  className="text-xs text-danger hover:underline cursor-pointer font-bold"
+                  onClick={() => setStep(s.id)}
+                  className={`p-2.5 rounded-xl border text-right transition-all flex items-center gap-2 cursor-pointer ${
+                    step === s.id
+                      ? "bg-primary-default text-white border-primary-default shadow-sm"
+                      : s.isDone
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/15"
+                      : "bg-card text-secondary border-subtle hover:bg-surface"
+                  }`}
                 >
-                  تغییر دسته‌بندی
+                  <span className="w-6 h-6 rounded-lg bg-black/10 dark:bg-white/10 flex items-center justify-center text-xs font-bold shrink-0">
+                    {s.isDone && step !== s.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : s.id}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] opacity-75 font-medium">گام {s.id}</p>
+                    <p className="text-xs font-bold truncate">{s.title}</p>
+                  </div>
                 </button>
-              </div>
-            ) : (
-              <p className="mt-1.5 text-xs text-[#92400E] font-semibold flex items-center gap-1">
-                <Info className="w-3.5 h-3.5" />
-                جهت ادامه ثبت محصول، حتماً یکی از دسته‌بندی‌های فوق را انتخاب کنید.
-              </p>
-            )}
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1.5 self-end md:self-center border border-subtle rounded-xl p-1 bg-card shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewMode("stepper")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "stepper"
+                    ? "bg-primary-default text-white shadow-xs"
+                    : "text-muted hover:text-primary"
+                }`}
+              >
+                گام‌به‌گام
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "all"
+                    ? "bg-primary-default text-white shadow-xs"
+                    : "text-muted hover:text-primary"
+                }`}
+              >
+                نمایش کامل
+              </button>
+            </div>
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Form Steps */}
+            <div className="lg:col-span-8 space-y-8">
+              
+              {/* Step 1: Basic Info & Category */}
+              {(viewMode === "all" || step === 1) && (
+                <section className="space-y-5 bg-card p-6 rounded-2xl border border-subtle shadow-xs animate-fade-in">
+                  <div className="border-b border-subtle pb-3 flex items-center justify-between">
+                    <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2.5">
+                      <span className="w-8 h-8 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center font-black text-sm">
+                        ۱
+                      </span>
+                      اطلاعات اصلی و دسته‌بندی محصول
+                    </h3>
+                    <span className="text-xs font-bold text-muted bg-surface px-2.5 py-1 rounded-lg border border-subtle">
+                      گام ۱ از ۴
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-secondary mb-1.5">
+                      نام محصول *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-primary font-medium text-sm"
+                      placeholder="مثال: هندزفری بلوتوثی پرو پلاس مدل ۲۰۲۴"
+                    />
+                  </div>
+
+                  {/* Compact & Attractive Category Selector */}
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <label className="text-xs sm:text-sm font-bold text-secondary">
+                        دسته‌بندی محصول *
+                      </label>
+                      <span className="text-[11px] text-muted font-normal">
+                        ۱۶ دسته‌بندی استاندارد و بدون تکرار زوپیت
+                      </span>
+                    </div>
+
+                    {/* Selected Category Compact View (Zero vertical waste) */}
+                    {formData.categoryId && !isCategoryPickerOpen ? (
+                      <div className="flex items-center justify-between p-3 bg-primary-default/5 border border-primary-default/20 rounded-2xl transition-all shadow-xs">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl p-2 bg-card rounded-xl border border-subtle shadow-xs">
+                            {(() => {
+                              const found = categories.find(c => String(c.id) === String(formData.categoryId)) ||
+                                CANONICAL_CATEGORIES.find(c => String(c.id) === String(formData.categoryId));
+                              return found?.icon || "📦";
+                            })()}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted font-medium">دسته‌بندی انتخاب‌شده:</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                                <CheckCircle className="w-3 h-3" />
+                                تایید شده
+                              </span>
+                            </div>
+                            <span className="text-sm font-black text-primary block mt-0.5">
+                              {(() => {
+                                const found = categories.find(c => String(c.id) === String(formData.categoryId)) ||
+                                  CANONICAL_CATEGORIES.find(c => String(c.id) === String(formData.categoryId));
+                                return found?.name || "دسته‌بندی";
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsCategoryPickerOpen(true)}
+                          className="px-3.5 py-2 bg-card hover:bg-surface text-primary-default border border-primary-default/30 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                        >
+                          <span>تغییر دسته‌بندی</span>
+                        </button>
+                      </div>
+                    ) : (
+                      /* Expandable Searchable Clean Category Grid */
+                      <div className="p-4 bg-surface rounded-2xl border border-subtle space-y-3 animate-fade-in">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={categorySearchQuery}
+                              onChange={(e) => setCategorySearchQuery(e.target.value)}
+                              placeholder="جستجوی سریع در ۱۶ دسته‌بندی اصلی زوپیت..."
+                              className="w-full pl-3 pr-9 py-2.5 bg-card border border-subtle rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-primary-default text-primary"
+                            />
+                            <Search className="w-4 h-4 text-muted absolute right-3 top-3" />
+                            {categorySearchQuery && (
+                              <button
+                                type="button"
+                                onClick={() => setCategorySearchQuery("")}
+                                className="absolute left-3 top-3 text-muted hover:text-primary cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          {formData.categoryId && (
+                            <button
+                              type="button"
+                              onClick={() => setIsCategoryPickerOpen(false)}
+                              className="px-3 py-2 text-xs text-muted hover:text-primary font-bold cursor-pointer rounded-lg hover:bg-card shrink-0"
+                            >
+                              بستن
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto pr-1">
+                          {categories
+                            .filter(c => !categorySearchQuery.trim() || (c.name || "").toLowerCase().includes(categorySearchQuery.trim().toLowerCase()))
+                            .map((cat) => {
+                              const isSelected = String(cat.id) === formData.categoryId;
+                              return (
+                                <button
+                                  key={cat.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData({ ...formData, categoryId: String(cat.id) });
+                                    setIsCategoryPickerOpen(false);
+                                    setCategorySearchQuery("");
+                                  }}
+                                  className={`p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border text-right ${
+                                    isSelected
+                                      ? "bg-primary-default text-white border-primary-default shadow-sm scale-[1.02]"
+                                      : "bg-card text-secondary hover:bg-background border-subtle hover:border-primary-default/40"
+                                  }`}
+                                >
+                                  <span className="text-lg">{cat.icon || "📦"}</span>
+                                  <span className="truncate flex-1">{cat.name}</span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-white shrink-0" />}
+                                </button>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
           <div>
             <label className="block text-sm font-semibold text-secondary mb-1.5">
@@ -1141,13 +1279,22 @@ export function SupplierAddProduct({
             </div>
           </div>
         </section>
+      )}
 
-        {/* Step 2: Price & Inventory */}
-        <section className="space-y-5">
-          <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2 flex items-center gap-2">
-             <span className="w-8 h-8 rounded-full bg-primary-default/10 text-primary-default flex items-center justify-center font-bold">2</span>
-             قیمت و موجودی
-          </h3>
+      {/* Step 2: Price & Inventory */}
+      {(viewMode === "all" || step === 2) && (
+        <section className="space-y-5 bg-card p-6 rounded-2xl border border-subtle shadow-xs animate-fade-in">
+          <div className="border-b border-subtle pb-3 flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center font-black text-sm">
+                ۲
+              </span>
+              قیمت‌گذاری و انبارداری
+            </h3>
+            <span className="text-xs font-bold text-muted bg-surface px-2.5 py-1 rounded-lg border border-subtle">
+              گام ۲ از ۴
+            </span>
+          </div>
           <div className="bg-primary-default/10 p-4 rounded-xl border border-primary-default/20 mb-6">
             <p className="text-sm text-primary-hover font-medium flex items-start gap-2">
               <Info className="w-5 h-5 shrink-0" />
@@ -1294,13 +1441,22 @@ export function SupplierAddProduct({
             </span>
           </div>
         </section>
+      )}
 
-        {/* Step 3: Variants */}
-        <section className="space-y-5">
-          <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2 flex items-center gap-2">
-             <span className="w-8 h-8 rounded-full bg-primary-default/10 text-primary-default flex items-center justify-center font-bold">3</span>
-             ویژگی‌های متغیر (مانند رنگ، سایز)
-          </h3>
+      {/* Step 3: Variants */}
+      {(viewMode === "all" || step === 3) && (
+        <section className="space-y-5 bg-card p-6 rounded-2xl border border-subtle shadow-xs animate-fade-in">
+          <div className="border-b border-subtle pb-3 flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center font-black text-sm">
+                ۳
+              </span>
+              تنوع و ویژگی‌های متغیر (رنگ، سایز، مدل)
+            </h3>
+            <span className="text-xs font-bold text-muted bg-surface px-2.5 py-1 rounded-lg border border-subtle">
+              گام ۳ از ۴
+            </span>
+          </div>
           <div className="bg-surface p-5 rounded-xl border border-subtle mb-6">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <h4 className="font-bold text-primary flex items-center gap-2">
@@ -1652,13 +1808,22 @@ export function SupplierAddProduct({
             </div>
           )}
         </section>
+      )}
 
-        {/* Step 4: Media */}
-        <section className="space-y-5">
-          <h3 className="text-lg font-bold text-primary mb-6 border-b pb-2 flex items-center gap-2">
-             <span className="w-8 h-8 rounded-full bg-primary-default/10 text-primary-default flex items-center justify-center font-bold">4</span>
-             تصاویر و ویدیو محصول
-          </h3>
+      {/* Step 4: Media & Final Review */}
+      {(viewMode === "all" || step === 4) && (
+        <section className="space-y-5 bg-card p-6 rounded-2xl border border-subtle shadow-xs animate-fade-in">
+          <div className="border-b border-subtle pb-3 flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center font-black text-sm">
+                ۴
+              </span>
+              تصاویر، ویدیو و رسانه‌های محصول
+            </h3>
+            <span className="text-xs font-bold text-muted bg-surface px-2.5 py-1 rounded-lg border border-subtle">
+              گام ۴ از ۴
+            </span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <h4 className="font-bold text-sm text-secondary mb-3">تصویر اصلی محصول</h4>
@@ -1913,75 +2078,195 @@ export function SupplierAddProduct({
             </p>
           </div>
         </section>
-        {/* Live Marketplace Card Preview Section */}
-        <section className="mt-8 border-t border-subtle pt-8 bg-surface/50 p-6 rounded-2xl border">
-          <h4 className="font-bold text-base text-primary mb-2 flex items-center gap-2">
-            <Eye className="w-5 h-5 text-primary-default" />
-            پیش‌نمایش آنلاین کارت محصول در خروجی فروشگاه Zopit
-          </h4>
-          <p className="text-xs text-muted mb-6">
-            خریداران محصول شما را با این کادر، عنوان، قیمت و برچسب موجودی در ویترین فروشگاه مشاهده خواهند کرد:
-          </p>
-
-          <div className="max-w-xs mx-auto bg-card rounded-2xl border border-subtle overflow-hidden shadow-lg transition-transform hover:-translate-y-1">
-            <div className="aspect-square bg-surface relative overflow-hidden flex items-center justify-center">
-              {formData.mainImage ? (
-                <img src={formData.mainImage} alt="Preview" className="w-full h-full object-cover" />
-              ) : (
-                <div className="text-center p-4 text-muted">
-                  <ImagePlus className="w-10 h-10 mx-auto mb-1 opacity-50" />
-                  <span className="text-xs font-semibold">بدون تصویر اصلی</span>
-                </div>
-              )}
-              <div className="absolute top-3 right-3 bg-emerald-500/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 shadow-sm">
-                <CheckCircle className="w-3 h-3" />
-                موجود در انبار
-              </div>
-            </div>
-
-            <div className="p-4 space-y-2.5 text-right">
-              {formData.brand && (
-                <span className="text-[10px] font-bold text-primary-default bg-primary-default/10 px-2 py-0.5 rounded-md inline-block">
-                  {formData.brand}
-                </span>
-              )}
-              <h5 className="font-bold text-sm text-primary line-clamp-2">
-                {formData.name || "عنوان محصول وارد نشده است"}
-              </h5>
-              
-              <div className="flex items-center justify-between border-t border-subtle pt-3 mt-2">
-                <span className="text-xs text-muted font-medium">قیمت پایه:</span>
-                <span className="font-mono font-bold text-sm text-primary">
-                  {formData.supplierBasePrice ? `${Number(formData.supplierBasePrice).toLocaleString('fa-IR')} تومان` : 'نامشخص'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-      </div>
       )}
 
-      {/* Footer Controls */}
-      <div className="p-6 border-t border-subtle flex justify-between items-center bg-card rounded-b-2xl mt-4">
-        <button
-          onClick={onCancel}
-          className="px-6 py-2.5 rounded-xl text-sm font-medium text-text-secondary bg-surface hover:bg-surface-hover transition-colors flex items-center gap-2 cursor-pointer"
-        >
-          انصراف
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="px-8 py-3 rounded-xl text-sm font-extrabold text-inverse bg-primary-default hover:bg-primary-hover transition-all shadow-lg shadow-primary-default/20 disabled:opacity-50 cursor-pointer flex items-center gap-2"
-        >
-          {isSubmitting ? (
-            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          ) : (
-             <CheckCircle className="w-4 h-4" />
+            </div>
+
+            {/* Right Column: Live Quality Score & Real-Time Card Preview */}
+            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
+              
+              {/* Quality & Completion Score Card */}
+              <div className="bg-card p-5 rounded-2xl border border-subtle shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-primary flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-primary-default" />
+                    کیفیت اطلاعات محصول
+                  </span>
+                  <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-primary-default/10 text-primary-default">
+                    {(() => {
+                      let score = 0;
+                      if (formData.name.trim()) score += 25;
+                      if (formData.categoryId) score += 25;
+                      if (formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0) score += 25;
+                      if (formData.mainImage) score += 25;
+                      return score;
+                    })()}%
+                  </span>
+                </div>
+
+                {/* Animated Progress bar */}
+                <div className="w-full h-2.5 bg-surface rounded-full overflow-hidden border border-subtle">
+                  <div
+                    className="h-full bg-primary-default rounded-full transition-all duration-500"
+                    style={{
+                      width: `${(() => {
+                        let score = 0;
+                        if (formData.name.trim()) score += 25;
+                        if (formData.categoryId) score += 25;
+                        if (formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0) score += 25;
+                        if (formData.mainImage) score += 25;
+                        return score;
+                      })()}%`
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className={`flex items-center gap-2 ${formData.name.trim() ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted"}`}>
+                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${formData.name.trim() ? "text-emerald-600 dark:text-emerald-400" : "text-muted"}`} />
+                    <span>عنوان کامل و جذاب محصول</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${formData.categoryId ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted"}`}>
+                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${formData.categoryId ? "text-emerald-600 dark:text-emerald-400" : "text-muted"}`} />
+                    <span>انتخاب دسته‌بندی مناسب</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted"}`}>
+                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted"}`} />
+                    <span>قیمت‌گذاری پایه تامین‌کننده</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${formData.mainImage ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted"}`}>
+                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${formData.mainImage ? "text-emerald-600 dark:text-emerald-400" : "text-muted"}`} />
+                    <span>تصویر باکیفیت و واضح</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Card Preview in Store */}
+              <div className="bg-card p-5 rounded-2xl border border-subtle shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-subtle">
+                  <h4 className="font-black text-xs text-primary flex items-center gap-1.5">
+                    <Eye className="w-4 h-4 text-primary-default" />
+                    نمای کارت در ویترین زوپیت
+                  </h4>
+                  <span className="text-[10px] text-muted">پیش‌نمایش زنده</span>
+                </div>
+
+                <div className="bg-surface rounded-2xl border border-subtle overflow-hidden shadow-sm transition-all hover:shadow-md">
+                  <div className="aspect-square bg-card relative overflow-hidden flex items-center justify-center">
+                    {formData.mainImage ? (
+                      <img src={formData.mainImage} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-center p-4 text-muted">
+                        <ImagePlus className="w-8 h-8 mx-auto mb-1 opacity-40" />
+                        <span className="text-[11px] font-semibold">بدون تصویر اصلی</span>
+                      </div>
+                    )}
+                    <div className="absolute top-2.5 right-2.5 bg-emerald-500/90 backdrop-blur-sm text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-xs">
+                      <CheckCircle className="w-2.5 h-2.5" />
+                      موجود در انبار
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 space-y-2 text-right">
+                    <div className="flex items-center justify-between gap-1">
+                      {formData.brand && (
+                        <span className="text-[10px] font-bold text-primary-default bg-primary-default/10 px-2 py-0.5 rounded-md">
+                          {formData.brand}
+                        </span>
+                      )}
+                      {formData.categoryId && (
+                        <span className="text-[10px] font-medium text-muted">
+                          {(() => {
+                            const found = categories.find(c => String(c.id) === String(formData.categoryId)) ||
+                              CANONICAL_CATEGORIES.find(c => String(c.id) === String(formData.categoryId));
+                            return found?.name || "";
+                          })()}
+                        </span>
+                      )}
+                    </div>
+                    <h5 className="font-bold text-xs text-primary line-clamp-2 min-h-[32px] leading-relaxed">
+                      {formData.name || "عنوان محصول وارد نشده است"}
+                    </h5>
+                    
+                    <div className="flex items-center justify-between border-t border-subtle pt-2.5 mt-2">
+                      <span className="text-[11px] text-muted font-medium">قیمت پایه:</span>
+                      <span className="font-mono font-black text-xs text-primary">
+                        {formData.supplierBasePrice ? `${Number(toEnglishDigits(formData.supplierBasePrice) || 0).toLocaleString('fa-IR')} تومان` : 'نامشخص'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contextual Supplier Hint */}
+              <div className="bg-primary-default/5 p-4 rounded-2xl border border-primary-default/20 space-y-2">
+                <span className="text-xs font-black text-primary-default flex items-center gap-1.5">
+                  <HelpCircle className="w-4 h-4" />
+                  راهنمای گام {step}:
+                </span>
+                <p className="text-[11px] leading-relaxed text-secondary">
+                  {step === 1 && "انتخاب دقیق دسته‌بندی و عنوان واضح باعث افزایش نمایش محصول در نتایج جستجو و فروش بیشتر خواهد شد."}
+                  {step === 2 && "مبلغ پایه تامین‌کننده، دریافتی خالص شماست. هزینه‌های ارسال و پورسانت توسط سامانه افزوده می‌شود."}
+                  {step === 3 && "اگر محصول چند رنگ یا مدل مختلف دارد، متغیرها را اضافه کنید تا مشتری تنوع کالا را مشاهده کند."}
+                  {step === 4 && "تصاویر باکیفیت و پس‌زمینه سفید یا خنثی شانس خرید محصول را چند برابر می‌کند."}
+                </p>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* Footer Controls & Stepper Navigation */}
+      <div className="p-4 sm:p-6 border-t border-subtle flex flex-wrap justify-between items-center gap-3 bg-card rounded-b-2xl mt-4">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-text-secondary bg-surface hover:bg-surface-hover transition-colors flex items-center gap-2 cursor-pointer"
+          >
+            انصراف
+          </button>
+
+          {viewMode === "stepper" && step > 1 && (
+            <button
+              type="button"
+              onClick={prevStep}
+              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-secondary bg-surface hover:bg-surface-hover border border-subtle transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <ChevronRight className="w-4 h-4" />
+              <span>مرحله قبل</span>
+            </button>
           )}
-          {initialData?.id ? "ویرایش نهایی" : "ثبت نهایی محصول"}
-        </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {viewMode === "stepper" && step < 4 ? (
+            <button
+              type="button"
+              onClick={nextStep}
+              className="px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-primary-default hover:bg-primary-hover transition-all shadow-md shadow-primary-default/20 cursor-pointer flex items-center gap-1.5"
+            >
+              <span>گام بعدی: {step === 1 ? "قیمت و موجودی" : step === 2 ? "تنوع و متغیرها" : "رسانه و بازبینی"}</span>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="px-8 py-3 rounded-xl text-xs sm:text-sm font-black text-white bg-primary-default hover:bg-primary-hover transition-all shadow-lg shadow-primary-default/25 disabled:opacity-50 cursor-pointer flex items-center gap-2"
+            >
+              {isSubmitting ? (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              <span>{initialData?.id ? "ذخیره تغییرات محصول" : "ثبت و تایید نهایی محصول"}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* WooCommerce Import Modal */}

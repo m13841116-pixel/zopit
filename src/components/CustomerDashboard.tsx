@@ -112,7 +112,7 @@ export function CustomerDashboard({
       case "REQUESTED":
         return { text: "در انتظار تایید", color: "bg-blue-100 text-blue-950 border-blue-300 dark:bg-blue-900 dark:text-blue-50 dark:border-blue-700 font-bold" };
       case "PENDING":
-        return { text: "در انتظار پرداخت", color: "bg-amber-400 text-slate-950 border-amber-500 dark:bg-amber-400 dark:text-slate-950 dark:border-amber-300 font-black" };
+        return { text: "در انتظار پرداخت", color: "bg-[#552370] text-white border-purple-950 dark:bg-[#552370] dark:text-white dark:border-purple-800 font-black" };
       case "SUPPLIER_APPROVED":
         return { text: "تایید شده غرفه‌دار", color: "bg-cyan-100 text-cyan-950 border-cyan-300 dark:bg-cyan-900 dark:text-cyan-50 dark:border-cyan-700 font-bold" };
       case "PREPARING":

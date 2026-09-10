@@ -8,7 +8,7 @@ export function EnamadBadge({
   variant = "subtle_footer",
   className = "" 
 }: { 
-  variant?: "subtle_footer" | "raw";
+  variant?: "subtle_footer" | "raw" | "compact";
   className?: string;
 }) {
   if (variant === "raw") {
@@ -18,6 +18,25 @@ export function EnamadBadge({
         className={className} 
         dangerouslySetInnerHTML={{ __html: RAW_ENAMAD_HTML }}
       />
+    );
+  }
+
+  if (variant === "compact") {
+    return (
+      <div className={`inline-flex items-center gap-2.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xs ${className}`} dir="rtl">
+        <div 
+          className="w-8 h-8 flex items-center justify-center shrink-0 [&_img]:w-full [&_img]:h-full [&_img]:object-contain"
+          dangerouslySetInnerHTML={{ __html: RAW_ENAMAD_HTML }}
+        />
+        <div className="text-right leading-tight">
+          <span className="font-black text-slate-800 dark:text-white text-[10px] block">
+            نماد اعتماد الکترونیکی
+          </span>
+          <span className="text-[9px] text-slate-500 font-medium block">
+            وزارت صنعت، معدن و تجارت
+          </span>
+        </div>
+      </div>
     );
   }
 

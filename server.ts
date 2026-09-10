@@ -10471,6 +10471,23 @@ const DEFAULT_CATEGORY_LIST = [
 
 async function ensureAndSanitizeCategories(onlyActive = false) {
   try {
+    const canonicalMapping: Record<string, string> = {
+      "موبایل": "موبایل و تبلت",
+      "لپ‌تاپ": "لپ‌تاپ و کامپیوتر",
+      "کالای دیجیتال": "کالای دیجیتال و جانبی",
+      "دیجیتال و لوازم الکترونیکی": "کالای دیجیتال و جانبی",
+      "کابل و شارژر": "کالای دیجیتال و جانبی",
+      "قاب و گلس": "موبایل و تبلت",
+      "لوازم جانبی": "کالای دیجیتال و جانبی",
+      "طلا و نقره": "طلا و زیورآلات",
+      "خودرو و موتورسیکلت": "خودرو و ابزارآلات",
+      "لوازم جانبی خودرو": "خودرو و ابزارآلات",
+      "سلامت و پزشکی": "سلامت و تجهیزات پزشکی",
+      "کتاب و هنر": "کتاب، هنر و لوازم تحریر",
+      "اسباب بازی کودک و نوزاد": "اسباب بازی، کودک و نوزاد",
+      "پت شاپ": "پت شاپ و حیوانات خانگی"
+    };
+
     // 1. Ensure all 16 default categories exist in DB and are active
     for (let i = 0; i < DEFAULT_CATEGORY_LIST.length; i++) {
       const catName = DEFAULT_CATEGORY_LIST[i];
@@ -10490,44 +10507,55 @@ async function ensureAndSanitizeCategories(onlyActive = false) {
         } catch (e) {
           console.error("Failed creating category:", catName, e);
         }
-      } else if (!existing.isActive || !existing.name || !existing.name.trim()) {
-        try {
-          await prisma.category.update({
-            where: { id: existing.id },
-            data: {
-              name: catName,
-              isActive: true,
-              sortOrder: existing.sortOrder || (i + 1)
-            }
-          });
-        } catch (e) {
-          console.error("Failed updating category:", existing.id, e);
+      } else {
+        await prisma.category.update({
+          where: { id: existing.id },
+          data: {
+            name: catName,
+            isActive: true,
+            sortOrder: i + 1
+          }
+        });
+      }
+    }
+
+    // 2. Find any non-canonical categories and migrate their products, then remove them
+    const allDbCats = await prisma.category.findMany();
+    for (const dbCat of allDbCats) {
+      if (!DEFAULT_CATEGORY_LIST.includes(dbCat.name)) {
+        const targetName = canonicalMapping[dbCat.name] || "کالای دیجیتال و جانبی";
+        const canonicalTarget = await prisma.category.findFirst({
+          where: { name: targetName }
+        });
+        if (canonicalTarget && canonicalTarget.id !== dbCat.id) {
+          try {
+            await prisma.product.updateMany({
+              where: { categoryId: dbCat.id },
+              data: { categoryId: canonicalTarget.id }
+            });
+            await prisma.category.delete({
+              where: { id: dbCat.id }
+            });
+          } catch (e) {
+            // If delete fails, just deactivate
+            await prisma.category.update({
+              where: { id: dbCat.id },
+              data: { isActive: false }
+            });
+          }
         }
       }
     }
 
-    // 2. Activate any inactive categories
-    try {
-      await prisma.category.updateMany({
-        where: { isActive: false },
-        data: { isActive: true }
-      });
-    } catch (e) {}
-
-    // 3. Fetch categories
-    let cats = await prisma.category.findMany({
-      where: onlyActive ? { isActive: true } : undefined,
+    // 3. Fetch strictly the 16 canonical categories
+    const cats = await prisma.category.findMany({
+      where: {
+        name: { in: DEFAULT_CATEGORY_LIST },
+        isActive: true
+      },
       orderBy: { sortOrder: 'asc' }
     });
 
-    // Fallback if onlyActive filtered out too many
-    if (onlyActive && cats.length < 16) {
-      cats = await prisma.category.findMany({
-        orderBy: { sortOrder: 'asc' }
-      });
-    }
-
-    // 4. Return with guaranteed valid names
     return cats.map((c, idx) => ({
       ...c,
       name: (c.name && c.name.trim()) ? c.name.trim() : (DEFAULT_CATEGORY_LIST[idx % DEFAULT_CATEGORY_LIST.length] || `دسته‌بندی ${c.id}`)
