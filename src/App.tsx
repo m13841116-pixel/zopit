@@ -579,6 +579,32 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
     }
   };
 
+  // Verify session on mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem("token");
+    if (savedToken) {
+      fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.user) {
+              setCurrentUser(data.user);
+              localStorage.setItem("user", JSON.stringify(data.user));
+            }
+          } else if (res.status === 401 || res.status === 403) {
+            // Token expired or invalid: cleanly clear stale auth state
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            setToken(null);
+            setCurrentUser(null);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
   // Fetch and cache system configuration rules
   useEffect(() => {
     fetch("/api/config")
@@ -1620,19 +1646,25 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
           ></div>{" "}
         </div>{" "}
         {notification && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] animate-bounce-short">
-            {" "}
+          <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] animate-bounce-short">
             <div
-              className={`flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl font-bold text-sm backdrop-blur-md border ${notification.type === "success" ? "bg-success/90 text-inverse border-success" : "bg-danger/90 text-inverse border-danger"}`}
+              className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl font-bold text-xs sm:text-sm backdrop-blur-md border ${
+                notification.type === "success"
+                  ? "bg-card/95 text-primary border-emerald-500/40 shadow-emerald-500/10"
+                  : "bg-card/95 text-primary border-rose-500/40 shadow-rose-500/10"
+              }`}
             >
-              {" "}
               {notification.type === "success" ? (
-                <CheckCircle2 className="w-5 h-5" />
+                <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
               ) : (
-                <AlertCircle className="w-5 h-5" />
+                <div className="w-6 h-6 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
               )}
-              {notification.message}
-            </div>{" "}
+              <span className="font-semibold text-secondary">{notification.message}</span>
+            </div>
           </div>
         )}
         {currentUser?.isImpersonated && (
@@ -3425,7 +3457,13 @@ function MyPanel({ currentUser, setCurrentUser }: { currentUser: any; setCurrent
 }
 
 export default function App() {
-  const [currentUser, setCurrentUser] = React.useState<any>(null);
+  const [currentUser, setCurrentUser] = React.useState<any>(() => {
+    try {
+      const saved = localStorage.getItem("user");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
   return <MyPanel currentUser={currentUser} setCurrentUser={setCurrentUser} />;
 }
 

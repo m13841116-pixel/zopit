@@ -562,6 +562,269 @@ export function SupplierDashboard({
     printWindow.document.close();
   };
 
+  const handleBulkPrintPostalLabels = (targetOrders?: any[]) => {
+    const selectedOrdersList = targetOrders && targetOrders.length > 0
+      ? targetOrders
+      : orders.filter((o) => selectedItems.includes(o.id));
+
+    if (selectedOrdersList.length === 0) {
+      if (showNotification) {
+        showNotification("لطفاً حداقل یک سفارش را برای چاپ گروهی لیبل انتخاب کنید.", "error");
+      }
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=900,height=750");
+    if (!printWindow) {
+      if (showNotification) {
+        showNotification("مرورگر مانع از باز شدن پنجره چاپ شد. لطفاً دسترسی پاپ‌آپ را فعال نمایید.", "error");
+      }
+      return;
+    }
+
+    const labelsHtml = selectedOrdersList.map((orderItem: any, index: number) => {
+      const storeName = orderItem.order?.store?.storeName || orderItem.order?.store?.username || "فروشگاه همکار";
+      const recipientName = orderItem.order?.recipientName || orderItem.order?.user?.name || storeName;
+      const phone = orderItem.order?.shippingPhone || orderItem.order?.user?.phone || "۰۹۱۲۰۰۰۰۰۰۰";
+      const province = orderItem.order?.province || "تهران";
+      const city = orderItem.order?.city || "تهران";
+      const address = orderItem.order?.shippingAddress || "نشانی ثبت نشده است";
+      const postalCode = orderItem.order?.postalCode || "۱۲۳۴۵۶۷۸۹۰";
+      const orderId = orderItem.orderId || orderItem.id;
+      const productName = orderItem.product?.name || "کالای سفارشی";
+      const quantity = orderItem.quantity || 1;
+      const attributes = orderItem.variant?.attributes ? `(${orderItem.variant.attributes})` : "";
+      const trackingCode = `ZP-${orderId}-${(orderItem.id * 7919).toString().slice(-6)}`;
+
+      return `
+        <div class="label-page">
+          <div class="label-box">
+            <div class="header">
+              <div class="logo">مرسوله پستی پلتفرم B2B زوپیت</div>
+              <div class="header-right">
+                <span class="badge">برچسب ${index + 1} از ${selectedOrdersList.length}</span>
+                <span class="order-id">کد سفارش: #${orderId}</span>
+              </div>
+            </div>
+
+            <div class="grid">
+              <div class="info-card">
+                <div class="card-title">📍 فرستنده:</div>
+                <div><strong>مرکز پردازش و انبار زوپیت</strong></div>
+                <div>سامانه ارسال یکپارچه کالا</div>
+              </div>
+
+              <div class="info-card">
+                <div class="card-title">👤 گیرنده مرسوله:</div>
+                <div><strong>نام:</strong> ${recipientName}</div>
+                <div><strong>فروشگاه مبدا:</strong> ${storeName}</div>
+                <div><strong>تلفن:</strong> ${phone}</div>
+              </div>
+            </div>
+
+            <div class="address-box">
+              <div><strong>استان / شهر:</strong> ${province} / ${city}</div>
+              <div><strong>نشانی دقیق پستی:</strong> ${address}</div>
+              <div style="margin-top: 6px;"><strong>کد پستی ۱۰ رقمی:</strong> <span style="font-family: monospace; font-size: 15px; font-weight: bold; letter-spacing: 1px;">${postalCode}</span></div>
+            </div>
+
+            <div class="product-box">
+              <div><strong>محتویات مرسوله:</strong> ${productName} ${attributes} (تعداد: <strong>${quantity}</strong> عدد)</div>
+            </div>
+
+            <div class="barcode-section">
+              <div class="barcode-lines"></div>
+              <div style="font-family: monospace; font-size: 12px; font-weight: bold;">${trackingCode}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html dir="rtl" lang="fa">
+      <head>
+        <meta charset="UTF-8">
+        <title>چاپ گروهی ${selectedOrdersList.length} لیبل پستی مرسولات زوپیت</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');
+          @page {
+            size: A6 landscape;
+            margin: 5mm;
+          }
+          body {
+            font-family: 'Vazirmatn', sans-serif;
+            margin: 0;
+            padding: 12px;
+            background: #f8fafc;
+            color: #111;
+          }
+          .no-print {
+            background: #1e293b;
+            color: #fff;
+            padding: 14px 24px;
+            margin-bottom: 24px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+          }
+          .btn-print {
+            background: #10B981;
+            color: #fff;
+            border: none;
+            padding: 10px 24px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .label-page {
+            page-break-after: always;
+            break-after: page;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: center;
+          }
+          .label-box {
+            width: 148mm;
+            min-height: 105mm;
+            border: 2.5px solid #000;
+            border-radius: 12px;
+            padding: 14px;
+            box-sizing: border-box;
+            background: #fff;
+            position: relative;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+          }
+          .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .logo {
+            font-size: 16px;
+            font-weight: 900;
+            color: #000;
+          }
+          .badge {
+            font-size: 11px;
+            background: #e2e8f0;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+          }
+          .order-id {
+            font-size: 13px;
+            font-weight: bold;
+            border: 2px solid #000;
+            padding: 2px 10px;
+            border-radius: 6px;
+            background: #f0f0f0;
+          }
+          .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+          }
+          .info-card {
+            border: 1.5px solid #333;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 11px;
+            line-height: 1.7;
+          }
+          .card-title {
+            font-weight: 900;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 3px;
+            margin-bottom: 4px;
+            font-size: 12px;
+          }
+          .address-box {
+            border: 1.5px solid #000;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            line-height: 1.7;
+            background: #fdfdfd;
+          }
+          .product-box {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            background: #f8fafc;
+          }
+          .barcode-section {
+            text-align: center;
+            border-top: 2px dashed #000;
+            padding-top: 8px;
+            margin-top: 10px;
+          }
+          .barcode-lines {
+            height: 36px;
+            background: repeating-linear-gradient(
+              90deg,
+              #000,
+              #000 3px,
+              #fff 3px,
+              #fff 6px
+            );
+            margin: 4px auto;
+            width: 70%;
+          }
+          @media print {
+            body { padding: 0; background: #fff; }
+            .no-print { display: none !important; }
+            .label-page { margin-bottom: 0; }
+            .label-box { border-color: #000; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print">
+          <div>
+            <strong>🖨️ آماده‌سازی ${selectedOrdersList.length} لیبل پستی استاندارد مرسولات زوپیت</strong>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">
+              در پنجره باز شده چاپگر، می‌توانید گزینه «Save as PDF» یا پرینتر حرارتی/لیبل‌زن خود را انتخاب فرمایید.
+            </div>
+          </div>
+          <button class="btn-print" onclick="window.print()">
+            چاپ همه (${selectedOrdersList.length} لیبل)
+          </button>
+        </div>
+
+        ${labelsHtml}
+
+        <script>
+          setTimeout(() => { window.print(); }, 400);
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+
+    if (showNotification) {
+      showNotification(`پنجره چاپ گروهی برای ${selectedOrdersList.length} لیبل پستی باز شد`, "success");
+    }
+  };
+
   const handleExportCSV = () => {
     if (orders.length === 0) {
       if (showNotification)
@@ -1890,22 +2153,22 @@ export function SupplierDashboard({
                       </div>
                     )}
 
-                    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border-2 border-slate-200 dark:border-slate-800 overflow-hidden">
                       {products.filter((p) =>
                         p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
                         (p.brand && p.brand.toLowerCase().includes(productSearch.toLowerCase())) ||
                         String(p.id).includes(productSearch)
                       ).length > 0 ? (
                         <table className="w-full text-right text-sm min-w-[800px]">
-                          <thead className="bg-background border-b border-subtle text-muted font-bold text-xs">
+                          <thead className="bg-slate-100/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-black text-xs">
                             <tr>
-                              <th className="px-4 py-4 text-center">تصویر کالا</th>
-                              <th className="px-4 py-2.5">نام محصول و شناسه</th>
-                              <th className="px-4 py-2.5">برند</th>
-                              <th className="px-4 py-2.5">موجودی انبار</th>
-                              <th className="px-4 py-2.5">قیمت پایه (تومان)</th>
-                              <th className="px-4 py-2.5">وضعیت</th>
-                              <th className="px-4 py-2.5 text-center">عملیات</th>
+                              <th className="px-4 py-3.5 text-center">تصویر کالا</th>
+                              <th className="px-4 py-3.5">نام محصول و شناسه</th>
+                              <th className="px-4 py-3.5">برند</th>
+                              <th className="px-4 py-3.5">موجودی انبار</th>
+                              <th className="px-4 py-3.5">قیمت پایه (تومان)</th>
+                              <th className="px-4 py-3.5">وضعیت</th>
+                              <th className="px-4 py-3.5 text-center">عملیات</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1924,8 +2187,8 @@ export function SupplierDashboard({
                               return (
                                 <tr
                                   key={product.id}
-                                  className={`hover:bg-background transition-colors ${
-                                    isQuickEditMode ? "bg-indigo-50/20 dark:bg-primary-hover/10" : ""
+                                  className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${
+                                    isQuickEditMode ? "bg-indigo-50/30 dark:bg-indigo-950/20" : ""
                                   }`}
                                 >
                                   {/* Product Thumbnail (40x40px) */}
@@ -1934,32 +2197,32 @@ export function SupplierDashboard({
                                       <img
                                         src={prodImg}
                                         alt={product.name}
-                                        className="w-10 h-10 object-cover rounded-lg border border-subtle mx-auto shadow-xs"
+                                        className="w-11 h-11 object-cover rounded-xl border border-slate-200 dark:border-slate-700 mx-auto shadow-xs"
                                       />
                                     ) : (
-                                      <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center mx-auto text-muted border border-subtle">
+                                      <div className="w-11 h-11 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center mx-auto text-slate-400 border border-slate-200 dark:border-slate-700">
                                         <Package className="w-5 h-5" />
                                       </div>
                                     )}
                                   </td>
 
                                   {/* Product Name & ID */}
-                                  <td className="px-4 py-2.5">
-                                    <span className="font-bold text-primary block leading-snug">
+                                  <td className="px-4 py-3">
+                                    <span className="font-extrabold text-slate-900 dark:text-white block leading-snug text-sm">
                                       {product.name}
                                     </span>
-                                    <span className="font-mono text-muted text-[11px] block mt-0.5">
+                                    <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px] block mt-0.5 font-medium">
                                       شناسه: #{product.id} {product.sku ? `| SKU: ${product.sku}` : ""}
                                     </span>
                                   </td>
 
                                   {/* Brand */}
-                                  <td className="px-4 py-2.5 text-muted text-xs font-medium">
+                                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300 text-xs font-bold">
                                     {product.brand || "-"}
                                   </td>
 
                                   {/* Stock */}
-                                  <td className="px-4 py-2.5">
+                                  <td className="px-4 py-3">
                                     {isQuickEditMode ? (
                                       <input
                                         type="number"
@@ -1976,7 +2239,7 @@ export function SupplierDashboard({
                                             },
                                           });
                                         }}
-                                        className="w-24 px-3 py-1.5 bg-background border-2 border-indigo-400 rounded-lg text-xs font-mono font-bold text-center outline-none focus:ring-2 focus:ring-primary-default"
+                                        className="w-24 px-3 py-1.5 bg-white dark:bg-slate-950 border-2 border-indigo-500 rounded-xl text-xs font-mono font-black text-slate-900 dark:text-white text-center outline-none focus:ring-2 focus:ring-indigo-600"
                                       />
                                     ) : inlineEditingCell?.productId === product.id && inlineEditingCell?.field === "stock" ? (
                                       <div className="flex items-center gap-1.5">
@@ -1993,13 +2256,13 @@ export function SupplierDashboard({
                                               setInlineEditingCell(null);
                                             }
                                           }}
-                                          className="w-20 px-2 py-1 text-xs font-mono font-bold bg-white dark:bg-slate-900 border-2 border-indigo-500 rounded-lg outline-none text-center shadow-inner"
+                                          className="w-20 px-2 py-1 text-xs font-mono font-black bg-white dark:bg-slate-900 border-2 border-indigo-600 rounded-xl outline-none text-center shadow-inner text-slate-900 dark:text-white"
                                         />
                                         <button
                                           type="button"
                                           onClick={() => handleSaveInlineCell(product.id, "stock", Number(inlineEditTemp || 0))}
                                           disabled={isSavingInlineCell === product.id}
-                                          className="p-1.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-all shadow-xs cursor-pointer active:scale-95"
+                                          className="p-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
                                           title="ذخیره"
                                         >
                                           <Check className="w-3.5 h-3.5" />
@@ -2007,7 +2270,7 @@ export function SupplierDashboard({
                                         <button
                                           type="button"
                                           onClick={() => setInlineEditingCell(null)}
-                                          className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 rounded-lg transition-all cursor-pointer active:scale-95"
+                                          className="p-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 rounded-xl transition-all cursor-pointer active:scale-95"
                                           title="انصراف"
                                         >
                                           <X className="w-3.5 h-3.5" />
@@ -2015,28 +2278,28 @@ export function SupplierDashboard({
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-1.5 group">
-                                        <span className={`font-mono font-bold text-xs px-2.5 py-1 rounded-lg ${
-                                          currentStock > 0 ? "bg-slate-100 dark:bg-slate-800 text-secondary" : "bg-rose-50 text-rose-600 dark:bg-rose-950/30"
-                                        }`}>
-                                          {currentStock} عدد
-                                        </span>
                                         <button
                                           type="button"
                                           onClick={() => {
                                             setInlineEditingCell({ productId: product.id, field: "stock" });
                                             setInlineEditTemp(currentStock);
                                           }}
-                                          className="p-1 text-slate-400 hover:text-primary-default hover:bg-indigo-50 dark:hover:bg-primary-hover/40 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
-                                          title="ویرایش سریع موجودی"
+                                          className={`inline-flex items-center gap-1.5 font-mono font-black text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer shadow-2xs ${
+                                            currentStock > 0
+                                              ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600 hover:bg-slate-200 hover:border-indigo-500"
+                                              : "bg-rose-100 dark:bg-rose-950 text-rose-900 dark:text-rose-200 border-2 border-rose-300 dark:border-rose-800 hover:bg-rose-200"
+                                          }`}
+                                          title="کلیک برای ویرایش سریع موجودی"
                                         >
-                                          <Pencil className="w-3.5 h-3.5" />
+                                          <span>{currentStock.toLocaleString("fa-IR")} عدد</span>
+                                          <Pencil className="w-3 h-3 opacity-60 group-hover:opacity-100 text-slate-500 dark:text-slate-400" />
                                         </button>
                                       </div>
                                     )}
                                   </td>
 
                                   {/* Base Price */}
-                                  <td className="px-4 py-2.5">
+                                  <td className="px-4 py-3">
                                     {isQuickEditMode ? (
                                       <input
                                         type="number"
@@ -2053,7 +2316,7 @@ export function SupplierDashboard({
                                             },
                                           });
                                         }}
-                                        className="w-32 px-3 py-1.5 bg-background border-2 border-indigo-400 rounded-lg text-xs font-mono font-bold text-center outline-none focus:ring-2 focus:ring-primary-default"
+                                        className="w-32 px-3 py-1.5 bg-white dark:bg-slate-950 border-2 border-indigo-500 rounded-xl text-xs font-mono font-black text-slate-900 dark:text-white text-center outline-none focus:ring-2 focus:ring-indigo-600"
                                       />
                                     ) : inlineEditingCell?.productId === product.id && inlineEditingCell?.field === "supplierBasePrice" ? (
                                       <div className="flex items-center gap-1.5">
@@ -2070,13 +2333,13 @@ export function SupplierDashboard({
                                               setInlineEditingCell(null);
                                             }
                                           }}
-                                          className="w-28 px-2 py-1 text-xs font-mono font-bold bg-white dark:bg-slate-900 border-2 border-indigo-500 rounded-lg outline-none text-center shadow-inner"
+                                          className="w-28 px-2 py-1 text-xs font-mono font-black bg-white dark:bg-slate-900 border-2 border-indigo-600 rounded-xl outline-none text-center shadow-inner text-slate-900 dark:text-white"
                                         />
                                         <button
                                           type="button"
                                           onClick={() => handleSaveInlineCell(product.id, "supplierBasePrice", Number(inlineEditTemp || 0))}
                                           disabled={isSavingInlineCell === product.id}
-                                          className="p-1.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-all shadow-xs cursor-pointer active:scale-95"
+                                          className="p-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
                                           title="ذخیره"
                                         >
                                           <Check className="w-3.5 h-3.5" />
@@ -2084,7 +2347,7 @@ export function SupplierDashboard({
                                         <button
                                           type="button"
                                           onClick={() => setInlineEditingCell(null)}
-                                          className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 rounded-lg transition-all cursor-pointer active:scale-95"
+                                          className="p-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 rounded-xl transition-all cursor-pointer active:scale-95"
                                           title="انصراف"
                                         >
                                           <X className="w-3.5 h-3.5" />
@@ -2092,17 +2355,17 @@ export function SupplierDashboard({
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-1.5 group">
-                                        <span className="font-mono font-black text-primary-default dark:text-indigo-400 text-sm">
+                                        <span className="font-mono font-black text-indigo-700 dark:text-indigo-400 text-sm">
                                           {currentPrice.toLocaleString("fa-IR")}
                                         </span>
-                                        <span className="text-[10px] text-muted font-normal">تومان</span>
+                                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold">تومان</span>
                                         <button
                                           type="button"
                                           onClick={() => {
                                             setInlineEditingCell({ productId: product.id, field: "supplierBasePrice" });
                                             setInlineEditTemp(currentPrice);
                                           }}
-                                          className="p-1 text-slate-400 hover:text-primary-default hover:bg-indigo-50 dark:hover:bg-primary-hover/40 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
+                                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-all cursor-pointer opacity-70 group-hover:opacity-100"
                                           title="ویرایش سریع قیمت پایه"
                                         >
                                           <Pencil className="w-3.5 h-3.5" />
@@ -2112,36 +2375,53 @@ export function SupplierDashboard({
                                   </td>
 
                                   {/* Status */}
-                                  <td className="px-4 py-2.5">
-                                    <span
-                                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                                        product.status === "ACTIVE" || product.status === "PUBLISHED"
-                                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
-                                          : product.status === "PENDING_APPROVAL" || product.status === "SUSPENDED"
-                                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
+                                  <td className="px-4 py-3">
+                                    <div className="flex flex-col gap-1 items-start">
+                                      <span
+                                        className={`px-3 py-1 rounded-xl text-xs font-black inline-flex items-center gap-1.5 shadow-2xs border ${
+                                          product.status === "ACTIVE" || product.status === "PUBLISHED"
+                                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800"
+                                            : product.status === "REJECTED"
+                                            ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800"
+                                            : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200 border-amber-300 dark:border-amber-800"
+                                        }`}
+                                      >
+                                        <span className={`w-2 h-2 rounded-full ${
+                                          product.status === "ACTIVE" || product.status === "PUBLISHED"
+                                            ? "bg-emerald-600 animate-pulse"
+                                            : product.status === "REJECTED"
+                                            ? "bg-rose-600"
+                                            : "bg-amber-600"
+                                        }`}></span>
+                                        {product.status === "ACTIVE" || product.status === "PUBLISHED"
+                                          ? "تایید شده"
                                           : product.status === "REJECTED"
-                                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
-                                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
-                                      }`}
-                                    >
-                                      {product.status === "ACTIVE" || product.status === "PUBLISHED"
-                                        ? "فعال"
-                                        : product.status === "REJECTED"
-                                        ? "رد شده"
-                                        : "در انتظار تایید"}
-                                    </span>
+                                          ? "نیازمند اصلاح"
+                                          : "در انتظار بررسی مدیر"}
+                                      </span>
+                                      {product.rejectionReason && (
+                                        <div className="bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-900 p-2 rounded-xl text-[11px] text-rose-800 dark:text-rose-200 max-w-xs mt-0.5 leading-relaxed text-right font-medium">
+                                          <div className="flex items-center gap-1 font-black text-rose-900 dark:text-rose-100 mb-0.5">
+                                            <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                                            <span>علت بازگشت جهت اصلاح:</span>
+                                          </div>
+                                          <p className="line-clamp-3">{product.rejectionReason}</p>
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
 
-                                  {/* Operations: Neutral Blue Edit Button */}
-                                  <td className="px-4 py-2.5 text-center">
+                                  {/* Operations */}
+                                  <td className="px-4 py-3 text-center">
                                     <button
+                                      type="button"
                                       onClick={() => {
                                         setProductToEdit(product);
                                         setActiveTab("edit-product");
                                       }}
-                                      className="bg-primary-default/10 text-primary-default hover:bg-primary-default/20  border border-primary-default/30  px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs hover:shadow-sm active:scale-95"
+                                      className="bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-indigo-600/20 whitespace-nowrap"
                                     >
-                                      ویرایش
+                                      {product.status === "REJECTED" ? "ویرایش و رفع نقص" : "ویرایش"}
                                     </button>
                                   </td>
                                 </tr>
@@ -2423,12 +2703,23 @@ export function SupplierDashboard({
                               <p className="font-black text-white text-sm">
                                 تعداد {selectedItems.length} سفارش برای عملیات ارسال انتخاب شده است.
                               </p>
-                              <p className="text-xs text-slate-200 mt-0.5 font-medium">
-                                می‌توانید وضعیت تمام سفارشات انتخاب شده را به صورت یکجا به «ارسال شد» تغییر داده و تحویل پست دهید.
+                              <p className="text-xs text-slate-200 mt-0.5 font-medium leading-relaxed">
+                                می‌توانید وضعیت تمام سفارشات انتخاب شده را به صورت یکجا به «ارسال شد» تغییر داده و تحویل پست دهید. 
+                                <span className="block mt-1 font-bold text-amber-300">
+                                  توجه فرمایید: زمانی که شما دکمه "ارسال شد" را می‌زنید (سفارش را تایید نهایی می‌کنید)، کیف پول شما شارژ خواهد شد.
+                                </span>
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 w-full md:w-auto">
+                          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                            <button
+                              type="button"
+                              onClick={() => handleBulkPrintPostalLabels()}
+                              className="flex-1 md:flex-initial bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95"
+                            >
+                              <Printer className="w-4 h-4" />
+                              چاپ گروهی لیبل‌ها ({selectedItems.length})
+                            </button>
                             <button
                               onClick={approveBatchOrders}
                               className="flex-1 md:flex-initial bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-95"

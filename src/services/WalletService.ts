@@ -22,11 +22,14 @@ export type LedgerStatus = keyof typeof LedgerStatus | string;
 
 export const PayoutStatus = {
   PENDING: 'PENDING',
+  QUEUED_FOR_PAYA: 'QUEUED_FOR_PAYA',
   PROCESSING: 'PROCESSING',
   SUCCESS: 'SUCCESS',
   FAILED: 'FAILED'
 } as const;
 export type PayoutStatus = keyof typeof PayoutStatus | string;
+
+export const MIN_WITHDRAWAL_AMOUNT = 300000; // 300,000 Tomans minimum for withdrawal
 
 const prisma = getPrisma();
 
@@ -204,24 +207,23 @@ export class WalletService {
   async requestPayout(walletId: string, amount: Decimal | number | string, shaba: string) {
     const payoutAmount = new Decimal(amount);
 
-    if (payoutAmount.lte(0)) {
-      throw new Error('Payout amount must be greater than zero.');
+    if (payoutAmount.lt(MIN_WITHDRAWAL_AMOUNT)) {
+      throw new Error(`حداقل مبلغ مجاز برای ثبت درخواست تسویه حساب، ۳۰۰,۰۰۰ تومان است.`);
     }
 
-    // Safety check: Ensure no payout is requested if there are already PENDING or PROCESSING payouts
-    // (Prevents double-payouts by restricting concurrent payout requests)
+    // Safety check: Ensure no payout is requested if there are already PENDING, QUEUED_FOR_PAYA or PROCESSING payouts
     const activePayouts = await prisma.payoutRequest.findFirst({
       where: {
         walletId,
-        status: { in: [PayoutStatus.PENDING, PayoutStatus.PROCESSING] }
+        status: { in: [PayoutStatus.PENDING, PayoutStatus.QUEUED_FOR_PAYA, PayoutStatus.PROCESSING] }
       }
     });
 
     if (activePayouts) {
-      throw new Error('An active payout request already exists. Please wait for it to complete.');
+      throw new Error('یک درخواست تسویه حساب فعال در حال پردازش یا در صف تسویه پایا دارید. لطفاً تا تکمیل آن شکیبا باشید.');
     }
 
-    const payoutRequest = await prisma.$transaction(async  (tx: any) => {
+    const payoutRequest = await prisma.$transaction(async (tx: any) => {
       // 1. Fetch wallet
       const wallet = await tx.wallet.findUnique({
         where: { id: walletId },
@@ -250,13 +252,13 @@ export class WalletService {
         throw new Error('Insufficient funds. Transaction reverted.');
       }
 
-      // 4. Create a PayoutRequest in PROCESSING state (we are about to request it)
+      // 4. Create a PayoutRequest in QUEUED_FOR_PAYA state (batch processed at 13:00 on business days)
       const pr = await tx.payoutRequest.create({
         data: {
           walletId,
           amount: payoutAmount,
           shaba,
-          status: PayoutStatus.PROCESSING,
+          status: PayoutStatus.QUEUED_FOR_PAYA,
           trackId: WalletService.generateTrackId(),
         },
       });
@@ -269,39 +271,55 @@ export class WalletService {
           type: LedgerType.WITHDRAWAL,
           status: LedgerStatus.PENDING,
           referenceId: pr.id,
-          description: `Payout request to Shaba: ${shaba}`,
+          description: `درخواست تسویه در صف پایا به شماره شبا: ${shaba}`,
         },
       });
 
       return pr;
     });
 
-    // Try calling gateway automated payout, or fallback to PENDING for admin manual payout
-    try {
-      const paymentService = await PaymentServiceFactory.getService();
-      const gatewayResponse = await paymentService.requestPayout(
-        payoutAmount.toNumber(),
-        shaba,
-        `Payout for wallet ${walletId}`
-      );
+    return payoutRequest;
+  }
 
-      return await prisma.payoutRequest.update({
-        where: { id: payoutRequest.id },
+  /**
+   * Process all payout requests currently queued for Paya batch processing (scheduled for 13:00)
+   */
+  static async processPayaBatch(): Promise<{ processedCount: number; batchTrackId: string; totalAmount: number }> {
+    const queuedRequests = await prisma.payoutRequest.findMany({
+      where: { status: PayoutStatus.QUEUED_FOR_PAYA }
+    });
+
+    if (queuedRequests.length === 0) {
+      return { processedCount: 0, batchTrackId: '', totalAmount: 0 };
+    }
+
+    const batchTrackId = `PAYA-BATCH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    let totalAmount = 0;
+
+    for (const req of queuedRequests) {
+      totalAmount += Number(req.amount);
+      await prisma.payoutRequest.update({
+        where: { id: req.id },
         data: {
-          trackId: gatewayResponse.trackId,
           status: PayoutStatus.PROCESSING,
-        },
+          trackId: `${batchTrackId}-${req.id.slice(-4)}`
+        }
       });
-    } catch (error: any) {
-      console.warn(`Direct gateway payout unavailable (${error.message}). Saved request as PENDING for admin approval.`);
-      
-      return await prisma.payoutRequest.update({
-        where: { id: payoutRequest.id },
+
+      await prisma.ledgerEntry.updateMany({
+        where: { referenceId: req.id },
         data: {
-          status: PayoutStatus.PENDING,
-        },
+          description: `پردازش تسویه پایا - شناسه پایا: ${batchTrackId} (شبا: ${req.shaba})`
+        }
       });
     }
+
+    console.log(`[WalletService] Processed Paya Batch ${batchTrackId}: ${queuedRequests.length} requests, total: ${totalAmount} Tomans`);
+    return {
+      processedCount: queuedRequests.length,
+      batchTrackId,
+      totalAmount
+    };
   }
 
   /**

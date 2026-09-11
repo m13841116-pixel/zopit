@@ -382,14 +382,35 @@ export default function ZoombitGramPageSettings({
                     )}
                   </div>
                   <input
-                    type="url"
-                    placeholder="https://example.com/avatar.jpg"
-                    value={avatarUrl}
-                    onChange={(e) => setAvatarUrl(e.target.value)}
-                    className="w-full bg-surface border border-subtle rounded-xl px-4 py-2.5 text-xs text-primary placeholder-muted outline-none focus:border-amber-500 transition-colors dir-ltr font-mono"
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        const file = e.target.files[0];
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                          const res = await fetch('/api/upload', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                            body: formData
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            setAvatarUrl(data.url);
+                          } else {
+                            const data = await res.json();
+                            toast(data.error || 'خطا در آپلود عکس', 'error');
+                          }
+                        } catch (err) {
+                          toast('خطا در برقراری ارتباط با سرور هنگام آپلود عکس', 'error');
+                        }
+                      }
+                    }}
+                    className="w-full bg-surface border border-subtle rounded-xl px-4 py-2 text-xs text-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 transition-colors"
                   />
                 </div>
-                <p className="text-[11px] text-muted">لینک عکس لوگو یا تصویر پروفایل فروشگاه خود را وارد کنید.</p>
+                <p className="text-[11px] text-muted">فایل عکس لوگو یا تصویر پروفایل فروشگاه خود را انتخاب کنید.</p>
               </div>
 
               {/* Store Name & Brand Name */}

@@ -127,8 +127,12 @@ export default function AllUsersList({
         setUsers(Array.isArray(data) ? data : []);
       } else {
         const errData = await res.json().catch(() => ({}));
-        if (showNotification) showNotification(`خطا در دریافت کاربران: ${errData.error || res.status}`, "error");
-        console.error("Backend error:", errData);
+        if (res.status === 401) {
+          if (showNotification) showNotification("نشست کاربری شما منقضی شده است. لطفاً مجدداً وارد شوید.", "error");
+        } else {
+          if (showNotification) showNotification(`خطا در دریافت کاربران: ${errData.error || res.status}`, "error");
+          console.warn("Fetch users error:", errData);
+        }
       }
     } catch (err) {
       console.error("Error fetching users:", err);

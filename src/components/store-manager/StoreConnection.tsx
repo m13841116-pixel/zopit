@@ -14,13 +14,17 @@ import {
   HelpCircle,
   ExternalLink,
   Lock,
-  Calculator
+  Calculator,
+  Save
 } from "lucide-react";
 
 export default function StoreConnection({ showNotification }: { showNotification?: (msg: string, type: "success" | "error" | "info") => void }) {
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [profitMarginType, setProfitMarginType] = useState<"percent" | "fixed">("percent");
-  const [profitMarginValue, setProfitMarginValue] = useState<number>(0);
+  const [profitMarginPercent, setProfitMarginPercent] = useState<number>(15);
+  const [profitFixedAmount, setProfitFixedAmount] = useState<number>(0);
+  const [formulaEnabled, setFormulaEnabled] = useState<boolean>(true);
+  const [applyToCatalog, setApplyToCatalog] = useState<boolean>(true);
+  const [sampleBasePrice, setSampleBasePrice] = useState<number>(100000);
   const [loading, setLoading] = useState(true);
   const [generatingKey, setGeneratingKey] = useState(false);
   const [savingMargin, setSavingMargin] = useState(false);
@@ -31,7 +35,7 @@ export default function StoreConnection({ showNotification }: { showNotification
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const productsEndpoint = `${baseUrl}/api/v1/store/products`;
-  const ordersEndpoint = `${baseUrl}/api/v1/store/orders`;
+  const ordersEndpoint = `${baseUrl}/api/v1/integrations/order-callback`;
 
   useEffect(() => {
     fetchSettings();
@@ -41,14 +45,23 @@ export default function StoreConnection({ showNotification }: { showNotification
     setLoading(true);
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch("/api/store-manager/settings", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
+      const [settingsRes, formulaRes] = await Promise.all([
+        fetch("/api/store-manager/settings", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/store-manager/pricing-formula", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null)
+      ]);
+
+      const data = await settingsRes.json();
       if (data.success) {
         setApiKey(data.apiKey);
-        setProfitMarginType(data.profitMarginType || "percent");
-        setProfitMarginValue(data.profitMarginValue ?? 0);
+      }
+
+      if (formulaRes && formulaRes.ok) {
+        const formulaData = await formulaRes.json();
+        setProfitMarginPercent(formulaData.profitMarginPercent ?? 15);
+        setProfitFixedAmount(formulaData.profitFixedAmount ?? 0);
+        setFormulaEnabled(formulaData.formulaEnabled ?? true);
+      } else if (data.success) {
+        setProfitMarginPercent(data.profitMarginValue || 15);
       }
     } catch (err) {
       console.error("Error fetching settings:", err);
@@ -82,30 +95,32 @@ export default function StoreConnection({ showNotification }: { showNotification
     }
   };
 
-  const handleSaveProfitMargin = async (e: React.FormEvent) => {
+  const handleSavePricingFormula = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingMargin(true);
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch("/api/store-manager/profit-margin", {
+      const res = await fetch("/api/store-manager/pricing-formula", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          profitMarginType,
-          profitMarginValue: Number(profitMarginValue)
+          profitMarginPercent: Number(profitMarginPercent) || 0,
+          profitFixedAmount: Number(profitFixedAmount) || 0,
+          formulaEnabled,
+          applyToCatalog
         })
       });
       const data = await res.json();
       if (data.success) {
-        if (showNotification) showNotification("فرمول محاسبه سود با موفقیت ذخیره شد.", "success");
+        if (showNotification) showNotification(data.message || "فرمول محاسبه سود با موفقیت ذخیره شد.", "success");
       } else {
-        if (showNotification) showNotification(data.error || "خطا در ذخیره سود", "error");
+        if (showNotification) showNotification(data.error || "خطا در ذخیره فرمول", "error");
       }
     } catch (err) {
-      if (showNotification) showNotification("خطا در ذخیره فرمول سود", "error");
+      if (showNotification) showNotification("خطا در برقراری ارتباط با سرور", "error");
     } finally {
       setSavingMargin(false);
     }
@@ -126,13 +141,11 @@ export default function StoreConnection({ showNotification }: { showNotification
     if (showNotification) showNotification("در حافظه کپی شد.", "info");
   };
 
-  // Sample price calculation
-  const sampleBasePrice = 100000;
-  const sampleSellingPrice =
-    profitMarginType === "percent"
-      ? Math.round(sampleBasePrice + (sampleBasePrice * profitMarginValue) / 100)
-      : Math.round(sampleBasePrice + Number(profitMarginValue));
-  const sampleProfit = sampleSellingPrice - sampleBasePrice;
+  // Sample price calculation: [قیمت فروش = (قیمت پایه تامین‌کننده × (1 + درصد سود / 100)) + مبلغ ثابت تومان]
+  const sampleSellingPrice = formulaEnabled
+    ? Math.round(sampleBasePrice * (1 + (profitMarginPercent || 0) / 100) + Number(profitFixedAmount || 0))
+    : sampleBasePrice;
+  const sampleProfit = Math.max(0, sampleSellingPrice - sampleBasePrice);
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in py-6 px-2" dir="rtl">
@@ -282,18 +295,170 @@ export default function StoreConnection({ showNotification }: { showNotification
               </div>
             </div>
           </div>
+
+          {/* Feature 2: Automated Pricing Formula Engine Card */}
+          <div className="bg-card border border-subtle rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-subtle pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center font-bold">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-primary">موتور محاسبه و به‌روزرسانی خودکار سود و قیمت</h2>
+                  <p className="text-xs text-muted">
+                    فرمول قیمت فروش: <code className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">[قیمت فروش = (قیمت پایه × (۱ + درصد سود / ۱۰۰)) + مبلغ ثابت]</code>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-secondary flex items-center gap-2 cursor-pointer bg-surface px-3 py-1.5 rounded-xl border border-subtle">
+                  <input
+                    type="checkbox"
+                    checked={formulaEnabled}
+                    onChange={(e) => setFormulaEnabled(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span>فعال‌سازی محاسبه خودکار</span>
+                </label>
+              </div>
+            </div>
+
+            <form onSubmit={handleSavePricingFormula} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Profit Margin Percent */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-secondary">
+                    درصد حاشیه سود (٪):
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="500"
+                      step="0.5"
+                      value={profitMarginPercent}
+                      onChange={(e) => setProfitMarginPercent(Math.max(0, Number(e.target.value)))}
+                      className="w-full pl-8 pr-4 py-3 bg-surface border border-subtle rounded-2xl text-xs font-bold text-primary focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all dir-ltr"
+                      placeholder="مثال: ۱۵"
+                    />
+                    <span className="absolute left-3 top-3.5 text-xs text-muted font-bold">%</span>
+                  </div>
+                  <p className="text-[11px] text-muted">درصد سودی که به قیمت پایه تامین‌کننده اضافه می‌شود.</p>
+                </div>
+
+                {/* Fixed Profit Amount */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-secondary">
+                    مبلغ ثابت افزوده سود (تومان):
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={profitFixedAmount}
+                      onChange={(e) => setProfitFixedAmount(Math.max(0, Number(e.target.value)))}
+                      className="w-full pl-12 pr-4 py-3 bg-surface border border-subtle rounded-2xl text-xs font-bold text-primary focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all dir-ltr"
+                      placeholder="مثال: ۲۰۰۰۰"
+                    />
+                    <span className="absolute left-3 top-3.5 text-xs text-muted font-bold">تومان</span>
+                  </div>
+                  <p className="text-[11px] text-muted">مبلغ ثابتی که به علاوه درصد سود به قیمت کالا اضافه می‌گردد.</p>
+                </div>
+              </div>
+
+              {/* Interactive Live Calculation Preview */}
+              <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-emerald-500/20 pb-3">
+                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-emerald-500" />
+                    پیش‌نمایش زنده محاسبه قیمت برای نمونه فرضی:
+                  </span>
+                  <div className="flex items-center gap-2 text-xs text-secondary">
+                    <span>قیمت پایه کالا:</span>
+                    <input
+                      type="number"
+                      step="5000"
+                      value={sampleBasePrice}
+                      onChange={(e) => setSampleBasePrice(Math.max(1000, Number(e.target.value)))}
+                      className="w-28 px-2 py-1 bg-surface border border-subtle rounded-lg text-xs font-mono font-bold text-center dir-ltr"
+                    />
+                    <span>تومان</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                  <div className="bg-surface/80 p-3 rounded-xl border border-subtle">
+                    <span className="text-[11px] text-muted block mb-1">قیمت خرید عمده از زوپیت</span>
+                    <span className="font-mono text-xs font-bold text-primary">{sampleBasePrice.toLocaleString()} تومان</span>
+                  </div>
+
+                  <div className="bg-surface/80 p-3 rounded-xl border border-subtle">
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold block mb-1">سود خالص شما در این کالا</span>
+                    <span className="font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">+{sampleProfit.toLocaleString()} تومان</span>
+                  </div>
+
+                  <div className="bg-emerald-500 text-white p-3 rounded-xl shadow-sm">
+                    <span className="text-[11px] text-emerald-100 block mb-1">قیمت نهایی فروش در سایت شما</span>
+                    <span className="font-mono text-sm font-black">{sampleSellingPrice.toLocaleString()} تومان</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Checkbox & Save Button */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
+                <label className="text-xs font-bold text-secondary flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={applyToCatalog}
+                    onChange={(e) => setApplyToCatalog(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span>همین فرمول را فوراً بر روی تمام محصولات موجود در کاتالوگ زوپیتی من اعمال و بازنویسی کن</span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={savingMargin}
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-6 rounded-2xl transition-all text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 disabled:opacity-50 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{savingMargin ? "در حال ذخیره..." : "ذخیره تنظیمات فرمول قیمت‌گذاری"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* Security Hole Closure Notice (بستن حفره قیمت) */}
-      <div className="bg-card border border-indigo-500/20 rounded-3xl p-6 shadow-lg space-y-3">
+      {/* Security Hole Closure Notice & Webhook Logic (بستن حفره قیمت و تسویه اتوماتیک کیف پول) */}
+      <div className="bg-card border border-indigo-500/20 rounded-3xl p-6 shadow-lg space-y-4">
         <div className="flex items-center gap-2 text-indigo-500 font-black text-sm">
           <Lock className="w-5 h-5" />
-          <span>امنیت اختصاصی و جلوگیری از دستکاری قیمت (Hole Closure)</span>
+          <span>امنیت اختصاصی، استعلام قیمت عمده و تسویه خودکار کیف پول (Order Callback API)</span>
         </div>
-        <p className="text-xs text-secondary leading-relaxed">
-          در پلتفرم زوپیت، قیمتی که از سمت ووکامرس یا افزونه در زمان ثبت سفارش ارسال شود ملاک قرار نمی‌گیرد. سیستم زوپیت مستقیماً کد محصول را در دیتابیس زوپیت استعلام کرده، قیمت پایه واقعی تامین‌کننده + هزینه پستی را محاسبه می‌کند و یک سفارش «در انتظار پرداخت» با قیمت واقعی برای شما ایجاد می‌نماید تا هیچ‌گونه سوء استفاده یا دستکاری در قیمت میسر نباشد.
-        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-secondary leading-relaxed">
+          <div className="bg-surface p-4 rounded-2xl border border-subtle space-y-2">
+            <span className="font-bold text-primary block flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              ۱. استعلام قیمت عمده از دیتابیس (Hole Closure):
+            </span>
+            <p className="text-muted">
+              قیمت ارسالی از سمت ووکامرس یا فروشگاه خارجی ملاک فاکتور زوپیت نخواهد بود. زوپیت کد کالای ارسالی (<code className="text-indigo-500 font-mono">zopit_sku</code>) را در بانک داده خود جستجو کرده و قیمت عمده واقعی تأمین‌کننده را به عنوان بهای تمام‌شده لحاظ می‌نماید تا امکان هیچ‌گونه دستکاری قیمتی وجود نداشته باشد.
+            </p>
+          </div>
+
+          <div className="bg-surface p-4 rounded-2xl border border-subtle space-y-2">
+            <span className="font-bold text-primary block flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-amber-500" />
+              ۲. منطق هوشمند کیف پول و تغییر وضعیت سفارش:
+            </span>
+            <p className="text-muted">
+              اگر موجودی کیف پول شما در زوپیت کافی باشد، هزینه فاکتور عمده به صورت اتوماتیک از کیف پول کسر شده، سفارش با وضعیت «ارسال‌شده به تامین‌کننده» ثبت می‌شود و پیامک آماده‌سازی به تامین‌کننده ارسال می‌گردد. در صورت کسری موجودی، سفارش در حالت «در انتظار شارژ کیف پول» قرار گرفته و پیامک اطلاع‌رسانی به شما ارسال می‌شود.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Guide Step-by-Step */}

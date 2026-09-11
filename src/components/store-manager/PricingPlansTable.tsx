@@ -248,6 +248,7 @@ export function PricingPlansTable({
             {/* Features List */}
             <div className="space-y-3 pt-1">
               <p className="text-xs font-bold text-slate-700">امکانات اصلی پلن استارتاپ:</p>
+              <FeatureItem active highlight>سهمیه ویترین: ۷۰ محصول (افزودن روزانه تا ۱۰ محصول)</FeatureItem>
               <FeatureItem active>۱۰ گیگابایت هاست ابری پرسرعت NVMe</FeatureItem>
               <FeatureItem active>۳.۵ هسته پردازنده CPU و ۳ گیگابایت RAM</FeatureItem>
               <FeatureItem active>درگاه مستقیم بانکی پرداخت (رایگان به نام شما)</FeatureItem>
@@ -269,7 +270,7 @@ export function PricingPlansTable({
                 </p>
               </div>
 
-              <FeatureItem active>فروشگاه‌ساز استاندارد وودمارت</FeatureItem>
+              <FeatureItem active>قالب فروشگاهی وودمارت (WoodMart)</FeatureItem>
               <FeatureItem active>پشتیبانی تیکتی استاندارد</FeatureItem>
               <FeatureItem active={false}>سیستم بکاپ‌گیری خودکار دوره‌ای</FeatureItem>
               <FeatureItem active={false}>خدمات طراحی لوگو و بنر با هوش مصنوعی</FeatureItem>
@@ -348,7 +349,7 @@ export function PricingPlansTable({
               {billingCycle === "ANNUAL" ? (
                 <div className="text-[11px] font-bold text-indigo-700 bg-indigo-100/70 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
                   <BadgePercent className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>شامل تخفیف ویژه خرید سالانه (صرفه‌جویی چشمگیر)</span>
+                  <span>شامل ۴ ماه رایگان (تخفیف ویژه سالانه)</span>
                 </div>
               ) : (
                 <div className="text-[11px] text-slate-500 font-medium">
@@ -360,12 +361,12 @@ export function PricingPlansTable({
             {/* Features List */}
             <div className="space-y-3 pt-1">
               <p className="text-xs font-bold text-indigo-900">تمامی امکانات استارتاپ، به‌علاوه:</p>
+              <FeatureItem active highlight>سهمیه ویترین: ۲۵۰ محصول (افزودن روزانه تا ۳۰ محصول)</FeatureItem>
               <FeatureItem active highlight>۱۵ گیگابایت هاست ابری فوق‌سریع NVMe</FeatureItem>
               <FeatureItem active highlight>۵ هسته قدرتمند CPU و ۵ گیگابایت RAM</FeatureItem>
               <FeatureItem active highlight>سیستم بکاپ استاندارد دوره‌ای دیتابیس و فایل</FeatureItem>
               <FeatureItem active highlight>طراحی هوشمند لوگو + ۱۰ ویدیوی تبلیغاتی AI در ماه</FeatureItem>
-              <FeatureItem active highlight>قالب وودمارت کانفیگ‌شده + پکیج اختصاصی بهینه‌سازی سرعت</FeatureItem>
-              <FeatureItem active highlight>سامانه پیامک هوشمند و ارسال کد تایید خودکار</FeatureItem>
+              <FeatureItem active highlight>قالب فروشگاهی وودمارت (WoodMart) بهینه‌شده</FeatureItem>
               <FeatureItem active highlight>پشتیبانی ویژه تیکتی (پاسخ سریع زیر ۶ ساعت)</FeatureItem>
               <FeatureItem active={false}>اتصال مستقیم با وب‌سرویس به ترب و ایمالز</FeatureItem>
               
@@ -423,29 +424,32 @@ export function PricingPlansTable({
             </div>
 
             {/* Price Box */}
-            <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+            <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-100 space-y-1.5">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-                  {billingCycle === "ANNUAL" ? "۹,۹۰۰,۰۰۰" : "۱,۲۹۰,۰۰۰"}
+                  {billingCycle === "ANNUAL" ? "۹,۹۰۰,۰۰۰" : "۹۹۰,۰۰۰"}
                 </span>
                 <span className="text-xs font-medium text-slate-500">
                   تومان / {billingCycle === "ANNUAL" ? "سالانه" : "ماهانه"}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">
-                {billingCycle === "ANNUAL" ? "بیش از ۴۰٪ صرفه‌جویی در پرداخت یکجا" : "پشتیبانی اختصاصی و اولویت حداکثری"}
+              <p className="text-[11px] font-bold text-purple-800 bg-purple-100/70 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                <BadgePercent className="w-3.5 h-3.5 text-purple-600" />
+                <span>{billingCycle === "ANNUAL" ? "شامل ۲ ماه رایگان (۱۷٪ تخفیف ویژه سالانه)" : "تعرفه ماهانه اقتصادی ویژه سازمان‌ها"}</span>
               </p>
             </div>
 
             {/* Features List */}
             <div className="space-y-3 pt-1">
               <p className="text-xs font-bold text-slate-700">تمامی امکانات پلن رشد، به‌علاوه:</p>
+              <FeatureItem active highlight>سهمیه ویترین: نامحدود (بدون سقف روزانه و کلی)</FeatureItem>
+              <FeatureItem active highlight>قالب اختصاصی وودمارت پلاس (WoodMart Plus)</FeatureItem>
+              <FeatureItem active highlight>پنل پیامکی حرفه‌ای اختصاصی (هدیه زوپیت برای کاربران ویژه)</FeatureItem>
               <FeatureItem active highlight>۳۰ گیگابایت هاست اختصاصی (۷ هسته) یا ۱۵ گیگابایت (۹ هسته)</FeatureItem>
               <FeatureItem active highlight>بکاپ خودکار کامل هر ۳ روز + بکاپ دیتابیس هر ۲۴ ساعت</FeatureItem>
               <FeatureItem active highlight>طراحی نامحدود بنر، لوگو و ویدیوهای تبلیغاتی هوش مصنوعی</FeatureItem>
               <FeatureItem active highlight>اتصال و یکپارچه‌سازی کامل به موتورهای ترب و ایمالز</FeatureItem>
               <FeatureItem active highlight>ثبت دامنه اختصاصی ir به نام مالک با هزینه رایگان</FeatureItem>
-              <FeatureItem active highlight>قالب و افزونه‌های پریمیوم لایسنس‌دار نامحدود</FeatureItem>
               <FeatureItem active highlight>پشتیبانی مستقیم تلگرام + تماس + تیکت اولویت فوری</FeatureItem>
               
               <div className="mt-3 pt-2.5 border-t border-purple-100 text-purple-700 font-extrabold text-[11px] flex items-center gap-2">
@@ -523,23 +527,67 @@ export function PricingPlansTable({
                   title="قیمت در حالت ماهانه"
                   v1={<span className="font-bold text-slate-800">۲۵۹,۰۰۰ تومان</span>}
                   v2={<span className="font-bold text-indigo-600">۴۹۹,۰۰۰ تومان</span>}
-                  v3={<span className="font-bold text-slate-900">۱,۲۹۰,۰۰۰ تومان</span>}
+                  v3={<span className="font-bold text-slate-900">۹۹۰,۰۰۰ تومان</span>}
                   isFeaturedColumn
                 />
                 <TableRow
                   title="قیمت در حالت سالانه"
-                  v1={<span className="font-bold text-slate-800">۲,۴۹۰,۰۰۰ تومان</span>}
+                  v1={
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-slate-800">۲,۴۹۰,۰۰۰ تومان</span>
+                      <span className="block text-[10px] text-emerald-600 font-bold">۲ ماه رایگان (تخفیف سالانه)</span>
+                    </div>
+                  }
                   v2={
                     <div className="space-y-0.5">
                       <span className="font-bold text-indigo-600">۳,۹۹۰,۰۰۰ تومان</span>
-                      <span className="block text-[10px] text-emerald-600 font-bold">۲ ماه رایگان (تخفیف ویژه)</span>
+                      <span className="block text-[10px] text-emerald-600 font-bold">۴ ماه رایگان (تخفیف ویژه سالانه)</span>
                     </div>
                   }
-                  v3={<span className="font-bold text-slate-900">۹,۹۰۰,۰۰۰ تومان</span>}
+                  v3={
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-slate-900">۹,۹۰۰,۰۰۰ تومان</span>
+                      <span className="block text-[10px] text-emerald-600 font-bold">۲ ماه رایگان (۱۷٪ تخفیف سالانه)</span>
+                    </div>
+                  }
                   isFeaturedColumn
                 />
 
-                {/* 2. زیرساخت و منابع سرور */}
+                {/* 2. سهمیه و ظرفیت انتخاب کالا از بانک زوپیت */}
+                <CategoryHeader title="سهمیه و ظرفیت انتخاب کالا از بانک زوپیت" icon={<Layers className="w-4 h-4 text-slate-500" />} />
+                <TableRow
+                  title="سهمیه اولیه ویترین فروشگاه"
+                  v1={<span className="font-bold text-slate-800">۷۰ محصول <span className="text-[11px] text-slate-500 font-normal">(۳.۵ برابر پلن رایگان)</span></span>}
+                  v2={<span className="font-bold text-indigo-700">۲۵۰ محصول <span className="text-[11px] text-indigo-500 font-normal">(۱۲.۵ برابر پلن رایگان)</span></span>}
+                  v3={
+                    <span className="font-extrabold text-purple-700 flex items-center gap-1.5">
+                      <Crown className="w-4 h-4 text-purple-600 shrink-0" />
+                      نامحدود (دسترسی به کل کاتالوگ زوپیت)
+                    </span>
+                  }
+                  isFeaturedColumn
+                />
+                <TableRow
+                  title="سهمیه افزودن روزانه (در ۲۴ ساعت)"
+                  v1={<span className="font-medium text-slate-700">۱۰ محصول در ۲۴ ساعت</span>}
+                  v2={<span className="font-semibold text-indigo-700">۳۰ محصول در ۲۴ ساعت</span>}
+                  v3={
+                    <span className="font-bold text-purple-700 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0" />
+                      نامحدود (بدون محدودیت و سقف روزانه)
+                    </span>
+                  }
+                  isFeaturedColumn
+                />
+                <TableRow
+                  title="مقایسه با پلن رایگان اولیه (۲۰ محصول، ۳ روزانه)"
+                  v1="ارتقا به ۷۰ محصول ویترین"
+                  v2={<span className="font-semibold text-indigo-700">ارتقا به ۲۵۰ محصول ویترین + ۳۰ کالا در روز</span>}
+                  v3={<span className="font-semibold text-purple-800">حذف کامل تمامی سقف‌ها و محدودیت‌ها</span>}
+                  isFeaturedColumn
+                />
+
+                {/* 3. زیرساخت و منابع سرور */}
                 <CategoryHeader title="زیرساخت فروشگاه و منابع سرور" icon={<Server className="w-4 h-4 text-slate-500" />} />
                 <TableRow
                   title="منابع سخت‌افزاری هاست ابری"
@@ -561,7 +609,7 @@ export function PricingPlansTable({
                   isFeaturedColumn
                 />
 
-                {/* 3. پرداخت، مالی و امور اداری */}
+                {/* 4. پرداخت، مالی و امور اداری */}
                 <CategoryHeader title="پرداخت و امور اداری" icon={<Shield className="w-4 h-4 text-slate-500" />} />
                 <TableRow
                   title="درگاه مستقیم بانکی و پرداخت اینترنتی"
@@ -602,17 +650,36 @@ export function PricingPlansTable({
                   isFeaturedColumn
                 />
 
-                {/* 4. طراحی، قالب و سرعت */}
+                {/* 5. طراحی، قالب و سرعت */}
                 <CategoryHeader title="طراحی، قالب و زیرساخت سایت" icon={<Palette className="w-4 h-4 text-slate-500" />} />
                 <TableRow
                   title="قالب و امکانات فروشگاهی"
-                  v1="وودمارت استاندارد"
-                  v2={<span className="font-semibold text-slate-800">وودمارت کانفیگ‌شده + پکیج افزایش سرعت</span>}
-                  v3={<span className="font-semibold text-slate-900">قالب پریمیوم سفارشی + لایسنس افزونه‌های پیشرفته</span>}
+                  v1="قالب فروشگاهی وودمارت (WoodMart)"
+                  v2={<span className="font-semibold text-slate-800">قالب فروشگاهی وودمارت (WoodMart) بهینه‌شده</span>}
+                  v3={
+                    <span className="font-bold text-purple-700 flex items-center gap-1.5">
+                      <Crown className="w-4 h-4 text-purple-600 shrink-0" />
+                      قالب اختصاصی وودمارت پلاس (WoodMart Plus)
+                    </span>
+                  }
                   isFeaturedColumn
                 />
 
-                {/* 5. محتوا، گرافیک و هوش مصنوعی */}
+                {/* 6. سرویس پیامک */}
+                <TableRow
+                  title="سامانه و پنل پیامک"
+                  v1={<StatusBadge status={false} text="ندارد" />}
+                  v2={<StatusBadge status={false} text="ندارد (نیاز به تهیه جداگانه)" />}
+                  v3={
+                    <span className="font-bold text-purple-700 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0" />
+                      پنل پیامکی حرفه‌ای اختصاصی (هدیه زوپیت)
+                    </span>
+                  }
+                  isFeaturedColumn
+                />
+
+                {/* 7. محتوا، گرافیک و هوش مصنوعی */}
                 <CategoryHeader title="محتوا، گرافیک و هوش مصنوعی" icon={<Bot className="w-4 h-4 text-slate-500" />} />
                 <TableRow
                   title="تولید محتوا و ویدیوهای تبلیغاتی AI"
@@ -622,7 +689,7 @@ export function PricingPlansTable({
                   isFeaturedColumn
                 />
 
-                {/* 6. بازاریابی و اتصال به سرویس‌ها */}
+                {/* 8. بازاریابی و اتصال به سرویس‌ها */}
                 <CategoryHeader title="بازاریابی و اتصال به پلتفرم‌ها" icon={<Globe className="w-4 h-4 text-slate-500" />} />
                 <TableRow
                   title="اتصال خودکار به موتورهای ترب و ایمالز"
@@ -637,7 +704,7 @@ export function PricingPlansTable({
                   isFeaturedColumn
                 />
 
-                {/* 7. پشتیبانی و امنیت */}
+                {/* 9. پشتیبانی و امنیت */}
                 <CategoryHeader title="پشتیبانی، امنیت و بکاپ" icon={<LifeBuoy className="w-4 h-4 text-slate-500" />} />
                 <TableRow
                   title="سیستم بکاپ‌گیری خودکار"
@@ -649,6 +716,13 @@ export function PricingPlansTable({
                       فول بکاپ ۳ روزه + دیتابیس ۲۴ ساعته
                     </span>
                   }
+                  isFeaturedColumn
+                />
+                <TableRow
+                  title="کانال پشتیبانی و سرعت پاسخگویی"
+                  v1="پشتیبانی تیکتی استاندارد"
+                  v2={<span className="font-semibold text-indigo-700">تیکت VIP اولویت‌دار (پاسخ زیر ۶ ساعت)</span>}
+                  v3={<span className="font-semibold text-slate-900">مدیر اختصاصی تلگرام + تماس تلفنی + تیکت فوری</span>}
                   isFeaturedColumn
                 />
                 <TableRow

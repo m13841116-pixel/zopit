@@ -18,7 +18,9 @@ import {
   TrendingUp,
   Boxes,
   Info,
-  DollarSign
+  DollarSign,
+  Zap,
+  AlertTriangle
 } from "lucide-react";
 import { getValidProductImageUrl } from "../utils/productUtils";
 import { formatSupplierCode, formatSupplierLocation, HighContrastStatusBadge } from "../utils/statusUtils";
@@ -457,7 +459,7 @@ export function DigikalaProductModal({
               <div className="bg-slate-50 dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 p-5 space-y-4 shadow-sm sticky top-4">
                 
                 {/* Supplier Identity */}
-                <div className="border-b border-slate-200 dark:border-slate-700 pb-3 space-y-1.5">
+                <div className="border-b border-slate-200 dark:border-slate-700 pb-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500 dark:text-slate-400 font-medium">تامین‌کننده اصلی:</span>
                     <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
@@ -471,6 +473,42 @@ export function DigikalaProductModal({
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                     <span>{formatSupplierLocation(product.supplierProvince || product.supplier?.province, product.supplierCity || product.supplier?.city)}</span>
+                  </div>
+
+                  {/* Supplier Trust Badges & Performance in Modal */}
+                  <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {(product.supplierInfo?.fulfillmentRate >= 95 || product.supplier?.fulfillmentRate >= 95) && (
+                        <span className="bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-lg border border-amber-500/30 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-500" /> تأمین‌کننده طلایی
+                        </span>
+                      )}
+                      {(product.supplierInfo?.avgProcessingTimeHours <= 24 || product.supplier?.avgProcessingTimeHours <= 24) && (
+                        <span className="bg-blue-500/15 text-blue-600 dark:text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-lg border border-blue-500/30 flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-blue-500" /> ارسال سریع
+                        </span>
+                      )}
+                      {(product.supplierInfo?.cancellationRate > 20 || product.supplierInfo?.warningLevel === 'LOW' || product.supplierInfo?.warningLevel === 'MEDIUM' || product.supplierInfo?.warningLevel === 'HIGH') && (
+                        <span className="bg-rose-500/15 text-rose-600 dark:text-rose-400 text-[10px] font-black px-2 py-0.5 rounded-lg border border-rose-500/30 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-rose-500" /> نیازمند بررسی
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-100/70 dark:bg-slate-900/50 p-2 rounded-xl border border-slate-200/60 dark:border-slate-700/40">
+                      <div>
+                        <span className="text-slate-500 dark:text-slate-400 block text-[10px]">نرخ تأمین موفق:</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                          {product.supplierInfo?.fulfillmentRate ?? product.supplier?.fulfillmentRate ?? 100}٪
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 dark:text-slate-400 block text-[10px]">سرعت پردازش:</span>
+                        <span className="font-bold text-blue-600 dark:text-blue-400 font-mono">
+                          {product.supplierInfo?.avgProcessingTimeHours ?? product.supplier?.avgProcessingTimeHours ?? 12} ساعت
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

@@ -42,11 +42,16 @@ model User {
   apiKey                 String?                 @unique
   profitMarginType       String?                 @default("percent")
   profitMarginValue      Float?                  @default(0)
+  profitMarginPercent    Float?                  @default(15)
+  profitFixedAmount      Float?                  @default(0)
+  formulaEnabled         Boolean?                @default(true)
   autoApproveOrders      Boolean?  @default(true)
   platformType           String?
   fieldOfActivity        String?
   productCount           Int?
   performanceScore       Int                     @default(100)
+  fulfillmentRate        Float?                  @default(100.0)
+  avgProcessingTimeHours Float?                  @default(12.0)
   penaltyPoints          Int                     @default(0)
   warningLevel           String                  @default("NONE")
   referralCode           String?                 @unique

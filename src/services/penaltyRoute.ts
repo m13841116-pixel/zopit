@@ -1,6 +1,123 @@
 import { Decimal } from '@prisma/client/runtime/library';
 import jwt from 'jsonwebtoken';
 
+/**
+ * Automate calculation of Supplier Metrics:
+ * - Fulfillment Rate: percentage of successfully shipped items vs cancelled/rejected
+ * - Average Processing Time: average hours from order placement to shipping
+ * - Cancellation Rate: percentage of cancelled items
+ * - Performance Score & Warning Level based on 20% cancellation threshold & penalty points
+ */
+export async function computeAndSaveSupplierMetrics(prisma: any, supplierId: number) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: supplierId }
+    });
+    if (!user) return null;
+
+    const items = await prisma.orderItem.findMany({
+      where: { supplierId },
+      include: {
+        order: {
+          include: {
+            statusHistory: true
+          }
+        }
+      }
+    });
+
+    const totalOrdersCount = items.length;
+    const shippedItems = items.filter((i: any) => ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(i.status));
+    const cancelledItems = items.filter((i: any) => ['CANCELLED', 'REJECTED'].includes(i.status));
+    const finalizedCount = shippedItems.length + cancelledItems.length;
+
+    let fulfillmentRate = 100.0;
+    let cancellationRate = 0.0;
+
+    if (finalizedCount > 0) {
+      fulfillmentRate = (shippedItems.length / finalizedCount) * 100;
+      cancellationRate = (cancelledItems.length / finalizedCount) * 100;
+    } else if (totalOrdersCount > 0) {
+      fulfillmentRate = 100.0;
+      cancellationRate = 0.0;
+    }
+
+    // Processing Time calculation
+    let totalProcessingHours = 0;
+    let validProcessingCount = 0;
+
+    for (const item of shippedItems) {
+      const order = item.order;
+      if (!order) continue;
+
+      const orderCreated = new Date(order.createdAt).getTime();
+      // Look for SHIPPED status history timestamp
+      const shippedHistory = order.statusHistory?.find((h: any) => h.toStatus === 'SHIPPED');
+      const shippedTime = shippedHistory
+        ? new Date(shippedHistory.createdAt).getTime()
+        : new Date(order.updatedAt || order.createdAt).getTime();
+
+      const diffHours = Math.max(0.5, (shippedTime - orderCreated) / (1000 * 60 * 60));
+      totalProcessingHours += diffHours;
+      validProcessingCount++;
+    }
+
+    let avgProcessingTimeHours = 12.0;
+    if (validProcessingCount > 0) {
+      avgProcessingTimeHours = totalProcessingHours / validProcessingCount;
+    } else if (user.avgProcessingTimeHours) {
+      avgProcessingTimeHours = user.avgProcessingTimeHours;
+    }
+
+    // Penalty Points & Warning Level
+    const penaltyPoints = user.penaltyPoints || 0;
+    let warningLevel = user.warningLevel || 'NONE';
+
+    // Auto-flag "Needs Review" / Warning if cancellation rate > 20% (with at least 3 orders)
+    if (finalizedCount >= 3 && cancellationRate > 20) {
+      if (warningLevel === 'NONE') {
+        warningLevel = cancellationRate > 40 ? 'MEDIUM' : 'LOW';
+      }
+    }
+
+    // Auto calculate performance score (100 - penalties - excess cancellations)
+    const excessCancelPenalty = (finalizedCount >= 3 && cancellationRate > 10)
+      ? Math.round((cancellationRate - 10) * 1.2)
+      : 0;
+    const computedScore = Math.max(0, Math.min(100, 100 - penaltyPoints - excessCancelPenalty));
+
+    const updated = await prisma.user.update({
+      where: { id: supplierId },
+      data: {
+        fulfillmentRate: parseFloat(fulfillmentRate.toFixed(1)),
+        avgProcessingTimeHours: parseFloat(avgProcessingTimeHours.toFixed(1)),
+        performanceScore: computedScore,
+        warningLevel
+      }
+    });
+
+    return {
+      user: updated,
+      totalOrdersCount,
+      shippedCount: shippedItems.length,
+      cancelledCount: cancelledItems.length,
+      fulfillmentRate: parseFloat(fulfillmentRate.toFixed(1)),
+      cancellationRate: parseFloat(cancellationRate.toFixed(1)),
+      avgProcessingTimeHours: parseFloat(avgProcessingTimeHours.toFixed(1)),
+      performanceScore: computedScore,
+      warningLevel,
+      badges: {
+        isFastShipper: avgProcessingTimeHours <= 24,
+        isGoldSupplier: fulfillmentRate >= 95 && computedScore >= 80,
+        isNeedsReview: (finalizedCount >= 3 && cancellationRate > 20) || warningLevel !== 'NONE' || computedScore < 70
+      }
+    };
+  } catch (err) {
+    console.error('Error computing supplier metrics for supplierId', supplierId, err);
+    return null;
+  }
+}
+
 export default function registerPenaltyRoutes(app: any, prisma: any, authenticateToken?: any) {
   // 1. Get Penalty Stats
   app.get('/api/admin/penalty-stats', async (req: any, res: any) => {
@@ -301,7 +418,10 @@ export default function registerPenaltyRoutes(app: any, prisma: any, authenticat
         userId = 5;
       }
 
-      const supplierFromDb = await prisma.user.findUnique({
+      // Compute fresh metrics
+      const computed = await computeAndSaveSupplierMetrics(prisma, Number(userId));
+
+      const supplierFromDb = computed?.user || await prisma.user.findUnique({
         where: { id: Number(userId) }
       }).catch(() => null);
 
@@ -312,6 +432,8 @@ export default function registerPenaltyRoutes(app: any, prisma: any, authenticat
         role: 'SUPPLIER',
         status: 'ACTIVE',
         performanceScore: 100,
+        fulfillmentRate: 100.0,
+        avgProcessingTimeHours: 12.0,
         penaltyPoints: 0,
         warningLevel: 'NONE'
       };
@@ -343,8 +465,8 @@ export default function registerPenaltyRoutes(app: any, prisma: any, authenticat
       const distinctAffectedOrders = Array.from(new Set(affectedOrders));
 
       const productsCount = (await prisma.product.count({ where: { supplierId: Number(userId) } }).catch(() => 0)) || 0;
-      const ordersCount = (await prisma.orderItem.count({ where: { supplierId: Number(userId) } }).catch(() => 0)) || 0;
-      const completedOrders = (await prisma.orderItem.count({ where: { supplierId: Number(userId), status: 'DELIVERED' } }).catch(() => 0)) || 0;
+      const ordersCount = computed?.totalOrdersCount ?? ((await prisma.orderItem.count({ where: { supplierId: Number(userId) } }).catch(() => 0)) || 0);
+      const completedOrders = computed?.shippedCount ?? ((await prisma.orderItem.count({ where: { supplierId: Number(userId), status: { in: ['SHIPPED', 'DELIVERED', 'COMPLETED'] } } }).catch(() => 0)) || 0);
 
       const score = Number(supplier.performanceScore) || 100;
       let grade = 'A+';
@@ -353,6 +475,16 @@ export default function registerPenaltyRoutes(app: any, prisma: any, authenticat
       else if (score < 70) grade = 'C';
       else if (score < 80) grade = 'B';
       else if (score < 90) grade = 'A';
+
+      const fulfillmentRate = computed?.fulfillmentRate ?? (typeof supplier.fulfillmentRate === 'number' ? supplier.fulfillmentRate : 100.0);
+      const avgProcessingTimeHours = computed?.avgProcessingTimeHours ?? (typeof supplier.avgProcessingTimeHours === 'number' ? supplier.avgProcessingTimeHours : 12.0);
+      const cancellationRate = computed?.cancellationRate ?? 0;
+
+      const badges = {
+        isFastShipper: avgProcessingTimeHours <= 24,
+        isGoldSupplier: fulfillmentRate >= 95 && score >= 80,
+        isNeedsReview: (ordersCount >= 3 && cancellationRate > 20) || supplier.warningLevel !== 'NONE' || score < 70
+      };
 
       res.json({
         supplier,
@@ -367,11 +499,13 @@ export default function registerPenaltyRoutes(app: any, prisma: any, authenticat
         totalProducts: productsCount,
         totalOrders: ordersCount,
         completedOrders,
-        fulfillmentRate: ordersCount > 0 ? Math.round((completedOrders / ordersCount) * 100) : 100,
-        cancellationRate: 0,
+        fulfillmentRate,
+        cancellationRate,
+        avgProcessingTimeHours,
         onTimeDeliveryRate: 100,
         penaltiesCount: penalties.length,
-        walletBalance: 0
+        walletBalance: 0,
+        badges
       });
     } catch (error: any) {
       console.error('Error in /api/supplier/performance:', error);

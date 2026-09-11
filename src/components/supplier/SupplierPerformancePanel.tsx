@@ -7,7 +7,14 @@ import {
   Layers,
   Calendar,
   ShieldAlert,
-  Info
+  Info,
+  Zap,
+  Sparkles,
+  TrendingUp,
+  Award,
+  AlertCircle,
+  HelpCircle,
+  ArrowUpRight
 } from "lucide-react";
 
 export default function SupplierPerformancePanel() {
@@ -50,13 +57,15 @@ export default function SupplierPerformancePanel() {
         };
       case "UNDER_REVIEW":
       case "Under Review":
+      case "WARNING":
         return {
-          label: "تحت بررسی",
-          color: "text-warning bg-warning/10 border-warning/20",
-          desc: "به دلیل ثبت امتیازهای منفی اخیر، وضعیت حساب کاربری شما توسط واحد پشتیبانی در حال بازنگری است."
+          label: "تحت بررسی و هشدار",
+          color: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
+          desc: "به دلیل افزایش نرخ لغو سفارشات یا امتیاز منفی، وضعیت حساب کاربری شما توسط واحد پایش سیستم در حال بررسی است."
         };
       case "TEMPORARILY_SUSPENDED":
       case "Temporarily Suspended":
+      case "SUSPENDED":
         return {
           label: "تعلیق موقت",
           color: "text-warning bg-warning/10 border-warning/20",
@@ -83,7 +92,7 @@ export default function SupplierPerformancePanel() {
       case "NONE":
         return { label: "بدون هشدار (عادی)", color: "text-success bg-success/10" };
       case "LOW":
-        return { label: "هشدار سطح پایین", color: "text-blue-400 bg-surface0/10" };
+        return { label: "هشدار سطح پایین", color: "text-blue-500 bg-blue-500/10" };
       case "MEDIUM":
         return { label: "هشدار سطح متوسط", color: "text-warning bg-warning/10" };
       case "HIGH":
@@ -112,49 +121,277 @@ export default function SupplierPerformancePanel() {
     );
   }
 
-  const { supplier, penalties, distinctAffectedOrders, affectedOrdersCount } = data;
+  const { supplier, penalties, distinctAffectedOrders, affectedOrdersCount, badges } = data;
   const statusInfo = translateStatus(supplier.status);
+
+  const fulfillmentRate = typeof data.fulfillmentRate === 'number' ? data.fulfillmentRate : (supplier.fulfillmentRate || 100);
+  const avgProcessingTimeHours = typeof data.avgProcessingTimeHours === 'number' ? data.avgProcessingTimeHours : (supplier.avgProcessingTimeHours || 12);
+  const cancellationRate = typeof data.cancellationRate === 'number' ? data.cancellationRate : 0;
+  const performanceScore = supplier.performanceScore ?? data.score ?? 100;
+
+  const isFast = badges?.isFastShipper ?? (avgProcessingTimeHours <= 24);
+  const isGold = badges?.isGoldSupplier ?? (fulfillmentRate >= 95 && performanceScore >= 80);
+  const isReview = badges?.isNeedsReview ?? (cancellationRate > 20 || supplier.warningLevel !== 'NONE' || performanceScore < 70);
 
   return (
     <div className="space-y-6 animate-fade-in" dir="rtl">
       {/* Overview Status Alert Banner */}
       <div className={`p-6 rounded-2xl border flex flex-col md:flex-row gap-4 items-start md:items-center justify-between ${statusInfo.color}`}>
         <div className="flex gap-4 items-center">
-          <div className="p-3 rounded-xl bg-background/50">
+          <div className="p-3 rounded-xl bg-background/50 shrink-0">
             <ShieldAlert className="w-8 h-8" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-lg">وضعیت پنل شما: {statusInfo.label}</span>
-              <span className="text-xs px-2 py-0.5 rounded bg-background/60 border border-current">
-                امتیاز عملکرد: {supplier.performanceScore || 100}٪
+              <span className="text-xs px-2.5 py-1 rounded-full bg-background/60 border border-current font-bold">
+                امتیاز عملکرد: {performanceScore}٪ (رتبه {data.grade || 'A+'})
               </span>
             </div>
-            <p className="text-xs mt-1 opacity-90 leading-relaxed">{statusInfo.desc}</p>
+            <p className="text-xs mt-1.5 opacity-90 leading-relaxed">{statusInfo.desc}</p>
+          </div>
+        </div>
+
+        {isReview && (
+          <div className="bg-amber-500 text-white text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 shrink-0 shadow-sm animate-pulse">
+            <AlertTriangle className="w-4 h-4" />
+            <span>نیازمند بهبود عملکرد</span>
+          </div>
+        )}
+      </div>
+
+      {/* Trust Badges Showcase Widget */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-3xl border border-indigo-500/30 shadow-lg relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-500/20 pb-4">
+            <div>
+              <h3 className="text-base font-black flex items-center gap-2 text-indigo-200">
+                <Award className="w-5 h-5 text-amber-400" />
+                نشان‌های اعتماد و رتبه‌بندی شما در بانک زوپیت
+              </h3>
+              <p className="text-xs text-indigo-300/80 mt-1">
+                این نشان‌ها در کارت کالاهای شما به مدیران فروشگاه‌ها نمایش داده می‌شوند و فروش شما را چند برابر می‌کنند.
+              </p>
+            </div>
+            <span className="text-[11px] bg-indigo-500/20 text-indigo-200 px-3 py-1 rounded-full border border-indigo-400/30 self-start sm:self-auto font-bold">
+              سیستم امتیازدهی خودکار
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+            {/* Gold Badge */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              isGold
+                ? "bg-amber-500/15 border-amber-400/40 text-amber-200 shadow-md ring-1 ring-amber-400/30"
+                : "bg-white/5 border-white/10 text-slate-400 opacity-60"
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-xl ${isGold ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-slate-400"}`}>
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">💎 تأمین‌کننده طلایی</h4>
+                    <span className="text-[10px] block opacity-80">نرخ تأمین موفق بالای ۹۵٪</span>
+                  </div>
+                </div>
+                {isGold ? (
+                  <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full">فعال</span>
+                ) : (
+                  <span className="text-[10px] bg-white/10 text-slate-400 px-2 py-0.5 rounded-full font-bold">قفل</span>
+                )}
+              </div>
+              <p className="text-[11px] leading-relaxed mt-2 opacity-90">
+                {isGold
+                  ? "تبریک! کالاهای شما با اولویت طلایی در رتبه‌های برتر بانک کالا به نمایش درمی‌آیند."
+                  : `برای کسب این نشان، نرخ تأمین خود را از ${fulfillmentRate.toFixed(1)}٪ به بالای ۹۵٪ برسانید.`}
+              </p>
+            </div>
+
+            {/* Fast Shipper Badge */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              isFast
+                ? "bg-blue-500/15 border-blue-400/40 text-blue-200 shadow-md ring-1 ring-blue-400/30"
+                : "bg-white/5 border-white/10 text-slate-400 opacity-60"
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-xl ${isFast ? "bg-blue-400/20 text-blue-300" : "bg-white/10 text-slate-400"}`}>
+                    <Zap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">⚡ ارسال سریع</h4>
+                    <span className="text-[10px] block opacity-80">میانگین پردازش زیر ۲۴ ساعت</span>
+                  </div>
+                </div>
+                {isFast ? (
+                  <span className="text-[10px] bg-blue-400 text-slate-950 font-black px-2 py-0.5 rounded-full">فعال</span>
+                ) : (
+                  <span className="text-[10px] bg-white/10 text-slate-400 px-2 py-0.5 rounded-full font-bold">قفل</span>
+                )}
+              </div>
+              <p className="text-[11px] leading-relaxed mt-2 opacity-90">
+                {isFast
+                  ? "عالی! سرعت پردازش شما زیر ۲۴ ساعت است و سفارشات با بیشترین سرعت به دست مشتری می‌رسند."
+                  : `میانگین زمان فعلی شما ${avgProcessingTimeHours.toFixed(1)} ساعت است. با ارسال زیر ۲۴ ساعت نشان سریع را دریافت کنید.`}
+              </p>
+            </div>
+
+            {/* Needs Review / Quality Guard */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              isReview
+                ? "bg-rose-500/20 border-rose-400/50 text-rose-200 shadow-md ring-1 ring-rose-400/40"
+                : "bg-emerald-500/10 border-emerald-400/30 text-emerald-200"
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-xl ${isReview ? "bg-rose-400/20 text-rose-300" : "bg-emerald-400/20 text-emerald-300"}`}>
+                    {isReview ? <AlertTriangle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">
+                      {isReview ? "⚠️ نیازمند بررسی" : "🛡️ پایش کیفی پایدار"}
+                    </h4>
+                    <span className="text-[10px] block opacity-80">
+                      {isReview ? "نرخ لغو بیش از ۲۰٪ یا اخطار" : "نرخ لغو سفارشات در محدوده مجاز"}
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                  isReview ? "bg-rose-500 text-white" : "bg-emerald-500/30 text-emerald-300"
+                }`}>
+                  {isReview ? "هشدار" : "سالم"}
+                </span>
+              </div>
+              <p className="text-[11px] leading-relaxed mt-2 opacity-90">
+                {isReview
+                  ? "توجه: درصد لغو یا تاخیر در ارسال بالا است. لطفا جهت جلوگیری از محدودیت پنل، به سفارشات فورا پاسخ دهید."
+                  : "عالی است! هیچ اخطار بحرانی یا درصد لغو غیرمجازی ثبت نشده است."}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
+      
       {/* Primary Statistics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        {/* Fulfillment Rate */}
+        <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-6 rounded-3xl border border-emerald-500/20 flex flex-col justify-between relative overflow-hidden shadow-xs">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <CheckCircle className="w-24 h-24 text-emerald-500" />
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-black text-emerald-800 dark:text-emerald-300">نرخ تأمین موفق</h4>
+              {fulfillmentRate >= 95 && (
+                <span className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                  عالی 💎
+                </span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2 mt-3">
+              <span className="text-4xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                {fulfillmentRate.toFixed(1)}٪
+              </span>
+            </div>
+            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-2 font-medium">
+              درصد سفارشاتی که بدون لغو با موفقیت ارسال کرده‌اید
+            </p>
+          </div>
+          <div className="relative z-10 mt-4 bg-white/50 dark:bg-black/20 p-3 rounded-2xl border border-emerald-500/20">
+            <p className="text-[10px] text-emerald-800 dark:text-emerald-200 font-bold leading-relaxed">
+              💡 نکته: تأمین‌کنندگان با نرخ بالای ۹۵٪ نشان طلایی دریافت می‌کنند و محصولاتشان در ویترین فروشگاه‌ها در اولویت بالا نمایش داده می‌شود.
+            </p>
+          </div>
+        </div>
+
+        {/* Processing Time */}
+        <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 p-6 rounded-3xl border border-blue-500/20 flex flex-col justify-between relative overflow-hidden shadow-xs">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Zap className="w-24 h-24 text-blue-500" />
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-black text-blue-800 dark:text-blue-300">میانگین زمان پردازش</h4>
+              {avgProcessingTimeHours <= 24 && (
+                <span className="bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                  سریع ⚡
+                </span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2 mt-3">
+              <span className="text-4xl font-extrabold text-blue-600 dark:text-blue-400">
+                {avgProcessingTimeHours.toFixed(1)}
+              </span>
+              <span className="text-blue-700 dark:text-blue-300 text-sm font-bold">ساعت</span>
+            </div>
+            <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-2 font-medium">
+              زمان سپری شده از ثبت سفارش توسط فروشگاه تا کلیک روی «ارسال شد»
+            </p>
+          </div>
+          <div className="relative z-10 mt-4 bg-white/50 dark:bg-black/20 p-3 rounded-2xl border border-blue-500/20">
+            <p className="text-[10px] text-blue-800 dark:text-blue-200 font-bold leading-relaxed">
+              ⚡ نکته: پردازش زیر ۲۴ ساعت نشان "ارسال سریع" را فعال کرده و اعتماد فروشگاه‌ها برای سفارش مجدد را جلب می‌کند.
+            </p>
+          </div>
+        </div>
+
+        {/* Cancellation Rate & Warning Threshold */}
+        <div className="bg-gradient-to-br from-rose-500/10 to-amber-500/10 p-6 rounded-3xl border border-rose-500/20 flex flex-col justify-between relative overflow-hidden shadow-xs">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <AlertCircle className="w-24 h-24 text-rose-500" />
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-black text-rose-800 dark:text-rose-300">نرخ لغو سفارشات</h4>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                cancellationRate > 20
+                  ? "bg-rose-500 text-white"
+                  : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+              }`}>
+                {cancellationRate > 20 ? "بیش از حد مجاز ⚠️" : "مطلوب ✓"}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2 mt-3">
+              <span className={`text-4xl font-extrabold ${cancellationRate > 20 ? "text-rose-600 dark:text-rose-400" : "text-slate-800 dark:text-slate-200"}`}>
+                {cancellationRate.toFixed(1)}٪
+              </span>
+            </div>
+            <p className="text-xs text-rose-700/80 dark:text-rose-300/80 mt-2 font-medium">
+              آستانه هشدار سیستمی: حداکثر ۲۰٪ لغو سفارش
+            </p>
+          </div>
+          <div className="relative z-10 mt-4 bg-white/50 dark:bg-black/20 p-3 rounded-2xl border border-rose-500/20">
+            <p className="text-[10px] text-rose-800 dark:text-rose-200 font-bold leading-relaxed">
+              ⚠️ توجه: اگر نرخ لغو سفارشات از ۲۰٪ عبور کند، نشان «نیازمند بررسی» فعال و امتیاز پنل شما کاهش می‌یابد.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Performance Score & Warnings Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Performance Score Progress */}
-        <div className="bg-surface p-6 rounded-2xl border border-subtle flex flex-col justify-between">
+        <div className="bg-surface p-6 rounded-3xl border border-subtle flex flex-col justify-between shadow-xs">
           <div>
             <div className="flex justify-between items-center">
               <h4 className="text-sm font-semibold text-muted">امتیاز عملکرد کلی شما</h4>
-              {(!supplier.performanceScore || supplier.performanceScore >= 75) && (
+              {performanceScore >= 80 && (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 flex items-center gap-1">
                   <CheckCircle className="w-3 h-3 text-emerald-500" /> عملکرد موفق
                 </span>
               )}
             </div>
             <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-4xl font-extrabold text-primary">{supplier.performanceScore || 100}</span>
+              <span className="text-4xl font-extrabold text-primary">{performanceScore}</span>
               <span className="text-muted text-sm">از ۱۰۰ امتیاز</span>
             </div>
-            {(!supplier.performanceScore || supplier.performanceScore >= 75) && (
+            {performanceScore >= 80 && (
               <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-2 flex items-center gap-1">
-                <CheckCircle className="w-3.5 h-3.5" /> امتیاز عملکرد کامل دریافت گردیده است.
+                <CheckCircle className="w-3.5 h-3.5" /> امتیاز عملکرد شما در سطح ممتاز قرار دارد.
               </p>
             )}
           </div>
@@ -163,13 +400,13 @@ export default function SupplierPerformancePanel() {
             <div className="w-full bg-background rounded-full h-2.5">
               <div
                 className={`h-2.5 rounded-full transition-all duration-500 ${
-                  supplier.performanceScore > 75
+                  performanceScore > 75
                     ? "bg-success"
-                    : supplier.performanceScore > 50
+                    : performanceScore > 50
                     ? "bg-warning"
                     : "bg-danger"
                 }`}
-                style={{ width: `${supplier.performanceScore || 100}%` }}
+                style={{ width: `${performanceScore}%` }}
               ></div>
             </div>
             <div className="flex justify-between items-center text-[10px] text-muted mt-2">
@@ -181,7 +418,7 @@ export default function SupplierPerformancePanel() {
         </div>
 
         {/* Penalty Points Tracker */}
-        <div className="bg-surface p-6 rounded-2xl border border-subtle flex flex-col justify-between">
+        <div className="bg-surface p-6 rounded-3xl border border-subtle flex flex-col justify-between shadow-xs">
           <div>
             <h4 className="text-sm font-semibold text-muted">کل امتیازات منفی ثبت شده</h4>
             <div className="flex items-baseline gap-2 mt-2">
@@ -195,7 +432,7 @@ export default function SupplierPerformancePanel() {
         </div>
 
         {/* Warning Level Display */}
-        <div className="bg-surface p-6 rounded-2xl border border-subtle flex flex-col justify-between">
+        <div className="bg-surface p-6 rounded-3xl border border-subtle flex flex-col justify-between shadow-xs">
           <div>
             <h4 className="text-sm font-semibold text-muted">سطح هشدار سیستمی</h4>
             <div className="mt-2.5">
@@ -215,7 +452,7 @@ export default function SupplierPerformancePanel() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Timeline (Left - 2cols) */}
-        <div className="lg:col-span-2 bg-surface p-6 rounded-2xl border border-subtle space-y-6">
+        <div className="lg:col-span-2 bg-surface p-6 rounded-3xl border border-subtle space-y-6 shadow-xs">
           <h3 className="text-base font-bold text-primary flex items-center gap-2">
             <Calendar className="w-5 h-5 text-primary-default" />
             تاریخچه و تایم‌لاین ثبت امتیاز اخطارها
@@ -224,7 +461,7 @@ export default function SupplierPerformancePanel() {
           <div className="space-y-5 relative before:absolute before:right-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-subtle/55 pr-8">
             {penalties && penalties.length > 0 ? (
               penalties.map((p: any) => (
-                <div key={p.id} className="relative bg-background p-4 rounded-xl border border-subtle space-y-2">
+                <div key={p.id} className="relative bg-background p-4 rounded-2xl border border-subtle space-y-2">
                   <div className="absolute -right-10 top-5 w-4 h-4 rounded-full bg-danger/20 border border-danger/80 flex items-center justify-center">
                     <div className="w-1.5 h-1.5 bg-danger rounded-full"></div>
                   </div>
@@ -259,7 +496,7 @@ export default function SupplierPerformancePanel() {
         </div>
 
         {/* Affected Orders (Right - 1col) */}
-        <div className="bg-surface p-6 rounded-2xl border border-subtle space-y-4">
+        <div className="bg-surface p-6 rounded-3xl border border-subtle space-y-4 shadow-xs">
           <h3 className="text-base font-bold text-primary flex items-center gap-2">
             <Layers className="w-5 h-5 text-primary-default" />
             سفارشات اخطاردار ({affectedOrdersCount || 0})
@@ -285,3 +522,4 @@ export default function SupplierPerformancePanel() {
     </div>
   );
 }
+

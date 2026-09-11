@@ -1158,7 +1158,10 @@ export default function StoreManagerDashboard({
                 (sysConfig["STORE_CATALOG_ENABLED"] === false ? (
                   renderMaintenance("زوپیت")
                 ) : (
-                  <StoreMarketplace globalSearchTerm={globalSearchTerm} />
+                  <StoreMarketplace
+                    globalSearchTerm={globalSearchTerm}
+                    onNavigateToPro={() => setActiveTab("pro_account")}
+                  />
                 ))}
               {activeTab === "my_catalog" &&
                 (sysConfig["STORE_CATALOG_ENABLED"] === false ? (

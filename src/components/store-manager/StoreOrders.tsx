@@ -235,6 +235,21 @@ export default function StoreOrders({
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get("payment_status");
+    const message = params.get("message");
+    const trackId = params.get("trackId");
+    
+    if (paymentStatus === "success") {
+      toast("پرداخت با موفقیت انجام شد. کد رهگیری: " + (trackId || ""), "success");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (paymentStatus === "failed" || paymentStatus === "error") {
+      toast(message || "پرداخت ناموفق بود یا با خطا مواجه شد", "error");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
   const fetchOrders = async () => {
     try {
       const res = await fetch("/api/store-manager/orders", {
@@ -643,6 +658,7 @@ export default function StoreOrders({
     const statusMap: any = {
       NEW: "جدید",
       PENDING_PAYMENT: "۴. در انتظار پرداخت",
+      PENDING_WALLET_CHARGE: "۴. در انتظار شارژ کیف پول",
       WAITING_SUPPLIER_CONFIRMATION: "۱. در انتظار تایید تأمین‌کننده",
       WAITING_STORE_ADDRESS: "۲. در انتظار ثبت آدرس",
       SUPPLIER_APPROVED: "۱. در انتظار تایید تأمین‌کننده",
@@ -668,6 +684,7 @@ export default function StoreOrders({
     const colorMap: any = {
       NEW: "bg-slate-600 text-white shadow-xs",
       PENDING_PAYMENT: "bg-amber-500 text-white shadow-xs",
+      PENDING_WALLET_CHARGE: "bg-amber-600 text-white shadow-xs",
       WAITING_SUPPLIER_CONFIRMATION: "bg-purple-600 text-white shadow-xs",
       WAITING_STORE_ADDRESS: "bg-blue-600 text-white shadow-xs",
       WAITING_SHIPPING_COST: "bg-sky-600 text-white shadow-xs",
@@ -694,7 +711,8 @@ export default function StoreOrders({
     const payableStatuses = [
       "PENDING_PAYMENT",
       "WAITING_FOR_PAYMENT",
-      "WAITING_SHIPPING_PAYMENT"
+      "WAITING_SHIPPING_PAYMENT",
+      "PENDING_WALLET_CHARGE"
     ];
     if (!payableStatuses.includes(order.status)) return false;
     return order.storeInvoiceId === null || order.storeInvoice?.status === "PENDING";

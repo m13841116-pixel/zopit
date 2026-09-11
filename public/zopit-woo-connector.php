@@ -246,11 +246,16 @@ class Zopit_Woo_Connector {
         $items = array();
         foreach ($order->get_items() as $item) {
             $product_id = $item->get_product_id();
+            $variation_id = $item->get_variation_id();
             $zopit_product_id = get_post_meta($product_id, '_zopit_product_id', true);
+            $product_obj = $item->get_product();
+            $sku = $product_obj ? $product_obj->get_sku() : '';
 
-            if ($zopit_product_id) {
+            if ($zopit_product_id || $sku) {
                 $items[] = array(
-                    'product_id' => intval($zopit_product_id),
+                    'zopit_sku' => $sku ?: ('ZOP-' . $zopit_product_id),
+                    'product_id' => $zopit_product_id ? intval($zopit_product_id) : 0,
+                    'variant_id' => $variation_id ? intval($variation_id) : null,
                     'quantity' => intval($item->get_quantity())
                 );
             }
@@ -262,6 +267,7 @@ class Zopit_Woo_Connector {
         }
 
         $payload = array(
+            'external_order_id' => strval($order_id),
             'woo_order_id' => strval($order_id),
             'items' => $items,
             'customer' => array(
@@ -275,7 +281,7 @@ class Zopit_Woo_Connector {
             'shipping_method' => $order->get_shipping_method() ?: 'POST'
         );
 
-        $response = wp_remote_post($api_url . '/api/v1/store/orders', array(
+        $response = wp_remote_post($api_url . '/api/v1/integrations/order-callback', array(
             'headers' => array(
                 'X-API-KEY' => $api_key,
                 'Content-Type' => 'application/json'
@@ -291,7 +297,8 @@ class Zopit_Woo_Connector {
             $res_body = json_decode(wp_remote_retrieve_body($response), true);
             if (isset($res_body['success']) && $res_body['success']) {
                 update_post_meta($order_id, '_zopit_synced', true);
-                update_post_meta($order_id, '_zopit_order_id', $res_body['zopitOrderId']);
+                $zopit_oid = isset($res_body['zopit_order_id']) ? $res_body['zopit_order_id'] : (isset($res_body['zopitOrderId']) ? $res_body['zopitOrderId'] : '');
+                update_post_meta($order_id, '_zopit_order_id', $zopit_oid);
             }
         }
     }

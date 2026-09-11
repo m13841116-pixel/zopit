@@ -56,7 +56,7 @@ const getPlanPrice = (plan: PlanId, cycle: BillingCycle): number => {
     return cycle === "ANNUAL" ? 3990000 : 499000;
   }
   if (plan === "VIP") {
-    return cycle === "ANNUAL" ? 9900000 : 1290000;
+    return cycle === "ANNUAL" ? 9900000 : 990000;
   }
   return 0;
 };
@@ -779,8 +779,8 @@ export function StoreProAccount({ user, showNotification, onNavigateTab }: Store
     },
     {
       id: 14,
-      title: "ویژه پلن VIP: + شامل تمامی امکانات و امکانات پیشرفته پلن رشد",
-      desc: "بهره‌مندی رایگان و همزمان از امکانات پیشرفته شامل هاست ابری فوق‌سریع، سامانه پیامک هوشمند، طراحی لوگو اختصاصی و پشتیبانی فوری",
+      title: "ویژه پلن VIP: + قالب وودمارت پلاس، پنل پیامکی اختصاصی و سهمیه نامحدود",
+      desc: "بهره‌مندی از قالب پیشرفته وودمارت پلاس (WoodMart Plus)، پنل پیامکی حرفه‌ای اختصاصی هدیه زوپیت، هاست ابری فوق‌سریع و سهمیه نامحدود انتخاب کالا",
       value: "هدیه رایگان زوپیت",
       icon: CheckCircle2,
       color: "from-purple-500/20 to-purple-600/5 text-purple-600 font-bold"

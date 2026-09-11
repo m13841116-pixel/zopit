@@ -331,7 +331,16 @@ export async function sendOtpSms(mobile: string, code: string) {
 }
 
 export async function notifySupplierNewOrder(supplierMobile: string, orderId: number, _supplierName?: string) {
-  return sendPattern(supplierMobile, 'MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT', [String(orderId)]);
+  const directMessage = `تامین‌کننده گرامی، سفارش جدید شماره #${orderId} ثبت شد. لطفاً جهت پرینت لیبل و ارسال اقدام کنید.\nزوپیت`;
+  try {
+    const patternRes = await sendPattern(supplierMobile, 'MELLIPAYAMAK_PATTERN_SUPPLIER_COMMIT', [String(orderId)]);
+    if (!patternRes.success) {
+      return await sendSms(supplierMobile, directMessage);
+    }
+    return patternRes;
+  } catch {
+    return await sendSms(supplierMobile, directMessage);
+  }
 }
 
 export async function notifySupplierCommitment(orderId: number, storeMobile?: string, supplierMobile?: string) {

@@ -104,6 +104,7 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
       SUPPLIER_APPROVED: '۲. در انتظار برآورد هزینه ارسال',
       WAITING_SHIPPING_COST: '۲. در انتظار برآورد هزینه ارسال',
       PENDING_PAYMENT: '۳. نیازمند پرداخت توسط مدیر فروشگاه',
+      PENDING_WALLET_CHARGE: '۳. در انتظار شارژ کیف پول',
       WAITING_FOR_PAYMENT: '۳. نیازمند پرداخت توسط مدیر فروشگاه',
       WAITING_SHIPPING_PAYMENT: '۳. نیازمند پرداخت هزینه ارسال',
       PAID: '۴. پرداخت شده (در انتظار صدور و چاپ لیبل)',
@@ -136,18 +137,18 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
     { 
       label: '۱. ثبت و آدرس مقصد', 
       activeStatuses: ['WAITING_STORE_ADDRESS', 'REQUESTED', 'NEW', 'WAITING_SUPPLIER_CONFIRMATION'], 
-      completedStatuses: ['WAITING_SHIPPING_COST', 'SUPPLIER_APPROVED', 'PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      completedStatuses: ['WAITING_SHIPPING_COST', 'SUPPLIER_APPROVED', 'PENDING_PAYMENT', 'PENDING_WALLET_CHARGE', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: CheckSquare 
     },
     { 
       label: '۲. برآورد هزینه ارسال', 
       activeStatuses: ['WAITING_SHIPPING_COST', 'SUPPLIER_APPROVED'], 
-      completedStatuses: ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
+      completedStatuses: ['PENDING_PAYMENT', 'PENDING_WALLET_CHARGE', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT', 'PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: Package 
     },
     { 
-      label: '۳. نیازمند پرداخت', 
-      activeStatuses: ['PENDING_PAYMENT', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT'], 
+      label: '۳. نیازمند پرداخت / شارژ', 
+      activeStatuses: ['PENDING_PAYMENT', 'PENDING_WALLET_CHARGE', 'WAITING_FOR_PAYMENT', 'WAITING_SHIPPING_PAYMENT'], 
       completedStatuses: ['PAID', 'PENDING_POSTAL_LABEL', 'READY_TO_SHIP', 'PREPARING', 'SHIPPED', 'PROCESSING', 'DELIVERED', 'COMPLETED'], 
       icon: CreditCard 
     },
@@ -253,7 +254,7 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
 
           {/* Glowing active progress line segment (RTL-aware) */}
           <div 
-            className="absolute right-[8%] top-5 h-[2px] bg-gradient-to-l from-purple-500 to-emerald-400 transition-all duration-500 rounded-full z-0"
+            className="absolute right-[8%] top-5 h-[2px] bg-emerald-500 transition-all duration-500 rounded-full z-0"
             style={{
               left: `${100 - 8 - (getFurthestStepIndex() * (84 / Math.max(1, steps.length - 1)))}%`,
               display: steps.some((_, i) => getStepState(i) === 'completed') ? 'block' : 'none'
@@ -268,26 +269,26 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
               <div key={idx} className="relative z-10 flex flex-col items-center flex-1">
                 {/* Stepper Node Bubble */}
                 <div 
-                  className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-300 relative ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 relative ${
                     state === 'completed'
-                      ? 'bg-emerald-950/15 border-emerald-700 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                      ? 'bg-emerald-50 border-emerald-500 text-emerald-600'
                       : state === 'active'
-                      ? 'bg-indigo-950/15 border-indigo-700 text-indigo-800 dark:text-indigo-300 shadow-md scale-110 ring-4 ring-indigo-500/20'
+                      ? 'bg-blue-50 border-blue-500 text-blue-600 shadow-sm ring-4 ring-blue-50'
                       : state === 'failed'
-                      ? 'bg-rose-950/15 border-rose-700 text-rose-800 dark:text-rose-300'
-                      : 'bg-zinc-100 border-zinc-300 text-zinc-500 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400'
+                      ? 'bg-rose-50 border-rose-500 text-rose-600'
+                      : 'bg-white border-zinc-200 text-zinc-400'
                   }`}
                 >
                   <StepIcon className={`w-4 h-4 ${state === 'active' ? 'animate-pulse' : ''}`} />
 
                   {/* Top corner completed badge */}
                   {state === 'completed' && (
-                    <span className="absolute -top-1 -right-1 bg-emerald-700 text-white rounded-full p-0.5 border border-white">
+                    <span className="absolute -top-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 border-2 border-white">
                       <Check className="w-2 h-2 stroke-[4]" />
                     </span>
                   )}
                   {state === 'failed' && (
-                    <span className="absolute -top-1 -right-1 bg-rose-700 text-white rounded-full p-0.5 border border-white">
+                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 border-2 border-white">
                       <X className="w-2 h-2 stroke-[4]" />
                     </span>
                   )}
@@ -296,9 +297,9 @@ export default function OrderTimeline({ orderId, showContactInfo = false }: Orde
                 {/* Step Label */}
                 <span 
                   className={`mt-2.5 text-[11px] font-bold tracking-tight text-center whitespace-nowrap transition-colors duration-300 ${
-                    state === 'completed' ? 'text-emerald-800 dark:text-emerald-300' :
-                    state === 'active' ? 'text-indigo-800 dark:text-indigo-300 font-extrabold' :
-                    state === 'failed' ? 'text-rose-800 dark:text-rose-300' : 'text-zinc-500 dark:text-zinc-400'
+                    state === 'completed' ? 'text-emerald-700' :
+                    state === 'active' ? 'text-blue-700 font-extrabold' :
+                    state === 'failed' ? 'text-rose-700' : 'text-zinc-400'
                   }`}
                 >
                   {step.label}

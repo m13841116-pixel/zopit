@@ -149,6 +149,7 @@ export function printOrderInvoice(order: any) {
           <p>شماره فاکتور سفارش: <span>#${order.id}</span></p>
           <p>تاریخ ثبت سفارش: <span>${formattedDate}</span></p>
           <p>وضعیت سفارش: <span>${order.status}</span></p>
+          <p>کد رهگیری پرداخت/سفارش: <span style="font-family: monospace;">${order.trackingCode || "در انتظار ثبت"}</span></p>
         </div>
         <div class="meta-column">
           <p>خریدار (فروشگاه): <span>${order.store?.companyName || order.store?.username || "نامشخص"}</span></p>

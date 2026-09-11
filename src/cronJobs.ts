@@ -1,5 +1,27 @@
 import { getPrisma } from './prisma.js';
 import { sendPattern } from './services/sms/SmsService.js';
+import { WalletService } from './services/WalletService.js';
+
+export async function runPayaBatchProcessing() {
+  try {
+    const result = await WalletService.processPayaBatch();
+    if (result.processedCount > 0) {
+      console.log(`[Cron/Paya] Processed batch ${result.batchTrackId}: ${result.processedCount} payouts, total: ${result.totalAmount.toLocaleString()} Tomans`);
+      const prisma = getPrisma();
+      await prisma.auditTrail.create({
+        data: {
+          action: 'PAYA_BATCH_PROCESSED',
+          resource: result.batchTrackId,
+          metadata: `Processed ${result.processedCount} requests totaling ${result.totalAmount} Tomans`
+        }
+      }).catch(() => {});
+    }
+    return result;
+  } catch (err: any) {
+    console.error('[Cron/Paya] Error during batch paya processing:', err?.message || err);
+    throw err;
+  }
+}
 
 export function startCronJobs() {
   // Run every 1 hour
@@ -7,6 +29,26 @@ export function startCronJobs() {
     try {
       const prisma = getPrisma();
       const now = new Date();
+
+      // 3. Batch Paya Processing at 13:00 (Tehran Time GMT+3:30)
+      // Check current hour in Asia/Tehran
+      const tehranHour = Number(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tehran',
+        hour: 'numeric',
+        hour12: false
+      }).format(now));
+
+      // Working days in Iran are Saturday to Wednesday (0 is Sunday, 4 is Thursday, 5 is Friday)
+      const tehranDay = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tehran',
+        weekday: 'short'
+      }).format(now);
+      const isWorkingDay = !['Thu', 'Fri'].includes(tehranDay);
+
+      if (tehranHour === 13 && isWorkingDay) {
+        // Run Paya batch processing
+        await runPayaBatchProcessing();
+      }
 
       // 1. Supplier unconfirmed order (6 hours)
       const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000);

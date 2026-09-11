@@ -631,38 +631,40 @@ export function SupplierAddProduct({
   ];
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-subtle overflow-hidden animate-fade-in max-w-6xl mx-auto my-6">
+    <div className="bg-transparent max-w-6xl mx-auto my-6 space-y-6">
       
-      {/* Top Header */}
-      <div className="bg-background border-b border-subtle p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Top Header Card */}
+      <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
         <div>
-          <h2 className="text-xl font-black text-primary flex items-center gap-2">
-            <Package className="w-6 h-6 text-primary-default" />
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+            <span className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/30">
+              <Package className="w-5 h-5" />
+            </span>
             {initialData?.id ? "ویرایش محصول" : "افزودن محصول جدید"}
           </h2>
-          <p className="text-xs text-muted mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1.5 font-medium">
             از روش‌های زیر می‌توانید محصول خود را در پلتفرم ثبت یا ویرایش کنید
           </p>
         </div>
 
         {initialData?.id && (
-          <span className="px-3 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 rounded-xl text-xs font-bold">
+          <span className="px-4 py-2 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border-2 border-amber-300 dark:border-amber-800 rounded-2xl text-xs font-black shadow-xs">
             در حال ویرایش کد کالا #{initialData.id}
           </span>
         )}
       </div>
 
-      {/* 4 Navigation Tabs Bar */}
+      {/* 4 Navigation Tabs Bar (Distinct container) */}
       {!initialData?.id && (
-        <div className="p-4 bg-surface border-b border-subtle">
+        <div className="p-3 bg-slate-100 dark:bg-slate-800/90 rounded-3xl border-2 border-slate-200 dark:border-slate-700 shadow-sm">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
             <button
               type="button"
               onClick={() => setActiveAddTab("manual")}
-              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+              className={`py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
                 activeAddTab === "manual"
-                  ? "bg-primary-default text-white border-primary-default shadow-md shadow-primary-default/20"
-                  : "bg-card text-secondary hover:bg-background border-subtle"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-[1.01]"
+                  : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
               }`}
             >
               <FileUp className="w-4 h-4" />
@@ -672,10 +674,10 @@ export function SupplierAddProduct({
             <button
               type="button"
               onClick={() => setActiveAddTab("woocommerce")}
-              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+              className={`py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
                 activeAddTab === "woocommerce"
-                  ? "bg-primary-default text-white border-primary-default shadow-md shadow-primary-default/20"
-                  : "bg-card text-secondary hover:bg-background border-subtle"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-[1.01]"
+                  : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
               }`}
             >
               <Globe className="w-4 h-4" />
@@ -685,10 +687,10 @@ export function SupplierAddProduct({
             <button
               type="button"
               onClick={() => setActiveAddTab("excel")}
-              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+              className={`py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
                 activeAddTab === "excel"
-                  ? "bg-primary-default text-white border-primary-default shadow-md shadow-primary-default/20"
-                  : "bg-card text-secondary hover:bg-background border-subtle"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-[1.01]"
+                  : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
@@ -698,13 +700,13 @@ export function SupplierAddProduct({
             <button
               type="button"
               onClick={() => setActiveAddTab("support")}
-              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+              className={`py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
                 activeAddTab === "support"
-                  ? "bg-primary-default text-white border-primary-default shadow-md shadow-primary-default/20"
-                  : "bg-card text-secondary hover:bg-background border-subtle"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-[1.01]"
+                  : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
               }`}
             >
-              <Gift className="w-4 h-4 text-amber-300" />
+              <Gift className="w-4 h-4 text-amber-400" />
               <span>۴. درخواست ثبت پشتیبانی</span>
             </button>
           </div>
@@ -991,46 +993,52 @@ export function SupplierAddProduct({
         /* Tab 1: Manual Form (Default) */
         <div className="p-4 sm:p-8 space-y-8 min-h-[400px]">
 
-          {/* Stepper Header & View Mode Switcher */}
-          <div className="bg-surface p-4 rounded-2xl border border-subtle flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 flex-1">
+          {/* Stepper Header & View Mode Switcher (Distinct elevated card) */}
+          <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border-2 border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1">
               {[
-                { id: 1, title: "اطلاعات و دسته‌بندی", icon: "📋", isDone: !!(formData.name.trim() && formData.categoryId) },
-                { id: 2, title: "قیمت و انبارداری", icon: "💰", isDone: !!(formData.supplierBasePrice && (Number(formData.stock) > 0 || formData.variants.length > 0)) },
-                { id: 3, title: "تنوع و متغیرها", icon: "🎨", isDone: formData.variants.length > 0 },
-                { id: 4, title: "رسانه و بازبینی", icon: "📸", isDone: !!formData.mainImage }
+                { id: 1, title: "اطلاعات و دسته‌بندی", isDone: !!(formData.name.trim() && formData.categoryId) },
+                { id: 2, title: "قیمت و انبارداری", isDone: !!(formData.supplierBasePrice && (Number(formData.stock) > 0 || formData.variants.length > 0)) },
+                { id: 3, title: "تنوع و متغیرها", isDone: formData.variants.length > 0 },
+                { id: 4, title: "رسانه و بازبینی", isDone: !!formData.mainImage }
               ].map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => setStep(s.id)}
-                  className={`p-2.5 rounded-xl border text-right transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`p-3 rounded-2xl border-2 text-right transition-all flex items-center gap-2.5 cursor-pointer shadow-xs ${
                     step === s.id
-                      ? "bg-primary-default text-white border-primary-default shadow-sm"
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/25 scale-[1.02]"
                       : s.isDone
-                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/15"
-                      : "bg-card text-secondary border-subtle hover:bg-surface"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-100 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
+                      : "bg-slate-50 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
                   }`}
                 >
-                  <span className="w-6 h-6 rounded-lg bg-black/10 dark:bg-white/10 flex items-center justify-center text-xs font-bold shrink-0">
-                    {s.isDone && step !== s.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : s.id}
+                  <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
+                    step === s.id
+                      ? "bg-white text-indigo-700"
+                      : s.isDone
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                  }`}>
+                    {s.isDone && step !== s.id ? <Check className="w-4 h-4 stroke-[3]" /> : s.id}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] opacity-75 font-medium">گام {s.id}</p>
-                    <p className="text-xs font-bold truncate">{s.title}</p>
+                    <p className={`text-[10px] font-bold ${step === s.id ? "text-indigo-100" : "text-slate-500 dark:text-slate-400"}`}>گام {s.id}</p>
+                    <p className="text-xs font-black truncate">{s.title}</p>
                   </div>
                 </button>
               ))}
             </div>
 
-            <div className="flex items-center gap-1.5 self-end md:self-center border border-subtle rounded-xl p-1 bg-card shrink-0">
+            <div className="flex items-center gap-1.5 self-end md:self-center border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-1 bg-slate-100 dark:bg-slate-800 shrink-0">
               <button
                 type="button"
                 onClick={() => setViewMode("stepper")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   viewMode === "stepper"
-                    ? "bg-primary-default text-white shadow-xs"
-                    : "text-muted hover:text-primary"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 گام‌به‌گام
@@ -1038,10 +1046,10 @@ export function SupplierAddProduct({
               <button
                 type="button"
                 onClick={() => setViewMode("all")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   viewMode === "all"
-                    ? "bg-primary-default text-white shadow-xs"
-                    : "text-muted hover:text-primary"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 نمایش کامل
@@ -1055,21 +1063,21 @@ export function SupplierAddProduct({
               
               {/* Step 1: Basic Info & Category */}
               {(viewMode === "all" || step === 1) && (
-                <section className="space-y-5 bg-card p-6 rounded-2xl border border-subtle shadow-xs animate-fade-in">
-                  <div className="border-b border-subtle pb-3 flex items-center justify-between">
-                    <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2.5">
-                      <span className="w-8 h-8 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center font-black text-sm">
+                <section className="space-y-6 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm animate-fade-in">
+                  <div className="border-b-2 border-slate-100 dark:border-slate-800 pb-4 flex items-center justify-between">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-600/30">
                         ۱
                       </span>
                       اطلاعات اصلی و دسته‌بندی محصول
                     </h3>
-                    <span className="text-xs font-bold text-muted bg-surface px-2.5 py-1 rounded-lg border border-subtle">
+                    <span className="text-xs font-black text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
                       گام ۱ از ۴
                     </span>
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-secondary mb-1.5">
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">
                       نام محصول *
                     </label>
                     <input
@@ -1078,7 +1086,7 @@ export function SupplierAddProduct({
                       onChange={(e) =>
                         setFormData({ ...formData, name: e.target.value })
                       }
-                      className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-primary font-medium text-sm"
+                      className="w-full px-4 py-3 bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 outline-none text-slate-900 dark:text-white font-bold text-sm transition-all"
                       placeholder="مثال: هندزفری بلوتوثی پرو پلاس مدل ۲۰۲۴"
                     />
                   </div>
@@ -1283,21 +1291,21 @@ export function SupplierAddProduct({
 
       {/* Step 2: Price & Inventory */}
       {(viewMode === "all" || step === 2) && (
-        <section className="space-y-5 bg-card p-6 rounded-2xl border border-subtle shadow-xs animate-fade-in">
-          <div className="border-b border-subtle pb-3 flex items-center justify-between">
-            <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center font-black text-sm">
+        <section className="space-y-6 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm animate-fade-in">
+          <div className="border-b-2 border-slate-100 dark:border-slate-800 pb-4 flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-3">
+              <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-600/30">
                 ۲
               </span>
               قیمت‌گذاری و انبارداری
             </h3>
-            <span className="text-xs font-bold text-muted bg-surface px-2.5 py-1 rounded-lg border border-subtle">
+            <span className="text-xs font-black text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
               گام ۲ از ۴
             </span>
           </div>
-          <div className="bg-primary-default/10 p-4 rounded-xl border border-primary-default/20 mb-6">
-            <p className="text-sm text-primary-hover font-medium flex items-start gap-2">
-              <Info className="w-5 h-5 shrink-0" />
+          <div className="bg-indigo-50 dark:bg-indigo-950/60 p-4 rounded-2xl border-2 border-indigo-200 dark:border-indigo-800 mb-6">
+            <p className="text-xs sm:text-sm text-indigo-900 dark:text-indigo-200 font-bold flex items-start gap-2.5">
+              <Info className="w-5 h-5 shrink-0 text-indigo-600" />
               <span>
                 توجه: مبلغ وارد شده به عنوان "قیمت پایه تامین‌کننده" مبلغی است که با شما تسویه می‌شود. قیمت نهایی برای مشتری توسط پلتفرم محاسبه و تعیین می‌گردد.
               </span>
@@ -1305,7 +1313,7 @@ export function SupplierAddProduct({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-semibold text-secondary mb-1.5">
+              <label className="block text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">
                 قیمت پایه تامین‌کننده (تومان) *
               </label>
               <input
@@ -1318,18 +1326,18 @@ export function SupplierAddProduct({
                     supplierBasePrice: e.target.value,
                   })
                 }
-                className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-left font-mono font-bold text-primary"
+                className="w-full px-4 py-3 bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 outline-none text-left font-mono font-black text-slate-900 dark:text-white text-base transition-all"
                 dir="ltr"
                 placeholder="مثلاً: 1250000 یا ۱,۲۵۰,۰۰۰"
               />
-              <div className="mt-2 space-y-2">
-                <p className="text-xs text-muted font-medium">
+              <div className="mt-2.5 space-y-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-bold">
                   {formData.supplierBasePrice ? `مبلغ به عدد: ${Number(toEnglishDigits(formData.supplierBasePrice) || 0).toLocaleString('fa-IR')} تومان` : 'مبلغ را به تومان وارد کنید'}
                 </p>
                 {formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0 && (
-                  <div className="p-3 bg-primary-default/10 border border-primary-default/25 rounded-xl text-xs space-y-1 shadow-sm">
-                    <span className="text-secondary block font-semibold">مبلغ به حروف:</span>
-                    <span className="text-primary-default font-black text-sm block">
+                  <div className="p-3.5 bg-indigo-50 dark:bg-indigo-950/60 border-2 border-indigo-200 dark:border-indigo-800 rounded-2xl text-xs space-y-1 shadow-xs">
+                    <span className="text-slate-700 dark:text-slate-300 block font-bold">مبلغ به حروف:</span>
+                    <span className="text-indigo-700 dark:text-indigo-300 font-black text-sm block">
                       {numberToWords(formData.supplierBasePrice)} تومان
                     </span>
                   </div>
@@ -1338,7 +1346,7 @@ export function SupplierAddProduct({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-secondary mb-1.5">
+              <label className="block text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">
                 موجودی اولیه (تعداد در انبار) *
               </label>
               <input
@@ -1348,13 +1356,13 @@ export function SupplierAddProduct({
                 onChange={(e) =>
                   setFormData({ ...formData, stock: e.target.value })
                 }
-                className="w-full px-4 py-3 bg-background border border-subtle rounded-xl focus:ring-2 focus:ring-primary-default outline-none text-left font-mono font-bold text-primary"
+                className="w-full px-4 py-3 bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 outline-none text-left font-mono font-black text-slate-900 dark:text-white text-base transition-all"
                 dir="ltr"
                 disabled={formData.variants.length > 0}
                 placeholder="مثلاً: 10"
               />
               {formData.variants.length > 0 && (
-                <p className="text-xs text-muted mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 font-bold">
                   موجودی کل از مجموع تعداد متغیرهای مرحله ۳ محاسبه می‌گردد.
                 </p>
               )}
@@ -1445,22 +1453,22 @@ export function SupplierAddProduct({
 
       {/* Step 3: Variants */}
       {(viewMode === "all" || step === 3) && (
-        <section className="space-y-5 bg-card p-6 rounded-2xl border border-subtle shadow-xs animate-fade-in">
-          <div className="border-b border-subtle pb-3 flex items-center justify-between">
-            <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center font-black text-sm">
+        <section className="space-y-6 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm animate-fade-in">
+          <div className="border-b-2 border-slate-100 dark:border-slate-800 pb-4 flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-3">
+              <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-600/30">
                 ۳
               </span>
               تنوع و ویژگی‌های متغیر (رنگ، سایز، مدل)
             </h3>
-            <span className="text-xs font-bold text-muted bg-surface px-2.5 py-1 rounded-lg border border-subtle">
+            <span className="text-xs font-black text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
               گام ۳ از ۴
             </span>
           </div>
-          <div className="bg-surface p-5 rounded-xl border border-subtle mb-6">
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 mb-6">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <h4 className="font-bold text-primary flex items-center gap-2">
-                <List className="w-5 h-5 text-secondary" />
+              <h4 className="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+                <List className="w-5 h-5 text-indigo-600" />
                 تعریف ویژگی‌ها
               </h4>
               
@@ -1812,30 +1820,30 @@ export function SupplierAddProduct({
 
       {/* Step 4: Media & Final Review */}
       {(viewMode === "all" || step === 4) && (
-        <section className="space-y-5 bg-card p-6 rounded-2xl border border-subtle shadow-xs animate-fade-in">
-          <div className="border-b border-subtle pb-3 flex items-center justify-between">
-            <h3 className="text-base sm:text-lg font-black text-primary flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-xl bg-primary-default/10 text-primary-default flex items-center justify-center font-black text-sm">
+        <section className="space-y-6 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm animate-fade-in">
+          <div className="border-b-2 border-slate-100 dark:border-slate-800 pb-4 flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-3">
+              <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-600/30">
                 ۴
               </span>
               تصاویر، ویدیو و رسانه‌های محصول
             </h3>
-            <span className="text-xs font-bold text-muted bg-surface px-2.5 py-1 rounded-lg border border-subtle">
+            <span className="text-xs font-black text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
               گام ۴ از ۴
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <h4 className="font-bold text-sm text-secondary mb-3">تصویر اصلی محصول</h4>
-              <div className="aspect-square bg-surface border-2 border-dashed border-subtle rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-primary-default transition-colors">
+              <h4 className="font-black text-xs sm:text-sm text-slate-900 dark:text-white mb-3">تصویر اصلی محصول</h4>
+              <div className="aspect-square bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-3xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-600 transition-colors">
                 {formData.mainImage ? (
                   <>
                     <img src={formData.mainImage} className="w-full h-full object-cover" alt="Main" />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <button
                         type="button"
                         onClick={() => setFormData({ ...formData, mainImage: "" })}
-                        className="p-3 bg-danger text-white rounded-full hover:bg-red-600 transition-colors cursor-pointer"
+                        className="p-3 bg-rose-600 text-white rounded-full hover:bg-rose-700 transition-colors cursor-pointer shadow-lg"
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
@@ -1843,12 +1851,12 @@ export function SupplierAddProduct({
                   </>
                 ) : (
                   <div className="text-center p-6 space-y-3">
-                    <ImagePlus className="w-10 h-10 mx-auto text-muted" />
-                    <p className="text-sm font-semibold text-secondary">
+                    <ImagePlus className="w-12 h-12 mx-auto text-slate-400" />
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
                       افزودن تصویر اصلی محصول
                     </p>
                     <div className="flex flex-col gap-2 items-center">
-                      <label className="px-4 py-2 bg-primary-default text-inverse hover:bg-primary-hover rounded-xl text-xs font-bold cursor-pointer transition-colors inline-flex items-center gap-1.5 shadow-sm">
+                      <label className="px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-2xl text-xs font-black cursor-pointer transition-all inline-flex items-center gap-2 shadow-md shadow-indigo-600/25">
                         <Upload className="w-4 h-4" />
                         <span>انتخاب فایل از سیستم</span>
                         <input
@@ -2086,13 +2094,13 @@ export function SupplierAddProduct({
             <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
               
               {/* Quality & Completion Score Card */}
-              <div className="bg-card p-5 rounded-2xl border border-subtle shadow-xs space-y-4">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-primary flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-primary-default" />
+                  <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
                     کیفیت اطلاعات محصول
                   </span>
-                  <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-primary-default/10 text-primary-default">
+                  <span className="text-xs font-black px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
                     {(() => {
                       let score = 0;
                       if (formData.name.trim()) score += 25;
@@ -2105,9 +2113,9 @@ export function SupplierAddProduct({
                 </div>
 
                 {/* Animated Progress bar */}
-                <div className="w-full h-2.5 bg-surface rounded-full overflow-hidden border border-subtle">
+                <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
                   <div
-                    className="h-full bg-primary-default rounded-full transition-all duration-500"
+                    className="h-full bg-indigo-600 rounded-full transition-all duration-500"
                     style={{
                       width: `${(() => {
                         let score = 0;
@@ -2121,61 +2129,61 @@ export function SupplierAddProduct({
                   />
                 </div>
 
-                <div className="space-y-2 text-xs">
-                  <div className={`flex items-center gap-2 ${formData.name.trim() ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted"}`}>
-                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${formData.name.trim() ? "text-emerald-600 dark:text-emerald-400" : "text-muted"}`} />
+                <div className="space-y-2.5 text-xs">
+                  <div className={`flex items-center gap-2.5 ${formData.name.trim() ? "text-emerald-700 dark:text-emerald-400 font-bold" : "text-slate-400 dark:text-slate-500"}`}>
+                    <CheckCircle className={`w-4 h-4 shrink-0 ${formData.name.trim() ? "text-emerald-600 dark:text-emerald-400" : "text-slate-300 dark:text-slate-600"}`} />
                     <span>عنوان کامل و جذاب محصول</span>
                   </div>
-                  <div className={`flex items-center gap-2 ${formData.categoryId ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted"}`}>
-                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${formData.categoryId ? "text-emerald-600 dark:text-emerald-400" : "text-muted"}`} />
+                  <div className={`flex items-center gap-2.5 ${formData.categoryId ? "text-emerald-700 dark:text-emerald-400 font-bold" : "text-slate-400 dark:text-slate-500"}`}>
+                    <CheckCircle className={`w-4 h-4 shrink-0 ${formData.categoryId ? "text-emerald-600 dark:text-emerald-400" : "text-slate-300 dark:text-slate-600"}`} />
                     <span>انتخاب دسته‌بندی مناسب</span>
                   </div>
-                  <div className={`flex items-center gap-2 ${formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted"}`}>
-                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted"}`} />
+                  <div className={`flex items-center gap-2.5 ${formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0 ? "text-emerald-700 dark:text-emerald-400 font-bold" : "text-slate-400 dark:text-slate-500"}`}>
+                    <CheckCircle className={`w-4 h-4 shrink-0 ${formData.supplierBasePrice && Number(toEnglishDigits(formData.supplierBasePrice)) > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-300 dark:text-slate-600"}`} />
                     <span>قیمت‌گذاری پایه تامین‌کننده</span>
                   </div>
-                  <div className={`flex items-center gap-2 ${formData.mainImage ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted"}`}>
-                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${formData.mainImage ? "text-emerald-600 dark:text-emerald-400" : "text-muted"}`} />
+                  <div className={`flex items-center gap-2.5 ${formData.mainImage ? "text-emerald-700 dark:text-emerald-400 font-bold" : "text-slate-400 dark:text-slate-500"}`}>
+                    <CheckCircle className={`w-4 h-4 shrink-0 ${formData.mainImage ? "text-emerald-600 dark:text-emerald-400" : "text-slate-300 dark:text-slate-600"}`} />
                     <span>تصویر باکیفیت و واضح</span>
                   </div>
                 </div>
               </div>
 
               {/* Live Card Preview in Store */}
-              <div className="bg-card p-5 rounded-2xl border border-subtle shadow-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-subtle">
-                  <h4 className="font-black text-xs text-primary flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-primary-default" />
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm space-y-3.5">
+                <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100 dark:border-slate-800">
+                  <h4 className="font-black text-xs text-slate-900 dark:text-white flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-indigo-600" />
                     نمای کارت در ویترین زوپیت
                   </h4>
-                  <span className="text-[10px] text-muted">پیش‌نمایش زنده</span>
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">پیش‌نمایش زنده</span>
                 </div>
 
-                <div className="bg-surface rounded-2xl border border-subtle overflow-hidden shadow-sm transition-all hover:shadow-md">
-                  <div className="aspect-square bg-card relative overflow-hidden flex items-center justify-center">
+                <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+                  <div className="aspect-square bg-slate-200 dark:bg-slate-900 relative overflow-hidden flex items-center justify-center">
                     {formData.mainImage ? (
                       <img src={formData.mainImage} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="text-center p-4 text-muted">
-                        <ImagePlus className="w-8 h-8 mx-auto mb-1 opacity-40" />
-                        <span className="text-[11px] font-semibold">بدون تصویر اصلی</span>
+                      <div className="text-center p-4 text-slate-400">
+                        <ImagePlus className="w-10 h-10 mx-auto mb-1 opacity-50" />
+                        <span className="text-xs font-bold">بدون تصویر اصلی</span>
                       </div>
                     )}
-                    <div className="absolute top-2.5 right-2.5 bg-emerald-500/90 backdrop-blur-sm text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-xs">
-                      <CheckCircle className="w-2.5 h-2.5" />
+                    <div className="absolute top-2.5 right-2.5 bg-emerald-600 text-white px-2.5 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 shadow-sm">
+                      <CheckCircle className="w-3 h-3" />
                       موجود در انبار
                     </div>
                   </div>
 
-                  <div className="p-3.5 space-y-2 text-right">
+                  <div className="p-4 space-y-2 text-right">
                     <div className="flex items-center justify-between gap-1">
                       {formData.brand && (
-                        <span className="text-[10px] font-bold text-primary-default bg-primary-default/10 px-2 py-0.5 rounded-md">
+                        <span className="text-[10px] font-black text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-lg">
                           {formData.brand}
                         </span>
                       )}
                       {formData.categoryId && (
-                        <span className="text-[10px] font-medium text-muted">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
                           {(() => {
                             const found = categories.find(c => String(c.id) === String(formData.categoryId)) ||
                               CANONICAL_CATEGORIES.find(c => String(c.id) === String(formData.categoryId));
@@ -2184,13 +2192,13 @@ export function SupplierAddProduct({
                         </span>
                       )}
                     </div>
-                    <h5 className="font-bold text-xs text-primary line-clamp-2 min-h-[32px] leading-relaxed">
+                    <h5 className="font-black text-xs text-slate-900 dark:text-white line-clamp-2 min-h-[32px] leading-relaxed">
                       {formData.name || "عنوان محصول وارد نشده است"}
                     </h5>
                     
-                    <div className="flex items-center justify-between border-t border-subtle pt-2.5 mt-2">
-                      <span className="text-[11px] text-muted font-medium">قیمت پایه:</span>
-                      <span className="font-mono font-black text-xs text-primary">
+                    <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-2.5 mt-2">
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400 font-bold">قیمت پایه:</span>
+                      <span className="font-mono font-black text-xs text-indigo-700 dark:text-indigo-400">
                         {formData.supplierBasePrice ? `${Number(toEnglishDigits(formData.supplierBasePrice) || 0).toLocaleString('fa-IR')} تومان` : 'نامشخص'}
                       </span>
                     </div>
@@ -2199,12 +2207,12 @@ export function SupplierAddProduct({
               </div>
 
               {/* Contextual Supplier Hint */}
-              <div className="bg-primary-default/5 p-4 rounded-2xl border border-primary-default/20 space-y-2">
-                <span className="text-xs font-black text-primary-default flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4" />
+              <div className="bg-indigo-50 dark:bg-indigo-950/60 p-5 rounded-3xl border-2 border-indigo-200 dark:border-indigo-800 space-y-2">
+                <span className="text-xs font-black text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-indigo-600" />
                   راهنمای گام {step}:
                 </span>
-                <p className="text-[11px] leading-relaxed text-secondary">
+                <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-300 font-medium">
                   {step === 1 && "انتخاب دقیق دسته‌بندی و عنوان واضح باعث افزایش نمایش محصول در نتایج جستجو و فروش بیشتر خواهد شد."}
                   {step === 2 && "مبلغ پایه تامین‌کننده، دریافتی خالص شماست. هزینه‌های ارسال و پورسانت توسط سامانه افزوده می‌شود."}
                   {step === 3 && "اگر محصول چند رنگ یا مدل مختلف دارد، متغیرها را اضافه کنید تا مشتری تنوع کالا را مشاهده کند."}
@@ -2219,12 +2227,12 @@ export function SupplierAddProduct({
       )}
 
       {/* Footer Controls & Stepper Navigation */}
-      <div className="p-4 sm:p-6 border-t border-subtle flex flex-wrap justify-between items-center gap-3 bg-card rounded-b-2xl mt-4">
+      <div className="p-4 sm:p-6 border-t-2 border-slate-200 dark:border-slate-800 flex flex-wrap justify-between items-center gap-3 bg-white dark:bg-slate-900 rounded-b-3xl mt-4">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-text-secondary bg-surface hover:bg-surface-hover transition-colors flex items-center gap-2 cursor-pointer"
+            className="px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 cursor-pointer"
           >
             انصراف
           </button>
@@ -2233,7 +2241,7 @@ export function SupplierAddProduct({
             <button
               type="button"
               onClick={prevStep}
-              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-secondary bg-surface hover:bg-surface-hover border border-subtle transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <ChevronRight className="w-4 h-4" />
               <span>مرحله قبل</span>
@@ -2246,7 +2254,7 @@ export function SupplierAddProduct({
             <button
               type="button"
               onClick={nextStep}
-              className="px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-primary-default hover:bg-primary-hover transition-all shadow-md shadow-primary-default/20 cursor-pointer flex items-center gap-1.5"
+              className="px-6 py-2.5 rounded-2xl text-xs sm:text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/25 cursor-pointer flex items-center gap-2"
             >
               <span>گام بعدی: {step === 1 ? "قیمت و موجودی" : step === 2 ? "تنوع و متغیرها" : "رسانه و بازبینی"}</span>
               <ChevronLeft className="w-4 h-4" />
@@ -2256,10 +2264,10 @@ export function SupplierAddProduct({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="px-8 py-3 rounded-xl text-xs sm:text-sm font-black text-white bg-primary-default hover:bg-primary-hover transition-all shadow-lg shadow-primary-default/25 disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              className="px-8 py-3 rounded-2xl text-xs sm:text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/30 disabled:opacity-50 cursor-pointer flex items-center gap-2"
             >
               {isSubmitting ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <CheckCircle className="w-4 h-4" />
               )}
