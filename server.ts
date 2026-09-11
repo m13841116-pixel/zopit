@@ -1386,6 +1386,8 @@ async function ensureDatabaseSchemaColumns(client?: any, force = false) {
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fieldOfActivity" TEXT;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "productCount" INTEGER;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "performanceScore" INTEGER DEFAULT 100;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fulfillmentRate" DOUBLE PRECISION DEFAULT 100.0;`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "avgProcessingTimeHours" DOUBLE PRECISION DEFAULT 12.0;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "penaltyPoints" INTEGER DEFAULT 0;`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "warningLevel" TEXT DEFAULT 'NONE';`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralCode" TEXT;`,
